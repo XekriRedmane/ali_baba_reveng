@@ -152,20 +152,22 @@ Useful resources:
 In general, booting the typical Apple disk until it runs the actual program
 looks like this:
 
-[[DISKCARD -> BOOT1 -> BOOT2 -> PROGRAM]]
+[[DISKCARD -> BOOT1 -> EALDR -> PROGRAM]]
 
 The disk card has a small ROM whose purpose is to load [[BOOT1]], which starts from
 track 0 sector 0, where the first byte of sector 0 tells the card how many sectors are in [[BOOT1]]. Standard [[DOS 3.3]]'s [[BOOT1]] is only one sector long, but other more custom
 disk loaders have more sectors (up to 16).
 
-The purpose of [[BOOT1]] is to load [[BOOT2]], which contains a set of general disk service
-routines. The entry point into [[BOOT2]] loads the main program and then jumps to
-it. The main program can then use the disk routines from [[BOOT2]].
+The purpose of [[BOOT1]] is to load the next stage. In this case, [[BOOT1]] loads
+[[EALDR]] (the Electronic Arts loader) from tracks 1--2 into [[$A000]]--[[$BFFF]],
+then enters it at [[$A806]] via a return address pushed onto the stack.
+
+[[EALDR]] is a mini virtual machine that reads game data from various tracks,
+decrypts a portion of it, and then jumps to the main program at [[$0800]].
 
 Since all we're interested in is the main program, we need to find out what
-happens at the beginning of [[BOOT2]], which will tell us where the program is on
-the disk, and what the program's entry point is. If the program itself uses the
-disk for any reason, then we have to look at [[BOOT2]] more closely.
+[[EALDR]] loads from disk and where. If the program itself uses the
+disk for any reason, then we have to look at [[BOOT1]]'s disk routines more closely.
 
 \subsection{Sector interleaving}
 
@@ -179,6 +181,40 @@ disk ``speed'' were coordinated. Thus, for example, sector 1 might be placed
 half the disk around from sector 0. In standard [[DOS 3.3]], sector 1 is placed
 nearly all the way around the disk -- [[7/8]] of the way around!
 
+The [[\texttt{.dsk}]] file stores sectors in [[DOS 3.3]] logical order. The mapping
+between physical sectors on the disk and logical sectors in the file is the
+standard [[DOS 3.3]] 2:1 software interleave:
+
+\begin{center}
+\begin{tabular}{r|cccccccccccccccc}
+Physical & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & 13 & 14 & 15 \\
+\hline
+DOS/File & 0 & 7 & 14 & 6 & 13 & 5 & 12 & 4 & 11 & 3 & 10 & 2 & 9 & 1 & 8 & 15 \\
+\end{tabular}
+\end{center}
+
+To find physical sector [[P]] of track [[T]] in the file:
+[[\texttt{file\_offset = (T * 16 + skew\_table[P]) * 256}]]
+
+The disk card's boot ROM reads physical sectors sequentially (0, 1, 2, \ldots)
+and loads them into consecutive memory pages starting at [[$0800]].
+
+In addition, the game's custom loader (in [[BOOT1]]) uses its own interleave
+table for loading data from tracks beyond track 0. This table maps physical
+sector numbers to memory page offsets within the target region:
+
+\begin{center}
+\begin{tabular}{r|cccccccccccccccc}
+Physical & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & 13 & 14 & 15 \\
+\hline
+Page offset & F & 8 & 1 & 9 & 2 & A & 3 & B & 4 & C & 5 & D & 6 & E & 7 & 0 \\
+\end{tabular}
+\end{center}
+
+The translation tables [[boot1\_xlat.txt]] and [[boot2\_xlat.txt]] encode the
+compound mapping from memory order to file position, accounting for both the
+DOS~3.3 skew and (for [[boot2\_xlat.txt]]) the custom loader interleave.
+
 \section{Extracting the sections}
 
 The disk image contains the following sections. Note that the disk has 16
@@ -188,8 +224,12 @@ sectors per track, and we will refer to tracks and sectors only by
 \begin{itemize}
   \item Sector 0-4: [[BOOT1]]:
     Target address [[$0800]], entry point [[$0801]].
-  \item Sector 16-47: [[BOOT2]]:
+  \item Sector 16-47: [[EALDR]] (EA Loader VM):
     Target address [[$A000]], entry point [[$A806]].
+  \item Tracks [[$0D]]--[[$10]] (sectors 208--271): Main program code.
+    Target address [[$0800]], entry point [[$0800]].
+    Track [[$0D]] loads to [[$0800]]--[[$17FF]], then track [[$0E]] overwrites
+    [[$1000]]--[[$1FFF]], so the final layout is [[$0800]]--[[$3FFF]].
 \end{itemize}
 
 The sections can be extracted from the disk image using the following commands:
@@ -199,11 +239,26 @@ python -m extract --first 0 -n 5 \
   -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o boot1.bin \
   --table boot1_xlat.txt
 python -m extract --first 16 -n 32 \
-  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o boot2.bin \
-  --table boot2_xlat.txt
-python -m extract --first 16 -n 26 \
-  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o main.bin --skew
+  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o ealdr.bin \
+  --table ealdr_xlat.txt
+python -m extract --first 208 -n 8 \
+  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o main_0800.bin \
+  --table ealdr_xlat.txt
+python -m extract --first 224 -n 48 \
+  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o main_1000.bin \
+  --table ealdr_xlat.txt
+cat main_0800.bin main_1000.bin > main.bin
 \end{verbatim}
+
+The main program extraction accounts for the overlap: track [[$0D]] is loaded
+at base page [[$08]] ([[$0800]]--[[$17FF]]), but track [[$0E]] at base page
+[[$10]] overwrites [[$1000]]--[[$17FF]]. We extract only the first 8 sectors
+(pages [[$08]]--[[$0F]]) from track [[$0D]], then all 48 sectors from tracks
+[[$0E]]--[[$10]], producing a contiguous [[$3800]]-byte image loadable at [[$0800]].
+
+Note: the [[EALDR]] also loads game data from tracks [[$07]]--[[$0C]] into
+[[$4000]]--[[$95FF]] and decrypts [[$4000]]--[[$67FF]] (see~\S\ref{sec:ealdr}).
+It also copies [[$A300]]--[[$A5FF]] from [[EALDR]] memory to [[$0500]]--[[$07FF]].
 
 \chapter{6502 programming techniques}
 
@@ -584,13 +639,31 @@ and convert them to raw [[HEX]] data.
 Although the 4am crack of the disk is copyable and deployable as a standard
 [[DOS 3.3]] image, so there's no funny business about custom sector layouts and
 custom prologues and epilogues, nevertheless everything else about [[BOOT1]]
-and [[BOOT2]] has been left intact. This includes any decryption routines and
+and [[EALDR]] has been left intact. This includes any decryption routines and
 other such protection schemes that do not involve the disk.
 
-In this case, the game was distributed by Electronic Arts,
-Thus, it is important to understand what [[BOOT]]
+In this case, the game was distributed by Electronic Arts.
+Thus, it is important to understand what [[EALDR]] does during the boot process.
 
 \section{BOOT1}
+
+[[BOOT1]] consists of 5 sectors from track 0, loaded by the disk card's boot
+ROM into [[$0800]]--[[$0CFF]]. The boot ROM reads physical sectors 0--4 into
+consecutive pages. After loading, execution enters at [[$0801]].
+
+[[BOOT1]] contains:
+\begin{itemize}
+  \item The boot code at [[$0800]] (sets reset vector, loads [[EALDR]], enters it).
+  \item Disk read routines at [[$0900]]--[[$0AFF]] (sector search, nibble decoding).
+  \item Translation table data at [[$0B00]].
+  \item The sector loader at [[$0C00]] with the custom interleave table at [[$0C48]].
+\end{itemize}
+
+The boot code loads [[EALDR]] from tracks 1--2 using the sector loader:
+first track 2 into [[$B000]]--[[$BFFF]] (base page [[$B0]]),
+then track 1 into [[$A000]]--[[$AFFF]] (base page [[$A0]]).
+It then pushes [[$A805]] onto the stack as a return address and, after
+a delay loop, executes [[RTS]] to enter [[EALDR]] at [[$A806]].
 
 After the disk card reads [[BOOT1]], the zero-page location [[IWMDATAPTR]] is
 left as the pointer to memory just after [[BOOT1]]. The
@@ -599,259 +672,1050 @@ location [[IWMSLTNDX]] is the disk card's slot index (slot times 16).
 <<BOOT1>>=
 @
 
-\section{BOOT2}
+\section{EALDR: EA Loader}
+\label{sec:ealdr}
 
-[[BOOT2]] contains a kind of mini virtual machine. The machine has a one-byte
-``psuedo-accumulator'' (stored at [[$48]]), a two-byte pointer ([[boot2_ptr]]), and an
-instruction pointer. The machine has 18 opcodes (see table).
+[[EALDR]] is a mini virtual machine with 18 opcodes. It occupies [[$A000]]--[[$BFFF]]
+(tracks 1--2), with the entry point at [[$A806]].
 
-\begin{table}[]
-\begin{tabular}{llll}
-\multicolumn{1}{c}{Byte} & \multicolumn{1}{c}{Opcode} & \multicolumn{1}{c}{Argument} & \multicolumn{1}{c}{Operation} \\
-00 & [[TJMP]] & addr & [[IP <- addr]] \\
-01 & [[CALL1]] & addr & [[A <- addr(A)]] \\
-02 & [[TBEQ]] & addr & If [[A == 0]], [[IP <- addr]] \\
-03 & [[LDI]] & val & [[A <- val]] \\
-04 & [[LD]] & addr & [[A <- (addr)]] \\
-05 & [[TCALL]] & addr & Push IP onto stack, jump to addr \\
-06 & [[ST]] & addr & [[(addr) <- A]] \\
-07 & [[SUBI]] & val & [[A -= val]] \\
-08 & [[CALL0]] & addr & [[addr()]] \\
-09 & [[TRET]] & none & Pop IP from stack \\
-0A & [[LDX]] & addr & [[A <- (addr + A)]] \\
-0B & [[ASL]] & none & [[A *= 2]] \\
-0C & [[INC]] & addr & [[A <- ++(addr)]] \\
-0D & [[ADD]] & val & [[A += val]] \\
-0E & [[DXR]] & none & decrypts (src) \\
-0F & [[TBNE]] & addr & If [[A != 0]], [[IP <- addr]] \\
-10 & [[SUB]] & addr & [[A -= (addr)]] \\
-11 & [[COPY]] & none & [[(dest++) <- (src++)]]
+\subsection{VM architecture}
+
+The VM has the following state:
+
+\begin{itemize}
+  \item \textbf{Accumulator} ([[A]]): One byte, stored at zero-page [[$48]].
+  \item \textbf{Instruction pointer}: A two-byte pointer in [[$46]]/[[$47]] plus
+        a [[Y]] register offset. The current bytecode address is [[$46]]/[[$47]] + [[Y]].
+  \item \textbf{Source pointer} ([[src]]): [[$4C]]/[[$4D]], used by [[DXR]] and [[COPY]].
+  \item \textbf{Destination pointer} ([[dest]]): [[$4E]]/[[$4F]], used by [[COPY]].
+  \item The 6502 hardware stack is used for VM subroutine return addresses.
+\end{itemize}
+
+\subsubsection{Entry mechanism}
+
+The entry code at [[$A806]] fills the hi-res screen with [[$FF]], copies
+splash screen data from [[$B000]]+ to [[$202C]]+, then jumps to the VM
+execution loop at [[$A849]]:
+
+\begin{verbatim}
+    A849: LDX  #$30       ; (skip 4 bytes to bytecodes at $A851)
+    A84B: JSR  $AA35      ; call VM interpreter
+    A84E: DEX             ; \
+    A84F: BPL  $A849      ; / unreachable: VM never returns here
+    A851: ...             ; VM bytecodes start here
+\end{verbatim}
+
+The VM interpreter at [[$AA35]] uses an RTS trick to obtain the bytecode
+address: it pulls the JSR return address ([[$A84D]]) from the stack into
+[[$46]]/[[$47]], then starts reading opcodes at offset [[Y=4]], which lands on
+[[$A851]]---the first bytecode, just past the [[DEX]]/[[BPL]] bytes. The [[DEX]]/[[BPL]]
+loop is never executed; it exists only as filler between the [[JSR]] and the bytecodes.
+
+\subsubsection{Opcode dispatch}
+
+The interpreter reads one byte from the bytecode stream as an opcode index.
+It looks up the index in a dispatch table at [[$AA60]] and computes the handler
+address as [[$AA72]] + table[opcode]. The [[JMP]] instruction at [[$AA5D]] is
+self-modified to jump to the handler.
+
+After a handler executes, control flow takes one of two paths:
+\begin{itemize}
+  \item \textbf{Linear}: The handler jumps to [[$AA45]], which reads the next
+        opcode from the current stream position (Y was already advanced past
+        the handler's arguments). Used by most opcodes.
+  \item \textbf{Goto}: The handler falls through to [[$AA72]], which reads
+        a 2-byte encoded address from the stream, loads it into [[$46]]/[[$47]],
+        resets [[Y=0]], and loops back to the dispatcher. Used by [[GOTO]], [[BEQ]],
+        [[BNE]], [[CALL]], and [[RET]].
+\end{itemize}
+
+\subsubsection{Bytecode encryption}
+
+Arguments in the bytecode stream are XOR-encrypted:
+\begin{itemize}
+  \item Address arguments (2 bytes): low byte XOR [[$03]], high byte XOR [[$D9]].
+        The subroutine at [[$AA82]] reads and decodes these into [[$42]]/[[$43]].
+  \item Immediate values (1 byte): XOR [[$4C]]. Decoded inline by the handler.
+\end{itemize}
+
+\subsection{Opcode table}
+
+\begin{table}[h]
+\begin{tabular}{clllp{7.5cm}}
+\toprule
+\thead{Byte} & \thead{Opcode} & \thead{Arg} & \thead{Handler} & \thead{Operation} \\
+\midrule
+00 & [[GOTO]]  & addr & \$AA72 & [[IP $\leftarrow$ addr]] \\
+01 & [[CALL1]] & addr & \$AAAE & Call 6502 subroutine at addr; [[A $\leftarrow$ result]] \\
+02 & [[BEQ]]   & addr & \$AAC5 & If [[A = 0]]: [[IP $\leftarrow$ addr]], else linear \\
+03 & [[LDI]]   & val  & \$AACF & [[A $\leftarrow$ val]] (1-byte immediate) \\
+04 & [[LD]]    & addr & \$AADD & [[A $\leftarrow$ (addr)]] \\
+05 & [[CALL]]  & addr & \$AAFA & Push return address; [[IP $\leftarrow$ addr]] \\
+06 & [[ST]]    & addr & \$AB1D & [[(addr) $\leftarrow$ A]] \\
+07 & [[SUBI]]  & val  & \$AB2E & [[A $\leftarrow$ A $-$ val]] (1-byte immediate) \\
+08 & [[CALL0]] & addr & \$AABF & Jump to 6502 code at addr (terminal, no return) \\
+09 & [[RET]]   & none & \$AB12 & Pop return address from stack; [[IP $\leftarrow$ addr]] \\
+0A & [[LDX]]   & addr & \$AAE9 & [[A $\leftarrow$ (addr + A)]] (indexed load) \\
+0B & [[ASL]]   & none & \$AB29 & [[A $\leftarrow$ A $\times$ 2]] \\
+0C & [[INC]]   & addr & \$AB7B & [[A $\leftarrow$ ++(addr)]] (increment memory, result to A) \\
+0D & [[ADD]]   & addr & \$AB8C & [[A $\leftarrow$ A + (addr)]] (add memory to A) \\
+0E & [[DXR]]   & none & \$AB55 & XOR byte at [[src]] with [[A]], store back; [[src += 2]]; [[A $\leftarrow$ src$_H$ $\oplus$ \$68]] \\
+0F & [[BNE]]   & addr & \$AB6E & If [[A $\neq$ 0]]: [[IP $\leftarrow$ addr]], else linear \\
+10 & [[SUB]]   & addr & \$AB9B & [[A $\leftarrow$ A $-$ (addr)]] \\
+11 & [[COPY]]  & none & \$ABAA & [[(dest++) $\leftarrow$ (src++)]] \\
+\bottomrule
 \end{tabular}
-\caption{EA loader program opcodes}
+\caption{EALDR VM opcodes. Opcodes 03 and 07 take a 1-byte XOR \$4C argument;
+opcodes 0B, 0E, 09, and 11 take no arguments; all others take a 2-byte
+XOR \$03/\$D9 address argument.}
 \label{table:ealoadervm}
 \end{table}
 
-The addresses and values in the program are ``encrypted''. Addresses need to be
-exclusive-ored with [[#$D903]] and values need to be exclusive-ored with [[#$4C]].
+\subsection{VM interpreter assembly}
 
-Here is the program:
+The entry code at [[$A806]] fills hi-res page 1 with white, copies the splash
+screen image, and falls into the VM loop:
 
-<<BOOT2 Program>>=
-A851:   LD      C050    ; TXTCLR soft switch (display graphics)
-        LD      C052    ; MIXCLR (display full screen)
-        LD      C057    ; HIRES (display hi-res graphics)
+<<EALDR entry>>=
+    ORG     $A806
+ealdr_entry:
+    LDY      #$00              ; Fill $2000-$7FFF with $FF
+    STY      ealdr_src         ; ($4C) = pointer low
+    LDA      #$20
+    STA      ealdr_src+1       ; ($4D) = $20 (start page)
+    LDA      #$FF
+.fill:
+    STA      (ealdr_src),Y
+    INY
+    BNE      .fill
+    INC      ealdr_src+1
+    BPL      .fill             ; loop until page $80 (sign bit set)
+
+    LDX      #$00              ; Copy splash screen from $B000+
+.copy_lo:
+    JSR      ealdr_copy_byte   ; copy byte, advance source
+    INX
+    CPX      #$20              ; X = $00..$1F (first 32 bytes)
+    BNE      .copy_lo
+    LDX      #$80
+.copy_hi:
+    JSR      ealdr_copy_byte   ; X = $80..$9F (next 32 bytes)
+    INX
+    CPX      #$A0
+    BNE      .copy_hi
+    INC      ealdr_copy_src+1  ; self-modify: advance source page
+    LDA      ealdr_copy_src+1
+    CMP      #$40              ; done when source page reaches $40
+    BNE      .copy_lo
+    JMP      ealdr_vm_exec     ; enter VM
+@ %def ealdr_entry
+
+The copy subroutine is self-modifying: the source address at [[$A83B]]/[[$A83C]]
+is incremented after each byte:
+
+<<EALDR copy subroutine>>=
+    ORG     $A83A
+ealdr_copy_byte:
+ealdr_copy_src = *+1
+    LDA      $B000             ; self-modified source address
+    STA      $202C,X           ; dest = HGR page + offset
+    INC      ealdr_copy_src    ; advance source (low byte)
+    BNE      .done
+    INC      ealdr_copy_src+1  ; carry to high byte
+.done:
+    RTS
+@ %def ealdr_copy_byte ealdr_copy_src
+
+The VM execution point. The bytecodes follow immediately after the [[JSR]]:
+
+<<EALDR VM exec>>=
+    ORG     $A849
+ealdr_vm_exec:
+    LDX      #$30              ; filler (skipped by Y=4)
+    JSR      ealdr_vm_interp   ; call interpreter
+    DEX                        ; \  these 3 bytes are skipped;
+    BPL      ealdr_vm_exec     ; /  the VM never returns here
+                                ; VM bytecodes begin at $A851
+@ %def ealdr_vm_exec
+
+\subsubsection{VM interpreter}
+
+The interpreter at [[$AA35]] saves the accumulator and [[Y]], uses the
+RTS trick to obtain the bytecode pointer from the caller's return
+address, then enters the dispatch loop:
+
+<<EALDR VM interpreter>>=
+    ORG     $AA35
+ealdr_vm_interp:
+    LDA      EALDR_psuedoacc   ; save VM accumulator
+    PHA
+    TYA                        ; save Y
+    PHA
+    JSR      ealdr_vm_init     ; RTS trick: pull return addr -> $46/$47
+
+    ; --- After RTS trick, execution resumes here ---
+    PLA                        ; pull saved Y -> $46 (low byte of return addr)
+    STA      ealdr_ptr
+    PLA                        ; pull saved acc -> $47 (high byte)
+    STA      ealdr_ptr+1
+
+    ; Dispatch loop
+    LDY      #$04              ; skip 4 bytes (DEX/BPL/offset + JSR addr byte)
+.dispatch:                      ; $AA45
+    LDA      (ealdr_ptr),Y     ; read opcode byte
+    INY
+    BNE      .no_carry
+    INC      ealdr_ptr+1
+.no_carry:
+    TAX                        ; opcode -> X
+    LDA      ealdr_dispatch_table,X  ; handler offset
+    CLC
+    ADC      #<ealdr_vm_loop   ; handler = $AA72 + offset
+    STA      ealdr_vm_jmp+1    ; self-modify JMP low byte
+    LDA      #>ealdr_vm_loop
+    ADC      #$00              ; carry
+    STA      ealdr_vm_jmp+2    ; self-modify JMP high byte
+ealdr_vm_jmp:
+    JMP      ealdr_vm_loop     ; self-modified: jump to handler
+
+    ; --- Handler return point (goto path) ---
+ealdr_vm_loop:                  ; $AA72
+    JSR      ealdr_read_arg16  ; read 2-byte encoded address -> $42/$43
+    LDA      $42
+    STA      ealdr_ptr         ; update bytecode pointer
+    LDA      $43
+    STA      ealdr_ptr+1
+    LDY      #$00
+    JMP      .dispatch         ; read next opcode
+@ %def ealdr_vm_interp ealdr_vm_loop
+
+The argument reader decodes a 2-byte address from the bytecode stream:
+
+<<EALDR VM arg reader>>=
+    ORG     $AA82
+ealdr_read_arg16:
+    LDA      (ealdr_ptr),Y     ; read low byte
+    EOR      #$03              ; decrypt
+    INY
+    BNE      .no_carry1
+    INC      ealdr_ptr+1
+.no_carry1:
+    STA      $42               ; decoded low byte
+    LDA      (ealdr_ptr),Y     ; read high byte
+    INY
+    BNE      .no_carry2
+    INC      ealdr_ptr+1
+.no_carry2:
+    EOR      #$D9              ; decrypt
+    STA      $43               ; decoded high byte
+    RTS
+@ %def ealdr_read_arg16
+
+The RTS trick subroutine: pulls 4 values from the stack (JSR return address,
+then the saved Y and accumulator), increments the return address, and jumps
+back to the instruction after [[JSR ealdr\_vm\_init]]:
+
+<<EALDR VM init>>=
+    ORG     $AA99
+ealdr_vm_init:
+    PLA
+    STA      $42               ; return addr low
+    PLA
+    STA      $43               ; return addr high
+    PLA
+    STA      ealdr_ptr         ; saved Y -> $46 (overwritten later)
+    PLA
+    STA      ealdr_ptr         ; saved acc -> $46 (overwrites Y)
+    INC      $42               ; return addr + 1
+    BNE      .no_carry
+    INC      $43
+.no_carry:
+    JMP      ($0042)           ; jump to instruction after JSR
+@ %def ealdr_vm_init
+
+\subsection{Dispatch table}
+
+The dispatch table at [[$AA60]] holds 18 one-byte offsets.  The
+handler address is [[$AA72]] + offset.  Opcodes [[0C]]--[[11]] point
+to three-byte [[JMP]] trampolines at [[$AB43]]--[[$AB54]] because
+their handlers lie beyond the one-byte offset range.
+
+<<EALDR dispatch table>>=
+    ORG     $AA60
+ealdr_dispatch_table:
+    HEX  00 3C 53 5D 6B 88 AB BC 4D A0 77 B7
+    ;    GOTO CALL1 BEQ LDI LD CALL ST SUBI CALL0 RET LDX ASL
+    HEX  D1 D4 D7 DA DD E0
+    ;    INC  ADD  DXR  BNE  SUB  COPY (trampolines)
+@ %def ealdr_dispatch_table
+
+\subsection{Opcode handlers}
+
+Each handler is reached via the self-modifying [[JMP]] at [[$AA5D]].
+After execution, handlers jump to either [[$AA45]] (linear: next
+opcode from current stream position) or [[$AA75]] (goto: set IP from
+[[$42]]/[[$43]] and dispatch).
+
+<<EALDR opcode handlers>>=
+    ORG     $AAAE
+; --- Opcode 01: CALL1 addr ---
+; Call 6502 subroutine; result -> VM acc.  Handler at $AAAE.
+ealdr_op_call1:
+    JSR      ealdr_read_arg16  ; decode addr -> $42/$43
+    TYA
+    PHA                        ; save Y (subroutine may clobber it)
+    LDA      EALDR_psuedoacc
+    JSR      ealdr_jmp_ind     ; JMP ($0042) -- enters subroutine
+    STA      EALDR_psuedoacc   ; return value -> VM acc
+    PLA
+    TAY                        ; restore Y
+    JMP      ealdr_vm_dispatch ; linear
+
+; Helper: indirect jump through $42/$43.  Used by CALL1 and CALL0.
+ealdr_jmp_ind:                  ; $AAC2
+    JMP      ($0042)
+
+; --- Opcode 08: CALL0 addr ---
+; Terminal jump to 6502 code (no return).  Handler at $AABF.
+ealdr_op_call0:
+    JSR      ealdr_read_arg16
+    JMP      ($0042)
+
+; --- Opcode 02: BEQ addr ---
+; Branch if VM acc = 0.  Handler at $AAC5.
+ealdr_op_beq:
+    JSR      ealdr_read_arg16
+    LDA      EALDR_psuedoacc
+    BEQ      ealdr_vm_loop     ; zero -> goto path (IP = $42/$43)
+    JMP      ealdr_vm_dispatch ; nonzero -> linear
+
+; --- Opcode 03: LDI val ---
+; Load 1-byte immediate (XOR $4C) into VM acc.  Handler at $AACF.
+ealdr_op_ldi:
+    LDA      (ealdr_ptr),Y    ; read encoded byte
+    INY
+    BNE      .nc
+    INC      ealdr_ptr+1
+.nc:
+    EOR      #$4C             ; decrypt
+    STA      EALDR_psuedoacc
+    JMP      ealdr_vm_dispatch
+
+; --- Opcode 04: LD addr ---
+; Load byte at addr into VM acc.  Handler at $AADD.
+ealdr_op_ld:
+    JSR      ealdr_read_arg16
+ealdr_op_ld_do:                 ; $AAE0 (shared by LDX)
+    LDX      #$00
+    LDA      ($42,X)           ; load byte at decoded address
+    STA      EALDR_psuedoacc
+    JMP      ealdr_vm_dispatch
+
+; --- Opcode 0A: LDX addr ---
+; Indexed load: A <- (addr + A).  Handler at $AAE9.
+ealdr_op_ldx:
+    JSR      ealdr_read_arg16
+    LDA      EALDR_psuedoacc  ; add VM acc to address
+    CLC
+    ADC      $42
+    STA      $42
+    BCC      .nc
+    INC      $43
+.nc:
+    JMP      ealdr_op_ld_do   ; fall into LD handler
+
+; --- Opcode 05: CALL addr ---
+; VM subroutine call: push return IP, goto addr.  Handler at $AAFA.
+ealdr_op_call:
+    JSR      ealdr_read_arg16  ; target -> $42/$43
+    TYA                        ; compute return IP = $46 + Y
+    CLC
+    ADC      ealdr_ptr
+    STA      ealdr_ptr
+    BCC      .nc
+    INC      ealdr_ptr+1
+.nc:
+    LDA      ealdr_ptr         ; push return addr (lo first, hi second)
+    PHA
+    LDA      ealdr_ptr+1
+    PHA
+    LDY      #$00
+    JMP      ealdr_vm_loop     ; goto path (IP = target)
+
+; --- Opcode 09: RET ---
+; Return from VM subroutine.  Handler at $AB12.
+ealdr_op_ret:
+    PLA                        ; pop return addr (hi first, lo second)
+    STA      ealdr_ptr+1
+    PLA
+    STA      ealdr_ptr
+    LDY      #$00
+    JMP      ealdr_vm_dispatch
+
+; --- Opcode 06: ST addr ---
+; Store VM acc at addr.  Handler at $AB1D.
+ealdr_op_st:
+    JSR      ealdr_read_arg16
+    LDA      EALDR_psuedoacc
+    LDX      #$00
+    STA      ($42,X)
+    JMP      ealdr_vm_dispatch
+
+; --- Opcode 0B: ASL ---
+; Shift VM acc left.  Handler at $AB29.
+ealdr_op_asl:
+    ASL      EALDR_psuedoacc
+    JMP      ealdr_vm_dispatch
+
+; --- Opcode 07: SUBI val ---
+; Subtract 1-byte immediate (XOR $4C) from VM acc.  Handler at $AB2E.
+ealdr_op_subi:
+    LDA      (ealdr_ptr),Y    ; read encoded byte
+    INY
+    BNE      .nc
+    INC      ealdr_ptr+1
+.nc:
+    EOR      #$4C             ; decrypt
+    STA      $42              ; temp
+    LDA      EALDR_psuedoacc
+    SEC
+    SBC      $42              ; acc - immediate
+    STA      EALDR_psuedoacc
+    JMP      ealdr_vm_dispatch
+
+; --- Trampolines for opcodes 0C-11 ---
+; These JMPs bridge the 1-byte dispatch offset limit.
+ealdr_tramp_inc:                ; $AB43
+    JMP      ealdr_op_inc
+ealdr_tramp_add:
+    JMP      ealdr_op_add
+ealdr_tramp_dxr:
+    JMP      ealdr_dxr_step
+ealdr_tramp_bne:
+    JMP      ealdr_op_bne
+ealdr_tramp_sub:
+    JMP      ealdr_op_sub
+ealdr_tramp_copy:
+    JMP      ealdr_op_copy
+
+; --- Opcode 0E: DXR ---
+; (see <<EALDR DXR step>>)
+
+; --- Opcode 0F: BNE addr ---
+; Branch if VM acc != 0.  Handler at $AB6E.
+ealdr_op_bne:
+    JSR      ealdr_read_arg16
+    LDA      EALDR_psuedoacc
+    BEQ      .skip
+    JMP      ealdr_vm_loop     ; nonzero -> goto path
+.skip:
+    JMP      ealdr_vm_dispatch ; zero -> linear
+
+; --- Opcode 0C: INC addr ---
+; Increment byte at addr; result also -> VM acc.  Handler at $AB7B.
+ealdr_op_inc:
+    JSR      ealdr_read_arg16
+    LDX      #$00
+    LDA      ($42,X)
+    CLC
+    ADC      #$01
+    STA      ($42,X)           ; store incremented value
+    STA      EALDR_psuedoacc   ; also update VM acc
+    JMP      ealdr_vm_dispatch
+
+; --- Opcode 0D: ADD addr ---
+; A <- A + (addr).  Handler at $AB8C.
+ealdr_op_add:
+    JSR      ealdr_read_arg16
+    LDX      #$00
+    LDA      ($42,X)
+    CLC
+    ADC      EALDR_psuedoacc
+    STA      EALDR_psuedoacc
+    JMP      ealdr_vm_dispatch
+
+; --- Opcode 10: SUB addr ---
+; A <- A - (addr).  Handler at $AB9B.
+ealdr_op_sub:
+    JSR      ealdr_read_arg16
+    LDX      #$00
+    LDA      EALDR_psuedoacc
+    SEC
+    SBC      ($42,X)
+    STA      EALDR_psuedoacc
+    JMP      ealdr_vm_dispatch
+
+; --- Opcode 11: COPY ---
+; Copy one byte: (dest++) <- (src++).  Handler at $ABAA.
+ealdr_op_copy:
+    LDX      #$00
+    LDA      (ealdr_src,X)    ; read from src
+    STA      (ealdr_dest,X)   ; write to dest
+    INC      ealdr_src        ; src++
+    BNE      .nc1
+    INC      ealdr_src+1
+.nc1:
+    INC      ealdr_dest       ; dest++
+    BNE      .nc2
+    INC      ealdr_dest+1
+.nc2:
+    JMP      ealdr_vm_dispatch
+@ %def ealdr_op_call1 ealdr_op_call0 ealdr_op_beq ealdr_op_ldi
+@ %def ealdr_op_ld ealdr_op_ldx ealdr_op_call ealdr_op_ret
+@ %def ealdr_op_st ealdr_op_asl ealdr_op_subi ealdr_op_bne
+@ %def ealdr_op_inc ealdr_op_add ealdr_op_sub ealdr_op_copy
+@ %def ealdr_jmp_ind
+
+\subsection{Machine language subroutines}
+
+These are 6502 routines called by [[CALL1]] or [[CALL0]] from the VM:
+
+<<EALDR clear text screen>>=
+    ORG     $A898
+ealdr_clear_text:
+    LDA      #$00
+    STA      ealdr_src         ; $4C = 0
+    LDA      #$04
+    STA      ealdr_src+1       ; $4D = 4 -> pointer = $0400
+    LDY      #$00
+.loop:
+    LDA      #$00
+    STA      (ealdr_src),Y     ; zero out
+    INY
+    BNE      .loop
+    INC      ealdr_src+1
+    LDA      ealdr_src+1
+    CMP      #$08              ; done at $0800
+    BNE      .loop
+    RTS
+@ %def ealdr_clear_text
+
+<<EALDR reboot handler>>=
+    ORG     $A948
+ealdr_reboot:
+    JSR      $FC58             ; HOME (clear screen)
+    LDA      #$FF
+.delay:
+    LDX      #$A0
+.inner:
+    DEX
+    BNE      .inner
+    BIT      $C030             ; click speaker
+    SEC
+    SBC      #$01
+    BNE      .delay
+    LDA      #$C5              ; 'E'
+    STA      $0400
+    LDA      #$C1              ; 'A'
+    STA      $0401
+    JMP      $C600             ; reboot from Disk II
+@ %def ealdr_reboot
+
+The ``funny increment'' routine manages the DXR key schedule.
+[[$AC60]] holds the low counter (``bot'') and [[$AC61]] holds the
+high counter (``top''). Bot increments each call; when it reaches top,
+it resets to 1 and top increments:
+
+<<EALDR funny increment>>=
+    ORG     $A970
+ealdr_funny_inc:
+    INC      ealdr_bot         ; $AC60
+    LDA      ealdr_bot
+    CMP      ealdr_top         ; $AC61
+    BEQ      .wrap
+    RTS
+.wrap:
+    LDA      #$01
+    STA      ealdr_bot
+    INC      ealdr_top
+    RTS
+@ %def ealdr_funny_inc ealdr_bot ealdr_top
+
+\subsection{DXR decryption step}
+
+The [[DXR]] opcode (0E) XORs a single byte at the source pointer with the
+accumulator, stores the result back, advances the pointer by 2 (processing
+every other byte), and derives the new accumulator from the pointer's high byte:
+
+<<EALDR DXR step>>=
+    ORG     $AB55
+ealdr_dxr_step:
+    LDX      #$00
+    LDA      (ealdr_src,X)     ; load byte at (src)
+    EOR      EALDR_psuedoacc   ; XOR with accumulator
+    STA      (ealdr_src,X)     ; store back
+    INC      ealdr_src         ; src += 2 (skip every other byte)
+    INC      ealdr_src
+    BNE      .no_carry
+    INC      ealdr_src+1
+.no_carry:
+    LDA      ealdr_src+1       ; new acc = high byte of src XOR $68
+    EOR      #$68
+    STA      EALDR_psuedoacc
+    JMP      ealdr_vm_dispatch ; linear continuation
+@ %def ealdr_dxr_step
+
+\subsection{Disk I/O routines}
+
+The EALDR disk code occupies [[$ABBF]]--[[$BFFF]].  Four entry points
+at [[$BC00]] are JMP trampolines:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\thead{Entry} & \thead{Target} & \thead{Function} \\
+\midrule
+[[$BC00]] & [[$BCD4]] & Move disk arm to half-track in [[A]] \\
+[[$BC03]] & [[$BF00]] & Read one track (16 sectors) to memory at page [[$3E]] \\
+[[$BC06]] & [[$BD21]] & Search for next address field \\
+[[$BC09]] & [[$BD14]] & Read and verify sector data field \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The sector search code at [[$ABBF]] is entered by [[CALL1 BC03]] (via [[$BF00]]).
+It looks for the standard DOS~3.3 address field prologue ([[D5 AA 96]]),
+reads the track/sector/volume/checksum nibbles, then calls the data field
+reader.  The custom interleave table at [[$BF64]] maps physical sectors to
+page offsets (see~\S\ref{sec:boot1} for the interleave mapping).
+
+<<EALDR disk entry points>>=
+    ORG     $BC00
+ealdr_move_arm:
+    JMP      $BCD4
+ealdr_read_track:               ; $BC03
+    JMP      $BF00
+ealdr_search_addr:              ; $BC06
+    JMP      $BD21
+ealdr_read_data:                ; $BC09
+    JMP      $BD14
+@ %def ealdr_move_arm ealdr_read_track ealdr_search_addr ealdr_read_data
+
+\subsection{VM program}
+
+Here is the decoded VM program. Addresses and values shown are after
+decryption.  The arrows show branch/jump targets within the listing.
+
+<<EALDR Program>>=
+; --- Display setup ---
+A851:   LD      C050    ; TXTCLR (show graphics)
+        LD      C052    ; MIXCLR (full screen, no text window)
+        LD      C057    ; HIRES (hi-res mode)
         LDI     F8
-        ST      004C    ; boot2_src
+        ST      004C    ; ealdr_src = $F8 (delay counter)
         LDI     48
-        ST      03F2
+        ST      03F2    ; SOFTEV lo = $48
         LDI     A9
-        ST      03F3    ; RESET handler = A948
+        ST      03F3    ; SOFTEV hi = $A9 -> reset handler = ealdr_reboot
         LDI     0C
-        ST      03F4    ; Power-up byte
+        ST      03F4    ; PWREDUP = $0C (EOR of $A9^$48^$A5 complement)
+
+; --- Splash screen delay ---
 A86E:   LDI     FF
-        CALL    FCA8    ; WAIT
-        INC     004C    ; boot2_src
-        TBEQ    A87C v
-        JMP     A86E ^
+        CALL1   FCA8    ; WAIT ($FF iterations)
+        INC     004C    ; ealdr_src++
+        BEQ     A87C v  ; done when wraps to 0 ($F8..$FF->$00 = 8 waits)
+        GOTO    A86E ^
 
-A87C:   LD      A805    ; it's 00.
-        TBEQ    A88D v
+; --- Group 1: optional tracks $03,$04,$21,$22 ---
+A87C:   LD      A805    ; flag byte (0 = skip Group 1)
+        BEQ     A88D v
         LDI     00
-        TCALL   A967 v  ; Read track by index
-        LD      C0E8    ; IWM: Motor off
-        CALL1   0000
+        CALL    A967 v  ; read_tracks_by_index(0) -> Group 1
+        LD      C0E8    ; IWM: motor off
+        CALL1   0000    ; ???
 
-        ; Read tracks 7-C to 0x4000-0x95FF.
-        ; Track B gets written to 0x8000-0x8FFF, but then
-        ; track C gets written to 0x8600-0x95FF.
+; --- Group 2: tracks $07-$0C -> $4000-$95FF ---
 A88D:   LDI     05
-        TCALL   A967 v  ; Read track by index (Tracks 7-C)
-        CALL1   A898    ; Zero out $400-$7FF
-        JMP     A8B2 v
+        CALL    A967 v  ; read_tracks_by_index(5) -> Group 2
+        CALL1   A898    ; ealdr_clear_text: zero $0400-$07FF
+        GOTO    A8B2 v
 
-A898:   ; machine language subroutine to zero out $400-$7FF (text page 0)
+A898:   ; [native] ealdr_clear_text
 
-A8B2:   LD      A800    ; it's 01
-        TBEQ    A8BB v
+; --- Group 3: tracks $0D-$10 -> $0800-$3FFF ---
+A8B2:   LD      A800    ; flag byte (nonzero = show lo-res)
+        BEQ     A8BB v
+A8B8:   LD      C056    ; LORES (lo-res mode)
 
-A8B8:   LD      C056    ; LORES (display lo-res)
-
-        ; Read tracks:
-        ;   0D -> 0x0800-0x17FF
-        ;   0E -> 0x1000-0x1FFF (overwrites half of track 0D)
-        ;   0F -> 0x2000-0x2FFF
-        ;   10 -> 0x3000-0x3FFF
+        ; Tracks loaded:
+        ;   $0D -> $0800-$17FF
+        ;   $0E -> $1000-$1FFF (overwrites upper half of $0D)
+        ;   $0F -> $2000-$2FFF
+        ;   $10 -> $3000-$3FFF
 A8BB:   LDI     0C
-        TCALL   A967 v  ; Read track by index (starts with track 0D)
+        CALL    A967 v  ; read_tracks_by_index($0C) -> Group 3
 
-        ; Silly checksum routine on A000-A2??
+; --- Checksum $A000-$A2DF ---
         LDI     00
-        ST      004C    ; boot2_src
-        ST      A9F2    ; boot2_tmp1
+        ST      004C    ; index = 0
+        ST      A9F2    ; ealdr_tmp1 = 0 (checksum accumulator)
 
-A8C8:   LD      004C    ; boot2_src
-        LDX     A000
+A8C8:   LD      004C    ; A = index
+        LDX     A000    ; A = mem[$A000 + index]
         SUB     A9F2
-        ST      A9F2    ; boot2_tmp1 -= A000[boot2_src]
+        ST      A9F2    ; checksum -= mem[$A000 + index]
         LD      004C
-        LDX     A100
+        LDX     A100    ; A = mem[$A100 + index]
         SUB     A9F2
-        ST      A9F2    ; boot2_tmp1 -= A100[boot2_src]
-        INC     004C
-        TBNE    A8C8 ^
+        ST      A9F2    ; checksum -= mem[$A100 + index]
+        INC     004C    ; index++
+        BNE     A8C8 ^  ; loop 256 times (pages $A0-$A1)
 
 A8E6:   LD      004C
-        LDX     A200
+        LDX     A200    ; A = mem[$A200 + index]
         SUB     A9F2
-        ST      A9F2    ; boot2_tmp1 -= A200[boot2_src]
+        ST      A9F2    ; checksum -= mem[$A200 + index]
         INC     004C
-        SUBI    E0      ; A -= 0xE0
-        TBNE    A8E6 ^
+        SUBI    E0      ; index - $E0
+        BNE     A8E6 ^  ; loop $E0 times (page $A2, bytes $00-$DF)
 
         LD      A9F2
-        SUBI    60      ; A = boot2_tmp1 - 0x60
-        TBNE    A9AB v  ; error (noreturn)
+        SUBI    60      ; checksum - $60
+        BNE     A9AB v  ; mismatch -> error_flash (noreturn)
 
+; --- Seek to track 5 and turn off motor ---
         LDI     05
-        CALL1   BC00    ; jumps to BCD4 (move_arm_to_track)
-        LD      A000
+        CALL1   BC00    ; ealdr_move_arm(5)
+        LD      A000    ; (discard)
         LDI     00
-        LD      C0E8    ; IWM: Motor off
+        LD      C0E8    ; IWM: motor off
 
+; --- DXR: decrypt $4000-$67FF ---
         LDI     00
         ST      004C
         LDI     40
-        ST      004D    ; boot2_src <- 4000
+        ST      004D    ; ealdr_src = $4000
 
         LDI     02
-        ST      AC60    ; boot2_bot <- 02
+        ST      AC60    ; ealdr_bot = 2
         LDI     03
-        ST      AC61    ; boot2_top <- 03
+        ST      AC61    ; ealdr_top = 3
 
-A923:   CALL1   A970    ; funny-increment AC60
-        DXR             ; decrypt byte at boot2_src
-        TBNE    A923 ^
+A923:   CALL1   A970    ; ealdr_funny_inc
+        DXR             ; XOR byte at src with acc; src += 2
+        BNE     A923 ^  ; loop until acc = 0
 
-        ; Copy A300-A5FF to 0500-07FF
-        LDI     00      ; boot2_src <- A300, boot2_dest <- 0500
+; --- Copy $A300-$A5FF to $0500-$07FF ---
+        LDI     00
         ST      004C
         ST      004E
         LDI     A3
-        ST      004D
+        ST      004D    ; ealdr_src = $A300
         LDI     05
-        ST      004F
+        ST      004F    ; ealdr_dest = $0500
 
-A93C:   COPY
-        LD      004F
-        SUBI    08
-        TBNE    A93C ^
+A93C:   COPY            ; (dest++) <- (src++)
+        LD      004F    ; dest high byte
+        SUBI    08      ; - $08
+        BNE     A93C ^  ; loop until dest reaches $0800
 
-        CALL0   0800    ; call main!
+; --- Enter main program ---
+        CALL0   0800    ; jump to main (no return)
 
-A948:   ; machine language subroutine
+; =============================================
+; Native 6502 subroutines
+; =============================================
 
-        ; Read tracks by index, until track page is 0.
-A967:   ST      A9F1    ; boot2_tmp0
-        LD      C0E9    ; IWM: Motor on
-        TJMP    A985 v
+A948:   ; [native] ealdr_reboot
 
-A970:   ; machine language subroutine
+; --- read_tracks_by_index: read a group of tracks from the table ---
+A967:   ST      A9F1    ; ealdr_tmp0 = table index
+        LD      C0E9    ; IWM: motor on
+        GOTO    A985 v
 
-A985:   LD      A9F1    ; boot2_tmp0
-        LDX     A9F3    ; boot2_table1 (track page)
-        TBEQ    A9F0 v  ; Return
-        ST      003E    ; boot2_track_page
-        LD      A9F1    ; boot2_tmp0
-        LDX     AA04    ; boot2_table2 (track)
-        CALL1   BC03    ; jumps to BF00 (read track)
-        TBEQ    A9A0 v  ; read track ok?
-        TJMP    A9D4 v  ; Error routine (noreturn)
+A970:   ; [native] ealdr_funny_inc
 
-A9A0:   LD      A9F1    ; boot2_tmp0++
-        SUBI    FF
+A985:   LD      A9F1    ; index
+        LDX     A9F3    ; EALDR_track_pages[index]
+        BEQ     A9F0 v  ; 0 = end sentinel -> return
+        ST      003E    ; ealdr_track_page = page
+        LD      A9F1    ; index
+        LDX     AA04    ; EALDR_tracks[index]
+        CALL1   BC03    ; ealdr_read_track
+        BEQ     A9A0 v  ; success?
+        GOTO    A9D4 v  ; error_halt (noreturn)
+
+A9A0:   LD      A9F1    ; index++
+        SUBI    FF      ; A = index - $FF = index + 1 (mod 256)
         ST      A9F1
-        TJMP    A985 ^
+        GOTO    A985 ^
 
-; Error routine: print '?' and turn motor on and off in a loop.
+; --- error_flash: print '?' and toggle motor in a loop ---
 A9AB:   LD      C0E9    ; IWM: motor on
-        CALL1   FC58    ; HOME (clear screen)
-        LD      C051    ; TXTSET (display text screen)
+        CALL1   FC58    ; HOME
+        LD      C051    ; TXTSET
         LDI     BF      ; '?'
-        ST      0400    ; Display '?'
+        ST      0400
         LDI     40
         CALL1   FCA8    ; WAIT
-        LD      C0E8    ; IWM: Motor off
+        LD      C0E8    ; IWM: motor off
 A9C1:   LDI     60
         CALL1   FCA8    ; WAIT
         LDI     08
         CALL1   FCA8    ; WAIT
-        INC     A9F2
-        TBNE    A9C1 ^
-        TJMP    A9AB ^
+        INC     A9F2    ; counter++
+        BNE     A9C1 ^  ; inner loop
+        GOTO    A9AB ^  ; outer loop (restart with motor on)
 
-; Error routine: beep, print "ERR", turn off disk motor, and spinloop.
+; --- error_halt: print "ERR" and hang ---
 A9D4:   CALL1   FC58    ; HOME
         CALL1   FBDD    ; BELL
-        LD      C051    ; TXTSET (display text screen)
+        LD      C051    ; TXTSET
         LDI     C5      ; 'E'
-        ST      0400    ; text page 0 char 0
+        ST      0400
         LDI     D2      ; 'R'
-        ST      0401    ; text page 0 char 1
-        ST      0402    ; text page 0 char 2
-        LD      C0E8    ; IWM: Motor off
-A9ED:   TJMP    A9ED -  ; Spinloop
+        ST      0401
+        ST      0402
+        LD      C0E8    ; IWM: motor off
+A9ED:   GOTO    A9ED -  ; infinite loop
 
-A9F0:   TRET
+A9F0:   RET
 @
 
-<<BOOT2 track pages>>=
-BOOT2_track_pages:
+<<EALDR track pages>>=
+    ORG     $A9F3
+EALDR_track_pages:
     HEX     08 10 20 30 00
     HEX     40 50 60 70 80 86 00
     HEX     08 10 20 30 00
 
-BOOT2_tracks:
+EALDR_tracks:
     HEX     03 04 21 22 00
     HEX     07 08 09 0A 0B 0C 00
     HEX     0D 0E 0F 10 00
-@ %def BOOT2_track_pages BOOT2_tracks
+@ %def EALDR_track_pages EALDR_tracks
 
-<<BOOT2 subroutine>>=
-FUN_a970:
-    INC      boot2_bot
-    LDA      boot2_bot
-    CMP      boot2_top
-    BEQ      .inc
-    RTS
-.inc:
-    LDA      #$01
-    STA      boot2_bot
-    INC      boot2_top
-    RTS
-@
-
-<<BOOT2 virtual DXR>>=
-boot2_routine_0E_DXR_jmp:
-    SUBROUTINE
-
-    LDX      #$00           ; boot2_src ^= BOOT2_psuedoacc
-    LDA      (boot2_src,X)
-    EOR      BOOT2_psuedoacc
-    STA      (boot2_src,X)
-    INC      boot2_src      ; boot_src += 2
-    INC      boot2_src
-    BNE      .continue
-    INC      boot2_src+1
-
-.continue:
-    LDA      boot2_src+1    ; BOOT2_psuedoacc = boot2_src_H ^ 0x68
-    EOR      #$68
-    STA      BOOT2_psuedoacc
-    JMP      .loop
-@ %def boot2_routine_0E_DXR_jmp
 
 
 \chapter{Startup}
+
+When EALDR finishes, it transfers control to [[$0800]] via [[CALL0 0800]].
+To analyze the main program in Ghidra, we extract a flat binary
+[[main.bin]] that represents the memory image at the moment of that jump.
+
+\section{Memory map at entry}
+
+The VM program loads three groups of tracks using the track tables at
+[[$A9F3]]/[[$AA04]].  Each track is 16~sectors of 256~bytes, placed
+into memory by the sector loader using the custom interleave table
+(see~\S\ref{sec:boot1}).  The base page for each track determines the
+starting address: track data fills base\_page*256 through
+base\_page*256+\$0FFF.
+
+\subsection{Group 1 (conditional, skipped in this image)}
+
+Loaded only when the flag byte at [[$A805]] is nonzero (it is~0 in
+this disk image, so Group~1 is skipped).  Group~3 overwrites the same
+region anyway.
+
+\begin{center}
+\begin{tabular}{ccl}
+\toprule
+\thead{Track} & \thead{Base page} & \thead{Memory range} \\
+\midrule
+\$03 & \$08 & \$0800--\$17FF \\
+\$04 & \$10 & \$1000--\$1FFF \\
+\$21 & \$20 & \$2000--\$2FFF \\
+\$22 & \$30 & \$3000--\$3FFF \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Group 2: game data (\$4000--\$95FF)}
+
+\begin{center}
+\begin{tabular}{ccll}
+\toprule
+\thead{Track} & \thead{Base page} & \thead{Memory range} & \thead{Notes} \\
+\midrule
+\$07 & \$40 & \$4000--\$4FFF & \\
+\$08 & \$50 & \$5000--\$5FFF & \\
+\$09 & \$60 & \$6000--\$6FFF & \\
+\$0A & \$70 & \$7000--\$7FFF & \\
+\$0B & \$80 & \$8000--\$8FFF & \\
+\$0C & \$86 & \$8600--\$95FF & Overwrites \$8600--\$8FFF from track \$0B \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Group 3: main program (\$0800--\$3FFF)}
+
+\begin{center}
+\begin{tabular}{ccll}
+\toprule
+\thead{Track} & \thead{Base page} & \thead{Memory range} & \thead{Notes} \\
+\midrule
+\$0D & \$08 & \$0800--\$17FF & \\
+\$0E & \$10 & \$1000--\$1FFF & Overwrites \$1000--\$17FF from track \$0D \\
+\$0F & \$20 & \$2000--\$2FFF & \\
+\$10 & \$30 & \$3000--\$3FFF & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{DXR decryption (\$4000--\$67FE)}
+
+After loading, the VM decrypts every other byte from [[$4000]] to [[$67FE]]
+(5120 iterations, stepping by~2).  The XOR key for each byte comes from
+[[ealdr\_funny\_inc]], which generates the sequence
+$$1,\; 2,\; 3,\; 1,\; 2,\; 3,\; 4,\; 1,\; 2,\; 3,\; 4,\; 5,\; \ldots$$
+starting with [[ealdr\_bot]]=2, [[ealdr\_top]]=3.  Each ``round'' counts
+$1 \ldots N{-}1$, then $N$~increments: the round length grows by one each time.
+
+The loop terminates when the source pointer's high byte equals [[$68]]
+(i.e.\ src reaches [[$6800]]), giving [[src\_hi XOR \$68 = 0]].
+
+\subsection{Final copy}
+
+The VM copies [[$A300]]--[[$A5FF]] (768~bytes from the EALDR image) to
+[[$0500]]--[[$07FF]].  This provides a small stub of routines and data
+below the main entry point.
+
+\subsection{Summary}
+
+At the [[CALL0 \$0800]] instruction, memory is laid out as follows:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\thead{Address range} & \thead{Source} & \thead{Notes} \\
+\midrule
+\$0500--\$07FF & EALDR \$A300--\$A5FF & Copied last \\
+\$0800--\$0FFF & Track \$0D & \\
+\$1000--\$1FFF & Track \$0E & \\
+\$2000--\$2FFF & Track \$0F & \\
+\$3000--\$3FFF & Track \$10 & \\
+\$4000--\$67FF & Tracks \$07--\$09 & DXR-decrypted (even bytes) \\
+\$6800--\$6FFF & Track \$09 & Not decrypted \\
+\$7000--\$7FFF & Track \$0A & Not decrypted \\
+\$8000--\$85FF & Track \$0B & Not decrypted \\
+\$8600--\$95FF & Track \$0C & Not decrypted \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Entry point: [[$0800]].
+
+\section{Extracting [[main.bin]]}
+
+The following script reads the disk image, applies the EALDR loading
+sequence, and writes a flat binary covering [[$0500]]--[[$95FF]]
+(37\,120 bytes).  For Ghidra, load at base address [[$0500]] with
+processor 6502:LE:8:default and set the entry point to [[$0800]].
+
+<<extract_main.py>>=
+<<extract main imports>>
+<<extract main constants>>
+<<extract main read track>>
+<<extract main funny inc>>
+<<extract main dxr>>
+<<extract main entry>>
+@
+
+<<extract main imports>>=
+import sys
+@
+
+<<extract main constants>>=
+DSK_FILE = "Ali Baba and the Forty Thieves (4am and san inc crack).dsk"
+EALDR_FILE = "ealdr.bin"
+OUTPUT_FILE = "main.bin"
+
+BASE_ADDR = 0x0500
+END_ADDR = 0x9600
+SIZE = END_ADDR - BASE_ADDR  # $9100 = 37120
+
+# DOS 3.3 physical-to-logical skew (physical sector -> file sector)
+DOS_SKEW = [0, 7, 14, 6, 13, 5, 12, 4, 11, 3, 10, 2, 9, 1, 8, 15]
+
+# Custom game loader interleave: physical sector -> page offset from base
+LOADER_INTERLEAVE = [0xF, 0x8, 0x1, 0x9, 0x2, 0xA, 0x3, 0xB,
+                     0x4, 0xC, 0x5, 0xD, 0x6, 0xE, 0x7, 0x0]
+
+# Track loading tables (from EALDR $A9F3 and $AA04)
+GROUP2 = [(0x07, 0x40), (0x08, 0x50), (0x09, 0x60),
+          (0x0A, 0x70), (0x0B, 0x80), (0x0C, 0x86)]
+GROUP3 = [(0x0D, 0x08), (0x0E, 0x10), (0x0F, 0x20), (0x10, 0x30)]
+@
+
+<<extract main read track>>=
+def read_track(dsk, track, base_page, mem):
+    """Read 16 sectors of a track into mem using the custom interleave.
+
+    Each physical sector on disk maps to a page offset via
+    LOADER_INTERLEAVE, so the data lands at (base_page + offset) * 256.
+    """
+    for phys in range(16):
+        page_offset = LOADER_INTERLEAVE[phys]
+        dos_logical = DOS_SKEW[phys]
+        file_pos = (track * 16 + dos_logical) * 256
+        dest = (base_page + page_offset) * 256 - BASE_ADDR
+        if 0 <= dest and dest + 256 <= SIZE:
+            mem[dest:dest + 256] = dsk[file_pos:file_pos + 256]
+@
+
+<<extract main funny inc>>=
+def funny_inc_gen(bot=2, top=3):
+    """Yield the ealdr_funny_inc key sequence: 1,2,3, 1,2,3,4, ..."""
+    while True:
+        bot += 1
+        if bot == top:
+            bot = 1
+            top += 1
+            yield 1
+        else:
+            yield bot
+@
+
+<<extract main dxr>>=
+def dxr_decrypt(mem):
+    """XOR every other byte from $4000 to $67FE with the funny_inc key."""
+    keys = funny_inc_gen()
+    src = 0x4000
+    while True:
+        key = next(keys)
+        offset = src - BASE_ADDR
+        if 0 <= offset < SIZE:
+            mem[offset] ^= key
+        src += 2
+        if (src >> 8) == 0x68:  # src_hi ^ $68 == 0 -> done
+            break
+@
+
+<<extract main entry>>=
+def main():
+    with open(DSK_FILE, "rb") as f:
+        dsk = f.read()
+    with open(EALDR_FILE, "rb") as f:
+        ealdr = f.read()
+
+    mem = bytearray(SIZE)
+
+    # Group 2: tracks $07-$0C -> $4000-$95FF
+    for track, base_page in GROUP2:
+        read_track(dsk, track, base_page, mem)
+
+    # Group 3: tracks $0D-$10 -> $0800-$3FFF
+    for track, base_page in GROUP3:
+        read_track(dsk, track, base_page, mem)
+
+    # DXR decrypt $4000-$67FE
+    dxr_decrypt(mem)
+
+    # Copy EALDR $A300-$A5FF -> $0500-$07FF
+    ealdr_src = 0xA300 - 0xA000  # offset in ealdr.bin
+    mem_dest = 0x0500 - BASE_ADDR
+    mem[mem_dest:mem_dest + 0x300] = ealdr[ealdr_src:ealdr_src + 0x300]
+
+    with open(OUTPUT_FILE, "wb") as f:
+        f.write(mem)
+    print(f"Wrote {len(mem)} bytes to {OUTPUT_FILE}")
+    print(f"Load in Ghidra at $0500, entry point $0800")
+
+if __name__ == "__main__":
+    main()
+@
 
 
 \chapter{Apple II Graphics}
@@ -990,11 +1854,17 @@ The new output handler installed by the HRCG is called whenever [[COUT]] is call
 [[A]] contains the character to output.
 
 The HRCG defines 96 characters as a character set. These characters are the
-"printing" characters, which are ASCII 32 (space) through 127 (delete).
-Character set 0 is always the standard set of Apple text characters. The
-font data for this standard
-set is stored at [[$97A5-$9AA4]], consisting of 8 bytes per character. Each byte represents 7 consecutive pixels since the
+``printing'' characters, which are ASCII 32 (space) through 127 (delete).
+Character set~0 is always the standard set of Apple text characters. The
+font data for this standard set is stored at [[$97A5--$9AA4]], consisting of
+8~bytes per character. Each byte represents 7~consecutive pixels since the
 high bit is used for color set selection.
+
+Note: the standard font data and the HRCG code at [[$9600--$97A4]] are not
+loaded directly to their final addresses by the EALDR\@.  Instead, the EALDR
+loads them into the hi-res page area [[$2000--$32FF]] (tracks~[[\$0F]] and
+[[\$10]]).  During [[game\_init]], the routine at [[$6DA5]] copies
+[[$2000--$32FF]] to [[$9600--$A8FF]] and clears [[$2000--$3FFF]].
 
 The Ali Baba font data for HRCG is stored at [[$83A5-$92A4]], starting with character set 1.
 Each character is 32 bytes, broken
@@ -1005,6 +1875,18 @@ Thus, each character is 14x16.
 Here are the font characters. There are 120 defined: 96 for character set 1,
 and 24 for character set 2. Characters 114-119 (character set 2, characters 18-23)
 form the EA logo that is displayed on the splash screen.
+
+<<font data>>=
+    ORG     $83A5
+FONT_DATA:
+    INCLUDE "fontdata.asm"
+@ %def FONT_DATA
+
+<<std font data>>=
+    ORG     $97A5
+STD_FONT_DATA:
+    INCLUDE "stdfontdata.asm"
+@ %def STD_FONT_DATA
 
 \input{font_data.tex}
 
@@ -1124,49 +2006,35 @@ from an address stored in [[PRINT_STRING_ADDR]], at the current cursor
 position.
 
 <<zero page defines>>=
-PRINT_STRING_ADDR       EQU     $1C     ; 2 bytes
+PRINT_STRING_ADDR       EQU     $BC     ; 2 bytes (same pointer as PRINT_FROM_PTR)
 @ %def PRINT_STRING_ADDR
 
 <<print string>>=
-    ORG     $7620
-PRINT_STRING:
-    SUBROUTINE
-
-    LDY     #$00
-    LDA     (PRINT_STRING_ADDR),Y
-    TAX
-
-.loop:
-    DEX
-    BPL     .print_char
-    RTS
-
-.print_char:
-    INY
-    LDA     (PRINT_STRING_ADDR),Y
-    JSR     ROM_COUT
-    JMP     .loop
-@ %def PRINT_STRING
-
-The [[PRINT_STRING_AT_ADDR]] first stores the [[X]] and [[Y]] registers to the
-[[PRINT_STRING_ADDR]], then calls [[PRINT_STRING]].
-
-<<print string>>=
-    ORG     $761C
+    ORG     $7758
 PRINT_STRING_AT_ADDR:
     SUBROUTINE
 
     STX     PRINT_STRING_ADDR
     STY     PRINT_STRING_ADDR+1
 
-    ; falls through to PRINT_STRING
+    ; falls through to PRINT_STRING / PRINT_FROM_PTR at $775C
 @ %def PRINT_STRING_AT_ADDR
+
+[[PRINT_STRING]] is the same entry point as [[PRINT_FROM_PTR]] at [[\$775C]]:
+both print a length-prefixed string from [[\$BC/\$BD]].
+[[PRINT_STRING_AT_ADDR]] at [[\$7758]] stores [[X/Y]] into [[\$BC/\$BD]]
+first, then falls through.
+
+<<print string>>=
+    ORG     $775C
+PRINT_STRING             ; same entry as PRINT_FROM_PTR
+@ %def PRINT_STRING
 
 The [[PRINT_CENTERED_PLUS_COL]] centers text, but moves it right by the
 current cursor's column. If the column is zero, the routine would center the text on the screen.
 
 <<print centered plus col>>=
-    ORG     $75D4
+    ORG     $7710
 PRINT_CENTERED_PLUS_COL:
     SUBROUTINE
 
@@ -1186,7 +2054,7 @@ The [[PRINT_BOTTOM_CENTERED]] centers text on row 23, which is the bottom of
 the screen.
 
 <<print bottom centered>>=
-    ORG     $75C9
+    ORG     $7705
 PRINT_BOTTOM_CENTERED:
     SUBROUTINE
 
@@ -1210,7 +2078,7 @@ FONT_ROW        EQU     $5A0D
 @ %def FONT_COL FONT_ROW
 
 <<font pos>>=
-    ORG     $75E7
+    ORG     $7723
 FONT_POS_TO_TEXT_POS:
     SUBROUTINE
 
@@ -1247,28 +2115,28 @@ This is what the [[PRINT_FONTCHAR]], [[PRINT_FONTCHAR_AT_TEXT_POS]], and
 <<defines>>=
 FONT_CHARNUM        EQU     $5A0E
 FONT_CHARSET        EQU     $5A0F
-s_PRINT_FONT_CHAR   EQU     $8183   ; 2 bytes
-CHAR_CHARSET        EQU     $8185
-CHAR_UPPER_LEFT     EQU     $8187
-CHAR_UPPER_RIGHT    EQU     $8188
-CHAR_LOWER_LEFT     EQU     $818A
-CHAR_LOWER_RIGHT    EQU     $818B
+s_PRINT_FONT_CHAR   EQU     $80A4   ; 10 bytes
+CHAR_CHARSET        EQU     $80A6
+CHAR_UPPER_LEFT     EQU     $80A8
+CHAR_UPPER_RIGHT    EQU     $80A9
+CHAR_LOWER_LEFT     EQU     $80AB
+CHAR_LOWER_RIGHT    EQU     $80AC
 @
 
 <<print font char>>=
-    ORG     $8183  // new: 80A4
+    ORG     $80A4
     HEX     09      ; num chars in this string
     HEX     81      ; ctrl-A (set character set)
-    HEX     B1      ; CHAR_CHARSET
+    HEX     B1      ; CHAR_CHARSET (self-modified)
     HEX     82      ; ctrl-B (block display mode)
-    HEX     A0      ; CHAR_UPPER_LEFT
-    HEX     85      ; CHAR_UPPER_RIGHT
+    HEX     A0      ; CHAR_UPPER_LEFT (self-modified)
+    HEX     A0      ; CHAR_UPPER_RIGHT (self-modified)
     HEX     83      ; ctrl-C (move to lower left of block)
-    HEX     B5      ; CHAR_LOWER_LEFT
-    HEX     80      ; CHAR_LOWER_RIGHT
+    HEX     A0      ; CHAR_LOWER_LEFT (self-modified)
+    HEX     A0      ; CHAR_LOWER_RIGHT (self-modified)
     HEX     84      ; ctrl-D (complete block data)
 
-    ORG     $6FB8
+    ORG     $7489
 PRINT_FONTCHAR:
     SUBROUTINE
 
@@ -1308,7 +2176,7 @@ PLOT_FONTCHAR:
     ASL
     ASL
     CLC
-    ADC     #$20    ; A = 4A + 0x20 (space)
+    ADC     #$20    ; A = 4*charnum + $20 (skip space)
     TAY
     STY     CHAR_UPPER_LEFT
     INY
@@ -1318,10 +2186,10 @@ PLOT_FONTCHAR:
     INY
     STY     CHAR_LOWER_RIGHT
     LDA     #<s_PRINT_FONT_CHAR
-    STA     PRINT_STRING_ADDR
+    STA     $BC
     LDA     #>s_PRINT_FONT_CHAR
-    STA     PRINT_STRING_ADDR+1
-    JMP     PRINT_STRING
+    STA     $BD
+    JMP     PRINT_FROM_PTR
 @ %def PRINT_FONTCHAR PRINT_FONTCHAR_AT_TEXT_POS
 
 The [[PLOT_CHAR]] routine prints the character number in [[A]], at the text
@@ -1538,6 +2406,1186 @@ the song.
 
 [[start_sound]] also checks for a keypress or a joystick button press, and this
 is the same as an [[END]] instruction.
+
+\chapter{The Attract Screen}
+\label{ch:attract}
+
+When the main program starts at [[$0800]], it calls [[GAME_INIT]] to set up
+hardware and graphics, then checks [[$5A01]]. If zero (first run), it enters
+the \emph{attract screen}---the title sequence that cycles through story scenes
+until the player presses a key.
+
+\section{Top-level flow}
+
+\subsection{Main entry (\$0800)}
+
+The first thing the main program does:
+
+<<main entry>>=
+    ORG     $0800
+MAIN_ENTRY:
+    SUBROUTINE
+
+    JSR     GAME_INIT
+    LDA     #$09                    ; \
+    STA     $FA                     ;  | $FA/$FB = $4009 (character record base)
+    LDA     #$40                    ;  |
+    STA     $FB                     ; /
+    LDA     $5A01                   ; first-run flag
+    BNE     .skip                   ; nonzero = game in progress
+    JSR     ATTRACT_SCREEN
+.skip:
+    ; ... continues to game loop ...
+@ %def MAIN_ENTRY
+
+\subsection{game\_init (\$78C7)}
+
+Sets up the Apple II for the game---reset vector, graphics mode, and
+various subsystem initialization.
+
+<<game init>>=
+    ORG     $78C7
+GAME_INIT:
+    SUBROUTINE
+
+    LDX     #$6F                    ; \
+    LDY     #$A5                    ;  | reset vector = $A56F
+    STX     $03F2                   ;  |
+    STY     $03F3                   ; /
+    JSR     $FB6F                   ; ROM: set reset vector checksum
+    LDA     #$14
+    STA     $5AA2                   ; delay/timer = $14
+    JSR     RELOCATE_HIRES_STAGING  ; copy $2000+ to $9600+/$B300+
+    LDA     $C050                   ; GR mode
+    LDA     $C052                   ; full screen (no text split)
+    LDA     $C054                   ; page 1
+    LDA     $C057                   ; hi-res
+    JSR     $6C2E
+    JSR     $791A
+    JSR     $773A
+    JSR     $7919
+    JSR     $5B00
+    JSR     $743B
+    JSR     SET_TEXT_WINDOW_BOTTOM
+    JSR     $6B94
+    LDA     #$00                    ; \
+    STA     $5A55                   ;  | clear state variables
+    STA     $5A56                   ;  |
+    STA     $F9                     ; /
+    JSR     $084E
+    JSR     $62E5
+    JSR     $0C51
+    LDA     #$01
+    STA     $5A02                   ; current player = 1
+    RTS
+@ %def GAME_INIT
+
+The soft-switch reads at [[$C050]]--[[$C057]] configure the Apple II display:
+[[GR]], full-screen (no split text), page 1, hi-res. This puts the display
+into HGR mode showing the framebuffer at [[$2000]]--[[$3FFF]].
+
+\subsection{attract\_screen (\$09F4)}
+\label{sec:attract_screen}
+
+<<attract screen>>=
+    ORG     $09F4
+ATTRACT_SCREEN:
+    SUBROUTINE
+
+    LDA     #$01
+    STA     $5A29                   ; scene/character index = 1
+    STA     $423E                   ; flag
+    JSR     COMPUTE_SCENE_PTR       ; scene 1 pointer → $BA/$BB
+    LDA     $BA                     ; \
+    STA     $F4                     ;  | $F4/$F5 = $BA/$BB (save pointer)
+    LDA     $BB                     ;  |
+    STA     $F5                     ; /
+    JSR     $0A17                   ; scene_setup
+    LDA     #$00
+    STA     $5A55                   ; clear location-change flag
+    JSR     SET_CURSOR_ROW21
+    LDA     #$26                    ; scene number $26 (38 decimal)
+    JMP     SCENE_LOOP              ; tail-call
+@ %def ATTRACT_SCREEN
+
+The attract screen starts with scene index 1 (the first story character
+setup) and begins playing scene \$26.
+
+\subsection{scene\_loop (\$6C37)}
+\label{sec:scene_loop}
+
+This is the main scene display loop.  It is called with the scene number
+in~A.
+
+<<scene loop>>=
+    ORG     $6C37
+SCENE_LOOP:
+    SUBROUTINE
+
+    STA     $5A99                   ; store scene number
+    LDA     #$14
+    STA     $5AA2                   ; timer/counter = $14
+
+    JSR     SAVE_ZP_POINTERS
+
+    JSR     STEP_PRNG
+    LDA     $5A18                   ; PRNG output
+    AND     #$0A                    ; test bits 1 and 3
+    BNE     .display                ; if any set, skip disk load
+    JSR     LOAD_SCENE_DATA
+
+.display:
+    JSR     $A478                   ; keyboard/timing check (EALDR resident)
+    BCS     .exit                   ; carry set = user pressed key
+
+    JSR     DISPLAY_STATUS_BAR
+    LDA     #<$5C00                 ; \
+    STA     $06                     ;  | $06/$07 = $5C00 (scene text data)
+    LDA     #>$5C00                 ;  |
+    STA     $07                     ; /
+    JSR     TEXT_RENDERER
+
+    LDX     #$06                    ; script index 6
+    JSR     SCRIPT_ENGINE           ; run script #3 ($A300)
+    LDA     $5CFF                   ; scene transition flag
+    BEQ     .done                   ; zero = no transition
+    STA     $5A99                   ; set new scene number
+    JMP     .display                ; continue
+
+.exit:
+    JSR     SET_TEXT_WINDOW_BOTTOM
+    LDA     #$1B
+    JSR     $761E                   ; sound/mode off
+                                    ; fall through to .done
+
+.done:
+    JSR     SET_TEXT_WINDOW_BOTTOM
+    LDA     #$00                    ; \
+    STA     $5A55                   ;  | clear location flags
+    STA     $5A56                   ; /
+    JSR     $72A7                   ; update display
+    JMP     RESTORE_ZP_POINTERS     ; restore and return
+@ %def SCENE_LOOP
+
+The scene loop calls [[$A478]] (a resident routine from EALDR, still in
+memory at [[$A000]]--[[$BFFF]]) each iteration to check for user input.
+If carry is set (key pressed), the loop exits.  Otherwise, it displays
+the status bar, renders the scene text from [[$5C00]], runs script \#3
+(the attract animation at [[$A300]]), and checks [[$5CFF]] for a scene
+transition.
+
+The [[$5C00]] region is populated dynamically by [[LOAD\_SCENE\_DATA]]
+from disk.  Its contents change with each scene.
+
+\section{Utility routines}
+
+\subsection{save\_zp\_pointers / restore\_zp\_pointers}
+
+These routines save and restore four zero-page pointer pairs to/from
+fixed addresses in the [[$5A00]] page.  The pointers are used throughout
+the game for character records, text buffers, and cursor state.
+
+<<save zp pointers>>=
+    ORG     $6D53
+SAVE_ZP_POINTERS:
+    SUBROUTINE
+
+    LDA     $BC
+    STA     $5A9A
+    LDA     $BD
+    STA     $5A9B
+    LDA     $F8
+    STA     $5A9C
+    LDA     $F9
+    STA     $5A9D
+    LDA     $BE
+    STA     $5A9E
+    LDA     $BF
+    STA     $5A9F
+    LDA     $F4
+    STA     $5AA0
+    LDA     $F5
+    STA     $5AA1
+    RTS
+@ %def SAVE_ZP_POINTERS
+@
+
+<<restore zp pointers>>=
+    ORG     $6D7C
+RESTORE_ZP_POINTERS:
+    SUBROUTINE
+
+    LDA     $5A9A
+    STA     $BC
+    LDA     $5A9B
+    STA     $BD
+    LDA     $5A9C
+    STA     $F8
+    LDA     $5A9D
+    STA     $F9
+    LDA     $5A9E
+    STA     $BE
+    LDA     $5A9F
+    STA     $BF
+    LDA     $5AA0
+    STA     $F4
+    LDA     $5AA1
+    STA     $F5
+    RTS
+@ %def RESTORE_ZP_POINTERS
+
+\subsection{relocate\_hires\_staging (\$6DA5)}
+
+During startup, tracks [[\$0F]] and [[\$10]] are loaded into the hi-res
+page area [[$2000--$3FFF]] as a staging area.  This routine, called from
+[[game\_init]], copies the staged data to its runtime addresses and clears
+the hi-res page:
+
+\begin{center}
+\begin{tabular}{ccl}
+\toprule
+\thead{Source} & \thead{Destination} & \thead{Size} \\
+\midrule
+\$2000--\$32FF & \$9600--\$A8FF & 19 pages (HRCG code + standard font) \\
+\$3300--\$3FFF & \$B300--\$BFFF & 13 pages (disk I/O routines) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The copy loop at [[.copy]] also clears each source byte, leaving the
+hi-res page zeroed for use as a graphics buffer.
+
+<<relocate hires staging>>=
+    ORG     $6DA5
+RELOCATE_HIRES_STAGING:
+    SUBROUTINE
+
+    LDA     #$00
+    STA     $BA                         ; \  dest = $9600
+    STA     $BC                         ; \  src  = $2000
+    LDA     #$20                        ;  |
+    STA     $BD                         ; /  src hi
+    LDA     #$96                        ;  |
+    STA     $BB                         ; /  dest hi
+    LDY     #$00
+    LDX     #$13                        ; 19 pages: $2000-$32FF -> $9600-$A8FF
+    JSR     .copy
+    LDX     #$0D                        ; 13 pages: $3300-$3FFF -> $B300-$BFFF
+    LDA     #$B3
+    STA     $BB                         ; dest hi = $B3
+    INC     $BD                         ; src hi = $33 (was $32 after first pass)
+
+.copy:
+    LDA     ($BC),Y                     ; load from source
+    STA     ($BA),Y                     ; store to dest
+    LDA     #$00
+    STA     ($BC),Y                     ; clear source byte
+    DEY
+    BNE     .copy                       ; inner loop (256 bytes)
+    DEX
+    BNE     .next_page                  ; more pages?
+    RTS
+
+.next_page:
+    INC     $BD                         ; next source page
+    INC     $BB                         ; next dest page
+    JMP     .copy
+@ %def RELOCATE_HIRES_STAGING
+
+\subsection{step\_prng (\$78A8)}
+
+The pseudo-random number generator computes:
+$$\texttt{val}_{n+1} = 69 \cdot \texttt{val}_n + \$53 \pmod{256}$$
+and stores both the full result and a shifted copy.
+
+<<step prng>>=
+    ORG     $78A8
+STEP_PRNG:
+    SUBROUTINE
+
+    LDA     $5A19                   ; val
+    ASL     A                       ; val*2
+    ASL     A                       ; val*4
+    STA     $5A1A                   ; temp = val*4
+    ASL     A                       ; val*8
+    ASL     A                       ; val*16
+    ASL     A                       ; val*32
+    ASL     A                       ; val*64
+    CLC
+    ADC     $5A1A                   ; val*64 + val*4 = val*68
+    CLC
+    ADC     $5A19                   ; val*68 + val = val*69
+    CLC
+    ADC     #$53                    ; + $53
+    STA     $5A19                   ; store full result
+    LSR     A                       ; val >> 1
+    STA     $5A18                   ; shifted copy (used for random tests)
+    RTS
+@ %def STEP_PRNG
+
+Two shifts produce [[val*4]], saved to [[$5A1A]].  Four more shifts give
+[[val*64]].  Adding [[val*4]] gives [[val*68]], then adding [[val]] gives
+[[val*69]].  Adding [[\$53]] completes the LCG step.  This is a linear
+congruential generator with multiplier 69, increment \$53, and modulus 256.
+
+\subsection{display\_status\_bar (\$6D1F)}
+
+Draws the ``PRESS SPACE BAR TO CONTINUE'' (or ``PRESS THE BUTTON TO
+CONTINUE'') message in the text window at the bottom of the screen.
+
+<<display status bar>>=
+    ORG     $6D1F
+DISPLAY_STATUS_BAR:
+    SUBROUTINE
+
+    LDA     #$90                    ; ctrl-P with high bit (toggle inverse)
+    JSR     ROM_COUT
+    STOW    STATUS_BORDER_DATA,$06  ; $06/$07 → status bar border data
+    JSR     TEXT_RENDERER           ; draw border box
+    JSR     PRINT_CTRL_AB           ; Ctrl-A, '0'
+    LDA     #$17
+    STA     TEXT_ROW                ; WNDBTM = 23
+
+    LDA     $5A00                   ; joystick/keyboard flag
+    BNE     .joystick
+
+    ; Keyboard path:
+    STOW    S_PRESS_SPACE,$BC       ; $BC/$BD → "PRESS SPACE BAR..."
+.set_margin:
+    LDA     #$04
+    STA     TEXT_COL                ; WNDLFT = 4
+    JMP     PRINT_FROM_PTR         ; print string, return
+
+.joystick:
+    STOW    S_PRESS_BUTTON,$BC      ; $BC/$BD → "PRESS THE BUTTON..."
+    JMP     .set_margin
+@ %def DISPLAY_STATUS_BAR
+
+The border box data at [[STATUS\_BORDER\_DATA]] is drawn via the hi-res
+text renderer.  The prompt text is printed via [[PRINT\_FROM\_PTR]].
+
+\subsection{print\_from\_ptr (\$775C)}
+
+Prints a length-prefixed string from [[$BC/$BD]] via COUT:
+
+<<print from ptr>>=
+    ORG     $775C
+PRINT_FROM_PTR:
+    SUBROUTINE
+
+    LDY     #$00
+    LDA     ($BC),Y                 ; first byte = length
+    TAX
+.loop:
+    DEX
+    BPL     .next
+    RTS                             ; done
+
+.next:
+    INY
+    LDA     ($BC),Y                 ; read next char
+    JSR     ROM_COUT
+    JMP     .loop
+@ %def PRINT_FROM_PTR
+
+\subsection{print\_ctrl\_AB (\$774E)}
+
+Sends Ctrl-A and [['0']] to COUT (selects character set~0 in the HRCG):
+
+<<print ctrl ab>>=
+    ORG     $774E
+PRINT_CTRL_AB:
+    SUBROUTINE
+
+    LDA     #$81                    ; Ctrl-A with high bit
+    JSR     ROM_COUT
+    LDA     #$B0                    ; '0' with high bit
+    JMP     ROM_COUT
+@ %def PRINT_CTRL_AB
+
+\subsection{set\_cursor\_row21 / set\_text\_window\_bottom}
+\label{sec:set_text_window}
+
+These two routines share the same code; they differ only in the
+window-bottom value loaded in~A.  The BNE at [[$76C0]] forms a
+``stretchy branch'' that skips the [[LDA \#\$14]], so both entry points
+share all code from [[$76C4]] onward.
+
+<<set text window bottom>>=
+    ORG     $76BE
+SET_CURSOR_ROW21:
+    SUBROUTINE
+
+    LDA     #$15                    ; WNDBTM = 21
+    BNE     .shared                 ; always taken (stretchy branch)
+
+SET_TEXT_WINDOW_BOTTOM:
+    LDA     #$14                    ; WNDBTM = 20
+
+.shared:
+    STA     TEXT_ROW
+    LDA     #$00
+    STA     TEXT_COL                ; WNDLFT = 0
+    JSR     PRINT_CTRL_AB
+    LDA     #$86                    ; Ctrl-F with high bit
+    JMP     ROM_COUT
+@ %def SET_CURSOR_ROW21 SET_TEXT_WINDOW_BOTTOM
+
+\subsection{compute\_scene\_ptr (\$0C32)}
+
+Computes a pointer into the game data from a 1-based scene index in~A.
+Each scene record is 16 bytes.  The result
+[[$BA/$BB = ($4000) + (index - 1) \times 16$]] is stored in [[$BA]]/[[$BB]],
+where [[$4000/$4001]] holds the base address of the scene table.
+
+<<compute scene ptr>>=
+    ORG     $0C32
+COMPUTE_SCENE_PTR:
+    SUBROUTINE
+
+    CLC
+    ADC     #$FF                    ; A = index - 1
+    ROL     A                       ; \
+    ROL     A                       ;  | rotate left 4 times
+    ROL     A                       ;  | = multiply by 16 (with carry)
+    ROL     A                       ; /
+    TAY                             ; save intermediate
+    ROL     A                       ; one more rotate
+    AND     #$0F                    ; high nybble → page offset
+    CLC
+    ADC     $4001                   ; add base page
+    STA     $BB                     ; high byte
+    TYA
+    AND     #$F0                    ; low nybble → byte offset
+    CLC
+    ADC     $4000                   ; add base offset
+    STA     $BA                     ; low byte
+    BCC     .done
+    INC     $BB                     ; carry
+.done:
+    RTS
+@ %def COMPUTE_SCENE_PTR
+
+\section{Text renderer}
+\label{sec:text_renderer}
+
+Reads a byte stream from the pointer at [[$06/$07]] and renders
+characters on the hi-res screen.  It maintains column/row state and
+supports several control codes.
+
+<<text renderer>>=
+    ORG     $6C8E
+TEXT_RENDERER:
+    SUBROUTINE
+
+    LDY     #$00
+.init:
+    LDA     #$02
+    STA     $5A97                   ; left margin = 2
+    STA     FONT_COL                ; current column = 2
+    LDA     #$12
+    STA     $5A96                   ; right margin = $12 (18)
+    LDA     #$01
+    STA     FONT_ROW                ; current row = 1
+
+    ; --- Main byte-reading loop ---
+.fetch:
+    LDA     ($06),Y                 ; read byte from stream
+    BMI     .set_pos                ; bit 7 set → position command
+    CMP     #$7F
+    BNE     .not_end
+    RTS                             ; $7F = end of stream
+
+.not_end:
+    CMP     #$7E
+    BEQ     .pause                  ; $7E = pause
+    CMP     #$7D
+    BEQ     .reset                  ; $7D = reset to full-screen mode
+
+    ; --- Character output ---
+    STY     $5A98                   ; save stream index
+    STA     FONT_CHARNUM            ; character code
+    LDA     #$02
+    STA     FONT_CHARSET            ; character width = 2
+    JSR     PRINT_FONTCHAR          ; draw at current position
+    INC     FONT_COL                ; advance column
+    LDA     FONT_COL
+    CMP     $5A96                   ; past right margin?
+    BCC     .next                   ; no → continue
+    INC     FONT_ROW                ; yes → next row
+    LDA     $5A97                   ;   reset column to left margin
+    STA     FONT_COL
+.next:
+    LDY     $5A98                   ; restore stream index
+    INY                             ; advance to next byte
+    BNE     .fetch                  ; loop (max 256 per page)
+    JMP     $1A31                   ; overflow handler
+
+    ; --- Position command ($80-$FE) ---
+.set_pos:
+    AND     #$7F                    ; row = byte & $7F
+    STA     FONT_ROW
+    INY
+    LDA     ($06),Y                 ; next byte = column
+    STA     FONT_COL
+    INY
+    JMP     .fetch
+
+    ; --- Pause ($7E): run script engine, show status bar ---
+.pause:
+    TYA                             ; \
+    PHA                             ;  | save stream index
+    NOP
+    LDX     #$06
+    JSR     SCRIPT_ENGINE           ; run attract script
+    LDA     $06                     ; \
+    PHA                             ;  | save $06/$07 (stream pointer)
+    LDA     $07                     ;  |
+    PHA                             ; /
+    JSR     DISPLAY_STATUS_BAR      ; (clobbers $06/$07)
+    PLA                             ; \
+    STA     $07                     ;  | restore $06/$07
+    PLA                             ;  |
+    STA     $06                     ; /
+    PLA                             ; restore stream index
+    TAY
+    NOP
+    INY                             ; advance past $7E
+    JMP     .init                   ; reinit margins/position
+
+    ; --- Reset ($7D): full-screen text mode ---
+.reset:
+    LDA     #$00
+    STA     $5A97                   ; left margin = 0
+    STA     FONT_COL                ; column = 0
+    STA     FONT_ROW                ; row = 0
+    LDA     #$14
+    STA     $5A96                   ; right margin = $14 (20)
+    INY                             ; advance past $7D
+    JMP     .fetch
+@ %def TEXT_RENDERER
+@
+
+\subsection{Control code summary}
+
+\begin{center}
+\begin{tabular}{cl}
+\toprule
+\thead{Byte} & \thead{Meaning} \\
+\midrule
+\$7D & Reset to full-screen mode (col=0, row=0, width=20) \\
+\$7E & Pause: run script engine and status bar, then resume \\
+\$7F & End of stream \\
+\$80--\$FE & Set row (byte \& \$7F), next byte = column \\
+Other & Character code for HRCG font \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Border data at \$7E2F}
+
+The text renderer data at [[STATUS\_BORDER\_DATA]] draws a decorative
+border for the status bar.  Characters \$33--\$41 are box-drawing glyphs
+in the HRCG font.
+
+<<status border data>>=
+    ORG     $7E2F
+STATUS_BORDER_DATA:
+    HEX     7D                      ; $7D: reset to full-screen
+    HEX     80 00                   ; row 0, col 0
+    HEX     33 3C                   ; top-left corner, left tee
+    HEX     34 34 34 34 34 34 34 34 ; horizontal bar (x17)
+    HEX     34 34 34 34 34 34 34 34
+    HEX     34
+    HEX     3D 35                   ; right tee, top-right corner
+    HEX     3A 3F                   ; decorative
+    HEX     81 12 3E 36 3A 3F      ; row 1, col 18, right edge
+    HEX     82 12 3E 36 3A 3F      ; row 2
+    HEX     83 12 3E 36 3A 3F      ; row 3
+    HEX     84 12 3E 36 3A 3F      ; row 4
+    HEX     85 12 3E 36 3A 3F      ; row 5
+    HEX     86 12 3E 36 3A 3F      ; row 6
+    HEX     87 12 3E 36 3A 3F      ; row 7
+    HEX     88 12 3E 36 3A 3F      ; row 8
+    HEX     89 12 3E 36 3A 3F      ; row 9
+    HEX     8A 12 3E 36            ; row 10
+    HEX     39 40                   ; bottom-left corner, left tee
+    HEX     38 38 38 38 38 38 38 38 ; horizontal bar (x17)
+    HEX     38 38 38 38 38 38 38 38
+    HEX     38
+    HEX     41 37                   ; right tee, bottom-right corner
+    HEX     7F                      ; end of stream
+@ %def STATUS_BORDER_DATA
+
+\subsection{Status bar text strings}
+
+<<status bar strings>>=
+    ORG     $7E97
+S_PRESS_SPACE:
+    APSTR   "  PRESS SPACE BAR TO CONTINUE   "
+
+S_PRESS_BUTTON:
+    APSTR   "  PRESS THE BUTTON TO CONTINUE  "
+@ %def S_PRESS_SPACE S_PRESS_BUTTON
+
+\section{Resident bytecode interpreter (\$0500--\$07FF)}
+\label{sec:resident_interp}
+
+EALDR copies 768 bytes from [[$A300]]--[[$A5FF]] to [[$0500]]--[[$07FF]]
+before entering the main program.  This region contains a second bytecode
+interpreter, separate from the EALDR VM, that runs during gameplay and
+the attract screen.  It uses the same XOR encryption scheme as the EALDR
+VM (low byte XOR [[\$03]], high byte XOR [[\$D9]]).
+
+\subsection{attract\_loop (\$0569)}
+
+The entry point for the resident interpreter.  Each iteration swaps
+context (zero-page state) and dispatches one bytecode instruction.
+
+<<attract loop>>=
+    ORG     $0569
+ATTRACT_LOOP:
+    SUBROUTINE
+
+    JSR     CONTEXT_SWAP
+    JSR     RESIDENT_DISPATCH
+    JMP     ATTRACT_LOOP
+@ %def ATTRACT_LOOP
+
+\subsection{context\_swap (\$06E0)}
+
+Swaps 16 bytes between zero page [[\$50]]--[[\$5F]] and [[\$07E5]]--[[\$07F4]].
+This gives the resident interpreter its own private set of zero-page
+temporaries that don't interfere with the main program.
+
+<<context swap>>=
+    ORG     $06E0
+CONTEXT_SWAP:
+    SUBROUTINE
+
+    LDX     #$0F
+.loop:
+    LDA     $50,X                   ; load ZP byte
+    PHA                             ; save on stack
+    LDA     $7E5,X                  ; load shadow byte
+    STA     $50,X                   ; → ZP
+    PLA                             ; recover old ZP byte
+    STA     $7E5,X                  ; → shadow
+    DEX
+    BPL     .loop
+    RTS
+@ %def CONTEXT_SWAP
+
+\subsection{resident\_dispatch (\$06B3)}
+
+Dispatches one bytecode instruction using a stack trick.  X and Y hold
+the bytecode pointer from the previous iteration.  They are pushed onto
+the stack at entry, then [[PULL\_TWO\_RET\_ADDRS]] rearranges the stack
+so the saved X/Y values end up in [[\$52/$53]] as the new bytecode pointer.
+
+<<resident dispatch>>=
+    ORG     $06B3
+RESIDENT_DISPATCH:
+    SUBROUTINE
+
+    TXA                             ; \
+    PHA                             ;  | save X, Y on stack
+    TYA                             ;  | (these ARE the bytecode pointer)
+    PHA                             ; /
+    JSR     PULL_TWO_RET_ADDRS      ; rearrange stack, jump to .resume
+
+    ; Control returns here via JMP ($54):
+.resume:
+    PLA                             ; \  recover saved Y
+    STA     $52                     ;  | $52/$53 = bytecode pointer
+    PLA                             ;  | recover saved X
+    STA     $53                     ; /
+
+    LDY     #$04                    ; skip 4 bytes
+.fetch:
+    LDA     ($52),Y                 ; read opcode
+    INY
+    BNE     .no_carry
+    INC     $53
+.no_carry:
+    TAX                             ; opcode → X (also saves position)
+    LDA     RESIDENT_DISPATCH_TABLE,X
+    STA     resident_jmp+1          ; self-modify: JMP low byte
+resident_jmp:
+    JMP     RESIDENT_DECODE_DISPATCH ; self-modified → $07xx
+@ %def RESIDENT_DISPATCH
+@
+
+[[PULL\_TWO\_RET\_ADDRS]] pulls both return addresses from the stack
+(its own and the caller's), increments each by 1 (since RTS pushes
+addr\textminus{}1), and jumps through [[\$54/$55]] back to the code
+after the [[JSR]] in [[RESIDENT\_DISPATCH]].
+
+<<pull two ret addrs>>=
+    ORG     $0738
+PULL_TWO_RET_ADDRS:
+    SUBROUTINE
+
+    PLA                             ; own return addr (low)
+    STA     $54
+    PLA                             ; own return addr (high)
+    STA     $55
+    PLA                             ; caller's return addr (low)
+    STA     $52
+    PLA                             ; caller's return addr (high)
+    STA     $53
+    INC     $52                     ; +1 (RTS pushed addr-1)
+    INC     $54                     ; +1
+    BNE     .done
+    INC     $55                     ; carry
+.done:
+    JMP     ($54)                   ; jump back to .resume
+@ %def PULL_TWO_RET_ADDRS
+
+\subsection{Dispatch table (\$06D3)}
+
+The 18-byte table maps opcode indices to handler addresses in page [[\$07]]:
+
+<<resident dispatch table>>=
+    ORG     $06D3
+RESIDENT_DISPATCH_TABLE:
+    HEX     00 27 55 5F 6D 8A AD B9
+    HEX     4F A2 CE 26 79 A2 0F B5
+    HEX     50 48
+@ %def RESIDENT_DISPATCH_TABLE
+@
+
+\begin{center}
+\begin{tabular}{ccl}
+\toprule
+\thead{Opcode} & \thead{Table byte} & \thead{Handler address} \\
+\midrule
+\$00 & \$00 & \$0700 (RESIDENT\_DECODE\_DISPATCH) \\
+\$01 & \$27 & \$0727 \\
+\$02 & \$55 & \$0755 \\
+\$03 & \$5F & \$075F \\
+\$04 & \$6D & \$076D \\
+\$05 & \$8A & \$078A \\
+\$06 & \$AD & \$07AD \\
+\$07 & \$B9 & \$07B9 \\
+\$08 & \$4F & \$074F \\
+\$09 & \$A2 & \$07A2 \\
+\$0A & \$CE & \$07CE \\
+\$0B & \$26 & \$0726 \\
+\$0C & \$79 & \$0779 \\
+\$0D & \$A2 & \$07A2 \\
+\$0E & \$0F & \$070F \\
+\$0F & \$B5 & \$07B5 \\
+\$10 & \$50 & \$0750 \\
+\$11 & \$48 & \$0748 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Opcodes \$09 and \$0D share the same handler (\$07A2).
+
+\subsection{decode\_encrypted\_addr (\$0710)}
+
+Decodes a 2-byte encrypted address from the bytecode stream.
+Uses the same XOR scheme as the EALDR VM.  The decoded address is
+left in [[\$54/$55]].
+
+<<decode encrypted addr>>=
+    ORG     $0710
+DECODE_ENCRYPTED_ADDR:
+    SUBROUTINE
+
+    LDA     ($52),Y                 ; read low byte
+    EOR     #$03                    ; decrypt
+    INY
+    BNE     .no_carry1
+    INC     $53
+.no_carry1:
+    STA     $54                     ; decoded low
+    LDA     ($52),Y                 ; read high byte
+    INY
+    BNE     .no_carry2
+    INC     $53
+.no_carry2:
+    EOR     #$D9                    ; decrypt
+    STA     $55                     ; decoded high
+    RTS
+@ %def DECODE_ENCRYPTED_ADDR
+
+\subsection{resident\_decode\_dispatch (\$0700)}
+
+Opcode \$00 handler---the resident interpreter's GOTO instruction.
+Decodes an address and redirects execution there.
+
+<<resident decode dispatch>>=
+    ORG     $0700
+RESIDENT_DECODE_DISPATCH:
+    SUBROUTINE
+
+    JSR     DECODE_ENCRYPTED_ADDR   ; → $54/$55
+    LDA     $54                     ; \
+    STA     $52                     ;  | $52/$53 = decoded address
+    LDA     $55                     ;  |
+    STA     $53                     ; /
+    LDY     #$00
+    JMP     RESIDENT_DISPATCH.fetch ; fetch from new location
+@ %def RESIDENT_DECODE_DISPATCH
+
+\section{Script/event engine (\$795B)}
+\label{sec:script_engine}
+
+The script engine runs short bytecode programs that control animations,
+sound, and game events.  It is called with a script index in X.
+
+\subsection{Entry and setup}
+
+<<script engine>>=
+    ORG     $795B
+SCRIPT_ENGINE:
+    SUBROUTINE
+
+    STA     $C010                   ; clear keyboard strobe
+    LDA     #$00
+    STA     $5AA7                   ; attract_flag = 0
+    CPX     #$06                    ; script index 6 = attract
+    BNE     .not_attract
+    INC     $5AA7                   ; attract_flag = 1
+.not_attract:
+
+    CPX     #$02                    ; special setup for index 2
+    BEQ     .setup_2
+    CPX     #$04                    ; special setup for index 4
+    BEQ     .setup_4
+    JMP     .load_ptr
+
+.setup_2:
+    DEY
+    STY     $80D5
+    JMP     .load_ptr
+.setup_4:
+    DEY
+    STY     $80E3
+@
+
+\subsection{Script pointer table}
+
+The script base address is loaded from the table at [[\$80AE]]:
+
+<<script engine>>=
+
+.load_ptr:
+    LDA     SCRIPT_TABLE,X          ; low byte
+    STA     $E4
+    LDA     SCRIPT_TABLE+1,X        ; high byte
+    STA     $E5                     ; $E4/$E5 = script start address
+@
+
+<<script pointer table>>=
+    ORG     $80AE
+SCRIPT_TABLE:
+    DC.W    $80C6                   ; script 0
+    DC.W    $80C7                   ; script 1
+    DC.W    $80D7                   ; script 2
+    DC.W    $A300                   ; script 3 (attract -- EALDR resident)
+    DC.W    $A3C3                   ; script 4
+    DC.W    $A3CE                   ; script 5
+    DC.W    $A3DE                   ; script 6
+    DC.W    $A409                   ; script 7
+@ %def SCRIPT_TABLE
+@
+
+Scripts 3--7 are in the [[\$A300]]--[[\$A5FF]] resident region (which was
+also copied to [[\$0500]]--[[\$07FF]] by EALDR, but the script table
+points to the original addresses).
+
+\subsection{Script interpreter}
+
+After setup, the interpreter initializes its loop counter and PRNG mask:
+
+<<script engine>>=
+
+    LDA     #$00
+    STA     $5A8D                   ; loop counter = 0
+    LDA     #$01
+    STA     $5A92                   ; PRNG mask = 1
+.fetch:
+    LDY     #$00
+    LDA     ($E4),Y                 ; read script byte
+    CMP     #$27
+    BCC     .control                ; < $27 → control command
+    JMP     .action                 ; ≥ $27 → action dispatch
+@
+
+\subsubsection{Control commands (< \$27)}
+
+<<script engine>>=
+
+.control:
+    CMP     #$25
+    BEQ     .cmd_25                 ; set PRNG mask = $0F
+    BCS     .cmd_26                 ; $26: PRNG mask = $00
+
+    CMP     #$23
+    BEQ     .cmd_23                 ; set action vector → $7A7F
+    BCS     .cmd_24                 ; set action vector → $7A91
+
+    CMP     #$21
+    BEQ     .cmd_21                 ; gosub
+    BCS     .cmd_22                 ; nop (return)
+
+    CMP     #$1F
+    BEQ     .cmd_1F                 ; set loop address
+    BCS     .cmd_20                 ; set gosub address
+
+    ; --- Loop/end-loop (byte < $1F) ---
+    CMP     $5A8D                   ; compare with loop counter
+    BEQ     .end_loop
+    BCC     .end_loop
+
+    INC     $5A8D                   ; counter++
+    LDA     $5A8E                   ; \
+    STA     $E4                     ;  | $E4/$E5 = loop address
+    LDA     $5A8F                   ;  |
+    STA     $E5                     ; /
+    JMP     .fetch
+
+.end_loop:
+    LDA     #$00
+    STA     $5A8D                   ; reset loop counter
+    JMP     SCRIPT_ADVANCE
+@
+
+When the byte value equals or exceeds the loop counter, the loop
+terminates and the counter resets.  Otherwise, the counter increments
+and execution jumps back to the saved loop address.
+
+\subsubsection{Command implementations}
+
+<<script engine>>=
+
+.cmd_25:                            ; PRNG mask = $0F
+    LDA     #$0F
+    STA     $5A92
+    JMP     SCRIPT_ADVANCE
+
+.cmd_26:                            ; PRNG mask = $00
+    LDA     #$00
+    STA     $5A92
+    JMP     SCRIPT_ADVANCE
+
+.cmd_23:                            ; action vector → $7A7F
+    STOW    $7A7F,$5A93
+    JMP     SCRIPT_ADVANCE
+
+.cmd_24:                            ; action vector → $7A91
+    STOW    $7A91,$5A93
+    JMP     SCRIPT_ADVANCE
+
+.cmd_22:                            ; nop (return from script)
+    RTS
+
+.cmd_21:                            ; gosub: jump to saved address
+    LDA     $5A90
+    STA     $E4
+    LDA     $5A91
+    STA     $E5
+    JMP     .fetch
+
+.cmd_1F:                            ; set loop address = current+1
+    JSR     SCRIPT_INC_E4
+    LDA     $E4
+    STA     $5A8E
+    LDA     $E5
+    STA     $5A8F
+    JMP     .fetch
+
+.cmd_20:                            ; set gosub address = current+1
+    JSR     SCRIPT_INC_E4
+    LDA     $E4
+    STA     $5A90
+    LDA     $E5
+    STA     $5A91
+    JMP     .fetch
+@
+
+\subsubsection{Action dispatch ($\geq$ \$27)}
+
+When the script byte is [[\$27]] or higher, the PRNG output is masked and
+XORed with the action byte, introducing randomness.  The action vector
+at [[\$F6]] is set by the handlers at [[\$5A93]]/[[\$5A94]].
+
+<<script engine>>=
+
+.action:
+    STA     $E2                     ; save action byte
+    JSR     STEP_PRNG
+    LDA     $5A18                   ; PRNG output
+    AND     $5A92                   ; apply mask
+    EOR     $E2                     ; XOR with action byte
+    STA     $E1                     ; modified action
+    JSR     SCRIPT_INC_E4           ; advance script pointer
+    LDY     #$00
+    LDA     ($E4),Y                 ; read parameter byte
+    STA     $E2
+    JSR     SCRIPT_ACTION_INDIRECT  ; → JMP ($5A93)
+    JMP     ($F6)                   ; dispatch via action vector
+@ %def SCRIPT_ENGINE
+
+\subsection{advance (\$7A4F)}
+
+The ``advance'' routine is the target of all [[JMP SCRIPT\_ADVANCE]] in
+the control commands.  It increments the script pointer, checks for user
+input (during attract mode), and loops back to [[.fetch]].
+
+During the attract screen ([[\$5AA7]] = 1), this routine checks for
+keyboard or joystick input.  If detected, it returns immediately via RTS,
+which exits the entire [[SCRIPT\_ENGINE]] call.
+
+<<script advance>>=
+    ORG     $7A4F
+SCRIPT_ADVANCE:
+    SUBROUTINE
+
+    JSR     SCRIPT_INC_E4           ; advance script pointer
+    LDA     $5AA7                   ; attract_flag
+    BEQ     .continue               ; not attract mode → skip input check
+
+    ; Attract mode: check keyboard
+    LDA     $C000                   ; keyboard register
+    BPL     .check_joy              ; no key → check joystick
+    RTS                             ; key pressed → exit
+
+.check_joy:
+    LDA     $5A00                   ; joystick flag
+    BEQ     .continue               ; no joystick → continue script
+    LDX     #$00
+    LDA     $C061,X                 ; button 0
+    BPL     .btn1                   ; not pressed
+    RTS                             ; pressed → exit
+.btn1:
+    INX
+    LDA     $C061,X                 ; button 1
+    BPL     .continue               ; not pressed → continue
+    RTS                             ; pressed → exit
+
+.continue:
+    LSR     $5A8C                   ; shift timing flag
+    JMP     SCRIPT_ENGINE.fetch     ; loop back to interpreter
+@ %def SCRIPT_ADVANCE
+
+\subsection{script helpers}
+
+<<script helpers>>=
+    ORG     $7A77
+SCRIPT_INC_E4:
+    SUBROUTINE
+
+    INC     $E4
+    BEQ     .carry
+    RTS
+.carry:
+    INC     $E5
+    RTS
+
+    ORG     $7A4C
+SCRIPT_ACTION_INDIRECT:
+    JMP     ($5A93)
+@ %def SCRIPT_INC_E4 SCRIPT_ACTION_INDIRECT
+
+\section{Scene data loading (\$6DD8)}
+
+Loads scene-specific data from disk into the [[\$5C00]] region.  The disk
+read calls [[\$B300]], which is part of the EALDR disk I/O code still
+resident in memory.  If the read fails, the routine fills a byte with
+PRNG output (a graceful degradation rather than crashing).
+
+<<load scene data>>=
+    ORG     $6DD8
+LOAD_SCENE_DATA:
+    SUBROUTINE
+
+    BIT     $C0E9                   ; check disk controller
+    LDA     #$05                    ; \
+    LDY     #$04                    ;  | ($08)+4 = 5 (track configuration)
+    STA     ($08),Y                 ; /
+    LDA     #$00
+    JSR     $6C18                   ; prepare disk parameters
+    CLC
+    JSR     $B300                   ; EALDR disk read routine
+    BCS     .error
+    RTS
+
+.error:
+    LDY     $5A18                   ; on error: fill with PRNG data
+    JSR     STEP_PRNG
+    LDA     $5A18
+    STA     $9AA6,Y
+    RTS
+@ %def LOAD_SCENE_DATA
+
+\section{Unresolved: \$A478}
+\label{sec:a478}
+
+The scene loop calls [[JSR \$A478]] every iteration to check for user
+input.  This address is in the EALDR region ([[\$A000]]--[[\$BFFF]]),
+which remains in memory after the main program starts.
+
+The bytes at [[\$A478]] include the undocumented NMOS 6502 opcode [[\$04]]
+(a 2-byte NOP).  This could mean the code legitimately uses undocumented
+instructions, or that the region is modified at runtime before being called.
+
+Partial decode:
+
+\begin{verbatim}
+    A478: 04 E5         ; NOP $E5 (DOP: 2-byte NOP, reads zp $E5)
+    A47A: 19 03 64      ; ORA $6403,Y
+    ...
+    A483: CA            ; DEX
+    A484: D0 FD         ; BNE $A483   (inner delay loop)
+    A486: 38            ; SEC
+    A487: E9 01         ; SBC #$01
+    A489: D0 F6         ; BNE $A481   (outer delay loop)
+    A48B: 60            ; RTS
+\end{verbatim}
+
+The inner loop at [[\$A483]]--[[\$A484]] ([[DEX; BNE]]) is a standard
+delay loop.  The outer loop decrements A and repeats, making this a
+nested delay.  The carry flag state on exit likely indicates whether a
+key was pressed (C=1) or the timer expired (C=0).  Further analysis
+requires an emulator that supports undocumented 6502 opcodes.
+
+\section{Summary}
+
+The attract screen call flow:
+
+\begin{itemize}
+  \item [[MAIN\_ENTRY]] ([[\$0800]]): calls [[GAME\_INIT]], then
+        [[ATTRACT\_SCREEN]] if [[\$5A01]] is zero.
+  \item [[ATTRACT\_SCREEN]] ([[\$09F4]]): sets scene index 1, calls
+        [[COMPUTE\_SCENE\_PTR]], tail-calls [[SCENE\_LOOP]] with scene \$26.
+  \item [[SCENE\_LOOP]] ([[\$6C37]]): saves ZP pointers, steps PRNG,
+        conditionally loads scene data from disk.  In a loop: checks
+        keyboard/timer via [[\$A478]], displays status bar, renders scene
+        text via [[TEXT\_RENDERER]], runs [[SCRIPT\_ENGINE]] with script \#3.
+        Exits when user presses a key or scene sequence ends.
+\end{itemize}
+
+Key subsystems:
+\begin{itemize}
+  \item \textbf{Text renderer} ([[TEXT\_RENDERER]]): Reads byte streams with
+        position commands, pause/reset control codes, and character data
+        for the HRCG font.
+  \item \textbf{Script engine} ([[SCRIPT\_ENGINE]]): Runs short bytecode
+        programs from [[SCRIPT\_TABLE]].  Supports loops, gosub, action
+        dispatch with PRNG randomization.
+  \item \textbf{Resident interpreter} ([[\$0500]]--[[\$07FF]]): A
+        secondary VM copied from EALDR, using context-swapped zero-page
+        state and XOR-encrypted addresses.
+  \item \textbf{PRNG} ([[STEP\_PRNG]]): Linear congruential generator with
+        formula $\texttt{val}_{n+1} = 69 \cdot \texttt{val}_n + \$53
+        \pmod{256}$.
+\end{itemize}
+
 
 \chapter{Animating the splash screen}
 
@@ -2044,6 +4092,369 @@ mob_dataptr_to_load4:
     JSR      get_mob_data
     STOW     DATA_PTR3, .load4
     RTS
+@
+
+@ \chapter{Assembly output}
+
+The following root chunks produce the assembly files when tangled.
+
+<<main.asm>>=
+    PROCESSOR 6502
+    <<Macros>>
+    <<zero page defines>>
+    <<defines>>
+    <<attract loop>>
+    <<resident dispatch>>
+    <<resident dispatch table>>
+    <<context swap>>
+    <<resident decode dispatch>>
+    <<decode encrypted addr>>
+    <<pull two ret addrs>>
+    <<main entry>>
+    <<attract screen>>
+    <<Get item at pos in room>>
+    <<compute scene ptr>>
+    <<plot char>>
+    <<print font char>>
+    <<scene loop>>
+    <<text renderer>>
+    <<display status bar>>
+    <<save zp pointers>>
+    <<restore zp pointers>>
+    <<relocate hires staging>>
+    <<load scene data>>
+    <<print bottom centered>>
+    <<print centered plus col>>
+    <<font pos>>
+    <<control routines>>
+    <<print string>>
+    <<set cursor compressed>>
+    <<print ctrl ab>>
+    <<print from ptr>>
+    <<set text window bottom>>
+    <<step prng>>
+    <<game init>>
+    <<script engine>>
+    <<script helpers>>
+    <<script advance>>
+    <<set text window upper left>>
+    <<status border data>>
+    <<status bar strings>>
+    <<font data>>
+    <<std font data>>
+    <<script pointer table>>
+@
+
+<<fontdata.asm>>=
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     78 7C 66 66 7C 78 60 60 03 07 0C 0C 07 03 00 00
+    HEX     63 7F 60 60 7C 0C 0C 0F 30 3F 00 00 0F 0C 0C 3C
+    HEX     C0 C0 D0 D0 D0 D4 D4 D4 80 80 82 82 82 8A 8A 8A
+    HEX     2A 22 22 2A 08 28 20 00 15 11 11 15 04 05 01 00
+    HEX     00 04 04 05 15 15 05 04 00 00 00 00 00 85 85 85
+    HEX     04 7F 44 44 00 40 60 00 0F 1F 3F 1F 0F 19 30 00
+    HEX     00 00 00 00 00 70 F8 B0 00 00 00 00 00 00 00 00
+    HEX     20 22 28 20 20 50 08 06 00 04 01 00 00 00 01 06
+    HEX     D0 90 D0 D0 D4 91 91 90 00 00 00 18 3A 60 40 00
+    HEX     10 10 50 10 15 01 01 00 00 00 0A 08 08 28 00 00
+    HEX     00 00 0F 0F 7C 44 44 7C 00 00 78 78 1F 11 11 1F
+    HEX     1C 44 70 10 10 70 60 00 1C 11 07 04 04 07 03 00
+    HEX     30 60 1C 06 23 2E 28 28 00 00 00 00 11 55 05 01
+    HEX     08 08 00 00 00 00 00 00 04 04 00 00 00 00 00 00
+    HEX     00 01 05 05 55 15 55 55 00 00 00 00 00 4A 2A 2A
+    HEX     55 55 55 55 05 05 00 00 2A 00 0A 0A 00 00 00 00
+    HEX     00 94 D5 C1 C9 D5 D4 C4 00 8A AA A0 A4 AA 8A 88
+    HEX     90 D4 C5 D5 85 94 D0 00 82 8A A8 AA A8 8A 82 00
+    HEX     A8 A8 A0 A0 AA AA A8 A8 81 91 D1 90 85 95 D5 D5
+    HEX     AA AA A0 A0 AA 8A A8 00 85 95 D5 84 94 D4 D0 00
+    HEX     00 00 0E 1B 59 58 58 58 00 00 04 0C 3F 0C 08 01
+    HEX     58 7C 26 27 7E 26 26 00 01 03 06 0E 07 06 06 00
+    HEX     00 00 00 00 00 40 62 6A 00 18 1C 0E 07 03 01 00
+    HEX     28 24 14 05 01 00 00 00 00 01 05 00 00 00 00 00
+    HEX     00 00 1E 33 33 30 30 28 00 00 1E 33 33 03 03 05
+    HEX     2A 22 2A 28 28 20 20 00 15 11 15 05 05 01 01 00
+    HEX     00 00 00 A0 A8 82 A2 82 00 00 00 00 81 81 80 80
+    HEX     82 56 54 44 46 42 00 00 08 22 0A 08 18 10 00 00
+    HEX     00 60 79 CF D2 D4 C4 D4 00 01 27 3C 9A 8A 88 8A
+    HEX     D0 90 D0 C0 00 00 00 00 82 82 82 00 00 00 00 00
+    HEX     8A AA 8A 88 A8 A8 A8 A8 00 95 95 95 B9 30 20 00
+    HEX     A8 A8 A8 A0 A0 80 80 00 80 A0 B1 B5 95 95 00 00
+    HEX     60 78 03 63 03 06 0C 78 07 0F 1C 0F 0C 06 03 01
+    HEX     20 2A 28 2A 28 2A 20 00 01 15 05 15 05 15 01 00
+    HEX     00 00 00 02 03 07 0F D6 00 00 00 10 30 38 3C 9A
+    HEX     D4 C4 D4 D0 D0 C0 00 00 8A 88 8A 82 82 80 00 00
+    HEX     50 40 40 14 15 05 65 75 02 00 00 0A 2A 28 28 29
+    HEX     75 75 64 04 90 90 90 D4 29 29 08 08 82 82 82 8A
+    HEX     00 00 00 00 00 42 6A 0A 00 00 20 18 0E 07 03 01
+    HEX     0A 2A 2A 2A 2A 0A 0A 00 15 15 01 05 00 00 00 00
+    HEX     00 A8 A0 00 80 A2 AA A8 00 00 81 85 85 95 D1 D5
+    HEX     AA A2 80 A0 A8 00 00 00 95 85 85 81 00 00 00 00
+    HEX     00 00 00 00 7C 6E 47 00 00 00 00 00 38 1D 07 00
+    HEX     7C 6E 47 00 00 00 00 00 38 1D 07 00 00 00 00 00
+    HEX     00 00 40 40 7C 44 44 44 00 00 01 01 1F 11 11 11
+    HEX     51 55 44 40 40 60 70 00 45 55 11 01 01 03 07 00
+    HEX     00 00 00 00 66 66 36 1E 00 00 00 00 0C 0C 0C 0E
+    HEX     06 66 3E 06 06 06 00 00 07 01 00 00 00 00 00 00
+    HEX     00 00 00 00 60 44 04 7F 00 00 00 00 00 03 0E 3F
+    HEX     04 44 60 00 00 00 00 00 0E 03 00 00 00 00 00 00
+    HEX     00 00 00 00 D0 D4 C4 00 00 00 00 00 8A AA A2 80
+    HEX     44 54 44 54 44 50 00 00 22 2A 22 2A 22 0A 00 00
+    HEX     7F 7F 0F 23 29 29 01 29 7F 7F 78 71 65 65 60 61
+    HEX     29 09 21 01 29 01 7F 7F 64 65 65 60 65 60 7F 7F
+    HEX     7F 7F 0F 07 03 03 03 03 7F 7F 78 70 60 60 60 60
+    HEX     03 03 03 03 03 03 7F 7F 60 60 60 60 60 60 7F 7F
+    HEX     00 33 3F 1E 1E 1E 7E 7E 00 66 7E 3C 3C 3C 3F 3F
+    HEX     0E 4E 4E 4E 4E 4E 4E 00 38 3A 3A 3A 3A 3A 3A 00
+    HEX     00 3C 3B 23 00 03 0B 03 00 06 40 60 00 60 58 78
+    HEX     00 01 00 0F 00 47 67 77 00 7C 71 73 00 67 77 77
+    HEX     00 3C 3B 23 00 4B 5B 73 00 36 38 3C 00 62 78 7E
+    HEX     00 19 0D 2F 00 67 67 77 00 3C 39 33 00 67 77 77
+    HEX     55 55 55 55 55 55 55 55 2A 2A 2A 2A 2A 2A 2A 2A
+    HEX     55 55 55 55 55 55 55 55 2A 2A 2A 2A 2A 2A 2A 2A
+    HEX     50 54 44 44 54 50 40 40 02 02 08 08 02 02 00 00
+    HEX     41 55 40 40 54 04 04 05 20 2A 00 00 0A 08 08 28
+    HEX     40 40 50 50 50 54 54 54 00 00 02 02 02 0A 0A 0A
+    HEX     AA A2 A2 AA 88 A8 A0 00 95 91 91 95 84 85 81 00
+    HEX     00 84 84 85 95 95 85 84 00 00 00 00 00 05 05 05
+    HEX     84 7F C4 C4 00 40 60 00 0F 1F 3F 1F 0F 19 30 00
+    HEX     00 00 00 00 00 F0 70 60 00 00 00 00 00 00 01 00
+    HEX     A0 A2 A8 A0 A0 D0 08 04 00 84 81 80 00 00 01 02
+    HEX     2A 2A 2A 2A 2A 2A 2A 2A 55 55 55 55 55 55 55 55
+    HEX     2A 2A 2A 2A 2A 2A 2A 2A 55 55 55 55 55 55 55 55
+    HEX     2A 2A 2A 2A 2A 2A 2A 2A 55 55 55 55 55 55 55 55
+    HEX     2A 2A 2A 2A 2A 2A 2A 2A 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     AA AA AA AA AA AA AA AA D5 D5 D5 D5 D5 D5 D5 D5
+    HEX     AA AA AA AA AA AA AA AA D5 D5 D5 D5 D5 D5 D5 D5
+    HEX     D5 D5 D5 D5 D5 D5 D5 D5 AA AA AA AA AA AA AA AA
+    HEX     D5 D5 D5 D5 D5 D5 D5 D5 AA AA AA AA AA AA AA AA
+    HEX     7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F
+    HEX     7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F
+    HEX     00 3F 3F 3F 00 7B 7B 7B 00 3F 3F 3F 00 7B 7B 7B
+    HEX     00 3F 3F 3F 00 77 77 77 00 3F 3F 3F 00 77 77 77
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 7F 7F 7F 7F 7F 7F 7F 7F
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 55 0C 7E 03 00 00 00 00 2A 00 0F 18
+    HEX     78 0C 0C 70 00 00 00 00 1F 10 1F 11 00 00 00 00
+    HEX     01 03 06 06 57 06 66 1E 00 00 00 00 2A 00 03 0C
+    HEX     06 0E 36 46 00 00 00 00 18 18 18 07 00 00 00 00
+    HEX     00 00 00 00 55 00 78 0C 00 00 00 00 2A 03 07 0C
+    HEX     06 06 08 70 00 00 00 00 00 00 0C 07 00 00 00 00
+    HEX     00 00 00 00 55 00 70 18 04 0C 18 18 3A 18 1B 1E
+    HEX     0C 04 18 70 00 00 00 00 18 1E 1B 19 00 00 00 00
+    HEX     00 00 00 00 55 40 7E 02 00 00 00 00 2A 01 03 06
+    HEX     1C 06 02 7C 00 00 00 00 00 0C 07 01 00 00 00 00
+    HEX     78 0C 18 30 7D 70 70 70 03 06 0C 00 2B 00 00 00
+    HEX     70 70 60 40 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 55 18 7C 06 00 00 00 00 2A 00 0C 13
+    HEX     06 7E 03 7E 00 60 18 06 03 00 0E 13 30 19 0E 00
+    HEX     02 06 0C 0C 5D 0C 4C 7C 00 00 00 00 2A 00 0F 10
+    HEX     1C 0C 0C 0C 00 00 00 00 30 1C 0E 03 00 00 00 00
+    HEX     60 70 60 00 55 00 60 60 01 03 01 00 2A 00 01 01
+    HEX     60 60 60 40 00 00 00 00 01 01 01 01 00 00 00 00
+    HEX     60 70 60 00 55 00 60 60 01 03 01 00 2A 00 01 01
+    HEX     60 60 60 60 60 26 1C 00 01 01 01 01 00 00 00 00
+    HEX     01 03 06 06 57 06 66 1E 00 00 00 00 2A 00 03 0C
+    HEX     06 66 06 06 00 00 00 00 0F 03 0F 3C 00 00 00 00
+    HEX     10 30 60 60 75 60 60 60 00 00 01 01 2A 01 01 01
+    HEX     60 60 60 40 00 00 00 00 01 01 01 01 00 00 00 00
+    HEX     00 00 00 00 55 00 1E 63 00 00 00 00 2A 0C 0F 11
+    HEX     63 03 06 0C 00 00 00 00 30 30 18 0C 00 00 00 00
+    HEX     00 00 00 00 55 00 46 76 00 00 00 00 2A 00 07 18
+    HEX     1E 06 06 46 00 00 00 00 18 0E 07 01 00 00 00 00
+    HEX     00 00 00 00 55 00 70 3C 00 00 00 00 2A 03 0F 10
+    HEX     0E 03 02 7C 00 00 00 00 30 1C 0F 03 00 00 00 00
+    HEX     00 00 00 00 55 00 46 76 00 00 00 00 2A 00 07 08
+    HEX     1E 06 1E 66 06 06 06 00 18 18 0E 03 00 00 00 00
+    HEX     00 00 00 00 55 00 78 44 00 00 00 00 2A 00 18 1B
+    HEX     06 06 1C 78 00 00 00 00 1E 18 1E 19 18 18 18 00
+    HEX     00 00 00 00 55 00 46 76 00 00 00 00 2A 00 07 08
+    HEX     1E 06 06 06 00 00 00 00 0C 04 00 00 00 00 00 00
+    HEX     00 00 00 00 55 00 7C 03 00 00 00 00 2A 30 33 1C
+    HEX     7E 40 07 7C 00 00 00 00 00 07 0C 03 00 00 00 00
+    HEX     00 04 0C 0C 7F 0C 0C 0C 00 00 00 00 2A 00 00 00
+    HEX     0C 0C 48 70 00 00 00 00 00 06 03 00 00 00 00 00
+    HEX     00 00 00 00 55 06 06 06 00 00 00 00 2A 00 38 38
+    HEX     06 06 0C 78 00 00 00 00 38 38 36 21 00 00 00 00
+    HEX     00 00 00 00 55 00 07 18 00 00 00 00 2A 30 30 30
+    HEX     0C 06 18 60 00 00 00 00 30 0C 03 00 00 00 00 00
+    HEX     00 00 00 00 55 00 30 1C 00 00 00 00 2A 30 30 30
+    HEX     06 46 66 38 00 00 00 00 30 30 19 0E 00 00 00 00
+    HEX     00 00 00 00 55 00 00 0E 00 00 00 00 2A 38 38 1C
+    HEX     38 70 3C 06 00 00 00 00 07 01 0E 38 00 00 00 00
+    HEX     00 00 00 00 55 0C 0C 0C 00 00 00 00 2A 00 20 30
+    HEX     0C 18 30 60 06 03 7C 00 38 38 38 37 30 1C 0F 00
+    HEX     00 00 00 00 55 0C 7F 00 00 00 00 00 2A 00 3F 18
+    HEX     00 4E 31 4E 00 00 00 00 06 01 38 0F 00 00 00 00
+    HEX     00 00 00 00 55 60 70 08 00 00 00 00 2A 00 07 0C
+    HEX     0C 0C 18 70 00 00 00 00 18 18 08 07 00 00 00 00
+    HEX     00 00 00 00 55 00 60 60 00 00 00 00 2A 00 00 00
+    HEX     60 60 60 60 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 40 60 40 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 55 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 55 30 7C 06 00 00 00 00 2A 00 03 0E
+    HEX     7C 00 00 7C 00 00 00 00 19 18 0C 07 00 00 00 00
+    HEX     00 00 00 00 55 00 00 00 00 00 00 00 2A 00 00 00
+    HEX     00 40 60 40 00 00 60 00 00 03 07 07 06 03 00 00
+    HEX     00 00 00 00 55 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 40 60 40 00 00 00 00 00 03 07 03 00 00 00 00
+    HEX     00 00 00 00 55 00 00 00 00 00 00 00 2A 00 00 00
+    HEX     78 00 00 00 00 00 00 00 07 00 00 00 00 00 00 00
+    HEX     00 00 40 40 40 40 40 40 02 03 03 03 03 03 03 03
+    HEX     00 40 60 40 00 00 00 00 00 03 07 03 00 00 00 00
+    HEX     70 1C 07 00 00 60 70 70 03 0E 1C 0C 07 01 00 00
+    HEX     00 70 78 70 00 00 00 00 00 00 01 00 00 00 00 00
+    HEX     00 00 0C 4E 42 4E 00 00 00 00 03 03 00 03 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 30 70 40 70 00 00 00 00 0C 1C 10 1C 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 60 30 18 18 00 00 06 01 00 00 00 00
+    HEX     18 38 70 60 00 00 00 00 00 00 00 01 03 00 00 00
+    HEX     00 00 00 30 60 40 00 00 00 00 00 00 01 03 07 06
+    HEX     00 00 00 40 20 18 00 00 06 06 03 01 00 00 00 00
+    HEX     00 00 00 00 55 60 7C 66 00 00 00 00 2A 00 07 0C
+    HEX     66 7C 60 66 7C 60 00 00 00 07 0C 0C 07 00 00 00
+    HEX     40 00 00 00 00 00 42 6A 01 07 0E 0E 0E 0F 07 03
+    HEX     68 24 14 05 01 00 00 00 01 01 05 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     C1 C4 00 C5 80 C4 C1 00 A0 88 00 A8 00 0C 18 30
+    HEX     00 03 1F 73 40 00 00 00 30 30 30 18 07 00 00 00
+    HEX     00 00 00 00 40 70 1C 0C 00 00 00 A0 01 07 0E 1C
+    HEX     06 46 4E 7E 7C 7C 70 40 1F 7F 7F 7F 1F 1F 0F 03
+    HEX     00 00 C0 D0 D4 95 95 95 00 AA 82 80 90 80 84 80
+    HEX     D5 D4 D0 00 00 00 08 00 90 80 82 AA 00 11 01 55
+    HEX     A0 A8 8A 82 82 8A A8 A0 85 94 D0 C0 C0 D0 94 85
+    HEX     A0 A8 88 88 A8 A0 00 00 85 94 90 90 94 85 00 00
+    HEX     00 95 D0 C0 C0 00 82 A0 00 00 00 82 8A AA AA AA
+    HEX     00 C0 D0 95 00 08 00 2A AA 8A 82 00 00 01 11 01
+    HEX     20 22 20 82 8A 88 88 A0 15 00 04 00 00 94 D1 D0
+    HEX     A0 88 88 8A 82 08 00 2A D0 D1 94 00 00 01 11 01
+    HEX     20 22 20 00 00 94 D0 C0 15 00 04 00 00 8A 82 00
+    HEX     C1 C4 C1 95 C1 C4 C1 90 A0 88 A0 AA A0 88 A0 82
+    HEX     A0 A8 8A 82 82 8A A8 A0 85 94 D0 C0 C0 D0 94 85
+    HEX     A0 A8 88 88 A8 A0 00 00 85 94 90 90 94 85 00 00
+    HEX     28 00 20 00 00 94 D0 C0 05 44 04 00 00 8A 82 00
+    HEX     C1 C4 C1 95 C1 C4 C1 90 A0 88 A0 AA A0 88 A0 82
+    HEX     28 00 20 00 00 A8 82 82 05 44 04 C0 D0 90 91 84
+    HEX     82 82 A8 00 00 00 08 00 84 91 90 D0 C0 11 01 55
+    HEX     00 00 00 00 55 40 00 00 00 00 00 A0 00 02 0C 30
+    HEX     00 00 00 00 00 00 00 00 60 40 7C 42 61 13 0C 00
+    HEX     00 00 00 00 00 00 00 A0 00 00 00 C0 D0 94 85 81
+    HEX     A8 88 88 A0 00 00 00 80 00 00 94 D1 D0 D0 94 85
+    HEX     00 00 00 82 8A A8 A0 00 00 00 90 80 C0 00 81 85
+    HEX     00 00 A8 8A 8A 8A A8 A0 94 90 90 85 00 00 00 81
+    HEX     00 00 00 00 00 00 00 00 85 94 D0 C0 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 C0 D0 94 85
+    HEX     A0 A8 8A 82 00 00 00 00 81 00 00 00 00 00 00 00
+    HEX     00 00 00 00 82 8A A8 A0 00 00 00 00 00 00 00 81
+    HEX     00 00 00 00 00 00 00 50 85 94 D0 C0 00 02 02 2A
+    HEX     40 40 40 10 00 00 00 00 0A 0A 08 20 00 00 00 00
+    HEX     A0 A8 8A 82 00 40 40 54 81 80 80 80 00 00 00 0A
+    HEX     50 50 10 04 00 00 00 00 02 02 02 08 00 00 00 00
+    HEX     00 7F 1F 00 7F 1F 00 7F 00 7F 00 00 7F 00 00 7F
+    HEX     00 1F 00 00 5F 60 00 7F 00 70 18 00 7F 01 00 7F
+    HEX     00 00 00 00 1F 00 00 7F 20 70 60 00 7C 40 00 7F
+    HEX     00 00 00 00 03 03 00 0F 1F 00 7F 1F 00 7F 1F 00
+    HEX     00 00 7F 00 00 7F 00 00 3C 00 7F 3E 00 7F 7E 00
+    HEX     00 00 7F 00 00 7F 00 00 00 00 7F 60 00 7F 78 00
+    HEX     01 00 7F 03 00 7F 03 00 0F 00 3F 3E 00 7F 7C 00
+    HEX     00 00 00 00 00 01 01 00 7F 1F 00 7F 1F 00 7F 7F
+    HEX     7F 00 00 7F 00 00 7F 7F 7F 7C 00 6F 40 00 0F 0F
+    HEX     7F 03 00 7F 7F 00 78 70 7F 7E 00 7F 1F 00 7F 7F
+    HEX     7F 01 00 7F 00 00 7F 7F 7F 78 00 7F 70 00 7F 7F
+    HEX     07 07 00 1F 1F 00 7F 7F 00 00 00 00 00 00 00 00
+@
+
+<<stdfontdata.asm>>=
+    HEX     00 00 00 00 00 00 00 00 08 08 08 08 08 00 08 00
+    HEX     14 14 14 00 00 00 00 00 08 1C 3E 7F 1C 1C 1C 1C
+    HEX     08 3C 0A 1C 28 1E 08 00 06 26 10 08 04 32 30 00
+    HEX     04 0A 0A 04 2A 12 2C 00 08 08 08 00 00 00 00 00
+    HEX     08 04 02 02 02 04 08 00 08 10 20 20 20 10 08 00
+    HEX     08 2A 1C 08 1C 2A 08 00 00 08 08 3E 08 08 00 00
+    HEX     00 00 00 00 00 8C 88 84 00 00 00 3E 00 00 00 00
+    HEX     00 00 00 00 00 00 8C 00 00 20 10 08 04 02 00 00
+    HEX     8C 92 22 22 22 92 8C 00 08 0C 08 08 08 08 1C 00
+    HEX     1C 22 20 10 84 82 3E 00 3E 90 10 18 20 22 1C 00
+    HEX     10 18 14 12 3E 10 10 00 3E 02 1E 20 20 22 1C 00
+    HEX     18 04 82 1E 22 22 1C 00 3E 90 10 88 08 84 04 00
+    HEX     1C 22 22 1C 22 22 1C 00 1C 22 22 3C 90 10 0C 00
+    HEX     00 00 8C 00 00 8C 00 00 00 00 8C 00 00 8C 88 84
+    HEX     08 0C 7E 7F 7E 0C 08 00 00 00 3E 00 3E 00 00 00
+    HEX     08 18 3F 7F 3F 18 08 00 1C 22 90 88 08 00 08 00
+    HEX     1C 1C 1C 1C 7F 3E 1C 08 08 8C 14 92 3E 22 22 00
+    HEX     1E 22 22 1E 22 22 1E 00 1C 22 02 02 02 22 1C 00
+    HEX     1E 22 22 22 22 22 1E 00 3E 02 02 1E 02 02 3E 00
+    HEX     3E 02 02 1E 02 02 02 00 3C 02 02 02 32 22 3C 00
+    HEX     22 22 22 3E 22 22 22 00 1C 08 08 08 08 08 1C 00
+    HEX     20 20 20 20 20 22 1C 00 22 12 0A 06 0A 12 22 00
+    HEX     02 02 02 02 02 02 3E 00 22 36 2A 2A 22 22 22 00
+    HEX     22 22 26 2A 32 22 22 00 1C 22 22 22 22 22 1C 00
+    HEX     1E 22 22 1E 02 02 02 00 1C 22 22 22 2A 12 2C 00
+    HEX     1E 22 22 1E 0A 12 22 00 1C 22 02 1C 20 22 1C 00
+    HEX     3E 08 08 08 08 08 08 00 22 22 22 22 22 22 1C 00
+    HEX     22 22 22 92 14 8C 08 00 22 22 22 2A 2A 36 22 00
+    HEX     22 92 14 08 14 92 22 00 22 92 14 08 08 08 08 00
+    HEX     3E 90 10 08 04 82 3E 00 3E 06 06 06 06 06 3E 00
+    HEX     00 02 04 08 10 20 00 00 3E 30 30 30 30 30 3E 00
+    HEX     00 00 08 14 22 00 00 00 00 00 00 00 00 00 00 7F
+    HEX     04 08 10 00 00 00 00 00 00 00 1C 20 3C 22 3C 00
+    HEX     02 02 1E 22 22 22 1E 00 00 00 3C 02 02 02 3C 00
+    HEX     20 20 3C 22 22 22 3C 00 00 00 1C 22 3E 02 3C 00
+    HEX     18 24 04 1E 04 04 04 00 00 00 1C 22 22 3C 20 1C
+    HEX     02 02 1E 22 22 22 22 00 08 00 0C 08 08 08 1C 00
+    HEX     10 00 18 10 10 10 12 0C 02 02 22 12 0E 12 22 00
+    HEX     0C 08 08 08 08 08 1C 00 00 00 36 2A 2A 2A 22 00
+    HEX     00 00 1E 22 22 22 22 00 00 00 1C 22 22 22 1C 00
+    HEX     00 00 1E 22 22 1E 02 02 00 00 3C 22 22 3C 20 20
+    HEX     00 00 3A 06 02 02 02 00 00 00 3C 02 1C 20 1E 00
+    HEX     04 04 1E 04 04 24 18 00 00 00 22 22 22 32 2C 00
+    HEX     00 00 22 92 14 8C 08 00 00 00 22 22 2A 2A 36 00
+    HEX     00 00 22 14 08 14 22 00 00 00 22 92 14 8C 08 86
+    HEX     00 00 3E 10 08 04 3E 00 38 0C 0C 06 0C 0C 38 00
+    HEX     08 08 08 08 08 08 08 08 0E 18 18 30 18 18 0E 00
+    HEX     2C 1A 00 00 00 00 00 00 7F 7F 7F 7F 7F 7F 7F 7F
+@
+
+<<ealdr.asm>>=
+    PROCESSOR 6502
+    <<EALDR entry>>
+    <<EALDR copy subroutine>>
+    <<EALDR VM exec>>
+    <<EALDR clear text screen>>
+    <<EALDR reboot handler>>
+    <<EALDR funny increment>>
+    <<EALDR track pages>>
+    <<EALDR VM interpreter>>
+    <<EALDR dispatch table>>
+    <<EALDR VM arg reader>>
+    <<EALDR VM init>>
+    <<EALDR opcode handlers>>
+    <<EALDR DXR step>>
+    <<EALDR disk entry points>>
 @
 
 \chapter{Index}\par\noindent

@@ -20,16 +20,16 @@ DOCCHUNKSTART = re.compile(r"(^@ )|(^@$)")
 CODECHUNKEND = re.compile(r"\s*>>.*$")
 CODECHUNKSTART = re.compile(r"^.*<<\s*")
 # Note that <<A>>= appends to chunk A, or starts chunk A if it doesn't already exist.
-CHUNKSTART = re.compile(r"(^<<[-. 0-9A-Za-z]*>>=)|(^@ )|(^@$)")
-CHUNKREF = re.compile(r"<<([-. 0-9A-Za-z]*)>>")
+CHUNKSTART = re.compile(r"(^<<[-._  0-9A-Za-z]*>>=)|(^@ )|(^@$)")
+CHUNKREF = re.compile(r"<<([-._  0-9A-Za-z]*)>>")
 # A chunk ref with optional leading whitespace before
 # the ref and optional leading whitespace before the name.
-SPACECHUNKREF = re.compile(r"\s*<<\s*([-. 0-9A-Za-z]*)>>")
+SPACECHUNKREF = re.compile(r"\s*<<\s*([-._ 0-9A-Za-z]*)>>")
 LABELPREFIXSTART = "PYNW"
 ISDEF = re.compile(r"^@\s+%def.*$")
 DEFPREFIX = re.compile(r"^@\s+%def\s+")
 IDENT = re.compile(r"\b[a-zA-Z_]\w*\b")
-FILENAME = re.compile(r"[A-Za-z0-9.]+")
+FILENAME = re.compile(r"[A-Za-z0-9_]+\.[A-Za-z0-9]+")
 
 
 @dataclasses.dataclass
