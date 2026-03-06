@@ -1,0 +1,2052 @@
+\documentclass[10pt]{report}
+\setlength{\parskip}{1em plus 0.1em minus 0.2em}
+\usepackage {amsmath}
+\usepackage {noweb}
+\usepackage {graphicx}
+\usepackage {ltablex}
+\usepackage {caption, booktabs}
+% For more space between table rows.
+\newcommand{\ra}[1]{\renewcommand{\arraystretch}{#1}}
+
+% To prevent floatables like tables from leaving their sections.
+\usepackage[section]{placeins}
+
+% To make \thead in tables bold.
+\usepackage{makecell}
+\renewcommand\theadfont{\bfseries}
+
+
+\graphicspath { {./images/} }
+
+\usepackage[table,dvipsnames]{xcolor}
+
+\usepackage[colorlinks=true, urlcolor=blue, linkcolor=red]{hyperref}
+
+\usepackage {booktabs}
+
+% https://tug.ctan.org/info/visualtikz/VisualTikZ.pdf is very helpful
+% for understanding tikz.
+
+\usepackage {tikz}
+\usetikzlibrary {positioning, shapes.geometric, shapes.multipart, svg.path, arrows.meta, quotes, calc, decorations.pathreplacing}
+\tikzstyle{startstop} = [rectangle, rounded corners, font=\tiny, minimum width=1cm, minimum height=0.3cm,text centered, draw=black, fill=blue!30]
+\tikzstyle{process} = [rectangle, text width=1cm, minimum width=1cm, font=\tiny, minimum height=0.3cm, text centered, draw=black, fill=orange!30]
+\tikzstyle{decision} = [diamond, aspect=2, text width=1.2cm, minimum width=1cm, font=\tiny, minimum height=0.3cm, text centered, draw=black, fill=green!30]
+\tikzstyle{splitstackbox} = [rectangle split, rectangle split parts=2, rectangle split horizontal, text width=4.984cm, minimum width=4.984cm, minimum height=0.5cm, text centered, draw=black, thick, inner xsep=0cm]
+\tikzstyle{fullstackbox} = [rectangle, text width=10cm, minimum width=10cm, minimum height=0.5cm, text centered, draw=black, thick, inner xsep=0cm]
+\tikzstyle{tallstackbox} = [rectangle, text width=10cm, minimum width=10cm, minimum height=1.2cm, text centered, draw=black, thick, inner xsep=0cm]
+
+
+\noweboptions {smallcode,longchunks}
+
+% Generate assembly file and tex file with:
+% python -m weave
+%
+% Generate pdf file with:
+% pdflatex --output-directory=output output/main.tex (run twice for two passes)
+%
+% Compile assembly file with:
+% cd output; dasm main.asm -Lmain.lst -omain.bin -f3 -v4
+
+\title{%
+  Ali Baba and the Forty Thieves \\
+  \large Reverse engineered from the Apple II version}
+\author{Robert Baruch}
+\date{}
+
+\begin{document}
+
+\definecolor{apple_white}{rgb}{0.9,0.9,0.9}
+\newcommand{\Cbk}{\cellcolor{black}}
+\newcommand{\Cbl}{\cellcolor{Cerulean}}
+\newcommand{\Cbw}{\cellcolor{apple_white}}
+\newcommand{\Cbo}{\cellcolor{orange}}
+\newcommand{\Cbg}{\cellcolor{green}}
+\newcommand{\Cbv}{\cellcolor{violet}}
+
+\maketitle
+\tableofcontents
+
+\pagestyle{noweb}
+
+@ \chapter{Ali Baba and the Forty Thieves}
+
+\begin{center}
+\includegraphics[width=\columnwidth]{images/splash_screen.png}
+\end{center}
+
+\section{Introduction}
+
+\textbf{Ali Baba and the Forty Thieves} (\href{https://en.wikipedia.org/wiki/Ali_Baba_and_the_Forty_Thieves_(video_game)}{Wikipedia link}) is a graphical computer role-playing
+game ([[CRPG]]) written by Stuart Smith in 1981 and released in 1982 for the
+Apple II.
+
+It was published by \href{https://en.wikipedia.org/wiki/Quality_Software}{Quality Software}. The game is a ``hot-seat'' multiplayer game, where players may take turns at
+the keyboard to control their character. The game can also be played single-player,
+with the player controlling all characters.
+
+The goal is to rescue Princess Buddir and bring her back to Ali Baba's home.
+Forty thieves wander the dungeon, and there are other fixed enemies and
+wandering friendly [[NPC]]s who can join your party.
+
+There is a good overview of the gameplay at \href{https://crpgaddict.blogspot.com/2013/07/game-103-ali-baba-and-forty-thieves-1981.html}{CRPG Addict}.
+
+The purpose of this document is to reverse engineer the game. The disk image used is
+from the Internet Archive:
+\begin{itemize}
+  \item \href{https://archive.org/details/AliBabaAndTheFortyThieves4amCrack}{Ali Baba and the Forty Thieves (4am and san inc crack)}
+\end{itemize}
+
+Although originally published by Quality Software, the disk image shows that it
+was published by Electronic Arts. In 1986, Electronic Arts published Age of
+Adventure, a compilation of Ali Baba and Stuart Smith's The Return of Heracles (1983).
+This image is almost certainly from this compilation: 4am also cracked The
+Return of Heracles on the same day.
+
+\section{About this document}
+
+All files can be found on \href{https://github.com/RobertBaruch/ali_baba_reveng}{Github}.
+
+The source for this document, [[main.nw]], is a literate programming document. This means the explanatory text is
+interspersed with source code. The assembly code and [[LaTeX]] file can be extracted from the document and compiled.
+
+The goal is to provide all the source code necessary to reproduce a binary
+identical to the images extracted from the disk.
+
+The code was reverse-engineered using Ghidra.
+
+The assembly code was assembled using [[dasm]] using this command line:
+
+\begin{verbatim}
+    dasm main.asm -Lmain.lst -omain.bin -f3 -v4
+\end{verbatim}
+
+The document is written in \LaTeX.
+
+This document doesn't explain every last detail. It's assumed that the reader can
+find enough details on the 6502 processor and the Apple II series of computers
+to fill in the gaps.
+
+Useful resources:
+
+\begin{itemize}
+\item \href{https://archive.org/details/6502alp}{6502 Assembly Language Programming}, by Lance A. Leventhal, 1979.
+\item \href{https://archive.org/details/aiimp}{Apple II Monitors Peeled}, Apple, 1981.
+\item \href{https://archive.org/details/beneath-apple-dos}{Beneath Apple DOS}, by Don Worth and Pieter Lechner, 1982.
+\item \href{https://archive.org/details/understanding_the_apple_ii}{Understanding the Apple II}, by Jim Sather, 1983.
+\item \href{https://archive.org/details/williams-et-al-1983-apple-ii-computer-graphics}{Apple II Computer Graphics}, by Ken Williams, Bob Kernaghan, and Lisa Kernaghan, 1983.
+\item \href{https://archive.org/details/Beagle_Bros-Poster_1}{Beagle Bros Apple Colors and ASCII Values}, Beagle Bros Micro Software Inc, 1984.
+\item \href{https://archive.org/details/hi-res-graphics-and-animation-using-assembly-language}{Hi-Res Graphics and Animation Using Assembly Language, The Guide for Apple II Programmers}, by Leanard I. Malkin, 1985.
+\item \href{https://archive.org/details/Apple_IIe_Technical_Reference_Manual/mode/1up}{Apple IIe Technical Reference Manual}, Apple, 1985.
+\item \href{https://6502disassembly.com/a2-rom/}{Apple II ROM disassemblies}, collected by Andy McFadden, 2019.
+\item \href{https://www.kreativekorp.com/miscpages/a2info/iomemory.shtml}{I/O Memory}, by Jon Relay.
+\item \href{https://www.masswerk.at/6502/6502_instruction_set.html}{6502 Instruction Set}, by Norbert Landsteiner.
+\end{itemize}
+
+\section{The booting of a disk}
+
+\textbf{Suggested reading:} \textit{Beneath Apple DOS}
+(Don Worth, Pieter Lechner, 1982) page 5-6,
+\href{https://archive.org/details/beneath-apple-dos/page/n57/mode/2up}{``What happens during booting''}.
+
+In general, booting the typical Apple disk until it runs the actual program
+looks like this:
+
+[[DISKCARD -> BOOT1 -> BOOT2 -> PROGRAM]]
+
+The disk card has a small ROM whose purpose is to load [[BOOT1]], which starts from
+track 0 sector 0, where the first byte of sector 0 tells the card how many sectors are in [[BOOT1]]. Standard [[DOS 3.3]]'s [[BOOT1]] is only one sector long, but other more custom
+disk loaders have more sectors (up to 16).
+
+The purpose of [[BOOT1]] is to load [[BOOT2]], which contains a set of general disk service
+routines. The entry point into [[BOOT2]] loads the main program and then jumps to
+it. The main program can then use the disk routines from [[BOOT2]].
+
+Since all we're interested in is the main program, we need to find out what
+happens at the beginning of [[BOOT2]], which will tell us where the program is on
+the disk, and what the program's entry point is. If the program itself uses the
+disk for any reason, then we have to look at [[BOOT2]] more closely.
+
+\subsection{Sector interleaving}
+
+Within a single track, sectors are not necessarily stored in consecutive order.
+The reason is that it takes time for the program to process the data for a
+sector it just read. By the time the program is ready to read the next sector,
+the disk has rotated some amount.
+
+It would make loading multiple sectors faster if the program ``speed'' and the
+disk ``speed'' were coordinated. Thus, for example, sector 1 might be placed
+half the disk around from sector 0. In standard [[DOS 3.3]], sector 1 is placed
+nearly all the way around the disk -- [[7/8]] of the way around!
+
+\section{Extracting the sections}
+
+The disk image contains the following sections. Note that the disk has 16
+sectors per track, and we will refer to tracks and sectors only by
+[[16 * track + sector]].
+
+\begin{itemize}
+  \item Sector 0-4: [[BOOT1]]:
+    Target address [[$0800]], entry point [[$0801]].
+  \item Sector 16-47: [[BOOT2]]:
+    Target address [[$A000]], entry point [[$A806]].
+\end{itemize}
+
+The sections can be extracted from the disk image using the following commands:
+
+\begin{verbatim}
+python -m extract --first 0 -n 5 \
+  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o boot1.bin \
+  --table boot1_xlat.txt
+python -m extract --first 16 -n 32 \
+  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o boot2.bin \
+  --table boot2_xlat.txt
+python -m extract --first 16 -n 26 \
+  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o main.bin --skew
+\end{verbatim}
+
+\chapter{6502 programming techniques}
+
+\section{Zero page temporaries}
+
+Zero-page consists essentially of global variables. Sometimes we need local
+temporaries, and Apple II programs mostly don't use the stack for those. Rather,
+some ``global'' variables are reserved for temporaries. You might see multiple
+symbols equated to a single zero-page location. The names of such symbols are
+used to make sense within their context.
+
+\section{Tail calls}
+
+Rather than a [[JSR]] immediately followed by an [[RTS]], instead a [[JMP]]
+can be used to save stack space, code space, and time. This is known as a
+tail call, because it is a call that happens at the tail of a function.
+
+\section{Unconditional branches}
+
+The 6502 doesn't have an unconditional short jump. However, if you can find
+a condition that is always true, this can serve as an unconditional short
+jump, which saves space and time.
+
+\section{Stretchy branches}
+
+6502 branches have a limit to how far they can jump. If they really need to
+jump farther than that, you have to put a [[JMP]] or an unconditional branch
+within reach.
+
+\section{Shared code}
+
+To save space, sometimes code at the end of one function is also useful to
+the next function, as long as it is within reach. This can save space, at
+the expense of functions being completely independent.
+
+\section{Macros}
+
+We use these macros to make our assembly language listings a little less verbose.
+
+\subsection{STOW, STOW2}
+
+[[STOW]] stores a 16-bit literal value to a memory location.
+
+For example, [[STOW #$01FF, $0200]] stores the 16-bit value [[#$01FF]] to memory location [[$0200]] (of course in little-endian order).
+
+<<Macros>>=
+    MACRO STOW
+        LDA      #<{1}
+        STA      {2}
+        LDA      #>{1}
+        STA      {2}+1
+    ENDM
+@ %def STOW
+
+[[STOW2]] does the same, but in the opposite order, still retaining little-endianness.
+
+<<Macros>>=
+    MACRO STOW2
+        LDA      #>{1}
+        STA      {2}+1
+        LDA      #<{1}
+        STA      {2}
+    ENDM
+@ %def STOW2
+
+\subsection{MOVB, MOVW, STOB}
+
+[[MOVB]] moves a byte from one memory location to another, while [[STOB]] stores a literal byte to a memory location.
+The implementation is identical, and the only difference is documentation.
+
+For example, [[MOVB $01, $0200]] moves the byte at memory location [[$01]] to memory location [[$0200]], while [[STOB #$01, $0200]] stores the byte [[#$01]] to memory location [[$0200]].
+
+<<Macros>>=
+    MACRO MOVB
+        LDA    {1}
+        STA    {2}
+    ENDM
+    MACRO STOB
+        LDA    {1}
+        STA    {2}
+    ENDM
+@ %def MOVB STOB
+
+[[MOVW]] moves a 16-bit value from one memory location to the another.
+
+For example, [[MOVW $01FF, $A000]] moves the 16-bit value at memory location [[$01FF]] to memory location [[$A000]].
+
+<<Macros>>=
+    MACRO MOVW
+        LDA    {1}
+        STA    {2}
+        LDA    {1}+1
+        STA    {2}+1
+    ENDM
+@ %def MOVW
+
+\subsection{PSHW, PULB, PULW}
+
+[[PSHW]] is a macro that pushes a 16-bit value in memory onto the stack.
+
+For example, [[PSHW $01FF]] pushes the 16-bit value at memory location [[$01FF]] onto the stack.
+
+<<Macros>>=
+    MACRO PSHW
+        LDA    {1}
+        PHA
+        LDA    {1}+1
+        PHA
+    ENDM
+@ %def PSHW
+
+[[PULB]] is a macro that pulls an 8-bit value from the stack to memory.
+
+For example, [[PULB $01FF]] pulls an 8-bit value from the stack and stores it at memory location [[$01FF]].
+
+<<Macros>>=
+    MACRO PULB
+        PLA
+        STA    {1}
+    ENDM
+@ %def PULB
+
+[[PULW]] is a macro that pulls a 16-bit value from the stack to memory.
+
+For example, [[PULW $01FF]] pulls a 16-bit value from the stack and stores it at memory location [[$01FF]].
+
+<<Macros>>=
+    MACRO PULW
+        PLA
+        STA    {1}+1
+        PLA
+        STA    {1}
+    ENDM
+@ %def PULW
+
+\subsection{INCW}
+
+[[INCW]] is a macro that increments a 16-bit little-endian value in memory.
+
+For example, [[INCW $01FF]] increments the 16-bit value at memory location [[$01FF]].
+
+<<Macros>>=
+    MACRO INCW
+        INC    {1}
+        BNE    .continue
+        INC    {1}+1
+.continue
+    ENDM
+@ %def INCW
+
+\subsection{ADDA, ADDAC, ADDB, ADDB2, ADDW, ADDWC}
+
+[[ADDA]] is a macro that adds the [[A]] register to a 16-bit little-endian memory location.
+
+For example, [[ADDA $01FF]] adds the contents of the [[A]] register to the 16-bit value at memory location [[$01FF]].
+
+<<Macros>>=
+    MACRO ADDA
+        CLC
+        ADC    {1}
+        STA    {1}
+        BCC    .continue
+        INC    {1}+1
+.continue
+    ENDM
+@ %def ADDA
+
+[[ADDAC]] is a macro that adds the [[A]] register, and whatever the carry flag is set to, to a 16-bit memory location.
+
+<<Macros>>=
+    MACRO ADDAC
+        ADC    {1}
+        STA    {1}
+        BCC    .continue
+        INC    {1}+1
+.continue
+    ENDM
+@ %def ADDAC
+
+[[ADDB]] is a macro that adds an 8-bit immediate value, or the 8-bit contents of memory, to a 16-bit memory location.
+
+For example, [[ADDB $01FF, #$01]] adds the immediate value [[#$01]] to the 16-bit value at memory location [[$01FF]], while
+[[ADDB $01FF, $0300]] adds the 8-bit value at memory location [[$0300]] to the 16-bit value at memory location [[$01FF]].
+
+<<Macros>>=
+    MACRO ADDB
+        LDA    {1}
+        CLC
+        ADC    {2}
+        STA    {1}
+        BCC    .continue
+        INC    {1}+1
+.continue
+    ENDM
+@ %def ADDB
+
+[[ADDB2]] is the same as [[ADDB]] except that it swaps
+the initial [[CLC]] and [[LDA]] instructions.
+
+<<Macros>>=
+    MACRO ADDB2
+        CLC
+        LDA    {1}
+        ADC    {2}
+        STA    {1}
+        BCC    .continue
+        INC    {1}+1
+.continue
+    ENDM
+@ %def ADDB2
+
+[[ADDW]] is a macro that adds two 16-bit values in memory and stores
+it to a third 16-bit memory location.
+
+For example, [[ADDW $01FF, $0300, $0400]] adds the 16-bit value at memory location [[$01FF]] to the 16-bit value at memory location [[$0300]], and stores the result at memory location [[$0400]].
+
+<<Macros>>=
+    MACRO ADDW
+        CLC
+        LDA    {1}
+        ADC    {2}
+        STA    {3}
+        LDA    {1}+1
+        ADC    {2}+1
+        STA    {3}+1
+    ENDM
+@ %def ADDW
+
+[[ADDWC]] is a macro that adds two 16-bit values in memory, plus
+the carry bit, and stores it to a third 16-bit memory location.
+
+<<Macros>>=
+    MACRO ADDWC
+        LDA    {1}
+        ADC    {2}
+        STA    {3}
+        LDA    {1}+1
+        ADC    {2}+1
+        STA    {3}+1
+    ENDM
+@ %def ADDWC
+
+\subsection{SUBB, SUBB2, SUBW}
+
+[[SUBB]] is a macro that subtracts an 8-bit value from a 16-bit memory location. This is the same as
+[[SUBB]] in the original Infocom source code. The immediate value is the second argument.
+
+For example, [[SUBB $01FF, #$01]] subtracts the immediate value [[#$01]] from
+the 16-bit value at memory location [[$01FF]] and stores it back.
+
+<<Macros>>=
+    MACRO SUBB
+        LDA    {1}
+        SEC
+        SBC    {2}
+        STA    {1}
+        BCS    .continue
+        DEC    {1}+1
+.continue
+    ENDM
+@ %def SUBB
+
+[[SUBB2]] is the same as [[SUBB]] except that it swaps the initial [[SEC]] and [[LDA]] instructions.
+
+<<Macros>>=
+    MACRO SUBB2
+        SEC
+        LDA    {1}
+        SBC    {2}
+        STA    {1}
+        BCS    .continue
+        DEC    {1}+1
+.continue
+    ENDM
+@ %def SUBB2
+
+[[SUBW]] is a macro that subtracts the 16-bit memory value in the second argument from a 16-bit memory location in the first argument,
+and stores it in the 16-bit memory location in the third argument.
+
+For example, [[SUBW $01FF, $0300, $0400]] subtracts the 16-bit value at memory location [[$0300]] from the 16-bit value at memory location [[$01FF]], and stores the result at memory location [[$0400]].
+
+<<Macros>>=
+    MACRO SUBW
+        SEC
+        LDA    {1}
+        SBC    {2}
+        STA    {3}
+        LDA    {1}+1
+        SBC    {2}+1
+        STA    {3}+1
+    ENDM
+@ %def SUBW
+
+[[SUBWL]] is a macro that subtracts the 16-bit memory value in the second argument from the 16-bit literal in the first argument,
+and stores it in the 16-bit memory location in the third argument.
+
+For example, [[SUBWL #$01FF, $0300, $0400]] subtracts the 16-bit value at memory location [[$0300]] from the 16-bit value [[#$01FF]], and stores the result at memory location [[$0400]].
+
+<<Macros>>=
+    MACRO SUBWL
+        SEC
+        LDA    <{1}
+        SBC    {2}
+        STA    {3}
+        LDA    >{1}
+        SBC    {2}+1
+        STA    {3}+1
+    ENDM
+@ %def SUBWL
+
+\subsection{ROLW, RORW}
+
+[[ROLW]] rotates a 16-bit memory location left.
+
+<<Macros>>=
+    MACRO ROLW
+        ROL    {1}
+        ROL    {1}+1
+    ENDM
+@ %def ROLW
+
+[[RORW]] rotates a 16-bit memory location right.
+
+<<Macros>>=
+    MACRO RORW
+        ROR    {1}+1
+        ROR    {1}
+    ENDM
+@ %def RORW
+
+\subsection{Comparison macros}
+
+OFten there is a compare instruction ([[CMP, CPX, CPY]]) followed by a branch. These macros combine
+the two instructions as a one-liner.
+
+<<Macros>>=
+    MACRO BEQ.A
+        CMP     {1}
+        BEQ     {2}
+    ENDM
+
+    MACRO BNE.A
+        CMP     {1}
+        BNE     {2}
+    ENDM
+
+    MACRO BEQ.X
+        CPX     {1}
+        BEQ     {2}
+    ENDM
+
+    MACRO BNE.X
+        CPX     {1}
+        BNE     {2}
+    ENDM
+
+    MACRO BEQ.Y
+        CPY     {1}
+        BEQ     {2}
+    ENDM
+
+    MACRO BNE.Y
+        CPY     {1}
+        BNE     {2}
+    ENDM
+@ %def BEQ.A, BNE.A, BEQ.X, BNE.X, BEQ.Y, BNE.Y
+
+\section{The APSTR postprocessor}
+
+Ali Baba uses Pascal-formatted strings. This means that string data has one length byte, then that number
+of character bytes after. In addition, the strings are in "Apple ASCII", where the high bit of each
+character is set. Rather than just adding raw hex bytes to the assembly listing, I've opted to write
+a small Python program which does a pass over the assembly source to find [[APSTR]] directives with strings
+and convert them to raw [[HEX]] data.
+
+\chapter{The boot process}
+
+Although the 4am crack of the disk is copyable and deployable as a standard
+[[DOS 3.3]] image, so there's no funny business about custom sector layouts and
+custom prologues and epilogues, nevertheless everything else about [[BOOT1]]
+and [[BOOT2]] has been left intact. This includes any decryption routines and
+other such protection schemes that do not involve the disk.
+
+In this case, the game was distributed by Electronic Arts,
+Thus, it is important to understand what [[BOOT]]
+
+\section{BOOT1}
+
+After the disk card reads [[BOOT1]], the zero-page location [[IWMDATAPTR]] is
+left as the pointer to memory just after [[BOOT1]]. The
+location [[IWMSLTNDX]] is the disk card's slot index (slot times 16).
+
+<<BOOT1>>=
+@
+
+\section{BOOT2}
+
+[[BOOT2]] contains a kind of mini virtual machine. The machine has a one-byte
+``psuedo-accumulator'' (stored at [[$48]]), a two-byte pointer ([[boot2_ptr]]), and an
+instruction pointer. The machine has 18 opcodes (see table).
+
+\begin{table}[]
+\begin{tabular}{llll}
+\multicolumn{1}{c}{Byte} & \multicolumn{1}{c}{Opcode} & \multicolumn{1}{c}{Argument} & \multicolumn{1}{c}{Operation} \\
+00 & [[TJMP]] & addr & [[IP <- addr]] \\
+01 & [[CALL1]] & addr & [[A <- addr(A)]] \\
+02 & [[TBEQ]] & addr & If [[A == 0]], [[IP <- addr]] \\
+03 & [[LDI]] & val & [[A <- val]] \\
+04 & [[LD]] & addr & [[A <- (addr)]] \\
+05 & [[TCALL]] & addr & Push IP onto stack, jump to addr \\
+06 & [[ST]] & addr & [[(addr) <- A]] \\
+07 & [[SUBI]] & val & [[A -= val]] \\
+08 & [[CALL0]] & addr & [[addr()]] \\
+09 & [[TRET]] & none & Pop IP from stack \\
+0A & [[LDX]] & addr & [[A <- (addr + A)]] \\
+0B & [[ASL]] & none & [[A *= 2]] \\
+0C & [[INC]] & addr & [[A <- ++(addr)]] \\
+0D & [[ADD]] & val & [[A += val]] \\
+0E & [[DXR]] & none & decrypts (src) \\
+0F & [[TBNE]] & addr & If [[A != 0]], [[IP <- addr]] \\
+10 & [[SUB]] & addr & [[A -= (addr)]] \\
+11 & [[COPY]] & none & [[(dest++) <- (src++)]]
+\end{tabular}
+\caption{EA loader program opcodes}
+\label{table:ealoadervm}
+\end{table}
+
+The addresses and values in the program are ``encrypted''. Addresses need to be
+exclusive-ored with [[#$D903]] and values need to be exclusive-ored with [[#$4C]].
+
+Here is the program:
+
+<<BOOT2 Program>>=
+A851:   LD      C050    ; TXTCLR soft switch (display graphics)
+        LD      C052    ; MIXCLR (display full screen)
+        LD      C057    ; HIRES (display hi-res graphics)
+        LDI     F8
+        ST      004C    ; boot2_src
+        LDI     48
+        ST      03F2
+        LDI     A9
+        ST      03F3    ; RESET handler = A948
+        LDI     0C
+        ST      03F4    ; Power-up byte
+A86E:   LDI     FF
+        CALL    FCA8    ; WAIT
+        INC     004C    ; boot2_src
+        TBEQ    A87C v
+        JMP     A86E ^
+
+A87C:   LD      A805    ; it's 00.
+        TBEQ    A88D v
+        LDI     00
+        TCALL   A967 v  ; Read track by index
+        LD      C0E8    ; IWM: Motor off
+        CALL1   0000
+
+        ; Read tracks 7-C to 0x4000-0x95FF.
+        ; Track B gets written to 0x8000-0x8FFF, but then
+        ; track C gets written to 0x8600-0x95FF.
+A88D:   LDI     05
+        TCALL   A967 v  ; Read track by index (Tracks 7-C)
+        CALL1   A898    ; Zero out $400-$7FF
+        JMP     A8B2 v
+
+A898:   ; machine language subroutine to zero out $400-$7FF (text page 0)
+
+A8B2:   LD      A800    ; it's 01
+        TBEQ    A8BB v
+
+A8B8:   LD      C056    ; LORES (display lo-res)
+
+        ; Read tracks:
+        ;   0D -> 0x0800-0x17FF
+        ;   0E -> 0x1000-0x1FFF (overwrites half of track 0D)
+        ;   0F -> 0x2000-0x2FFF
+        ;   10 -> 0x3000-0x3FFF
+A8BB:   LDI     0C
+        TCALL   A967 v  ; Read track by index (starts with track 0D)
+
+        ; Silly checksum routine on A000-A2??
+        LDI     00
+        ST      004C    ; boot2_src
+        ST      A9F2    ; boot2_tmp1
+
+A8C8:   LD      004C    ; boot2_src
+        LDX     A000
+        SUB     A9F2
+        ST      A9F2    ; boot2_tmp1 -= A000[boot2_src]
+        LD      004C
+        LDX     A100
+        SUB     A9F2
+        ST      A9F2    ; boot2_tmp1 -= A100[boot2_src]
+        INC     004C
+        TBNE    A8C8 ^
+
+A8E6:   LD      004C
+        LDX     A200
+        SUB     A9F2
+        ST      A9F2    ; boot2_tmp1 -= A200[boot2_src]
+        INC     004C
+        SUBI    E0      ; A -= 0xE0
+        TBNE    A8E6 ^
+
+        LD      A9F2
+        SUBI    60      ; A = boot2_tmp1 - 0x60
+        TBNE    A9AB v  ; error (noreturn)
+
+        LDI     05
+        CALL1   BC00    ; jumps to BCD4 (move_arm_to_track)
+        LD      A000
+        LDI     00
+        LD      C0E8    ; IWM: Motor off
+
+        LDI     00
+        ST      004C
+        LDI     40
+        ST      004D    ; boot2_src <- 4000
+
+        LDI     02
+        ST      AC60    ; boot2_bot <- 02
+        LDI     03
+        ST      AC61    ; boot2_top <- 03
+
+A923:   CALL1   A970    ; funny-increment AC60
+        DXR             ; decrypt byte at boot2_src
+        TBNE    A923 ^
+
+        ; Copy A300-A5FF to 0500-07FF
+        LDI     00      ; boot2_src <- A300, boot2_dest <- 0500
+        ST      004C
+        ST      004E
+        LDI     A3
+        ST      004D
+        LDI     05
+        ST      004F
+
+A93C:   COPY
+        LD      004F
+        SUBI    08
+        TBNE    A93C ^
+
+        CALL0   0800    ; call main!
+
+A948:   ; machine language subroutine
+
+        ; Read tracks by index, until track page is 0.
+A967:   ST      A9F1    ; boot2_tmp0
+        LD      C0E9    ; IWM: Motor on
+        TJMP    A985 v
+
+A970:   ; machine language subroutine
+
+A985:   LD      A9F1    ; boot2_tmp0
+        LDX     A9F3    ; boot2_table1 (track page)
+        TBEQ    A9F0 v  ; Return
+        ST      003E    ; boot2_track_page
+        LD      A9F1    ; boot2_tmp0
+        LDX     AA04    ; boot2_table2 (track)
+        CALL1   BC03    ; jumps to BF00 (read track)
+        TBEQ    A9A0 v  ; read track ok?
+        TJMP    A9D4 v  ; Error routine (noreturn)
+
+A9A0:   LD      A9F1    ; boot2_tmp0++
+        SUBI    FF
+        ST      A9F1
+        TJMP    A985 ^
+
+; Error routine: print '?' and turn motor on and off in a loop.
+A9AB:   LD      C0E9    ; IWM: motor on
+        CALL1   FC58    ; HOME (clear screen)
+        LD      C051    ; TXTSET (display text screen)
+        LDI     BF      ; '?'
+        ST      0400    ; Display '?'
+        LDI     40
+        CALL1   FCA8    ; WAIT
+        LD      C0E8    ; IWM: Motor off
+A9C1:   LDI     60
+        CALL1   FCA8    ; WAIT
+        LDI     08
+        CALL1   FCA8    ; WAIT
+        INC     A9F2
+        TBNE    A9C1 ^
+        TJMP    A9AB ^
+
+; Error routine: beep, print "ERR", turn off disk motor, and spinloop.
+A9D4:   CALL1   FC58    ; HOME
+        CALL1   FBDD    ; BELL
+        LD      C051    ; TXTSET (display text screen)
+        LDI     C5      ; 'E'
+        ST      0400    ; text page 0 char 0
+        LDI     D2      ; 'R'
+        ST      0401    ; text page 0 char 1
+        ST      0402    ; text page 0 char 2
+        LD      C0E8    ; IWM: Motor off
+A9ED:   TJMP    A9ED -  ; Spinloop
+
+A9F0:   TRET
+@
+
+<<BOOT2 track pages>>=
+BOOT2_track_pages:
+    HEX     08 10 20 30 00
+    HEX     40 50 60 70 80 86 00
+    HEX     08 10 20 30 00
+
+BOOT2_tracks:
+    HEX     03 04 21 22 00
+    HEX     07 08 09 0A 0B 0C 00
+    HEX     0D 0E 0F 10 00
+@ %def BOOT2_track_pages BOOT2_tracks
+
+<<BOOT2 subroutine>>=
+FUN_a970:
+    INC      boot2_bot
+    LDA      boot2_bot
+    CMP      boot2_top
+    BEQ      .inc
+    RTS
+.inc:
+    LDA      #$01
+    STA      boot2_bot
+    INC      boot2_top
+    RTS
+@
+
+<<BOOT2 virtual DXR>>=
+boot2_routine_0E_DXR_jmp:
+    SUBROUTINE
+
+    LDX      #$00           ; boot2_src ^= BOOT2_psuedoacc
+    LDA      (boot2_src,X)
+    EOR      BOOT2_psuedoacc
+    STA      (boot2_src,X)
+    INC      boot2_src      ; boot_src += 2
+    INC      boot2_src
+    BNE      .continue
+    INC      boot2_src+1
+
+.continue:
+    LDA      boot2_src+1    ; BOOT2_psuedoacc = boot2_src_H ^ 0x68
+    EOR      #$68
+    STA      BOOT2_psuedoacc
+    JMP      .loop
+@ %def boot2_routine_0E_DXR_jmp
+
+
+\chapter{Startup}
+
+
+\chapter{Apple II Graphics}
+Hi-res graphics on the Apple II is odd. Graphics are memory-mapped, not exactly
+consecutively, and bits don't always correspond to pixels. Color especially is
+odd, compared to today's luxurious 32-bit per pixel RGBA.
+
+The Apple II has two hi-res graphics pages, and maps the area from [[$2000-$3FFF]] to
+high-res graphics page 1 (HGR1), and [[$4000-$5FFF]] to page 2 (HGR2).
+
+\section{Pixels and their color}
+First we'll talk about pixels. Nominally, the resolution of the hi-res graphics screen
+is 280 pixels wide by 192 pixels tall. In the memory map, each row is represented
+by 40 bytes. The high bit of each byte is not used for pixel data, but is used to
+control color.
+
+Here are some rules for how these bytes are turned into pixels:
+\begin{itemize}
+  \item Pixels are drawn to the screen from byte data least significant bit first.
+        This means that for the first byte bit 0 is column 0, bit 1 is column 1,
+        and so on.
+  \item A pattern of [[11]] results in two white pixels at the [[1]] positions.
+  \item A pattern of [[010]] results at least in a colored pixel at the [[1]] position.
+  \item A pattern of [[101]] results at least in a colored pixel at the [[0]] position.
+  \item So, a pattern of [[01010]] results in at least three consecutive colored
+        pixels starting from the first [[1]] to the last [[1]]. The last [[0]] bit
+        would also be colored if followed by a [[1]].
+  \item Likewise, a pattern of [[11011]] results in two white pixels, a colored pixel,
+        and then two more white pixels.
+  \item The color of a [[010]] pixel depends on the column that the [[1]] falls on, and
+        also whether the high bit of its byte was set or not.
+  \item The color of a [[11011]] pixel depends on the column that the [[0]] falls on, and
+        also whether the high bit of its byte was set or not.
+
+        \begin{center}
+        \begin{tabular}{@{}rcc@{}} \toprule
+        & Odd & Even \\ \cmidrule(r){2-3}
+        High bit clear & Green & Violet \\
+        High bit set & Orange & Blue \\ \bottomrule
+        \end{tabular}
+        \end{center}
+
+        The implication is that you can only select one pair of colors per byte.
+\end{itemize}
+
+An example would probably be good here. We will take one of the font characters from the game,
+the lower-case [[r]]:
+
+\begin{center}
+\begin{tabular}{@{}rccc@{}} \toprule
+Bytes & Bits & Colorset & Pixel Data \\ \cmidrule{1-3}
+[[00 00]] & [[00000000 00000000]] & [[0]] & [[00000000000000]] \\
+[[00 00]] & [[00000000 00000000]] & [[0]] & [[00000000000000]] \\
+[[00 00]] & [[00000000 00000000]] & [[0]] & [[00000000000000]] \\
+[[00 00]] & [[00000000 00000000]] & [[0]] & [[00000000000000]] \\
+[[55 2A]] & [[01010101 00101010]] & [[0]] & [[10101010101010]] \\
+[[00 00]] & [[00000000 00000000]] & [[0]] & [[00000000000000]] \\
+[[46 07]] & [[01000110 00000111]] & [[0]] & [[01100011110000]] \\
+[[76 08]] & [[01110110 00001000]] & [[0]] & [[01101110001000]] \\
+[[00 1E]] & [[00000000 00011110]] & [[0]] & [[01111000011000]] \\
+[[00 06]] & [[00000000 00000110]] & [[0]] & [[01100000010000]] \\
+[[00 06]] & [[00000000 00000110]] & [[0]] & [[01100000000000]] \\
+[[00 06]] & [[00000000 00000110]] & [[0]] & [[01100000000000]] \\
+[[2A 00]] & [[00101010 00000000]] & [[0]] & [[00000000000000]] \\
+[[00 00]] & [[00000000 00000000]] & [[0]] & [[00000000000000]] \\
+[[07 00]] & [[00000111 00000000]] & [[0]] & [[00000000000000]] \\
+[[08 00]] & [[00001000 00000000]] & [[0]] & [[00000000000000]] \\ \bottomrule
+\end{tabular}
+\caption{Font character example}
+\label{table:fontexample}
+\end{center}
+
+Assuming that the following bits are all zero, and we place the
+character starting at column 0, we should see this:
+
+\begin{center}
+\scalebox{0.8}{
+\begin{tabular}{@{}rcccccccccccccc@{}}
+0 & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk \\
+1 & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk \\
+2 & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk \\
+3 & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk \\
+4 & \Cbv & \Cbv & \Cbv & \Cbv & \Cbv & \Cbv & \Cbv & \Cbv & \Cbv & \Cbv & \Cbv & \Cbv & \Cbv & \Cbk \\
+5 & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk \\
+6 & \Cbk & \Cbw & \Cbw & \Cbk & \Cbk & \Cbk & \Cbw & \Cbw & \Cbw & \Cbw & \Cbk & \Cbk & \Cbk & \Cbk \\
+7 & \Cbk & \Cbw & \Cbw & \Cbv & \Cbw & \Cbw & \Cbw & \Cbk & \Cbk & \Cbk & \Cbv & \Cbk & \Cbk & \Cbk \\
+8 & \Cbk & \Cbw & \Cbw & \Cbw & \Cbw & \Cbk & \Cbk & \Cbk & \Cbk & \Cbw & \Cbw & \Cbk & \Cbk & \Cbk \\
+9 & \Cbk & \Cbw & \Cbw & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbg & \Cbk & \Cbk & \Cbk & \Cbk \\
+10 & \Cbk & \Cbw & \Cbw & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk \\
+11 & \Cbk & \Cbw & \Cbw & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk \\
+12 & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk \\
+13 & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk \\
+14 & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk \\
+15 & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk & \Cbk \\
+\end{tabular}
+}
+\end{center}
+
+Here is a screenshot of that character, cut from the splash screen:
+
+\begin{center}
+\includegraphics{images/font_r.png}
+\end{center}
+
+The violet line goes all the way across the character in that image because it is followed by another font
+character with that line, so the lines connect according to the pixel color rules.
+
+\subsection{The Hi-Res Character Generator}
+
+The Hi-Res Character Generator (HRCG) is a library provided by the Applesoft Toolkit
+which allows a developer to display a custom font. Applesoft Toolkit also
+contains Animatrix, which is a utility used to create fonts for the HRCG.
+
+The \href{https://archive.org/details/applesoft-toolkit}{manual for the Applesoft Toolkit}
+can be found on the Internet Archive.
+
+<<init hcrg>>=
+init_HRCG:
+    SUBROUTINE
+
+    ; Overwrites part of HRCG so it returns immediately after setting TXTPAGE1
+    ; instead of continuing on to set TXTPAGE2.
+    LDA     #$60                        ; RTS
+    STA     $94B6
+
+    ; Overwrites part of HRCG so that it does not call DOS_VEC_RECONNECT upon
+    ; initialization.
+    LDA     #$EA                        ; NOP
+    STA     HRCG_overwritten_with_NOP
+    STA     HRCG_overwritten_with_NOP+1
+    STA     HRCG_overwritten_with_NOP+2
+    JMP     HRCG_link_and_set_mode_jmp
+@
+
+The new output handler installed by the HRCG is called whenever [[COUT]] is called.
+[[A]] contains the character to output.
+
+The HRCG defines 96 characters as a character set. These characters are the
+"printing" characters, which are ASCII 32 (space) through 127 (delete).
+Character set 0 is always the standard set of Apple text characters. The
+font data for this standard
+set is stored at [[$97A5-$9AA4]], consisting of 8 bytes per character. Each byte represents 7 consecutive pixels since the
+high bit is used for color set selection.
+
+The Ali Baba font data for HRCG is stored at [[$83A5-$92A4]], starting with character set 1.
+Each character is 32 bytes, broken
+up into four blocks of eight bytes (7x8 blocks) each. The first block is the upper left of the character, the second block is
+the upper right, the third is the lower left, and the fourth is the lower right.
+Thus, each character is 14x16.
+
+Here are the font characters. There are 120 defined: 96 for character set 1,
+and 24 for character set 2. Characters 114-119 (character set 2, characters 18-23)
+form the EA logo that is displayed on the splash screen.
+
+\input{font_data.tex}
+
+\subsection{HRCG control routines}
+
+Ali Baba provides several convenience routines which translate to HRCG control codes.
+
+<<control routines>>=
+    ORG     $75F4
+SET_INVERSE_VIDEO:
+    SUBROUTINE
+
+    LDA     #$89        ; ctrl-I
+    JMP     ROM_COUT
+
+SET_NORMAL_VIDEO:
+    SUBROUTINE
+
+    LDA     #$8E        ; ctrl-N
+    JMP     ROM_COUT
+
+SET_TEXT_WINDOW_WRAP:
+    SUBROUTINE
+
+    LDA     #$8F        ; ctrl-O
+    JSR     ROM_COUT
+    LDA     #$97        ; ctrl-W
+    JMP     ROM_COUT
+
+SET_TEXT_WINDOW_SCROLL:
+    SUBROUTINE
+
+    LDA     #$8F        ; ctrl-O
+    JSR     ROM_COUT
+    LDA     #$93        ; ctrl-S
+    JMP     ROM_COUT
+
+SET_CHARSET_0:
+    SUBROUTINE
+
+    LDA     #$81        ; ctrl-A
+    JSR     ROM_COUT
+    LDA     #$B0        ; 0
+    JMP     ROM_COUT
+
+@ %def SET_INVERSE_VIDEO SET_NORMAL_VIDEO SET_TEXT_WINDOW_WRAP SET_TEXT_WINDOW_SCROLL SET_CHARSET_0
+
+\subsection{Printing routines}
+
+The plain text screen (using the standard Apple text characters) is 40
+columns by 24 rows. The [[TEXT_COL]] and [[TEXT_ROW]] locations keep track
+of the cursor position when ROM routines are used for printing text.
+
+We can set the text window to start either from row 0 using [[SET_TEXT_WINDOW_UPPER_LEFT_ALL]],
+or from row 21 using [[SET_TEXT_WINDOW_UPPER_LEFT_LOW]]. Using the bottom of the
+screen allows us to use it as a status and input window while the map is displayed
+above.
+
+<<zero page defines>>=
+TEXT_COL                EQU     $24     ; Cursor position
+TEXT_ROW                EQU     $25
+@ %def TEXT_COL TEXT_ROW
+
+<<set text window upper left>>=
+    ORG     $7830
+SET_TEXT_WINDOW_UPPER_LEFT_ALL:
+    SUBROUTINE
+
+    LDA     #0
+    JMP     SET_TEXT_WINDOW_UPPER_LEFT
+
+SET_TEXT_WINDOW_UPPER_LEFT_LOW:
+    SUBROUTINE
+
+    LDA     #21
+
+    ; fall through
+
+SET_TEXT_WINDOW_UPPER_LEFT:
+    SUBROUTINE
+
+    STA     TEXT_ROW
+    LDA     #0
+    STA     TEXT_COL
+    LDA     #$96        ; ctrl-V (set text window upper left)
+    JMP     ROM_COUT
+@
+
+Since text on the lower part always starts at row 21, and the column number only
+needs 6 bits, we can specify a compressed 8-bit version of the cursor, where the
+row number can be specified by upper two bits (so 20 through 23).
+
+<<set cursor compressed>>=
+    ORG     $7649
+SET_CURSOR_COMPRESSED:
+    SUBROUTINE
+
+    PHA
+    AND     #$3F
+    STA     TEXT_COL
+    PLA
+    LSR
+    LSR
+    LSR
+    LSR
+    LSR
+    LSR
+    CLC
+    ADC
+    ADC     #20
+    STA     TEXT_ROW
+    RTS
+@
+
+The [[PRINT_STRING]] routine prints a Pascal-style string (length first),
+from an address stored in [[PRINT_STRING_ADDR]], at the current cursor
+position.
+
+<<zero page defines>>=
+PRINT_STRING_ADDR       EQU     $1C     ; 2 bytes
+@ %def PRINT_STRING_ADDR
+
+<<print string>>=
+    ORG     $7620
+PRINT_STRING:
+    SUBROUTINE
+
+    LDY     #$00
+    LDA     (PRINT_STRING_ADDR),Y
+    TAX
+
+.loop:
+    DEX
+    BPL     .print_char
+    RTS
+
+.print_char:
+    INY
+    LDA     (PRINT_STRING_ADDR),Y
+    JSR     ROM_COUT
+    JMP     .loop
+@ %def PRINT_STRING
+
+The [[PRINT_STRING_AT_ADDR]] first stores the [[X]] and [[Y]] registers to the
+[[PRINT_STRING_ADDR]], then calls [[PRINT_STRING]].
+
+<<print string>>=
+    ORG     $761C
+PRINT_STRING_AT_ADDR:
+    SUBROUTINE
+
+    STX     PRINT_STRING_ADDR
+    STY     PRINT_STRING_ADDR+1
+
+    ; falls through to PRINT_STRING
+@ %def PRINT_STRING_AT_ADDR
+
+The [[PRINT_CENTERED_PLUS_COL]] centers text, but moves it right by the
+current cursor's column. If the column is zero, the routine would center the text on the screen.
+
+<<print centered plus col>>=
+    ORG     $75D4
+PRINT_CENTERED_PLUS_COL:
+    SUBROUTINE
+
+    LDA     #40
+    SEC
+    LDY     #$00
+    SBC     (PRINT_STRING_ADDR),Y
+    CLC
+    LSR     A
+    ADC     TEXT_COL
+    STA     TEXT_COL
+    JSR     SET_CHARSET_0
+    JMP     PRINT_STRING
+@ %def PRINT_CENTERED_PLUS_COL
+
+The [[PRINT_BOTTOM_CENTERED]] centers text on row 23, which is the bottom of
+the screen.
+
+<<print bottom centered>>=
+    ORG     $75C9
+PRINT_BOTTOM_CENTERED:
+    SUBROUTINE
+
+    LDA     #$17
+    STA     TEXT_ROW
+    LDA     #$00
+    STA     TEXT_COL
+    JMP     PRINT_CENTERED_PLUS_COL
+@ %def PRINT_BOTTOM_CENTERED
+
+\subsection{HRCG font character routines}
+
+Since each HRCG font character is effectively two by two "normal" characters,
+there is a routine to convert from font coordinate to text cursor coordinate
+so that the HRCG can locate the font character at the text coordinate (at
+the upper left of the font character).
+
+<<defines>>=
+FONT_COL        EQU     $5A0C
+FONT_ROW        EQU     $5A0D
+@ %def FONT_COL FONT_ROW
+
+<<font pos>>=
+    ORG     $75E7
+FONT_POS_TO_TEXT_POS:
+    SUBROUTINE
+
+    LDA     FONT_COL
+    ASL
+    STA     TEXT_COL
+    LDA     FONT_ROW
+    ASL
+    STA     TEXT_ROW
+    RTS
+@ %def FONT_POS_TO_TEXT_POS
+
+Two basic routines print the font character stored in [[FONT_CHARNUM]].
+One routine simply does the font position to text position conversion before
+calling the second. There is a stored string which has spots for the character
+set and the four character blocks that this routine sets.
+
+When printing using the 2x2 font characters, we can set up the HRCG's
+"block display mode". This takes four characters and plots them in a 2x2
+array with the upper left at the text cursor position.
+
+Because our font table consists of 4 "normal" characters, we need to be able
+to map a font character onto its character set and character. The font table
+contains 120 font characters, or 480 "normal" characters. Since each
+character set is 96 characters, the entire font table spans five character
+sets, with character set 1 starting off the table.
+
+Not only that, but the first character in the character set is ASCII 32
+(space), so we have to take that into account also.
+
+This is what the [[PRINT_FONTCHAR]], [[PRINT_FONTCHAR_AT_TEXT_POS]], and
+[[PLOT_FONTCHAR]] routines do.
+
+<<defines>>=
+FONT_CHARNUM        EQU     $5A0E
+FONT_CHARSET        EQU     $5A0F
+s_PRINT_FONT_CHAR   EQU     $8183   ; 2 bytes
+CHAR_CHARSET        EQU     $8185
+CHAR_UPPER_LEFT     EQU     $8187
+CHAR_UPPER_RIGHT    EQU     $8188
+CHAR_LOWER_LEFT     EQU     $818A
+CHAR_LOWER_RIGHT    EQU     $818B
+@
+
+<<print font char>>=
+    ORG     $8183  // new: 80A4
+    HEX     09      ; num chars in this string
+    HEX     81      ; ctrl-A (set character set)
+    HEX     B1      ; CHAR_CHARSET
+    HEX     82      ; ctrl-B (block display mode)
+    HEX     A0      ; CHAR_UPPER_LEFT
+    HEX     85      ; CHAR_UPPER_RIGHT
+    HEX     83      ; ctrl-C (move to lower left of block)
+    HEX     B5      ; CHAR_LOWER_LEFT
+    HEX     80      ; CHAR_LOWER_RIGHT
+    HEX     84      ; ctrl-D (complete block data)
+
+    ORG     $6FB8
+PRINT_FONTCHAR:
+    SUBROUTINE
+
+    JSR     FONT_POS_TO_TEXT_POS
+    ; fall through
+
+PRINT_FONTCHAR_AT_TEXT_POS:
+    LDX     #$B1            ; start from char set 1
+    LDA     FONT_CHARSET
+    CMP     #$02
+    BNE     .store_charset
+
+    ; FONT_CHARSET != 2
+    INX
+    INX                     ; start from charset 3 if FONT_CHARSET != 2.
+
+.store_charset:
+    STX     CHAR_CHARSET
+    ; fall through
+
+PLOT_FONTCHAR:
+    LDA     FONT_CHARNUM
+
+    ; Increment the charset by 1 for every multiple above character 24.
+.loop:
+    CMP     #24             ; 24 font chars = 96 normal chars = 1 char set
+    BCC     .print_block
+
+    ; FONT_CHARNUM >= 24
+    INX
+    STX     CHAR_CHARSET
+    SEC
+    SBC     #24
+    JMP     .loop
+
+.print_block:
+    ASL
+    ASL
+    CLC
+    ADC     #$20    ; A = 4A + 0x20 (space)
+    TAY
+    STY     CHAR_UPPER_LEFT
+    INY
+    STY     CHAR_UPPER_RIGHT
+    INY
+    STY     CHAR_LOWER_LEFT
+    INY
+    STY     CHAR_LOWER_RIGHT
+    LDA     #<s_PRINT_FONT_CHAR
+    STA     PRINT_STRING_ADDR
+    LDA     #>s_PRINT_FONT_CHAR
+    STA     PRINT_STRING_ADDR+1
+    JMP     PRINT_STRING
+@ %def PRINT_FONTCHAR PRINT_FONTCHAR_AT_TEXT_POS
+
+The [[PLOT_CHAR]] routine prints the character number in [[A]], at the text
+coordinate in [[X]] and [[Y]].
+
+<<plot char>>=
+    ORG     $5D7D
+PLOT_CHAR:
+    SUBROUTINE
+
+    STA     FONT_CHARNUM
+    STX     TEXT_COL
+    STY     TEXT_ROW
+    LDA     #$01
+    STZ     FONT_CHARSET
+    JMP     PRINT_FONTCHAR_AT_TEXT_POS
+@ %def PLOT_CHAR
+
+\chapter{Sound}
+
+The [[TONE_RANDOMIZE_MASK]] is initially set to 1 to apply a little bit of
+randomness to the song notes. However, this can be set to [[00]] via opcode [[NORAND]]
+to play exact notes, or set to [[0F]] via opcode [[HIRAND]] to provide high
+randomness.
+
+\begin{table}[]
+\begin{tabular}{llll}
+\multicolumn{1}{c}{Byte} & \multicolumn{1}{c}{Opcode} & \multicolumn{1}{c}{Argument} & \multicolumn{1}{c}{Operation} \\
+[[1F]] & [[MARK2]] & none & [[($5A8E) <- IP+1]] \\
+[[20]] & [[MARK1]] & none & [[($5A90) <- IP+1]] \\
+[[21]] & [[GOTO1]] & none & [[IP <- ($5A90)]] \\
+[[22]] & [[LOW]] & none & [[TONE_ROUTINE_ADDR <- tone]] \\
+[[23]] & [[HIGH]] & none & [[TONE_ROUTINE_ADDR <- high_tone]] \\
+[[24]] & [[END]] & none & Ends the song routine \\
+[[25]] & [[HIRAND]] & none & [[TONE_RANDOMIZE_MASK <- 0F]] \\
+[[26]] & [[NORAND]] & none & [[TONE_RANDOMIZE_MASK <- 00]] \\
+[[27-FF]] & [[NOTE]] & duration & Plays note \\
+\end{tabular}
+\caption{Song program opcodes}
+\label{table:song}
+\end{table}
+
+Playing a tone involves accessing the speaker address twice per audio cycle.
+The [[tone]] routine delays [[10X+31]] cycles between speaker accesses, and
+based on an average Apple II cycle time of [[0.98]] microseconds, this means
+that the frequency of the note played will be equal to [[510204 / (10X+31)]] Hz.
+See \href{https://6502disassembly.com/a2-rom/}{The Oft Misunderstood WAIT} for a derivation of average cycle time.
+
+<<tone>>=
+tone:
+    SUBROUTINE
+
+    LDY      #$0A           ; 2 cycles
+
+.outer_loop:
+    LDA      SPKR           ; 4 cycles
+
+.inner_loop:
+    ROL      DAT_00e3       ; 5 cycles
+    DEX                     ; 2 cycles
+    BNE      .inner_loop    ; 3 cycles
+
+    LDX      note_freq      ; 3 cycles
+    ROL      DAT_00e3       ; 5 cycles
+    ROR      DAT_00e3       ; 5 cycles
+    NOP                     ; 3 cycles
+    NOP                     ; 3 cycles
+    NOP                     ; 3 cycles
+    DEY                     ; 2 cycles
+    BNE      .outer_loop    ; 3 cycles
+
+    DEC      note_duration  ; 5 cycles
+    BNE      tone           ; 3 cycles
+    RTS
+@ %def tone
+
+The [[high_tone]] routine does the same thing, but with shorter delays.
+The frequency of the note played by [[high_tone]] will be equal to
+[[510204 / (5X+12)]] Hz.
+
+<<high tone>>=
+high_tone:
+    SUBROUTINE
+
+    LDY      #$0A           ; 2 cycles
+
+.outer_loop:
+    LDA      SPKR           ; 4 cycles
+
+.inner_loop:
+    DEX                     ; 2 cycles
+    BNE      .inner_loop    ; 3 cycles
+
+    LDX      note_freq      ; 3 cycles
+    DEY                     ; 2 cycles
+    BNE      .outer_loop    ; 3 cycles
+
+    DEC      note_duration  ; 5 cycles
+    BNE      high_tone      ; 3 cycles
+    RTS
+@ %def high_tone
+
+Based on cycle times, these are the closest values for various notes. At the higher
+frequencies, the values get so low that they differ only by one, which means the
+notes aren't very accurate.
+
+\begin{table}[]
+\begin{tabular}{llll}
+\multicolumn{1}{c}{Note} &
+\multicolumn{1}{c}{Freq} &
+\multicolumn{1}{c}{Low Tone} &
+\multicolumn{1}{c}{Low Freq} &
+\multicolumn{1}{c}{High Tone} &
+\multicolumn{1}{c}{High Freq} \\
+[[A3]] & [[220.0]] & [[E5]] & [[219.8]] & [[--]] & [[--]] \\
+[[Bb3]] & [[233.1]] & [[D8]] & [[232.9]] & [[--]] & [[--]] \\
+[[B3]] & [[246.9]] & [[CC]] & [[246.4]] & [[--]] & [[--]] \\
+[[C4]] & [[261.6]] & [[C0]] & [[261.5]] & [[--]] & [[--]] \\
+[[Db4]] & [[277.2]] & [[B5]] & [[277.1]] & [[--]] & [[--]] \\
+[[D4]] & [[293.7]] & [[AB]] & [[293.1]] & [[--]] & [[--]] \\
+[[Eb4]] & [[311.1]] & [[A1]] & [[310.9]] & [[--]] & [[--]] \\
+[[E4]] & [[329.6]] & [[98]] & [[329.0]] & [[--]] & [[--]] \\
+[[F4]] & [[349.2]] & [[8F]] & [[349.2]] & [[--]] & [[--]] \\
+[[Gb4]] & [[370.0]] & [[87]] & [[369.4]] & [[--]] & [[--]] \\
+[[G4]] & [[392.0]] & [[7F]] & [[392.2]] & [[--]] & [[--]] \\
+[[Ab4]] & [[415.3]] & [[78]] & [[414.5]] & [[F3]] & [[415.8]] \\
+[[A4]] & [[440.0]] & [[71]] & [[439.5]] & [[E6]] & [[439.1]] \\
+[[Bb4]] & [[466.2]] & [[6A]] & [[467.6]] & [[D8]] & [[467.2]] \\
+[[B4]] & [[493.9]] & [[64]] & [[494.9]] & [[CC]] & [[494.4]] \\
+[[C5]] & [[523.2]] & [[5E]] & [[525.4]] & [[C1]] & [[522.2]] \\
+[[Db5]] & [[554.4]] & [[59]] & [[554.0]] & [[B6]] & [[553.4]] \\
+[[D5]] & [[587.3]] & [[54]] & [[585.8]] & [[AB]] & [[588.5]] \\
+[[Eb5]] & [[622.2]] & [[4F]] & [[621.4]] & [[A2]] & [[620.7]] \\
+[[E5]] & [[659.2]] & [[4A]] & [[661.7]] & [[98]] & [[660.9]] \\
+[[F5]] & [[698.5]] & [[46]] & [[698.0]] & [[90]] & [[697.0]] \\
+[[Gb5]] & [[740.0]] & [[42]] & [[738.4]] & [[87]] & [[742.7]] \\
+[[G5]] & [[784.0]] & [[3E]] & [[783.7]] & [[80]] & [[782.5]] \\
+[[Ab5]] & [[830.6]] & [[3A]] & [[835.0]] & [[78]] & [[833.7]] \\
+[[A5]] & [[880.0]] & [[37]] & [[878.1]] & [[72]] & [[876.6]] \\
+[[Bb5]] & [[932.3]] & [[34]] & [[926.0]] & [[6B]] & [[932.7]] \\
+[[B5]] & [[987.8]] & [[31]] & [[979.3]] & [[65]] & [[986.9]] \\
+[[C6]] & [[1046.5]] & [[2E]] & [[1039.1]] & [[5F]] & [[1047.6]] \\
+[[Db6]] & [[1108.7]] & [[2B]] & [[1106.7]] & [[5A]] & [[1104.3]] \\
+[[D6]] & [[1174.7]] & [[28]] & [[1183.8]] & [[54]] & [[1181.0]] \\
+[[Eb6]] & [[1244.5]] & [[26]] & [[1241.4]] & [[50]] & [[1238.4]] \\
+[[E6]] & [[1318.5]] & [[24]] & [[1304.9]] & [[4B]] & [[1318.4]] \\
+[[F6]] & [[1396.9]] & [[21]] & [[1413.3]] & [[47]] & [[1390.2]] \\
+[[Gb6]] & [[1480.0]] & [[1F]] & [[1496.2]] & [[43]] & [[1470.3]] \\
+[[G6]] & [[1568.0]] & [[1D]] & [[1589.4]] & [[3F]] & [[1560.3]] \\
+[[Ab6]] & [[1661.2]] & [[1C]] & [[1640.5]] & [[3B]] & [[1661.9]] \\
+[[A6]] & [[1760.0]] & [[1A]] & [[1753.3]] & [[38]] & [[1747.3]] \\
+[[Bb6]] & [[1864.7]] & [[18]] & [[1882.7]] & [[34]] & [[1875.8]] \\
+[[B6]] & [[1975.5]] & [[17]] & [[1954.8]] & [[31]] & [[1985.2]] \\
+[[C7]] & [[2093.0]] & [[15]] & [[2117.0]] & [[2E]] & [[2108.3]] \\
+[[Db7]] & [[2217.5]] & [[14]] & [[2208.7]] & [[2C]] & [[2199.2]] \\
+[[D7]] & [[2349.3]] & [[13]] & [[2308.6]] & [[29]] & [[2351.2]] \\
+[[Eb7]] & [[2489.0]] & [[11]] & [[2538.3]] & [[27]] & [[2464.8]] \\
+[[E7]] & [[2637.0]] & [[10]] & [[2671.2]] & [[24]] & [[2657.3]] \\
+[[F7]] & [[2793.8]] & [[0F]] & [[2818.8]] & [[22]] & [[2803.3]] \\
+[[Gb7]] & [[2960.0]] & [[0E]] & [[2983.6]] & [[20]] & [[2966.3]] \\
+[[G7]] & [[3136.0]] & [[0D]] & [[3169.0]] & [[1E]] & [[3149.4]] \\
+[[Ab7]] & [[3322.4]] & [[0C]] & [[3378.8]] & [[1C]] & [[3356.6]] \\
+\end{tabular}
+\caption{Notes and tone values}
+\label{table:tones}
+\end{table}
+
+We run into an issue when we look at the song table for the splash screen. The
+very first note played is low [[3F]]. This is closest to [[G5]], although it
+results in a frequency of [[771.9]] Hz, which is less accurate than the [[783.7]] Hz
+that would be given by [[3F]]. In fact, all the low tones are off by a bit,
+unless we assume that the programmer erred, thinking that the low tones were
+just one octave below the high tones. In that case, we should just use the high
+tone table and subtract one octave for the low tones.
+
+<<song table>>=
+SPLASH_SONG:
+    LOW
+    TONE 3F, 65     ; G5  @ 655ms
+    HIGH
+    TONE 3F, 49     ; G6  @ 469ms
+    TONE 3F, 8A     ; G6  @ 887ms
+    TONE 3F, 8A     ; G6  @ 887ms
+    TONE 3F, 8A     ; G6  @ 887ms
+    TONE 3F, 5C     ; G6  @ 591ms
+    LOW
+    TONE C1, 0C     ; C4  @ 231ms
+    TONE 80, 04     ; G4  @  51ms
+    TONE 50, 06     ; Eb5 @  49ms
+    TONE 3F, 08     ; G5  @  52ms
+    HIGH
+    TONE 60, 0A     ; C6  @  97ms (tone inaccurate)
+    TONE 50, 0C     ; Eb5 @  97ms
+    TONE 3F, 2E     ; G6  @ 296ms
+    TONE 47, 1B     ; F5  @ 195ms
+    TONE 3F, 1F     ; G6  @ 199ms
+    TONE 47, 1B     ; F5  @ 195ms
+    TONE 50, 18     ; Eb5 @ 194ms
+    TONE 47, 1B     ; F5  @ 195ms
+    TONE 50, 18     ; Eb5 @ 194ms
+    TONE 55, 17     ; D6  @ 197ms (tone inaccurate)
+@
+
+The [[start_sound]] routine goes through a sound table, executing each
+instruction until it encounters a [[TONE]] instruction. It then
+plays that tone, and then jumps to a routine given by [[indirect_routine]]. This
+routine should do something, and then return to the song-playing loop by
+jumping to [[next_table_entry]]. This allows the game to play a sound while doing
+something else, for example, animating the splash screen at the beginning of the
+game, and also interrupts the sound on keypress or joystick button press.
+
+If [[start_sound]] encounters an [[END]] instruction, it returns, and that ends
+the song.
+
+[[start_sound]] also checks for a keypress or a joystick button press, and this
+is the same as an [[END]] instruction.
+
+\chapter{Animating the splash screen}
+
+The [[start_splash_screen]] routine first loads up the initial splash screen,
+sets [[indirect_routine]] to [[note_played]], and begins the sound routine by
+calling [[start_sound]].
+
+[[note_played]] plots a mob, then sets [[indirect_routine]] to [[splash_routine_2]]
+and jumps to [[next_table_entry]].
+
+[[splash_routine_2]] calls a routine first with [[$5E1F]] then with [[$5E3A]],
+then jumps to [[splash_screen_step]].
+
+[[splash_screen_step]] then sets [[indirect_routine]] to [[splash_routine_1]]
+then [[splash_routine_0]] and calls [[set_splash_routine]] within [[note_played]].
+After that, [[splash_screen_step]] presumably moves mobs around.
+
+
+When the user ends the splash screen, the [[start_splash_screen]] routine
+replaces the indirect jump to [[indirect_routine]] in [[start_sound]] to an
+absolute jump to [[next_table_entry]], since there is no further need to
+animate while playing sound.
+
+
+\chapter{The data}
+\subsection{Message data}
+
+<<Message data>>=
+MESSAGE_DATA:
+    APSTR ""
+    APSTR "GOLD EATING ROCK SLIME GOBBLES THE CASH."
+    APSTR ""
+    APSTR "YOUR USED ARMOR IS WORTHLESS."
+    APSTR ""
+@ %def MESSAGE_DATA
+
+\subsection{Location data}
+
+The first two bytes (bytes 0 and 1) in a [[LOCATION_DATA]] record form a pointer to the location's
+name string. If they are [[FFFF]], then that is the end of the records. Byte 3 and byte 4 are
+serial positions, where serial position is 20 times row plus column. I'm guessing this is the
+top left and bottom right extents of the room.
+
+<<Location data>>=
+LOCATION_DATA:
+    DC.W s_ALI_BABA_HOME
+    HEX  01
+    DC.B 20*6+9  ; ROWCOL 6, 9
+    DC.B 20*9+13
+    HEX  01
+    DC.W 451E
+    DC.B 01
+
+    HEX 4E 42 00 43 8B 01 27 45 00
+    HEX 59 42 3F 00 BB 01 42 45 00
+    HEX 69 42 00 07 4C 01 5D 45 00
+    HEX 77 42 4A 03 C4 25 78 45 00
+    HEX 88 42 51 00 72 29 AB 45 00
+    HEX 92 42 52 64 C2 29 CF 45 00
+    HEX 9C 42 5F 52 BD 49 DE 45 00
+    HEX A8 42 60 59 C4 49 ED 45 00
+    HEX BB 42 00 02 60 49 11 46 00
+    HEX CB 42 00 01 B7 60 3E 46 00
+    HEX D1 42 00 17 95 61 56 46 00
+    HEX E4 42 6A 03 C4 62 8C 46 00
+    HEX F7 42 5C 67 BC 48 22 47 00
+    HEX 0B 43 57 03 74 48 34 47 00
+    HEX 16 43 5E 6F C4 48 43 47 00
+    HEX 29 43 43 00 C1 04 55 47 00
+    HEX 30 43 00 21 9F 04 8E 47 00
+    HEX 41 43 6B 14 AE 64 A9 47 00
+    HEX 4E 43 6C 19 B3 65 D0 47 00
+    HEX 60 43 00 03 C4 21 EB 47 00
+    HEX 6D 43 62 1E B2 40 18 48 00
+    HEX 6F 43 00 1A 96 46 2D 48 00
+    HEX 80 43 63 15 B2 41 45 48 00
+    HEX 82 43 00 6D C1 60 60 48 00
+    HEX 94 43 64 15 B2 42 72 48 00
+    HEX 97 43 00 2B AF 22 81 48 00
+    HEX A4 43 00 15 B2 43 CF 48 00
+    HEX A6 43 1B 54 C1 05 EA 48 00
+    HEX B7 43 47 14 63 05 F9 48 00
+    HEX C5 43 45 15 B2 02 20 49 00
+    HEX D8 43 68 15 B2 44 44 49 00
+    HEX DA 43 00 07 4A 60 62 49 00
+    HEX ED 43 69 15 B2 45 86 49 00
+    HEX EF 43 55 02 60 20 95 49 00
+    HEX F6 43 61 15 AA 40 A1 49 00
+    HEX F8 43 00 40 72 06 C5 49 00
+    HEX 07 44 00 06 BE 47 D7 49 00
+    HEX 16 44 6D 3C BB 63 F8 49 00
+    HEX 25 44 00 7F C4 63 07 4A 00
+    HEX 36 44 00 0B 88 63 19 4A 00
+    HEX 46 44 00 14 47 63 3D 4A 00
+    HEX 58 44 3A 18 A9 26 49 4A 00
+    HEX 5E 44 4B 14 A4 26 55 4A 00
+    HEX 62 44 00 1D AE 26 64 4A 00
+    HEX 68 44 4C 22 B3 26 73 4A 00
+    HEX 71 44 12 50 C4 27 82 4A 00
+    HEX 7D 44 00 00 60 27 94 4A 00
+    HEX 89 44 00 23 B3 24 B8 4A 00
+    HEX 92 44 00 1F AF 24 CA 4A 00
+    HEX 99 44 00 1C AB 24 DC 4A 00
+    HEX A1 44 4E 18 A8 24 EB 4A 00
+    HEX A7 44 4D 14 A4 24 FA 4A 00
+    HEX AE 44 00 02 60 20 0C 4B 00
+    HEX B5 44 4F 66 C4 20 21 4B 00
+    HEX BC 44 49 02 C4 07 33 4B 00
+    HEX C9 44 3C 18 AD 03 7B 4B 00
+    HEX DB 44 00 0E C4 28 93 4B 00
+    HEX E4 44 00 7E C2 28 AB 4B 00
+    HEX F4 44 00 3C B6 28 C6 4B 00
+    HEX FF 44 50 02 86 28 DE 4B 00
+    HEX 0C 45 14 03 C4 23 0E 4C 00
+    HEX FF FF
+@ %def LOCATION_DATA
+
+<<Location names>>=
+LOCATION_NAMES:
+s_ALI_BABA_HOME:
+    APSTR "ALI BABA HOME"
+@ %def LOCATION_NAMES
+
+\chapter{Combat}
+
+\section{Manual}
+
+According to the original manual:
+
+Strike probability
+
+Whenever any character tries to strike another character, the game will
+compute his chance of success. Any character's base chance of striking
+his victim is 3.125% times their dexterity. Thus, a player with a dexterity of
+11 has a 34.375% chance of striking his victim. However, the base chance is
+adjusted by several factors:
+
+If the victim is:
+
+particularly difficult to hit
+
+(halflings and elves have this ability to dodge) . . .. .. . ... subtract 12.5%
+particularly easy to hit. . . . . . ....... . .. . .. .. .. .. . .. . . . .. . add 12.5%
+extremely easy to hit ....... . . ... . . .. . . .. .. .. . .. . . . .. ... . add 25%
+down (unconscious, in hand to hand combat, or resting) .. . . add 18.75%
+currently resting (this is in
+addition to the adjustment for being down) . . . .. .. . . . . . .. . add 9.375 %
+defending . .. .. ..... .. .. . ... . . . ... . ........ . ..... subtract 9.375%
+attacking ..... . ... . ... . ..... . ... ... ..... .... . . ... . no adjustment
+running . . .... . .. . ..... .. .... . ... . .. .. .. . ..... . .. subtract 3.125 %
+on the same space with attacker, the stronger character is
+is given an advantage .. . .. . add 1.5625% times attackers strength and
+subtract 1.5625% times victim's strength
+
+The chance of striking the victim is then adjusted, if necessary, so that it
+is never less than 3.125% nor greater than 96.875%.
+
+The probabilities are in increments of 1/32. In the code, 1/32 is represented by
+a single count in 6 bits, so the maximum count is 31 (96.875%).
+
+DATA[0,1] = name
+DATA[4] = creature type:
+  0x00: Human
+  0x01: Elf
+  0x02: Dwarf
+  0x03: Halfling
+  0x15: Human
+  0x23: Human (Morgiana, Princess Buddir)
+  0x3C: Owl
+  0x3F: Statue, Sultan, Right guard, Left guard, small zombie, big zombie
+  0x41: Dwarf
+  0x43: Thief
+  0x44: Bear
+  0x45: Rat
+  0x46: Wolf
+  0x47: Dragon
+  0x48: Greasy
+  0x4A: Sword
+  0x4B: Ram
+  0x4C: Scorpion
+  0x4D: Succubus
+  0x4E: Tiger, Leo, Jackal
+  0x4F: Crab
+  0x50: Bull
+  0x54: Zombie (Witless)
+  0x58: Thief
+  0x59: Brown Bear
+  0x5E: Wanderer
+  0x5F: Mechanical Sword
+  0x61: Scorpion (Giant)
+  0x65: Sonny Boy Minotaur
+  0x93: Statue (Gemini I, Gemini II)
+  0x93: Aladdin
+  0x94: Elf
+  0x9B: White Dragon
+  0x9E: Bane of Thieves
+  0xA6: Unicorn
+
+DATA[5] = STR
+DATA[6] = CON/HP 0-3F
+DATA[7] = MEL-1
+DATA[9] = HTH-1
+DATA[B] =
+  7: Extremely easy to hit
+  6: Particularly difficult to hit
+  5: ? Incredibly easy to hit?
+  4: DEX-1
+  3: DEX-1
+  2: DEX-1
+  1: DEX-1
+  0: DEX-1
+
+DATA[C] = SPD
+DATA[F] =
+  7:
+  6:
+  5:
+  4:
+  3:
+  2: Unconscious/Down
+  1: State
+  0: State
+
+State:
+  0:
+  1:
+  2:
+  3: Defending
+
+<<Hit chance>>=
+(15AB)
+.compute_to_hit:
+    JSR      load_pos_char_5aa2
+    LDA      DAT_5a74_flag_mob_is_0
+    CMP      #$01
+    BNE      .mob
+    LDA      #$1C
+    STA      TO_HIT
+    JMP      .roll
+
+.mob:
+    ; Base chance = dexterity (-1)
+    LDY      #$0B
+    LDA      (MOB_PTR?),Y
+    TAX
+    AND      #$1F
+    STA      TO_HIT
+    TXA
+
+    ; If DEX bit 5 set, clear DEX bit 4
+    ; and add 75% to chance.
+    AND      #$20
+    BEQ      LAB_15d6
+    TXA
+    AND      #$EF
+    STA      (MOB_PTR?),Y
+    LDA      #$18
+    JSR      add_to_to_hit
+
+LAB_15d6:
+    ; If opponent DEX bit 6 set,
+    ; subtract 12.5% (particularly difficult
+    ; to hit).
+    LDA      (THING_PTR?),Y
+    TAY
+    AND      #$40
+    BEQ      LAB_15e2
+    LDA      #$FC
+    JSR      add_to_to_hit
+
+LAB_15e2:
+    ; If opponent DEX bit 7 set,
+    ; add 25% (extremely easy to hit).
+    TYA
+    AND      #$80
+    BEQ      .check_thing_f
+    LDA      #$08
+    JSR      add_to_to_hit
+
+.check_thing_f:
+    ; If opponent F bit 2 set,
+    ; add 18.75% (down: unconscious, in hand to hand combat,
+    ; or resting)
+    LDY      #$0F
+    LDA      (THING_PTR?),Y
+    TAX
+    AND      #$04
+    BEQ      LAB_15fa
+    LDA      #$06
+    JSR      add_to_to_hit
+
+LAB_15fa:
+    ; If opponent F bits 1,0 < 1
+    ; add 9.375% (currently resting)
+    TXA
+    AND      #$03
+    CMP      #$01
+    BPL      LAB_1609
+    LDA      #$03
+    JSR      add_to_to_hit
+    JMP      .check_thing_6
+
+LAB_1609:
+    ; subtract 3.125% ("running" -- bugged?)
+    BNE      LAB_1613
+    LDA      #$FF
+    JSR      add_to_to_hit
+    JMP      .check_thing_6
+
+LAB_1613:
+    ; If opponent F bits 1,0 == 3
+    ; subtract 9.375% (opponent is defending)
+    CMP      #$03
+    BNE      .check_thing_6
+    LDA      #$FD
+    JSR      add_to_to_hit
+
+.check_thing_6:
+    ; If opponent CON <= 3
+    ; add 75%.
+    LDY      #$06
+    LDA      (THING_PTR?),Y
+    AND      #$3F
+    CMP      #$03
+    BCS      LAB_162b
+    LDA      #$18
+    JSR      add_to_to_hit
+
+LAB_162b:
+    ; If mob[3] == thing[3]...
+    LDY      #$03
+    LDA      (MOB_PTR?),Y
+    CMP      (THING_PTR?),Y
+    BNE      .limit_to_hit
+
+    ; add Thing[STR]/2 & 0x0F - Mob[STR]/2 & 0x0F
+    LDY      #$05
+    LDA      (THING_PTR?),Y
+    ROR      A
+    AND      #$0F
+    STA      DAT_5a77
+    LDA      (MOB_PTR?),Y
+    ROR      A
+    AND      #$0F
+    SEC
+    SBC      DAT_5a77
+    JSR      add_to_to_hit
+
+.limit_to_hit:
+    LDA      TO_HIT
+    BPL      .adjust_for_automatic_fail
+    LDA      #$00
+    STA      TO_HIT
+    JMP      .roll
+
+.adjust_for_automatic_fail:
+    CMP      #$1F
+    BMI      .roll
+    LDA      #$1E
+    STA      TO_HIT
+
+.roll:
+    LDA      #$1F
+    JSR      get_random
+    CMP      TO_HIT
+    BMI      .do_hit
+    BEQ      .do_hit
+    JSR      clear_row_21
+    JSR      print_name_of_actor
+    JSR      scroll_status_window_up
+    LDA      #$D2
+    STA      DATA_PTR2
+    LDA      #$7C
+    STA      DATA_PTR2+1
+    JSR      print_centered_row_23
+    JSR      scroll_status_window_up
+    LDA      #$01
+    CMP      DAT_5a74_flag_mob_is_0
+    BEQ      .do_blink
+    JSR      print_thing_name_centered_row_23
+.do_blink:
+    JSR      blink_5aa2
+    RTS
+.do_hit:
+    LDA      DAT_5a74_flag_mob_is_0
+    BEQ      .hit_mob
+    JMP      hit_nonmob?
+.hit_mob:
+    JMP      hit_mob?
+@
+
+Personally, I find the Python version of [[get_item_at_pos_in_room]] much easier to
+understand. It is much less verbose and doesn't involve self-modification.
+
+<<py Get item at pos in room>>=
+get_item_at_pos_in_room(pos, room_ptr):
+    # "Args" are A (a position) and TMP_PTR (room data ptr).
+    # "Return value" is DATA_PTR.
+
+    # return 0x8000 | mob data ptr if mob at pos.
+    mob_ptr = room_ptr
+    while mob_ptr[MOB]:
+        mob_ptr = mob_data_ptr(mob_ptr[MOB])
+        if mob_ptr[POS] == pos:
+            return 0x8000 | mob_ptr
+
+    # return map record ptr if object at pos.
+    map_ptr = room_ptr[MAP]
+    while map_ptr[0] != 0xFF:
+        if map_ptr[0] == pos:
+            return map_ptr
+        map_ptr += 3
+
+    # return brick (1) or space (0) otherwise.
+    return is_at_outer_limits()
+@
+
+<<Get item at pos in room>>=
+    ORG      $0B62
+    ; Takes A (pos) and TMP_PTR (pointer to room data)
+get_item_at_pos_in_room:
+    SUBROUTINE
+
+    STA      DAT_5a17_pos
+
+    ; load1 <- TMP_PTR
+    ; load3 <- TMP_PTR
+
+    LDA      TMP_PTR+1
+    STA      .load1+2
+    STA      .load3+2
+    LDA      TMP_PTR
+    STA      .load1+1
+    STA      .load3+1
+    JMP      .get_mob_link
+
+.inner_loop:
+    ; load2 <- room data[MAP]
+
+    LDX      #$06
+.load1:
+    LDA      .load1+1,X
+    STA      .load2+1-6,X
+    INX
+    BNE.X    #$08, .load1
+
+.load2:
+    ; Y <- (load2)
+
+    LDY      .load2+1
+    BNE.Y    #$FF, .not_ff          ; (load2) != 0xFF?
+    JMP      is_at_outer_limits     ; else goto is_at_outer_limits
+
+.not_ff:
+    BEQ.Y    DAT_5a17_pos, .return_load2  ; (load2) == DAT_5a17_pos?
+
+    ; load2 += 3
+
+    INCW     .load2
+    INCW     .load2
+    INC      .load2+1
+    BNE      .load2
+    INC      .load2+2
+    JMP      .load2
+
+.return_load2:
+    ; DATA_PTR <- load2
+
+    STOW     .load2+1, DATA_PTR
+    RTS
+
+.get_mob_link:
+
+    LDX      #$02
+.load3:
+    LDA      .load3+1,X  ; A <- load3[MOB]
+    BEQ.A    #$00, .inner_loop
+    JSR      mob_dataptr_to_load4
+
+    LDX      #$03
+.load4:
+    LDY      .load4+1,X  ; Y <- load4[POS]
+    BEQ.Y    DAT_5a17_pos, .return_load4
+
+    ; load3 <- load4
+
+    STOW     .load4+1, .load3+1
+    JMP      .get_mob_link
+
+.return_load4:
+    ; DATA_PTR = 0x8000 | load4
+
+    LDA      #$80
+    ORA      .load4+2
+    STA      DATA_PTR+1
+    LDA      .load4+1
+    STA      DATA_PTR
+    RTS
+
+mob_dataptr_to_load4:
+    SUBROUTINE
+    ; load4 <- mob data for A
+
+    JSR      get_mob_data
+    STOW     DATA_PTR3, .load4
+    RTS
+@
+
+\chapter{Index}\par\noindent
+\nowebindex
+@
+\end{document}
