@@ -2146,9 +2146,8 @@ BLINK_CHAR      EQU     $5AA4   ; font character number
 <<defines>>=
 ROM_COUT            EQU     $FDF0   ; Apple II ROM character output
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
-get_mob_data        EQU     $0C32   ; convert mob index to data pointer ($BA/$BB)
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
-@ %def ROM_COUT DAT_5a17_pos get_mob_data is_at_outer_limits
+@ %def ROM_COUT DAT_5a17_pos is_at_outer_limits
 
 <<print font char>>=
     ORG     $80A4
@@ -4161,10 +4160,53 @@ mob_dataptr_to_load4:
     SUBROUTINE
     ; load4 <- mob data for A
 
-    JSR      get_mob_data
+    JSR      GET_MOB_DATA
     STOW     DATA_PTR3, .load4
     RTS
 @
+
+\subsection{get\_mob\_data (\$0C32)}
+
+Converts a 1-based mob index in [[A]] to a pointer to its 16-byte data
+record, stored in [[DATA\_PTR3]] ([[\$BA/\$BB]]).  The mob data table
+starts at the address stored in [[\$4000/\$4001]] (within the decrypted
+game data region), with each record being 16 bytes.  The formula is:
+
+\begin{center}
+[[DATA\_PTR3]] = [[\$4000/\$4001]] + (A $-$ 1) $\times$ 16
+\end{center}
+
+The multiplication by 16 is done by rotating the decremented index
+left by 4 bits through carry, then splitting the result into high and
+low byte contributions.
+
+<<get mob data>>=
+    ORG     $0C32
+GET_MOB_DATA:
+    SUBROUTINE
+
+    CLC
+    ADC     #$FF                    ; A = index - 1, C = 1
+    ROL                             ; \
+    ROL                             ;  | rotate {C, A} left 4 bits
+    ROL                             ;  | = (index-1) * 16 with bits split
+    ROL                             ; /
+    TAY                             ; save rotated value
+    ROL                             ; one more rotate
+    AND     #$0F                    ; high byte contribution = (index-1) >> 4
+    CLC
+    ADC     $4001                   ; add base page
+    STA     DATA_PTR3+1
+    TYA
+    AND     #$F0                    ; low byte contribution = ((index-1) & $0F) << 4
+    CLC
+    ADC     $4000                   ; add base offset
+    STA     DATA_PTR3
+    BCC     .done
+    INC     DATA_PTR3+1             ; carry to high byte
+.done:
+    RTS
+@ %def GET_MOB_DATA
 
 @ \chapter{Assembly output}
 
@@ -4185,6 +4227,7 @@ The following root chunks produce the assembly files when tangled.
 <<main entry>>
 <<attract screen>>
 <<Get item at pos in room>>
+<<get mob data>>
 <<compute scene ptr>>
 <<plot char>>
 <<print font char>>
