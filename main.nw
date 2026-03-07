@@ -6832,12 +6832,6 @@ INPUT_DIR       EQU     $5A67   ; direction/command from input (1-9)
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
 @ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR TURN_ACTIVE
 
-<<defines>>=
-AI_CHOOSE_TARGET    EQU     $68AB   ; NPC: pick movement target
-PICKUP_TREASURE     EQU     $646B   ; handle treasure pickup ($C0-$D1)
-TRIGGER_SCENE_EVENT EQU     $1D04   ; handle scene event ($D2-$D4)
-@ %def AI_CHOOSE_TARGET PICKUP_TREASURE TRIGGER_SCENE_EVENT
-
 <<game turn loop>>=
     ORG     $19AD
 GAME_TURN_LOOP:
@@ -7076,6 +7070,26 @@ GAME_TURN_LOOP:
 .empty_slot:
     JMP     FUN_1D4D            ; $FE: empty slot interaction
 @ %def GAME_TURN_LOOP
+
+<<handle encounter>>=
+    ORG     $1C01
+HANDLE_ENCOUNTER:               ; non-activated encounter dispatch
+@ %def HANDLE_ENCOUNTER
+
+<<trigger scene event>>=
+    ORG     $1D04
+TRIGGER_SCENE_EVENT:            ; scene event handler ($D2-$D4)
+@ %def TRIGGER_SCENE_EVENT
+
+<<pickup treasure>>=
+    ORG     $646B
+PICKUP_TREASURE:                ; treasure pickup handler ($C0-$D1)
+@ %def PICKUP_TREASURE
+
+<<ai choose target>>=
+    ORG     $68AB
+AI_CHOOSE_TARGET:               ; NPC: choose movement target
+@ %def AI_CHOOSE_TARGET
 
 \subsection{set\_blink\_target (\$16A3)}
 
@@ -7515,6 +7529,8 @@ The following root chunks produce the assembly files when tangled.
 <<random in range>>
 <<advance group link>>
 <<game turn loop>>
+<<handle encounter>>
+<<trigger scene event>>
 <<fill map>>
 <<render font char>>
 <<draw blink alt>>
@@ -7523,6 +7539,8 @@ The following root chunks produce the assembly files when tangled.
 <<print font char>>
 <<init game state>>
 <<init world>>
+<<pickup treasure>>
+<<ai choose target>>
 <<init stub2>>
 <<init disk iob>>
 <<scene loop>>

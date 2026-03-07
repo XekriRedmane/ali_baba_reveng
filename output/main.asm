@@ -261,9 +261,6 @@ MOVE_POINTS     EQU     $5A65   ; movement points remaining
 STEPS_TAKEN     EQU     $5A66   ; steps taken this turn
 INPUT_DIR       EQU     $5A67   ; direction/command from input (1-9)
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
-AI_CHOOSE_TARGET    EQU     $68AB   ; NPC: pick movement target
-PICKUP_TREASURE     EQU     $646B   ; handle treasure pickup ($C0-$D1)
-TRIGGER_SCENE_EVENT EQU     $1D04   ; handle scene event ($D2-$D4)
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
     ORG     $0569
 ATTRACT_LOOP:
@@ -1725,6 +1722,10 @@ GAME_TURN_LOOP:
 
 .empty_slot:
     JMP     FUN_1D4D            ; $FE: empty slot interaction
+    ORG     $1C01
+HANDLE_ENCOUNTER:               ; non-activated encounter dispatch
+    ORG     $1D04
+TRIGGER_SCENE_EVENT:            ; scene event handler ($D2-$D4)
     ORG     $743B
 FILL_MAP:
     SUBROUTINE
@@ -1939,6 +1940,10 @@ INIT_WORLD:
     LDY     #<WORLD_INIT_DATA       ; /
     JMP     $5F19                   ; initialize world from data table
 
+    ORG     $646B
+PICKUP_TREASURE:                ; treasure pickup handler ($C0-$D1)
+    ORG     $68AB
+AI_CHOOSE_TARGET:               ; NPC: choose movement target
     ORG     $6B94
 INIT_STUB2:
     RTS
