@@ -2625,7 +2625,7 @@ ATTRACT_SCREEN:
     STA     $F4                     ;  | $F4/$F5 = $BA/$BB (save pointer)
     LDA     $BB                     ;  |
     STA     $F5                     ; /
-    JSR     $0A17                   ; scene_setup
+    JSR     SCENE_SETUP
     LDA     #$00
     STA     LOCATION_FLAG           ; clear location-change flag
     JSR     SET_CURSOR_ROW21
@@ -2635,6 +2635,79 @@ ATTRACT_SCREEN:
 
 The attract screen starts with scene index 1 (the first story character
 setup) and begins playing scene \$26.
+
+\subsection{scene\_setup (\$0A17)}
+
+Initializes a scene for display.  Loads the character record for index
+[[\$5A29]], reads the character's bounding box from bytes~3--4 of the
+record at [[\$BE]], converts to column/row ranges, picks a random
+position within those bounds, sets the font cursor there, and performs
+additional character-record bookkeeping.
+
+The bounding box bytes are packed map positions decoded by
+[[POS\_TO\_COLROW]].  The routine increments the minimums (so the range
+is exclusive of the border), then calls [[RANDOM\_IN\_RANGE]] twice to
+pick a random column and row within the bounds.
+
+<<scene setup>>=
+    ORG     $0A17
+SCENE_SETUP:
+    SUBROUTINE
+
+    LDA     $5A29                   ; character/scene index
+    JSR     $1053                   ; load character record → $BE
+    LDY     #$03
+    LDA     ($BE),Y                 ; byte 3: min position (packed)
+    JSR     POS_TO_COLROW           ; → A=min_col, Y=min_row
+    STA     $5A51                   ; min_col
+    STY     $5A53                   ; min_row
+    LDY     #$04
+    LDA     ($BE),Y                 ; byte 4: max position (packed)
+    JSR     POS_TO_COLROW           ; → A=max_col, Y=max_row
+    STA     $5A52                   ; max_col
+    STY     $5A54                   ; max_row
+    INC     $5A51                   ; min_col++ (exclusive border)
+    INC     $5A53                   ; min_row++
+    CLC
+    LDA     $5A52                   ; \
+    SBC     $5A51                   ;  | col_range = max_col - min_col
+    JSR     RANDOM_IN_RANGE         ;  | random column offset
+    CLC                             ;  |
+    ADC     $5A51                   ;  | col = min_col + offset
+    STA     FONT_COL                ; / set font column
+    CLC
+    LDA     $5A54                   ; \
+    SBC     $5A53                   ;  | row_range = max_row - min_row
+    JSR     RANDOM_IN_RANGE         ;  | random row offset
+    CLC                             ;  |
+    ADC     $5A53                   ; / row = min_row + offset
+    TAY                             ; Y = row
+    LDA     FONT_COL                ; A = col
+    JSR     COLROW_TO_POS           ; → A = linear position
+    LDY     #$03
+    STA     ($F4),Y                 ; store position in record byte 3
+    LDA     $F4                     ; \
+    STA     $BC                     ;  | $BC/$BD = $F4/$F5
+    LDA     $F5                     ;  |
+    STA     $BD                     ; /
+    LDA     #$00
+    STA     $5A28                   ; clear player index
+    JSR     $0F84                   ; character record management
+    LDY     #$0D
+    LDA     #$00                    ; \
+    STA     ($F4),Y                 ;  | clear bytes 13-14 of record
+    INY                             ;  |
+    STA     ($F4),Y                 ; /
+    JSR     CLAMP_CHAR_FIELD        ; ensure byte 6 >= byte 5 minimum
+    LDA     $5A02                   ; current player index
+    CMP     $5A29                   ; compare with scene index
+    BNE     .done                   ; not current player → skip
+    LDY     #$03
+    LDA     ($F4),Y                 ; load position from record
+    JSR     DRAW_CHAR_AT_POS        ; draw character at position
+.done:
+    RTS
+@ %def SCENE_SETUP
 
 \subsection{scene\_loop (\$6C37)}
 \label{sec:scene_loop}
@@ -2859,6 +2932,154 @@ Two shifts produce [[val*4]], saved to [[PRNG\_TEMP]].  Four more shifts give
 [[val*64]].  Adding [[val*4]] gives [[val*68]], then adding [[val]] gives
 [[val*69]].  Adding [[\$53]] completes the LCG step.  This is a linear
 congruential generator with multiplier 69, increment \$53, and modulus 256.
+
+\subsection{random\_in\_range (\$1317)}
+
+Returns a uniform random integer in [[0..A$-$1]] using rejection sampling.
+The routine finds the smallest bitmask that covers the range, then repeatedly
+calls [[STEP\_PRNG]] and masks [[PRNG\_OUTPUT]] until the result is less than
+or equal to the shifted limit.  This avoids modulo bias.
+
+Input: A~=~range limit (1--127).  If A~=~0, returns~0 immediately.
+Output: A~=~random value in [[0..limit$-$1]].
+
+<<defines>>=
+RNG_LIMIT           EQU     $5A11   ; random\_in\_range temporary (limit/shift count)
+RNG_MASK            EQU     $5A12   ; random\_in\_range bit mask
+@ %def RNG_LIMIT RNG_MASK
+
+<<random in range>>=
+    ORG     $1317
+RANDOM_IN_RANGE:
+    SUBROUTINE
+
+    STA     RNG_LIMIT               ; save range limit
+    CMP     #$00
+    BNE     .nonzero
+    RTS                             ; range=0 → return 0
+
+.nonzero:
+    CMP     #$02                    ; \
+    BPL     .ge2                    ;  |
+    LDY     #$06                    ;  | range 1: mask=$40, shift=6
+    LDA     #$40                    ;  |
+    BNE     .have_mask              ; /
+.ge2:
+    CMP     #$04                    ; \
+    BPL     .ge4                    ;  |
+    LDY     #$05                    ;  | range 2-3: mask=$60, shift=5
+    LDA     #$60                    ;  |
+    BNE     .have_mask              ; /
+.ge4:
+    CMP     #$08                    ; \
+    BPL     .ge8                    ;  |
+    LDY     #$04                    ;  | range 4-7: mask=$70, shift=4
+    LDA     #$70                    ;  |
+    BNE     .have_mask              ; /
+.ge8:
+    CMP     #$10                    ; \
+    BPL     .ge16                   ;  |
+    LDY     #$03                    ;  | range 8-15: mask=$78, shift=3
+    LDA     #$78                    ;  |
+    BNE     .have_mask              ; /
+.ge16:
+    CMP     #$20                    ; \
+    BPL     .ge32                   ;  |
+    LDY     #$02                    ;  | range 16-31: mask=$7C, shift=2
+    LDA     #$7C                    ;  |
+    BNE     .have_mask              ; /
+.ge32:
+    CMP     #$40                    ; \
+    BPL     .ge64                   ;  |
+    LDY     #$01                    ;  | range 32-63: mask=$7E, shift=1
+    LDA     #$7E                    ;  |
+    BNE     .have_mask              ; /
+.ge64:
+    LDY     #$00                    ; range 64-127: mask=$7F, shift=0
+    LDA     #$7F
+
+.have_mask:
+    STA     RNG_MASK                ; save bit mask
+    LDA     RNG_LIMIT               ; reload range limit
+    STY     RNG_LIMIT               ; save shift count in RNG_LIMIT
+.shift_loop:
+    DEY                             ; \
+    BMI     .shifted                ;  | shift limit left by (shift count)
+    CLC                             ;  | positions so it aligns with the
+    ROL     A                       ;  | mask bits
+    BNE     .shift_loop             ; /
+.shifted:
+    LDY     RNG_LIMIT               ; Y = shift count
+    STA     RNG_LIMIT               ; save shifted limit
+
+.sample:
+    JSR     STEP_PRNG               ; get next random byte
+    LDA     PRNG_OUTPUT
+    AND     RNG_MASK                ; mask to relevant bits
+    CMP     RNG_LIMIT               ; compare with shifted limit
+    BEQ     .accept                 ; equal → accept
+    BPL     .sample                 ; greater → reject, retry
+
+.accept:
+    DEY                             ; \
+    BPL     .shift_right            ;  | shift result right by (shift count)
+    RTS                             ;  | to recover the final value
+.shift_right:
+    CLC                             ;  |
+    ROR     A                       ;  |
+    BCC     .accept                 ; / (always taken: masked bit is 0)
+@ %def RANDOM_IN_RANGE
+
+\subsection{clamp\_char\_field (\$0A93)}
+
+Ensures that byte~6 of the character record at [[$F4]] has its lower 6~bits
+at least as large as byte~5's lower 5~bits.  If byte~6 is smaller, its low
+bits are replaced with byte~5's value (preserving byte~6's top 2~bits).
+This clamps a stat floor---likely ensuring current HP does not fall below
+a minimum derived from another field.
+
+<<clamp char field>>=
+    ORG     $0A93
+CLAMP_CHAR_FIELD:
+    SUBROUTINE
+
+    LDY     #$05
+    LDA     ($F4),Y                 ; byte 5 of record
+    AND     #$1F                    ; low 5 bits = minimum
+    STA     $BA
+    INY
+    LDA     ($F4),Y                 ; byte 6 of record
+    AND     #$3F                    ; low 6 bits = current value
+    CMP     $BA
+    BCC     .clamp                  ; current < minimum → clamp
+    RTS                             ; current >= minimum → done
+.clamp:
+    LDA     ($F4),Y                 ; reload byte 6
+    AND     #$C0                    ; preserve top 2 bits
+    ORA     $BA                     ; set low bits to minimum
+    STA     ($F4),Y
+    RTS
+@ %def CLAMP_CHAR_FIELD
+
+\subsection{draw\_char\_at\_pos (\$1156)}
+
+Given a map position in~A, sets the font cursor to the corresponding
+column and row, looks up what character or mob occupies that position,
+determines its font character, and draws it.
+
+<<draw char at pos>>=
+    ORG     $1156
+DRAW_CHAR_AT_POS:
+    SUBROUTINE
+
+    JSR     POS_TO_COLROW           ; A=pos → A=col, Y=row
+    STA     FONT_COL                ; set font column
+    STY     FONT_ROW                ; set font row
+    JSR     COLROW_TO_POS           ; re-linearize (A = col + row*20)
+    JSR     $0B62                   ; look up entity at position → $BE
+    JSR     $0C7E                   ; determine font char from entity data
+    JMP     $7489                   ; render the font character
+@ %def DRAW_CHAR_AT_POS
 
 \subsection{display\_status\_bar (\$6D1F)}
 
@@ -3119,6 +3340,29 @@ POS_TO_COLROW:
     ADC      #$14              ; add 20 back → A = column (remainder)
     RTS                        ; A = column (0-19), Y = row (0-9)
 @ %def POS_TO_COLROW
+
+\subsection{colrow\_to\_pos (\$0D98)}
+
+The inverse of [[POS\_TO\_COLROW]]: converts a column in~A and row in~Y
+to a linear map position [[A = col + row * 20]].  The carry is cleared
+once on entry; thereafter the loop adds~20 per row and exits early if
+carry occurs (overflow past 255).
+
+<<colrow to pos>>=
+    ORG     $0D98
+COLROW_TO_POS:
+    SUBROUTINE
+
+    CLC
+.loop:
+    DEY                         ; row--
+    BPL     .add                ; still >= 0 → add another 20
+    RTS                         ; Y exhausted, A = result
+.add:
+    ADC     #$14                ; A += 20
+    BCC     .loop               ; no overflow → continue
+                                ; carry set → return (overflow)
+@ %def COLROW_TO_POS
 
 \subsection{compute\_scene\_ptr (\$0C32)}
 
@@ -4675,6 +4919,7 @@ The following root chunks produce the assembly files when tangled.
 <<pull two ret addrs>>
 <<main entry>>
 <<attract screen>>
+<<scene setup>>
 <<Get item at pos in room>>
 <<pos to colrow>>
 <<get mob data>>
@@ -4685,6 +4930,10 @@ The following root chunks produce the assembly files when tangled.
 <<anim tick and wait>>
 <<timed wait>>
 <<call rom wait>>
+<<clamp char field>>
+<<colrow to pos>>
+<<draw char at pos>>
+<<random in range>>
 <<draw blink alt>>
 <<draw blink char>>
 <<plot char>>

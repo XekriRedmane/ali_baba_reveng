@@ -204,6 +204,8 @@ SAVED_BC            EQU     $5A9A   ; saved $BC/$BD pointer (2 bytes)
 SAVED_F8            EQU     $5A9C   ; saved $F8/$F9 pointer (2 bytes)
 SAVED_BE            EQU     $5A9E   ; saved $BE/$BF pointer (2 bytes)
 SAVED_F4            EQU     $5AA0   ; saved $F4/$F5 pointer (2 bytes)
+RNG_LIMIT           EQU     $5A11   ; random\_in\_range temporary (limit/shift count)
+RNG_MASK            EQU     $5A12   ; random\_in\_range bit mask
 MSG_TABLE_PTR           EQU     $4005   ; message table base (2 bytes)
 MSG_LINE_COUNT          EQU     $5A57   ; lines printed so far
 DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
@@ -353,12 +355,69 @@ ATTRACT_SCREEN:
     STA     $F4                     ;  | $F4/$F5 = $BA/$BB (save pointer)
     LDA     $BB                     ;  |
     STA     $F5                     ; /
-    JSR     $0A17                   ; scene_setup
+    JSR     SCENE_SETUP
     LDA     #$00
     STA     LOCATION_FLAG           ; clear location-change flag
     JSR     SET_CURSOR_ROW21
     LDA     #$26                    ; scene number $26 (38 decimal)
     JMP     SCENE_LOOP              ; tail-call
+    ORG     $0A17
+SCENE_SETUP:
+    SUBROUTINE
+
+    LDA     $5A29                   ; character/scene index
+    JSR     $1053                   ; load character record → $BE
+    LDY     #$03
+    LDA     ($BE),Y                 ; byte 3: min position (packed)
+    JSR     POS_TO_COLROW           ; → A=min_col, Y=min_row
+    STA     $5A51                   ; min_col
+    STY     $5A53                   ; min_row
+    LDY     #$04
+    LDA     ($BE),Y                 ; byte 4: max position (packed)
+    JSR     POS_TO_COLROW           ; → A=max_col, Y=max_row
+    STA     $5A52                   ; max_col
+    STY     $5A54                   ; max_row
+    INC     $5A51                   ; min_col++ (exclusive border)
+    INC     $5A53                   ; min_row++
+    CLC
+    LDA     $5A52                   ; \
+    SBC     $5A51                   ;  | col_range = max_col - min_col
+    JSR     RANDOM_IN_RANGE         ;  | random column offset
+    CLC                             ;  |
+    ADC     $5A51                   ;  | col = min_col + offset
+    STA     FONT_COL                ; / set font column
+    CLC
+    LDA     $5A54                   ; \
+    SBC     $5A53                   ;  | row_range = max_row - min_row
+    JSR     RANDOM_IN_RANGE         ;  | random row offset
+    CLC                             ;  |
+    ADC     $5A53                   ; / row = min_row + offset
+    TAY                             ; Y = row
+    LDA     FONT_COL                ; A = col
+    JSR     COLROW_TO_POS           ; → A = linear position
+    LDY     #$03
+    STA     ($F4),Y                 ; store position in record byte 3
+    LDA     $F4                     ; \
+    STA     $BC                     ;  | $BC/$BD = $F4/$F5
+    LDA     $F5                     ;  |
+    STA     $BD                     ; /
+    LDA     #$00
+    STA     $5A28                   ; clear player index
+    JSR     $0F84                   ; character record management
+    LDY     #$0D
+    LDA     #$00                    ; \
+    STA     ($F4),Y                 ;  | clear bytes 13-14 of record
+    INY                             ;  |
+    STA     ($F4),Y                 ; /
+    JSR     CLAMP_CHAR_FIELD        ; ensure byte 6 >= byte 5 minimum
+    LDA     $5A02                   ; current player index
+    CMP     $5A29                   ; compare with scene index
+    BNE     .done                   ; not current player → skip
+    LDY     #$03
+    LDA     ($F4),Y                 ; load position from record
+    JSR     DRAW_CHAR_AT_POS        ; draw character at position
+.done:
+    RTS
     ORG      $0B62
     ; Takes A (pos) and TMP_PTR (pointer to room data)
 get_item_at_pos_in_room:
@@ -595,6 +654,129 @@ CALL_ROM_WAIT:
 
     LDA     WAIT_DURATION           ; load duration parameter
     JMP     ROM_WAIT                ; tail-call ROM WAIT
+    ORG     $0A93
+CLAMP_CHAR_FIELD:
+    SUBROUTINE
+
+    LDY     #$05
+    LDA     ($F4),Y                 ; byte 5 of record
+    AND     #$1F                    ; low 5 bits = minimum
+    STA     $BA
+    INY
+    LDA     ($F4),Y                 ; byte 6 of record
+    AND     #$3F                    ; low 6 bits = current value
+    CMP     $BA
+    BCC     .clamp                  ; current < minimum → clamp
+    RTS                             ; current >= minimum → done
+.clamp:
+    LDA     ($F4),Y                 ; reload byte 6
+    AND     #$C0                    ; preserve top 2 bits
+    ORA     $BA                     ; set low bits to minimum
+    STA     ($F4),Y
+    RTS
+    ORG     $0D98
+COLROW_TO_POS:
+    SUBROUTINE
+
+    CLC
+.loop:
+    DEY                         ; row--
+    BPL     .add                ; still >= 0 → add another 20
+    RTS                         ; Y exhausted, A = result
+.add:
+    ADC     #$14                ; A += 20
+    BCC     .loop               ; no overflow → continue
+                                ; carry set → return (overflow)
+    ORG     $1156
+DRAW_CHAR_AT_POS:
+    SUBROUTINE
+
+    JSR     POS_TO_COLROW           ; A=pos → A=col, Y=row
+    STA     FONT_COL                ; set font column
+    STY     FONT_ROW                ; set font row
+    JSR     COLROW_TO_POS           ; re-linearize (A = col + row*20)
+    JSR     $0B62                   ; look up entity at position → $BE
+    JSR     $0C7E                   ; determine font char from entity data
+    JMP     $7489                   ; render the font character
+    ORG     $1317
+RANDOM_IN_RANGE:
+    SUBROUTINE
+
+    STA     RNG_LIMIT               ; save range limit
+    CMP     #$00
+    BNE     .nonzero
+    RTS                             ; range=0 → return 0
+
+.nonzero:
+    CMP     #$02                    ; \
+    BPL     .ge2                    ;  |
+    LDY     #$06                    ;  | range 1: mask=$40, shift=6
+    LDA     #$40                    ;  |
+    BNE     .have_mask              ; /
+.ge2:
+    CMP     #$04                    ; \
+    BPL     .ge4                    ;  |
+    LDY     #$05                    ;  | range 2-3: mask=$60, shift=5
+    LDA     #$60                    ;  |
+    BNE     .have_mask              ; /
+.ge4:
+    CMP     #$08                    ; \
+    BPL     .ge8                    ;  |
+    LDY     #$04                    ;  | range 4-7: mask=$70, shift=4
+    LDA     #$70                    ;  |
+    BNE     .have_mask              ; /
+.ge8:
+    CMP     #$10                    ; \
+    BPL     .ge16                   ;  |
+    LDY     #$03                    ;  | range 8-15: mask=$78, shift=3
+    LDA     #$78                    ;  |
+    BNE     .have_mask              ; /
+.ge16:
+    CMP     #$20                    ; \
+    BPL     .ge32                   ;  |
+    LDY     #$02                    ;  | range 16-31: mask=$7C, shift=2
+    LDA     #$7C                    ;  |
+    BNE     .have_mask              ; /
+.ge32:
+    CMP     #$40                    ; \
+    BPL     .ge64                   ;  |
+    LDY     #$01                    ;  | range 32-63: mask=$7E, shift=1
+    LDA     #$7E                    ;  |
+    BNE     .have_mask              ; /
+.ge64:
+    LDY     #$00                    ; range 64-127: mask=$7F, shift=0
+    LDA     #$7F
+
+.have_mask:
+    STA     RNG_MASK                ; save bit mask
+    LDA     RNG_LIMIT               ; reload range limit
+    STY     RNG_LIMIT               ; save shift count in RNG_LIMIT
+.shift_loop:
+    DEY                             ; \
+    BMI     .shifted                ;  | shift limit left by (shift count)
+    CLC                             ;  | positions so it aligns with the
+    ROL     A                       ;  | mask bits
+    BNE     .shift_loop             ; /
+.shifted:
+    LDY     RNG_LIMIT               ; Y = shift count
+    STA     RNG_LIMIT               ; save shifted limit
+
+.sample:
+    JSR     STEP_PRNG               ; get next random byte
+    LDA     PRNG_OUTPUT
+    AND     RNG_MASK                ; mask to relevant bits
+    CMP     RNG_LIMIT               ; compare with shifted limit
+    BEQ     .accept                 ; equal → accept
+    BPL     .sample                 ; greater → reject, retry
+
+.accept:
+    DEY                             ; \
+    BPL     .shift_right            ;  | shift result right by (shift count)
+    RTS                             ;  | to recover the final value
+.shift_right:
+    CLC                             ;  |
+    ROR     A                       ;  |
+    BCC     .accept                 ; / (always taken: masked bit is 0)
     ORG     $74CB
 DRAW_BLINK_ALT:
     SUBROUTINE
