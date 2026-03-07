@@ -3864,12 +3864,16 @@ and its appearance (byte 4) is converted to a font character number.
 On the player's turn, the player's column and row are taken directly from
 [[\$5A63]]/[[\$5A64]], and the font character is looked up via [[\$0C7E]].
 
+<<defines>>=
+IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
+@ %def IS_PLAYER_TURN
+
 <<set blink target>>=
     ORG     $16A3
 SET_BLINK_TARGET:
     SUBROUTINE
 
-    LDA     $5A74                   ; 0 = mob's turn, 1 = player's turn
+    LDA     IS_PLAYER_TURN
     CMP     #$01
     BEQ     .player
 
@@ -3905,7 +3909,7 @@ SET_BLINK_TARGET:
 (15AB)
 .compute_to_hit:
     JSR      SET_BLINK_TARGET
-    LDA      DAT_5a74_flag_mob_is_0
+    LDA      IS_PLAYER_TURN
     CMP      #$01
     BNE      .mob
     LDA      #$1C
@@ -4049,14 +4053,14 @@ LAB_162b:
     JSR      print_centered_row_23
     JSR      scroll_status_window_up
     LDA      #$01
-    CMP      DAT_5a74_flag_mob_is_0
+    CMP      IS_PLAYER_TURN
     BEQ      .do_blink
     JSR      print_thing_name_centered_row_23
 .do_blink:
     JSR      blink
     RTS
 .do_hit:
-    LDA      DAT_5a74_flag_mob_is_0
+    LDA      IS_PLAYER_TURN
     BEQ      .hit_mob
     JMP      hit_nonmob?
 .hit_mob:

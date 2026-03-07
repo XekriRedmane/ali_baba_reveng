@@ -192,6 +192,7 @@ BLINK_CHAR      EQU     $5AA4   ; font character number
 ROM_COUT            EQU     $FDF0   ; Apple II ROM character output
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
+IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
     ORG     $0569
 ATTRACT_LOOP:
     SUBROUTINE
