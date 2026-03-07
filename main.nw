@@ -8066,6 +8066,991 @@ UPDATE_EVENT_LIST:
     JMP     .scan
 @ %def UPDATE_EVENT_LIST
 
+<<fun 0925>>=
+    ORG     $0925
+FUN_0925:
+@ %def FUN_0925
+
+<<fun 0933>>=
+    ORG     $0933
+FUN_0933:
+@ %def FUN_0933
+
+<<fun 1231>>=
+    ORG     $1231
+FUN_1231:
+    SUBROUTINE
+    ; Check hostility threshold: if $5A18 >= $40, show message $1C
+    ; and return 1; else show message $1D and return 0.
+    JSR     FUN_78A8
+    LDA     $5A18
+    CMP     #$40
+    BPL     .pass
+    JMP     .fail
+.pass:
+    JSR     SET_CURSOR_ROW21
+    JSR     FUN_0D8A
+    JSR     FUN_769B
+    LDA     #$1C
+    JSR     DISPLAY_MESSAGE
+    LDA     #$01
+    RTS
+.fail:
+    JSR     SET_CURSOR_ROW21
+    JSR     FUN_0D8A
+    JSR     FUN_769B
+    LDA     #$1D
+    JSR     DISPLAY_MESSAGE
+    LDA     #$00
+    RTS
+@ %def FUN_1231
+
+<<fun 143f>>=
+    ORG     $143F
+FUN_143F:
+    SUBROUTINE
+    ; Auto-heal: if HP < $28, randomly attempt healing via $1482.
+    ; Loops while $5A18 >= $50 (still injured). Shows message $21
+    ; if player heals for the first time.
+    LDY     #$06
+    LDA     ($F8),Y
+    AND     #$3F
+    CMP     #$28
+    BMI     .do_heal
+    RTS
+.do_heal:
+    LDA     #$01
+    JSR     RANDOM_IN_RANGE
+    CMP     #$00
+    BNE     .start_heal
+    RTS
+.start_heal:
+    LDA     #$00
+    STA     $5A16
+.heal_loop:
+    JSR     FUN_1482
+    JSR     FUN_78A8
+    LDA     $5A18
+    CMP     #$50
+    BPL     .heal_loop
+    LDY     #$04
+    LDA     ($F8),Y
+    CMP     #$15
+    BCC     .player
+.done:
+    RTS
+.player:
+    LDA     $5A16
+    BNE     .done
+    JSR     SET_CURSOR_ROW21
+    JSR     FUN_0D8A
+    JSR     FUN_769B
+    LDA     #$21
+    JMP     DISPLAY_MESSAGE
+@ %def FUN_143F
+
+<<fun 1482>>=
+    ORG     $1482
+FUN_1482:
+@ %def FUN_1482
+
+<<fun 14a3>>=
+    ORG     $14A3
+FUN_14A3:
+@ %def FUN_14A3
+
+<<fun 14b7>>=
+    ORG     $14B7
+FUN_14B7:
+    SUBROUTINE
+    ; Check encounter, clear restricted flag, conditionally set it,
+    ; then set char state to 2.
+    JSR     CHECK_ENCOUNTER
+    JSR     FUN_1BEF
+    LDA     #$02
+    CMP     $5A1F
+    BNE     .skip
+    JSR     FUN_1BF8
+.skip:
+    LDA     #$02
+    JSR     FUN_1BE0
+    RTS
+@ %def FUN_14B7
+
+<<fun 14cd>>=
+    ORG     $14CD
+FUN_14CD:
+    SUBROUTINE
+    ; Set char state to 3, call $199D, jump to combat logic at $15AB.
+    LDA     #$03
+    JSR     FUN_1BE0
+    JSR     FUN_199D
+    JMP     FUN_15AB
+@ %def FUN_14CD
+
+<<fun 15ab>>=
+    ORG     $15AB
+FUN_15AB:
+    SUBROUTINE
+    ; Combat willingness calculation and attack resolution.
+    ; Computes willingness score in $5A76 based on char/target stats,
+    ; then rolls random to determine if attack occurs.
+    JSR     FUN_16A3
+    LDA     $5A74
+    CMP     #$01
+    BNE     .not_player
+    LDA     #$1C
+    STA     $5A76
+    JMP     .clamp_done
+.not_player:
+    LDY     #$0B
+    LDA     ($F8),Y
+    TAX
+    AND     #$1F
+    STA     $5A76
+    TXA
+    AND     #$20
+    BEQ     .no_bit5
+    TXA
+    AND     #$EF
+    STA     ($F8),Y
+    LDA     #$18
+    JSR     FUN_169B
+.no_bit5:
+    LDA     ($F4),Y
+    TAY
+    AND     #$40
+    BEQ     .no_bit6
+    LDA     #$FC
+    JSR     FUN_169B
+.no_bit6:
+    TYA
+    AND     #$80
+    BEQ     .no_bit7
+    LDA     #$08
+    JSR     FUN_169B
+.no_bit7:
+    LDY     #$0F
+    LDA     ($F4),Y
+    TAX
+    AND     #$04
+    BEQ     .no_restrict
+    LDA     #$06
+    JSR     FUN_169B
+.no_restrict:
+    TXA
+    AND     #$03
+    CMP     #$01
+    BPL     .ge1
+    LDA     #$03
+    JSR     FUN_169B
+    JMP     .state_done
+.ge1:
+    BNE     .ne1
+    LDA     #$FF
+    JSR     FUN_169B
+    JMP     .state_done
+.ne1:
+    CMP     #$03
+    BNE     .state_done
+    LDA     #$FD
+    JSR     FUN_169B
+.state_done:
+    LDY     #$06
+    LDA     ($F4),Y
+    AND     #$3F
+    CMP     #$03
+    BCS     .hp_ok
+    LDA     #$18
+    JSR     FUN_169B
+.hp_ok:
+    LDY     #$03
+    LDA     ($F8),Y
+    CMP     ($F4),Y
+    BNE     .diff_pos
+    LDY     #$05
+    LDA     ($F4),Y
+    ROR
+    AND     #$0F
+    STA     $5A77
+    LDA     ($F8),Y
+    ROR
+    AND     #$0F
+    SEC
+    SBC     $5A77
+    JSR     FUN_169B
+.diff_pos:
+    LDA     $5A76
+    BPL     .not_neg
+    LDA     #$00
+    STA     $5A76
+    JMP     .clamp_done
+.not_neg:
+    CMP     #$1F
+    BMI     .clamp_done
+    LDA     #$1E
+    STA     $5A76
+.clamp_done:
+    LDA     #$1F
+    JSR     RANDOM_IN_RANGE
+    CMP     $5A76
+    BMI     .attack
+    BEQ     .attack
+    JSR     SET_CURSOR_ROW21
+    JSR     FUN_0D8A
+    JSR     FUN_769B
+    LDA     #$D2
+    STA     $BC
+    LDA     #$7C
+    STA     $BD
+    JSR     PRINT_BOTTOM_CENTERED
+    JSR     FUN_769B
+    LDA     #$01
+    CMP     $5A74
+    BEQ     .is_player
+    JSR     FUN_1406
+.is_player:
+    JSR     FUN_0D10
+    RTS
+.attack:
+    LDA     $5A74
+    BEQ     .mob_attack
+    JMP     FUN_1751
+.mob_attack:
+    JMP     FUN_1860
+@ %def FUN_15AB
+
+<<fun 169b>>=
+    ORG     $169B
+FUN_169B:
+@ %def FUN_169B
+
+<<fun 199d>>=
+    ORG     $199D
+FUN_199D:
+@ %def FUN_199D
+
+<<fun 1a31>>=
+    ORG     $1A31
+FUN_1A31:
+@ %def FUN_1A31
+
+<<fun 1ba7>>=
+    ORG     $1BA7
+FUN_1BA7:
+    SUBROUTINE
+    ; End turn: clear $5B27, check encounter, compare level vs $5A66
+    LDA     #$00
+    STA     $5B27
+    JSR     FUN_1BCB
+    LDA     $5A66
+    BNE     .check_level
+    JMP     FUN_14A3
+.check_level:
+    LDY     #$0C
+    LDA     ($F8),Y
+    ROR
+    AND     #$07
+    CMP     $5A66
+    BMI     .too_low
+    JMP     FUN_14A3
+.too_low:
+@ %def FUN_1BA7
+
+<<fun 1bc6>>=
+    ORG     $1BC6
+FUN_1BC6:
+    SUBROUTINE
+    ; Set char field 15 state to 1
+    LDA     #$01
+    JMP     FUN_1BE0
+@ %def FUN_1BC6
+
+<<fun 1bcb>>=
+    ORG     $1BCB
+FUN_1BCB:
+    SUBROUTINE
+    ; Check encounter at char position, clear restricted flag,
+    ; set it if encounter type is 2.
+    LDY     #$03
+    LDA     ($F8),Y
+    JSR     CHECK_ENCOUNTER
+    JSR     FUN_1BEF
+    LDA     $5A1F
+    CMP     #$02
+    BNE     .done
+    JSR     FUN_1BF8
+.done:
+    RTS
+@ %def FUN_1BCB
+
+<<fun 1bef>>=
+    ORG     $1BEF
+FUN_1BEF:
+    SUBROUTINE
+    ; Clear restricted flag (bit 2 of char field 15)
+    LDY     #$0F
+    LDA     ($F8),Y
+    AND     #$FB
+    STA     ($F8),Y
+    RTS
+@ %def FUN_1BEF
+
+<<fun 1bf8>>=
+    ORG     $1BF8
+FUN_1BF8:
+    SUBROUTINE
+    ; Set restricted flag (bit 2 of char field 15)
+    LDY     #$0F
+    LDA     ($F8),Y
+    ORA     #$04
+    STA     ($F8),Y
+    RTS
+@ %def FUN_1BF8
+
+<<fun 1cf1>>=
+    ORG     $1CF1
+FUN_1CF1:
+    SUBROUTINE
+    ; Display message $0C and set char state to 0.
+    JSR     SET_CURSOR_ROW21
+    JSR     FUN_0D8A
+    JSR     FUN_769B
+    LDA     #$0C
+    JSR     DISPLAY_MESSAGE
+    LDA     #$00
+    JMP     FUN_1BE0
+@ %def FUN_1CF1
+
+<<fun 1d4d>>=
+    ORG     $1D4D
+FUN_1D4D:
+    SUBROUTINE
+    ; Handle empty slot interaction: treasure pickup, traps,
+    ; and event activation.
+    LDA     #$00
+    JSR     FUN_1BE0
+    LDY     #$02
+    LDA     ($BE),Y
+    STA     $5A59
+    AND     #$C0
+    CMP     #$C0
+    BNE     .not_active
+    LDA     ($BE),Y
+    AND     #$1F
+    TAX
+    CMP     #$1D
+    BPL     .no_remove
+    LDY     #$00
+    LDA     #$FE
+    STA     ($BE),Y
+    TXA
+    CMP     #$00
+    BEQ     .no_remove
+    LDA     #$0A
+    JSR     FUN_6C37
+.no_remove:
+    JSR     FUN_1B52
+    JSR     FUN_645F
+    CMP     #$00
+    BNE     .has_threat
+    STA     $5A65
+.has_threat:
+    JMP     FUN_1A31
+.not_active:
+    PHA
+    LDX     #$0E
+    JSR     SCRIPT_ENGINE
+    PLA
+    CMP     #$00
+    BNE     .has_type
+    LDA     $5A59
+    AND     #$1F
+    CMP     #$1B
+    BMI     .small_val
+    JMP     FUN_1CF1
+.small_val:
+    JSR     SET_CURSOR_ROW21
+    JSR     FUN_0D8A
+    JSR     FUN_769B
+    LDA     #$0D
+    JSR     DISPLAY_MESSAGE
+    LDA     #$01
+    JMP     FUN_1425
+.has_type:
+    CMP     #$40
+    BEQ     .type40
+    LDA     #$19
+    JSR     RANDOM_IN_RANGE
+    STA     $5A18
+    LDY     #$05
+    LDA     ($F8),Y
+    AND     #$1F
+    CMP     $5A18
+    BPL     .type40
+    JSR     SET_CURSOR_ROW21
+    LDA     #$10
+    JSR     DISPLAY_MESSAGE
+    LDY     #$02
+    LDA     $5A59
+    AND     #$3F
+    ORA     #$40
+    STA     ($BE),Y
+    JSR     FUN_78A8
+    LDA     $5A18
+    CMP     #$14
+    BMI     .trap_damage
+    RTS
+.trap_damage:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$11
+    JSR     DISPLAY_MESSAGE
+    JSR     FUN_1BF8
+    JSR     FUN_0D8A
+    JSR     FUN_0D10
+    JSR     FUN_78A8
+    LDA     $5A18
+    ROL
+    ROL
+    LDA     #$01
+    ADC     #$00
+    JMP     FUN_1425
+.type40:
+    LDA     $5A59
+    AND     #$1F
+    STA     $5A5A
+    CMP     #$1B
+    BPL     .big_treasure
+    JSR     SET_CURSOR_ROW21
+    LDA     #$13
+    JSR     FUN_6C37
+    JMP     .clear_slot
+.big_treasure:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$12
+    JSR     DISPLAY_MESSAGE
+    LDA     $5A5A
+    CMP     #$1F
+    BMI     .clear_slot
+    DEC     $5A5A
+    LDA     $5A59
+    AND     #$E0
+    ORA     $5A5A
+    LDY     #$02
+    STA     ($BE),Y
+    JMP     .update_pos
+.clear_slot:
+    LDY     #$00
+    LDA     #$FE
+    STA     ($BE),Y
+.update_pos:
+    LDA     CURRENT_COL
+    STA     TURN_START_COL
+    LDA     CURRENT_ROW
+    STA     TURN_START_ROW
+    JSR     FUN_1B81
+    JSR     FUN_0D30
+    JMP     FUN_1DDC
+@ %def FUN_1D4D
+
+<<fun 1ddc>>=
+    ORG     $1DDC
+FUN_1DDC:
+@ %def FUN_1DDC
+
+<<fun 1751>>=
+    ORG     $1751
+FUN_1751:
+@ %def FUN_1751
+
+<<fun 1860>>=
+    ORG     $1860
+FUN_1860:
+@ %def FUN_1860
+
+<<fun 1e5a>>=
+    ORG     $1E5A
+FUN_1E5A:
+    SUBROUTINE
+    ; Mob encounter on movement: check flee chance, commit move,
+    ; check encounter type, walk group for combat.
+    LDA     #$00
+    STA     $5A26
+    LDA     $F8
+    STA     $BC
+    LDA     $F9
+    STA     $BD
+    LDA     CURRENT_COL
+    LDY     CURRENT_ROW
+    JSR     COLROW_TO_POS
+    JSR     FUN_0F49
+    LDA     $5A26
+    BEQ     .no_flee
+    LDY     #$05
+    LDA     ($F8),Y
+    AND     #$1F
+    CLC
+    ADC     #$10
+    SEC
+    SBC     $5A26
+    BMI     .clamp_low
+    CMP     #$1D
+    BMI     .in_range
+    LDA     #$1C
+    BNE     .in_range
+.clamp_low:
+    LDA     #$04
+.in_range:
+    ASL
+    ASL
+    ORA     #$03
+    TAX
+    JSR     FUN_78A8
+    TXA
+    CMP     $5A18
+    BPL     .no_flee
+    JSR     SET_CURSOR_ROW21
+    JSR     FUN_0D8A
+    JSR     FUN_769B
+    LDA     #$1E
+    JSR     DISPLAY_MESSAGE
+    LDA     TURN_START_COL
+    STA     CURRENT_COL
+    LDA     TURN_START_ROW
+    STA     CURRENT_ROW
+    JMP     FUN_1BA7
+.no_flee:
+    JSR     FUN_1B52
+    LDY     #$03
+    LDA     ($F8),Y
+    JSR     CHECK_ENCOUNTER
+    LDA     $5A1F
+    CMP     #$02
+    BPL     .hostile
+    JSR     FUN_645F
+    CMP     #$01
+    BEQ     .one_threat
+    JMP     FUN_1BA7
+.one_threat:
+    JMP     FUN_1A31
+.hostile:
+    JSR     FUN_12FA
+.walk_group:
+    LDA     $F5
+    BEQ     .group_done
+    LDY     #$03
+    LDA     ($F8),Y
+    CMP     ($F4),Y
+    BNE     .next_member
+    JSR     FUN_1F03
+.next_member:
+    JSR     FUN_1300
+    JMP     .walk_group
+.group_done:
+    JSR     SET_CURSOR_ROW21
+    JSR     FUN_0D8A
+    JSR     FUN_769B
+    LDA     #$1F
+    JSR     DISPLAY_MESSAGE
+    JMP     FUN_1BA7
+@ %def FUN_1E5A
+
+<<fun 1f03>>=
+    ORG     $1F03
+FUN_1F03:
+@ %def FUN_1F03
+
+<<fun 5f19>>=
+    ORG     $5F19
+FUN_5F19:
+@ %def FUN_5F19
+
+<<fun 5f60>>=
+    ORG     $5F60
+FUN_5F60:
+    SUBROUTINE
+    ; Set up input: store X/Y in $C1/$C0, call setup routines.
+    STX     $C1
+    STY     $C0
+    JSR     FUN_6014
+    JSR     FUN_6024
+    JSR     FUN_5F70
+    JMP     FUN_602F
+@ %def FUN_5F60
+
+<<fun 5f70>>=
+    ORG     $5F70
+FUN_5F70:
+@ %def FUN_5F70
+
+<<fun 6014>>=
+    ORG     $6014
+FUN_6014:
+@ %def FUN_6014
+
+<<fun 6024>>=
+    ORG     $6024
+FUN_6024:
+@ %def FUN_6024
+
+<<fun 602f>>=
+    ORG     $602F
+FUN_602F:
+@ %def FUN_602F
+
+<<fun 60c7>>=
+    ORG     $60C7
+FUN_60C7:
+    SUBROUTINE
+    ; Teardown input and jump to $5F19.
+    JSR     FUN_60CD
+    JMP     FUN_5F19
+@ %def FUN_60C7
+
+<<fun 60cd>>=
+    ORG     $60CD
+FUN_60CD:
+    SUBROUTINE
+    ; Return X=$60, Y=$7D (pointer to input table).
+    LDX     #$60
+    LDY     #$7D
+    RTS
+@ %def FUN_60CD
+
+<<fun 60d2>>=
+    ORG     $60D2
+FUN_60D2:
+    SUBROUTINE
+    ; Configure input handler: set up self-modifying addresses
+    ; from $5B25/$5B26/$5A65/$5B27.
+    JSR     FUN_750C
+    LDA     $5B26
+    STA     $60B3
+    LDA     $5B25
+    STA     $609F
+    EOR     #$01
+    STA     $608B
+    STA     $6095
+    EOR     #$01
+    CLC
+    ADC     #$03
+    STA     $607E
+    LDA     $5A65
+    STA     $6081
+    LDA     $5B27
+    BEQ     .clear
+    RTS
+.clear:
+    STA     $6081
+    RTS
+@ %def FUN_60D2
+
+<<fun 6458>>=
+    ORG     $6458
+FUN_6458:
+@ %def FUN_6458
+
+<<fun 645f>>=
+    ORG     $645F
+FUN_645F:
+    SUBROUTINE
+    ; Check adjacent threats at current col/row position.
+    LDA     CURRENT_COL
+    LDY     CURRENT_ROW
+    JSR     COLROW_TO_POS
+    JMP     FUN_0EF1
+@ %def FUN_645F
+
+<<fun 6742>>=
+    ORG     $6742
+FUN_6742:
+    SUBROUTINE
+    ; NPC movement AI: evaluate 4 directions + stay, pick best
+    ; direction based on distance to target and randomized scoring.
+    JSR     FUN_0D30
+    LDA     $5A05
+    CMP     #$04
+    BEQ     .do_ai
+    LDA     $5A71
+    CMP     #$00
+    BNE     .do_ai
+    RTS
+.do_ai:
+    LDA     #$00
+    STA     $5A6B
+    STA     $5A6C
+    STA     $5A6D
+    STA     $5A6E
+    LDA     #$0A
+    STA     $5A6A
+    LDA     $5A71
+    JSR     FUN_13DB
+    STA     $5A68
+    CMP     #$00
+    BEQ     .no_target
+    LDA     #$13
+    STA     $5A6A
+.no_target:
+    LDX     $5A5D
+    BEQ     .no_prev
+    INC     $5A6A,X
+    INC     $5A6A,X
+    INC     $5A6A,X
+.no_prev:
+    LDA     #$01
+    STA     $5A6F
+    LDY     #$03
+    LDA     ($F8),Y
+    SEC
+    SBC     #$14
+    STA     $5A70
+    JSR     FUN_6815
+    INC     $5A6F
+    LDA     $5A70
+    CLC
+    ADC     #$28
+    STA     $5A70
+    JSR     FUN_6815
+    INC     $5A6F
+    LDA     $5A70
+    SEC
+    SBC     #$15
+    STA     $5A70
+    JSR     FUN_6815
+    INC     $5A6F
+    INC     $5A70
+    INC     $5A70
+    JSR     FUN_6815
+    LDA     #$06
+    STA     $5A6F
+    LDA     $5A05
+    CMP     #$04
+    BNE     .not_phase4
+    LDA     #$0F
+    STA     $5A6F
+.not_phase4:
+    LDX     #$04
+    CLC
+.score_loop:
+    LDA     $5A6A,X
+    ROL
+    ROL
+    STA     $5A6A,X
+    LDA     $5A6F
+    JSR     RANDOM_IN_RANGE
+    CLC
+    ADC     $5A6A,X
+    STA     $5A6A,X
+    DEX
+    BPL     .score_loop
+    LDA     #$7F
+    STA     $BA
+    LDX     #$04
+.find_min:
+    LDA     $5A6A,X
+    CMP     $BA
+    BCS     .not_lower
+    STA     $BA
+    STX     $BB
+.not_lower:
+    DEX
+    BPL     .find_min
+    LDA     $BB
+    CMP     #$03
+    BPL     .ge3
+    EOR     #$03
+    BPL     .store_dir
+.ge3:
+    EOR     #$07
+.store_dir:
+    STA     $5A5D
+    LDA     $BB
+    RTS
+@ %def FUN_6742
+
+<<fun 6815>>=
+    ORG     $6815
+FUN_6815:
+@ %def FUN_6815
+
+<<fun 70df>>=
+    ORG     $70DF
+FUN_70DF:
+    SUBROUTINE
+    ; Shop/store display: iterate through item bitmask,
+    ; show prices and names for available items.
+    LDA     $5A05
+    BEQ     .do_shop
+    RTS
+.do_shop:
+    LDA     #$DD
+    STA     $E6
+    LDA     #$7E
+    STA     $E7
+    LDY     #$01
+    LDA     ($BE),Y
+    SEC
+    SBC     #$D5
+    TAX
+.count_loop:
+    DEX
+    BMI     .counted
+    JSR     FUN_71F0
+    JMP     .count_loop
+.counted:
+    LDY     #$02
+    LDA     ($BE),Y
+    STA     $5A83
+    JSR     SET_CURSOR_ROW21
+    LDY     #$28
+    LDA     ($E6),Y
+    JSR     FUN_6C37
+    JSR     FUN_0925
+    JSR     FUN_0933
+.item_start:
+    LDA     #$80
+    STA     $5A80
+    LDA     #$00
+    STA     $5A85
+.item_loop:
+    LDA     $5A83
+    AND     $5A80
+    BNE     .show_item
+    JMP     .next_item
+.show_item:
+    LDA     #$00
+    STA     $5A81
+    STA     $5A82
+    LDY     $5A85
+    INY
+    INY
+    INY
+    INY
+    LDA     $5A56
+    ROL
+    ROL
+    ROL
+    ROL
+    AND     #$03
+    TAX
+    STA     $5A84
+.price_loop:
+    JSR     FUN_71FC
+    DEX
+    BPL     .price_loop
+    LDA     #$20
+    LDX     #$04
+.clear1:
+    STA     $7D04,X
+    DEX
+    BPL     .clear1
+    LDX     #$13
+.clear2:
+    STA     $7D0F,X
+    DEX
+    BPL     .clear2
+    LDA     $5A81
+    STA     $BC
+    LDA     $5A82
+    STA     $BD
+    LDA     #$04
+    STA     $BA
+    LDA     #$7D
+    STA     $BB
+    JSR     FUN_0DA1
+    LDY     $5A85
+    INY
+    INY
+    LDA     ($E6),Y
+    STA     $BC
+    INY
+    LDA     ($E6),Y
+    STA     $BD
+    LDY     #$00
+    LDA     ($BC),Y
+    TAY
+    TAX
+    DEX
+.copy_name:
+    LDA     ($BC),Y
+    STA     $7D0F,X
+    DEY
+    DEX
+    BPL     .copy_name
+    JMP     FUN_6458
+.next_item:
+    CLC
+    LDA     $5A80
+    ROR
+    BCC     .more_items
+    JMP     .item_start
+.more_items:
+    STA     $5A80
+    LDA     $5A85
+    ADC     #$05
+    STA     $5A85
+    JMP     .item_loop
+@ %def FUN_70DF
+
+<<fun 71f0>>=
+    ORG     $71F0
+FUN_71F0:
+@ %def FUN_71F0
+
+<<fun 71fc>>=
+    ORG     $71FC
+FUN_71FC:
+@ %def FUN_71FC
+
+<<fun 7489>>=
+    ORG     $7489
+FUN_7489:
+    SUBROUTINE
+    ; Draw sprite: set up HRCG parameters from font char number
+    ; and direction, then call PRINT_STRING.
+    JSR     FUN_7723
+    LDX     #$B1
+    LDA     $5A0F
+    CMP     #$02
+    BNE     .not2
+    INX
+    INX
+.not2:
+    STX     $80A6
+    LDA     $5A0E
+.check_range:
+    CMP     #$18
+    BCC     .in_range
+    INX
+    STX     $80A6
+    SEC
+    SBC     #$18
+    JMP     .check_range
+.in_range:
+    ASL
+    ASL
+    CLC
+    ADC     #$20
+    TAY
+    STY     $80A8
+    INY
+    STY     $80A9
+    INY
+    STY     $80AB
+    INY
+    STY     $80AC
+    LDA     #$A4
+    STA     $BC
+    LDA     #$80
+    STA     $BD
+    JMP     PRINT_STRING
+@ %def FUN_7489
+
+<<fun 750c>>=
+    ORG     $750C
+FUN_750C:
+@ %def FUN_750C
+
 <<fun 704d>>=
     ORG     $704D
 MODIFY_CHAR_STATS:
@@ -8595,23 +9580,47 @@ The following root chunks produce the assembly files when tangled.
 <<check adjacent threats>>
 <<sum hostile at pos>>
 <<draw char at pos>>
+<<fun 0925>>
+<<fun 0933>>
 <<fun 106f>>
 <<fun 1142>>
 <<fun 12d0>>
 <<advance group link>>
 <<fun 1260>>
 <<fun 1300>>
+<<fun 1231>>
 <<random in range>>
 <<fun 138d>>
 <<fun 13db>>
 <<fun 1406>>
 <<fun 1414>>
 <<fun 1425>>
+<<fun 143f>>
+<<fun 1482>>
+<<fun 14a3>>
+<<fun 14b7>>
+<<fun 14cd>>
+<<fun 15ab>>
+<<fun 169b>>
+<<fun 199d>>
 <<game turn loop>>
+<<fun 1a31>>
 <<fun 1b52>>
+<<fun 1ba7>>
+<<fun 1bc6>>
+<<fun 1bcb>>
 <<fun 1be0>>
+<<fun 1bef>>
+<<fun 1bf8>>
 <<handle encounter>>
+<<fun 1cf1>>
 <<trigger scene event>>
+<<fun 1d4d>>
+<<fun 1ddc>>
+<<fun 1751>>
+<<fun 1860>>
+<<fun 1e5a>>
+<<fun 1f03>>
 <<fill map>>
 <<render font char>>
 <<draw blink alt>>
@@ -8620,13 +9629,31 @@ The following root chunks produce the assembly files when tangled.
 <<print font char>>
 <<init game state>>
 <<init world>>
+<<fun 5f19>>
+<<fun 5f60>>
+<<fun 5f70>>
+<<fun 6014>>
+<<fun 6024>>
+<<fun 602f>>
+<<fun 60c7>>
+<<fun 60cd>>
+<<fun 60d2>>
+<<fun 6458>>
+<<fun 645f>>
 <<pickup treasure>>
 <<fun 657b>>
 <<fun 6593>>
 <<fun 65a1>>
+<<fun 6742>>
+<<fun 6815>>
 <<ai choose target>>
 <<fun 704d>>
 <<fun 70d4>>
+<<fun 70df>>
+<<fun 71f0>>
+<<fun 71fc>>
+<<fun 7489>>
+<<fun 750c>>
 <<fun 769b>>
 <<init stub2>>
 <<init disk iob>>
