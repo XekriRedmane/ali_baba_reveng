@@ -2123,6 +2123,23 @@ CHAR_LOWER_LEFT     EQU     $80AB
 CHAR_LOWER_RIGHT    EQU     $80AC
 @
 
+The blink cursor is a saved font position used to flash a character on the
+hi-res screen.  Three bytes at [[$5AA2]]--[[$5AA4]] mirror [[FONT_COL]],
+[[FONT_ROW]], and [[FONT_CHARNUM]]: they record which character to blink and
+where.  The rendering path (\$74E0) copies them into the [[FONT_]] variables
+before calling [[PRINT_FONTCHAR]].
+
+A [[BLINK_COL]] value of [[\$14]] (20) acts as a sentinel meaning ``no active
+blink position,'' since valid font--column values are 0--19.  Both
+[[game\_init]] and [[scene\_loop]] store [[\$14]] here to disable the blink
+cursor at startup and at each new scene.
+
+<<defines>>=
+BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
+BLINK_ROW       EQU     $5AA3   ; font row
+BLINK_CHAR      EQU     $5AA4   ; font character number
+@ %def BLINK_COL BLINK_ROW BLINK_CHAR
+
 <<print font char>>=
     ORG     $80A4
     HEX     09      ; num chars in this string
@@ -2454,7 +2471,7 @@ GAME_INIT:
     STY     $03F3                   ; /
     JSR     $FB6F                   ; ROM: set reset vector checksum
     LDA     #$14
-    STA     $5AA2                   ; delay/timer = $14
+    STA     BLINK_COL               ; disable blink cursor
     JSR     RELOCATE_HIRES_STAGING  ; copy $2000+ to $9600+/$B300+
     LDA     $C050                   ; GR mode
     LDA     $C052                   ; full screen (no text split)
@@ -2524,7 +2541,7 @@ SCENE_LOOP:
 
     STA     $5A99                   ; store scene number
     LDA     #$14
-    STA     $5AA2                   ; timer/counter = $14
+    STA     BLINK_COL               ; disable blink cursor
 
     JSR     SAVE_ZP_POINTERS
 
@@ -3815,10 +3832,55 @@ State:
   2:
   3: Defending
 
+\subsection{set\_blink\_target (\$16A3)}
+
+Sets up the blink cursor from the current combatant.  On the mob's turn,
+the mob's packed position (byte 3 of mob data) is split into column and row,
+and its appearance (byte 4) is converted to a font character number.
+On the player's turn, the player's column and row are taken directly from
+[[\$5A63]]/[[\$5A64]], and the font character is looked up via [[\$0C7E]].
+
+<<set blink target>>=
+    ORG     $16A3
+SET_BLINK_TARGET:
+    SUBROUTINE
+
+    LDA     $5A74                   ; 0 = mob's turn, 1 = player's turn
+    CMP     #$01
+    BEQ     .player
+
+    ; --- mob path: convert packed position to col/row ---
+    LDY     #$03
+    LDA     ($F4),Y                 ; mob data[3] = packed position
+    JSR     $0C25                   ; divmod by 20 → A=col, Y=row
+    STA     BLINK_COL
+    STY     BLINK_ROW
+    LDY     #$04
+    LDA     ($F4),Y                 ; mob data[4] = appearance
+    JSR     $0CF7                   ; appearance → font char number
+    STA     BLINK_CHAR
+    RTS
+
+    ; --- player path: col/row already separate ---
+.player:
+    LDA     $5A63                   ; player font column
+    STA     BLINK_COL
+    LDA     $5A64                   ; player font row
+    STA     BLINK_ROW
+    LDA     $F4                     ; \
+    STA     $BE                     ;  | copy pointer $F4 → $BE
+    LDA     $F5                     ;  |
+    STA     $BF                     ; /
+    JSR     $0C7E                   ; look up player's font char
+    LDA     FONT_CHARNUM
+    STA     BLINK_CHAR
+    RTS
+@ %def SET_BLINK_TARGET
+
 <<Hit chance>>=
 (15AB)
 .compute_to_hit:
-    JSR      load_pos_char_5aa2
+    JSR      SET_BLINK_TARGET
     LDA      DAT_5a74_flag_mob_is_0
     CMP      #$01
     BNE      .mob
@@ -3967,7 +4029,7 @@ LAB_162b:
     BEQ      .do_blink
     JSR      print_thing_name_centered_row_23
 .do_blink:
-    JSR      blink_5aa2
+    JSR      blink
     RTS
 .do_hit:
     LDA      DAT_5a74_flag_mob_is_0
