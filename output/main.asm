@@ -192,6 +192,8 @@ BLINK_CHAR      EQU     $5AA4   ; font character number
 ROM_COUT            EQU     $FDF0   ; Apple II ROM character output
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
+MSG_TABLE_PTR           EQU     $4005   ; message table base (2 bytes)
+MSG_LINE_COUNT          EQU     $5A57   ; lines printed so far
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
     ORG     $0569
 ATTRACT_LOOP:
@@ -938,6 +940,88 @@ SET_CURSOR_COMPRESSED:
     ADC     #20
     STA     TEXT_ROW
     RTS
+    ORG     $761E
+DISPLAY_MESSAGE:
+    SUBROUTINE
+
+    TAX                             ; X = message index
+    LDA     MSG_TABLE_PTR           ; load table base into $BC/$BD
+    STA     PRINT_STRING_ADDR
+    LDA     MSG_TABLE_PTR+1
+    STA     PRINT_STRING_ADDR+1
+    LDA     #$00
+    STA     MSG_LINE_COUNT          ; reset line counter
+
+    JMP     .check_index            ; skip to index check
+
+.skip_entry:
+    LDY     #$00
+    LDA     (PRINT_STRING_ADDR),Y   ; get string length
+    TAY
+    SEC                             ; +1 for length byte itself
+    ADC     PRINT_STRING_ADDR       ; advance pointer past this entry
+    STA     PRINT_STRING_ADDR
+    LDA     PRINT_STRING_ADDR+1
+    ADC     #$00
+    STA     PRINT_STRING_ADDR+1
+    CPY     #$00                    ; was length zero? (end of table)
+    BNE     .skip_entry             ; no — keep skipping within group
+.next_index:
+    DEX
+.check_index:
+    CPX     #$00
+    BNE     .skip_entry             ; more entries to skip
+
+.print_loop:
+    LDY     #$00
+    LDA     (PRINT_STRING_ADDR),Y   ; get length of current string
+    BNE     .has_text               ; nonzero — print it
+
+    ; length is zero — message is done
+    LDA     MSG_LINE_COUNT
+    CMP     #$02                    ; printed exactly 2 lines?
+    BEQ     .final_scroll
+    RTS                             ; otherwise just return
+.final_scroll:
+    JMP     $769B                   ; scroll once more and return
+
+.has_text:
+    LDA     MSG_LINE_COUNT
+    CMP     #$01
+    BMI     .first_line             ; line_count < 1: first line
+    BEQ     .second_line            ; line_count == 1: second line
+
+    ; third+ line: scroll, then print
+    JSR     $769B                   ; scroll status window
+.second_line:
+    JSR     PRINT_BOTTOM_CENTERED   ; print centered on row 23
+    JMP     .advance
+
+.first_line:
+    JSR     PRINT_BOTTOM_CENTERED   ; print centered on row 23
+    JSR     $769B                   ; scroll status window
+
+.advance:
+    INC     MSG_LINE_COUNT
+    LDY     #$00
+    LDA     PRINT_STRING_ADDR
+    SEC
+    ADC     (PRINT_STRING_ADDR),Y   ; add length + 1 (SEC sets carry)
+    STA     PRINT_STRING_ADDR
+    LDA     PRINT_STRING_ADDR+1
+    ADC     #$00
+    STA     PRINT_STRING_ADDR+1
+    LDA     #$01
+    CMP     MSG_LINE_COUNT          ; printed <= 1 lines?
+    BCC     .pause                  ; no — need to pause
+    LDY     #$00
+    LDA     (PRINT_STRING_ADDR),Y   ; peek at next entry
+    BNE     .print_loop             ; more text — keep printing
+
+.pause:
+    JSR     $0D10                   ; delay
+    JSR     PRINT_CTRL_AB           ; reset character set
+    JMP     .print_loop             ; continue with next line
     ORG     $774E
 PRINT_CTRL_AB:
     SUBROUTINE
