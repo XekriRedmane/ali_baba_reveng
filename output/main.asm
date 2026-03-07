@@ -1093,7 +1093,7 @@ DISPLAY_MESSAGE:
     BEQ     .final_scroll
     RTS                             ; otherwise just return
 .final_scroll:
-    JMP     $769B                   ; scroll once more and return
+    JMP     SCROLL_STATUS_LINE                   ; scroll once more and return
 
 .has_text:
     LDA     MSG_LINE_COUNT
@@ -1102,14 +1102,14 @@ DISPLAY_MESSAGE:
     BEQ     .second_line            ; line_count == 1: second line
 
     ; third+ line: scroll, then print
-    JSR     $769B                   ; scroll status window
+    JSR     SCROLL_STATUS_LINE                   ; scroll status window
 .second_line:
     JSR     PRINT_BOTTOM_CENTERED   ; print centered on row 23
     JMP     .advance
 
 .first_line:
     JSR     PRINT_BOTTOM_CENTERED   ; print centered on row 23
-    JSR     $769B                   ; scroll status window
+    JSR     SCROLL_STATUS_LINE                   ; scroll status window
 
 .advance:
     INC     MSG_LINE_COUNT
@@ -1174,6 +1174,18 @@ SET_TEXT_WINDOW_BOTTOM:
     JSR     PRINT_CTRL_AB
     LDA     #$86                    ; Ctrl-F with high bit
     JMP     ROM_COUT1
+    ORG     SCROLL_STATUS_LINE
+SCROLL_STATUS_LINE:
+    SUBROUTINE
+
+    JSR     SET_TEXT_WINDOW_SCROLL   ; enable scroll mode
+    JSR     SET_TEXT_WINDOW_UPPER_LEFT_LOW ; window top = row 21
+    LDA     #$17
+    STA     TEXT_ROW                 ; cursor to row 23
+    LDA     #$83                    ; Ctrl-C with high bit (scroll up)
+    JSR     ROM_COUT1
+    JSR     SET_TEXT_WINDOW_UPPER_LEFT_ALL ; reset window to (0,0)
+    JMP     SET_TEXT_WINDOW_WRAP     ; restore wrap mode and return
     ORG     $78A8
 STEP_PRNG:
     SUBROUTINE
@@ -1407,7 +1419,7 @@ SCRIPT_ADVANCE:
 .continue:
     LSR     $5A8C                   ; shift timing flag
     JMP     SCRIPT_ENGINE.fetch     ; loop back to interpreter
-    ORG     $7830
+    ORG     $792D
 SET_TEXT_WINDOW_UPPER_LEFT_ALL:
     SUBROUTINE
 
@@ -1415,14 +1427,11 @@ SET_TEXT_WINDOW_UPPER_LEFT_ALL:
     JMP     SET_TEXT_WINDOW_UPPER_LEFT
 
 SET_TEXT_WINDOW_UPPER_LEFT_LOW:
-    SUBROUTINE
-
     LDA     #21
 
     ; fall through
 
 SET_TEXT_WINDOW_UPPER_LEFT:
-    SUBROUTINE
 
     STA     TEXT_ROW
     LDA     #0
