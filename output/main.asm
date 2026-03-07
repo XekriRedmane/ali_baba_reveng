@@ -1386,8 +1386,38 @@ DRAW_CHAR_AT_POS:
     JSR     FIND_ENTITY_AT_POS      ; look up entity at position → $BE
     JSR     GET_ENTITY_FONTCHAR     ; determine font char from entity data
     JMP     RENDER_FONT_CHAR        ; render the font character
+    ORG     $106F
+FUN_106F:                       ; apply damage/effect (via FUN_1425)
     ORG     $12D0
-FUN_12D0:                       ; check NPC join condition
+FUN_12D0:
+    SUBROUTINE
+    ; Pick a random eligible group member (field 4 in $00-$14 range)
+    ; Uses ($FA)[8] as group size, calls RANDOM_IN_RANGE to pick Nth
+.loop:
+    LDY     #$08
+    LDA     ($FA),Y             ; group size
+    BEQ     .zero               ; empty group
+    JSR     RANDOM_IN_RANGE     ; random(size)
+    CMP     #$00
+    BEQ     .loop               ; 0 → retry
+    TAX                         ; X = count down to Nth member
+    JSR     FIRST_GROUP_MEMBER
+.check:
+    LDY     #$04
+    LDA     ($F4),Y             ; member field 4
+    BMI     .next               ; negative → skip
+    CMP     #$15
+    BPL     .next               ; >= $15 → skip
+    DEX
+    BNE     .next               ; not Nth yet
+    RTS                         ; found: $F4/$F5 points to member
+.next:
+    JSR     FUN_1300
+    JMP     .check
+.zero:
+    STA     $F4                 ; clear pointer
+    STA     $F5
+    RTS
     ORG     $12FA
 FIRST_GROUP_MEMBER:
     SUBROUTINE
@@ -1410,7 +1440,22 @@ NEXT_GROUP_MEMBER:
     STA     $F5                     ; /
     RTS
     ORG     $1300
-FUN_1300:                       ; advance to next group member
+FUN_1300:
+    SUBROUTINE
+    ; Follow group link: ($F4)[2] → next member via GET_MOB_DATA
+    LDY     #$02
+    LDA     ($F4),Y             ; link field
+    BNE     .follow
+    STA     $F4                 ; zero → end of list
+    STA     $F5
+    RTS
+.follow:
+    JSR     GET_MOB_DATA        ; A → ($BA/$BB) = data pointer
+    LDA     $BA
+    STA     $F4
+    LDA     $BB
+    STA     $F5
+    RTS
     ORG     $1317
 RANDOM_IN_RANGE:
     SUBROUTINE
@@ -1491,15 +1536,111 @@ RANDOM_IN_RANGE:
     ROR     A                       ;  |
     BCC     .accept                 ; / (always taken: masked bit is 0)
     ORG     $138D
-FUN_138D:                       ; find encounter position
+FUN_138D:
+    SUBROUTINE
+    ; Find nearest non-activated event (byte 1 < $C0) by Manhattan distance
+    ; Returns position in A ($5A13)
+    LDA     #$7F                ; initial min distance
+    STA     $5A14
+    LDY     #$06
+    LDA     ($FA),Y             ; event list pointer low
+    STA     $BE
+    INY
+    LDA     ($FA),Y             ; event list pointer high
+    STA     $BF
+    JMP     .check_end
+.eval:
+    LDY     #$01
+    LDA     ($BE),Y             ; event byte 1 = type
+    CMP     #$C0
+    BCS     .advance            ; >= $C0 → activated, skip
+    LDY     #$00
+    LDA     ($BE),Y             ; event byte 0 = position
+    STA     $5A15
+    JSR     FUN_13DB            ; Manhattan distance
+    CMP     $5A14
+    BPL     .advance            ; not closer
+    STA     $5A14               ; new minimum
+    LDA     $5A15
+    STA     $5A13               ; record position
+.advance:
+    LDA     $BE
+    CLC
+    ADC     #$03                ; next 3-byte entry
+    STA     $BE
+    BCC     .check_end
+    INC     $BF
+.check_end:
+    LDY     #$00
+    LDA     ($BE),Y
+    CMP     #$FE                ; $FE = empty slot, skip
+    BEQ     .advance
+    CMP     #$FF                ; $FF = end of list
+    BNE     .eval
+    LDA     $5A13               ; return nearest position
+    RTS
     ORG     $13DB
-FUN_13DB:                       ; compute distance to position
+FUN_13DB:
+    SUBROUTINE
+    ; Manhattan distance: |col(A) - col(char)| + |row(A) - row(char)|
+    ; Input: A = packed position to measure from
+    ; Uses char's position from ($F8)[3]
+    JSR     POS_TO_COLROW       ; A → col in A, row in Y
+    STA     $5A0C               ; save target col
+    STY     $5A0D               ; save target row
+    LDY     #$03
+    LDA     ($F8),Y             ; char packed position
+    JSR     POS_TO_COLROW
+    SEC
+    SBC     $5A0C               ; char col - target col
+    BCS     .pos1
+    EOR     #$FF                ; negate (absolute value)
+    ADC     #$01
+.pos1:
+    STA     $BA                 ; |delta col|
+    TYA
+    SEC
+    SBC     $5A0D               ; char row - target row
+    BCS     .pos2
+    EOR     #$FF
+    ADC     #$01
+.pos2:
+    CLC
+    ADC     $BA                 ; |delta col| + |delta row|
+    RTS
     ORG     $1406
-FUN_1406:                       ; party join setup
+FUN_1406:
+    SUBROUTINE
+    ; Copy ($F4)[0..1] → $BC/$BD, then JMP $7705
+    LDY     #$00
+    LDA     ($F4),Y
+    STA     $BC
+    INY
+    LDA     ($F4),Y
+    STA     $BD
+    JMP     FUN_7705
     ORG     $1414
-FUN_1414:                       ; encounter setup
+FUN_1414:
+    SUBROUTINE
+    ; Copy $F8/$F9 → $BC/$BD, store $5A02 → $5A28, JMP $0F84
+    LDA     $F8
+    STA     $BC
+    LDA     $F9
+    STA     $BD
+    LDA     $5A02
+    STA     $5A28
+    JMP     FUN_0F84
     ORG     $1425
-FUN_1425:                       ; apply damage/effect to char
+FUN_1425:
+    SUBROUTINE
+    ; Apply effect: copy $F8/$F9 → $F6/$F7, JMP $106F with A
+    TAX
+    LDA     $F8
+    STA     $F6
+    LDA     $F9
+    STA     $F7
+    TXA
+    JMP     FUN_106F
     ORG     $19AD
 GAME_TURN_LOOP:
     SUBROUTINE
@@ -1737,11 +1878,57 @@ GAME_TURN_LOOP:
 .empty_slot:
     JMP     FUN_1D4D            ; $FE: empty slot interaction
     ORG     $1B52
-FUN_1B52:                       ; commit move (update pos, draw sprite)
-    ORG     $1B81
-FUN_1B81:                       ; reset to turn start position
+FUN_1B52:
+    SUBROUTINE
+    ; Commit move: store CURRENT_COL/ROW, convert to packed pos,
+    ; update char field 3, set font char, draw sprite
+    LDA     CURRENT_COL
+    STA     $5A0C
+    STA     $5AA2
+    LDY     CURRENT_ROW
+    STY     $5A0D
+    STY     $5AA3
+    JSR     COLROW_TO_POS
+    LDY     #$03
+    STA     ($F8),Y             ; update char packed position
+    LDA     $5A04
+    STA     $5A0E               ; FONT_CHARNUM
+    STA     $5AA4
+    LDA     #$01
+    STA     $5A0F
+    JSR     FUN_7489            ; draw sprite
+    LDX     #$16
+    STX     $5AA9
+    ; falls through to FUN_1B81
+FUN_1B81:
+    ; Reset to turn start: convert start col/row to packed pos,
+    ; call $1156, update current→start, conditionally run script
+    LDA     TURN_START_COL
+    LDY     TURN_START_ROW
+    JSR     COLROW_TO_POS
+    JSR     FUN_1156
+    LDA     CURRENT_COL
+    STA     TURN_START_COL
+    LDA     CURRENT_ROW
+    STA     TURN_START_ROW
+    LDX     $5AA9
+    CPX     #$16
+    BEQ     .run_script
+    RTS
+.run_script:
+    DEC     $5AA9
+    JMP     SCRIPT_ENGINE
     ORG     $1BE0
-FUN_1BE0:                       ; set char field 15 low 2 bits to A
+FUN_1BE0:
+    SUBROUTINE
+    ; Set char field 15 low 2 bits to A
+    STA     $5A60
+    LDY     #$0F
+    LDA     ($F8),Y
+    AND     #$FC                ; clear low 2 bits
+    ORA     $5A60               ; set to new value
+    STA     ($F8),Y
+    RTS
     ORG     $1C01
 HANDLE_ENCOUNTER:
     SUBROUTINE
@@ -2262,13 +2449,46 @@ PICKUP_TREASURE:
     JSR     SCENE_LOOP          ; show bonus scene $0C
     JMP     .mark_used          ; mark event used
     ORG     $657B
-FUN_657B:                       ; special chest helper 1
-    ORG     $6580
-FUN_6580:                       ; special chest helper 2
+FUN_657B:
+    SUBROUTINE
+    ; Increment char field 5 low 5 bits (capped at $1F)
+    LDY     #$05
+    JMP     .body
+FUN_6580:
+    ; Increment char field Y low 5 bits (capped at $1F)
+    LDY     #$0B
+.body:
+    LDA     ($F8),Y
+    TAX
+    AND     #$1F
+    CMP     #$1F
+    BNE     .inc
+    RTS
+.inc:
+    CLC
+    TXA
+    ADC     #$01
+    STA     ($F8),Y
+    RTS
     ORG     $6593
-FUN_6593:                       ; add item to inventory
+FUN_6593:
+    SUBROUTINE
+    ; Clear 5 bytes at $7BAB-$7BAF and $7BCC-$7BD0 (spaces)
+    LDA     #$20
+    LDX     #$04
+.loop:
+    STA     $7BAB,X
+    STA     $7BCC,X
+    DEX
+    BPL     .loop
+    RTS
     ORG     $65A1
-FUN_65A1:                       ; display treasure pickup message
+FUN_65A1:
+    SUBROUTINE
+    ; Clear $5A57 and JMP $764A (display message)
+    LDA     #$00
+    STA     $5A57
+    JMP     FUN_764A
     ORG     $68AB
 AI_CHOOSE_TARGET:
     SUBROUTINE
@@ -2423,10 +2643,35 @@ AI_CHOOSE_TARGET:
     STA     $5A72               ; target column
     STY     $5A73               ; target row
     RTS
-    ORG     $769B
-FUN_769B:                       ; party join display
+    ORG     $704D
+FUN_704D:                       ; treasure data lookup (via FUN_70D4)
     ORG     $70D4
-FUN_70D4:                       ; look up treasure data
+FUN_70D4:
+    SUBROUTINE
+    ; Copy $F8/$F9 → $F6/$F7, JMP $704D (treasure lookup)
+    LDA     $F8
+    STA     $F6
+    LDA     $F9
+    STA     $F7
+    JMP     FUN_704D
+    ORG     $764A
+FUN_764A:                       ; display message (via FUN_65A1)
+    ORG     $769B
+FUN_769B:
+    SUBROUTINE
+    ; Text display: init HRCG, set window bottom, output char $83, reset
+    JSR     FUN_7744
+    JSR     FUN_7932
+    LDA     #$17
+    STA     $25                 ; WNDBTM = 23
+    LDA     #$83
+    JSR     $FDED               ; ROM COUT
+    JSR     FUN_792D
+    JMP     FUN_773A
+    ORG     $7744
+FUN_7744:                       ; HRCG init
+    ORG     $7932
+FUN_7932:                       ; HRCG setup
     ORG     $6B94
 INIT_STUB2:
     RTS
