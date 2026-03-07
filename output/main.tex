@@ -2021,7 +2021,7 @@ needs 6 bits, we can specify a compressed 8-bit version of the cursor, where the
 row number can be specified by upper two bits (so 20 through 23).
 
 \nwenddocs{}\nwbegincode{108}\sublabel{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}}}\moddef{set cursor compressed~{\nwtagstyle{}\subpageref{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
-    ORG     $7649
+    ORG     $776E
 SET_CURSOR_COMPRESSED:
     SUBROUTINE
 
@@ -2036,7 +2036,6 @@ SET_CURSOR_COMPRESSED:
     LSR
     LSR
     CLC
-    ADC
     ADC     #20
     STA     \nwlinkedidentc{TEXT_ROW}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}
     RTS
@@ -2366,7 +2365,7 @@ The {\Tt{}PLOT{\_}CHAR\nwendquote} routine prints the character number in {\Tt{}
 coordinate in {\Tt{}X\nwendquote} and {\Tt{}Y\nwendquote}.
 
 \nwenddocs{}\nwbegincode{140}\sublabel{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}}}\moddef{plot char~{\nwtagstyle{}\subpageref{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
-    ORG     $5D7D
+    ORG     $5DB0
 \nwlinkedidentc{PLOT_CHAR}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}:
     SUBROUTINE
 
@@ -2374,7 +2373,7 @@ coordinate in {\Tt{}X\nwendquote} and {\Tt{}Y\nwendquote}.
     STX     \nwlinkedidentc{TEXT_COL}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}
     STY     \nwlinkedidentc{TEXT_ROW}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}
     LDA     #$01
-    STZ     FONT_CHARSET
+    STA     FONT_CHARSET
     JMP     \nwlinkedidentc{PRINT_FONTCHAR_AT_TEXT_POS}{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}
 \nwindexdefn{\nwixident{PLOT{\_}CHAR}}{PLOT:unCHAR}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\eatline
 \nwidentdefs{\\{{\nwixident{PLOT{\_}CHAR}}{PLOT:unCHAR}}}\nwidentuses{\\{{\nwixident{PRINT{\_}FONTCHAR{\_}AT{\_}TEXT{\_}POS}}{PRINT:unFONTCHAR:unAT:unTEXT:unPOS}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{PRINT{\_}FONTCHAR{\_}AT{\_}TEXT{\_}POS}}{PRINT:unFONTCHAR:unAT:unTEXT:unPOS}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwendcode{}\nwbegindocs{141}\nwdocspar

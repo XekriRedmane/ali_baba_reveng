@@ -621,7 +621,7 @@ DRAW_BLINK_CHAR:
     PLA
     STA     PRINT_STRING_ADDR
     RTS
-    ORG     $5D7D
+    ORG     $5DB0
 PLOT_CHAR:
     SUBROUTINE
 
@@ -629,7 +629,7 @@ PLOT_CHAR:
     STX     TEXT_COL
     STY     TEXT_ROW
     LDA     #$01
-    STZ     FONT_CHARSET
+    STA     FONT_CHARSET
     JMP     PRINT_FONTCHAR_AT_TEXT_POS
     ORG     $80A4
     HEX     09      ; num chars in this string
@@ -1031,7 +1031,7 @@ PRINT_STRING_AT_ADDR:
     ; falls through to PRINT_STRING / PRINT_FROM_PTR at $775C
     ORG     $775C
 PRINT_STRING             ; same entry as PRINT_FROM_PTR
-    ORG     $7649
+    ORG     $776E
 SET_CURSOR_COMPRESSED:
     SUBROUTINE
 
@@ -1046,7 +1046,6 @@ SET_CURSOR_COMPRESSED:
     LSR
     LSR
     CLC
-    ADC
     ADC     #20
     STA     TEXT_ROW
     RTS
