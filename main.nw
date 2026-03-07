@@ -3298,7 +3298,8 @@ supports several control codes.
 <<defines>>=
 TEXT_RIGHT_MARGIN        EQU     $5A96   ; right margin column for text wrap
 TEXT_LEFT_MARGIN         EQU     $5A97   ; left margin column for text wrap
-@ %def TEXT_RIGHT_MARGIN TEXT_LEFT_MARGIN
+TEXT_STREAM_IDX          EQU     TEXT_STREAM_IDX   ; saved Y index into byte stream
+@ %def TEXT_RIGHT_MARGIN TEXT_LEFT_MARGIN TEXT_STREAM_IDX
 
 <<text renderer>>=
     ORG     $6C8E
@@ -3330,7 +3331,7 @@ TEXT_RENDERER:
     BEQ     .reset                  ; $7D = reset to full-screen mode
 
     ; --- Character output ---
-    STY     $5A98                   ; save stream index
+    STY     TEXT_STREAM_IDX                   ; save stream index
     STA     FONT_CHARNUM            ; character code
     LDA     #$02
     STA     FONT_CHARSET            ; character width = 2
@@ -3343,7 +3344,7 @@ TEXT_RENDERER:
     LDA     TEXT_LEFT_MARGIN        ;   reset column to left margin
     STA     FONT_COL
 .next:
-    LDY     $5A98                   ; restore stream index
+    LDY     TEXT_STREAM_IDX                   ; restore stream index
     INY                             ; advance to next byte
     BNE     .fetch                  ; loop (max 256 per page)
     JMP     $1A31                   ; overflow handler

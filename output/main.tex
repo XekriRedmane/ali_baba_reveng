@@ -3380,8 +3380,9 @@ supports several control codes.
 \nwenddocs{}\nwbegincode{199}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}\nwenddeflinemarkup
 \nwlinkedidentc{TEXT_RIGHT_MARGIN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}        EQU     $5A96   ; right margin column for text wrap
 \nwlinkedidentc{TEXT_LEFT_MARGIN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}         EQU     $5A97   ; left margin column for text wrap
-\nwindexdefn{\nwixident{TEXT{\_}LEFT{\_}MARGIN}}{TEXT:unLEFT:unMARGIN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{TEXT{\_}RIGHT{\_}MARGIN}}{TEXT:unRIGHT:unMARGIN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\eatline
-\nwidentdefs{\\{{\nwixident{TEXT{\_}LEFT{\_}MARGIN}}{TEXT:unLEFT:unMARGIN}}\\{{\nwixident{TEXT{\_}RIGHT{\_}MARGIN}}{TEXT:unRIGHT:unMARGIN}}}\nwendcode{}\nwbegindocs{200}\nwdocspar
+\nwlinkedidentc{TEXT_STREAM_IDX}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}          EQU     \nwlinkedidentc{TEXT_STREAM_IDX}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}   ; saved Y index into byte stream
+\nwindexdefn{\nwixident{TEXT{\_}LEFT{\_}MARGIN}}{TEXT:unLEFT:unMARGIN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{TEXT{\_}RIGHT{\_}MARGIN}}{TEXT:unRIGHT:unMARGIN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{TEXT{\_}STREAM{\_}IDX}}{TEXT:unSTREAM:unIDX}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\eatline
+\nwidentdefs{\\{{\nwixident{TEXT{\_}LEFT{\_}MARGIN}}{TEXT:unLEFT:unMARGIN}}\\{{\nwixident{TEXT{\_}RIGHT{\_}MARGIN}}{TEXT:unRIGHT:unMARGIN}}\\{{\nwixident{TEXT{\_}STREAM{\_}IDX}}{TEXT:unSTREAM:unIDX}}}\nwendcode{}\nwbegindocs{200}\nwdocspar
 
 \nwenddocs{}\nwbegincode{201}\sublabel{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}}}\moddef{text renderer~{\nwtagstyle{}\subpageref{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $6C8E
@@ -3413,7 +3414,7 @@ supports several control codes.
     BEQ     .reset                  ; $7D = reset to full-screen mode
 
     ; --- Character output ---
-    STY     $5A98                   ; save stream index
+    STY     \nwlinkedidentc{TEXT_STREAM_IDX}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}                   ; save stream index
     STA     FONT_CHARNUM            ; character code
     LDA     #$02
     STA     FONT_CHARSET            ; character width = 2
@@ -3426,7 +3427,7 @@ supports several control codes.
     LDA     \nwlinkedidentc{TEXT_LEFT_MARGIN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}        ;   reset column to left margin
     STA     \nwlinkedidentc{FONT_COL}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}
 .next:
-    LDY     $5A98                   ; restore stream index
+    LDY     \nwlinkedidentc{TEXT_STREAM_IDX}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}                   ; restore stream index
     INY                             ; advance to next byte
     BNE     .fetch                  ; loop (max 256 per page)
     JMP     $1A31                   ; overflow handler
@@ -3474,7 +3475,7 @@ supports several control codes.
     INY                             ; advance past $7D
     JMP     .fetch
 \nwindexdefn{\nwixident{TEXT{\_}RENDERER}}{TEXT:unRENDERER}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{TEXT{\_}RENDERER}}{TEXT:unRENDERER}}}\nwidentuses{\\{{\nwixident{DISPLAY{\_}STATUS{\_}BAR}}{DISPLAY:unSTATUS:unBAR}}\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}\\{{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}}\\{{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}}\\{{\nwixident{TEXT{\_}LEFT{\_}MARGIN}}{TEXT:unLEFT:unMARGIN}}\\{{\nwixident{TEXT{\_}RIGHT{\_}MARGIN}}{TEXT:unRIGHT:unMARGIN}}}\nwindexuse{\nwixident{DISPLAY{\_}STATUS{\_}BAR}}{DISPLAY:unSTATUS:unBAR}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{FONT{\_}ROW}}{FONT:unROW}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{TEXT{\_}LEFT{\_}MARGIN}}{TEXT:unLEFT:unMARGIN}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{TEXT{\_}RIGHT{\_}MARGIN}}{TEXT:unRIGHT:unMARGIN}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwendcode{}\nwbegindocs{202}\nwdocspar
+\nwidentdefs{\\{{\nwixident{TEXT{\_}RENDERER}}{TEXT:unRENDERER}}}\nwidentuses{\\{{\nwixident{DISPLAY{\_}STATUS{\_}BAR}}{DISPLAY:unSTATUS:unBAR}}\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}\\{{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}}\\{{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}}\\{{\nwixident{TEXT{\_}LEFT{\_}MARGIN}}{TEXT:unLEFT:unMARGIN}}\\{{\nwixident{TEXT{\_}RIGHT{\_}MARGIN}}{TEXT:unRIGHT:unMARGIN}}\\{{\nwixident{TEXT{\_}STREAM{\_}IDX}}{TEXT:unSTREAM:unIDX}}}\nwindexuse{\nwixident{DISPLAY{\_}STATUS{\_}BAR}}{DISPLAY:unSTATUS:unBAR}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{FONT{\_}ROW}}{FONT:unROW}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{TEXT{\_}LEFT{\_}MARGIN}}{TEXT:unLEFT:unMARGIN}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{TEXT{\_}RIGHT{\_}MARGIN}}{TEXT:unRIGHT:unMARGIN}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwindexuse{\nwixident{TEXT{\_}STREAM{\_}IDX}}{TEXT:unSTREAM:unIDX}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}\nwendcode{}\nwbegindocs{202}\nwdocspar
 \nwenddocs{}\nwbegindocs{203}\nwdocspar
 
 \subsection{Control code summary}
@@ -5315,6 +5316,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{TEXT{\_}RENDERER}}{TEXT:unRENDERER}}%
 \nwixlogsorted{i}{{\nwixident{TEXT{\_}RIGHT{\_}MARGIN}}{TEXT:unRIGHT:unMARGIN}}%
 \nwixlogsorted{i}{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}%
+\nwixlogsorted{i}{{\nwixident{TEXT{\_}STREAM{\_}IDX}}{TEXT:unSTREAM:unIDX}}%
 \nwixlogsorted{i}{{\nwixident{TICK{\_}ANIM{\_}COUNTER}}{TICK:unANIM:unCOUNTER}}%
 \nwixlogsorted{i}{{\nwixident{TIMED{\_}WAIT}}{TIMED:unWAIT}}%
 \nwixlogsorted{i}{{\nwixident{TMP{\_}PTR}}{TMP:unPTR}}%

@@ -205,6 +205,7 @@ WAIT_DURATION           EQU     $7AAD   ; ROM WAIT duration parameter
 ROM_WAIT                EQU     $FCA8   ; Apple II ROM WAIT routine
 TEXT_RIGHT_MARGIN        EQU     $5A96   ; right margin column for text wrap
 TEXT_LEFT_MARGIN         EQU     $5A97   ; left margin column for text wrap
+TEXT_STREAM_IDX          EQU     TEXT_STREAM_IDX   ; saved Y index into byte stream
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
     ORG     $0569
 ATTRACT_LOOP:
@@ -772,7 +773,7 @@ TEXT_RENDERER:
     BEQ     .reset                  ; $7D = reset to full-screen mode
 
     ; --- Character output ---
-    STY     $5A98                   ; save stream index
+    STY     TEXT_STREAM_IDX                   ; save stream index
     STA     FONT_CHARNUM            ; character code
     LDA     #$02
     STA     FONT_CHARSET            ; character width = 2
@@ -785,7 +786,7 @@ TEXT_RENDERER:
     LDA     TEXT_LEFT_MARGIN        ;   reset column to left margin
     STA     FONT_COL
 .next:
-    LDY     $5A98                   ; restore stream index
+    LDY     TEXT_STREAM_IDX                   ; restore stream index
     INY                             ; advance to next byte
     BNE     .fetch                  ; loop (max 256 per page)
     JMP     $1A31                   ; overflow handler
