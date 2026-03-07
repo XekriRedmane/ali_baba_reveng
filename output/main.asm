@@ -176,6 +176,7 @@ TMP_PTR                 EQU     $FA     ; temporary pointer (2 bytes)
 DATA_PTR3               EQU     $BA     ; data pointer 3 (2 bytes)
 PRINT_STRING_ADDR       EQU     $BC     ; 2 bytes (same pointer as PRINT_FROM_PTR)
 DATA_PTR                EQU     $BE     ; data pointer / return value (2 bytes)
+RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
 FONT_COL        EQU     $5A0C
 FONT_ROW        EQU     $5A0D
 FONT_CHARNUM        EQU     $5A0E
@@ -206,6 +207,8 @@ LOCATION_FLAG       EQU     $5A55   ; location-change flag
 LOCATION_FLAG2      EQU     $5A56   ; secondary location flag
 SCENE_NUMBER        EQU     $5A99   ; current scene number
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
+RWTS_IOB                EQU     $B7E8   ; RWTS Input/Output Block (14 bytes)
+RWTS_ENTRY              EQU     $B7B5   ; RWTS entry point
 SAVED_BC            EQU     $5A9A   ; saved $BC/$BD pointer (2 bytes)
 SAVED_F8            EQU     $5A9C   ; saved $F8/$F9 pointer (2 bytes)
 SAVED_BE            EQU     $5A9E   ; saved $BE/$BF pointer (2 bytes)
@@ -1590,6 +1593,15 @@ PLOT_FONTCHAR:
     LDA     #>s_PRINT_FONT_CHAR
     STA     $BD
     JMP     PRINT_FROM_PTR
+    ORG     $6C2E
+INIT_DISK_IOB:
+    SUBROUTINE
+
+    LDA     #>RWTS_IOB              ; \ set RWTS IOB pointer
+    LDY     #<RWTS_IOB              ;  | $08/$09 = $B7E8
+    STA     RWTS_IOB_PTR+1          ;  |
+    STY     RWTS_IOB_PTR            ; /
+    RTS
     ORG     $6C37
 SCENE_LOOP:
     SUBROUTINE
@@ -2116,7 +2128,7 @@ GAME_INIT:
     LDA     $C052                   ; full screen (no text split)
     LDA     $C054                   ; page 1
     LDA     $C057                   ; hi-res
-    JSR     $6C2E
+    JSR     INIT_DISK_IOB
     JSR     $791A
     JSR     $773A
     JSR     $7919

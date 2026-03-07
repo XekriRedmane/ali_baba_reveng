@@ -2841,7 +2841,7 @@ GAME_INIT:
     LDA     $C052                   ; full screen (no text split)
     LDA     $C054                   ; page 1
     LDA     $C057                   ; hi-res
-    JSR     $6C2E
+    JSR     INIT_DISK_IOB
     JSR     $791A
     JSR     $773A
     JSR     $7919
@@ -3182,6 +3182,36 @@ SCENE_SETUP:
 @ %def SCENE_SETUP
 
 \subsection{scene\_loop (\$6C37)}
+\subsection{init\_disk\_iob (\$6C2E)}
+
+Sets the zero-page pointer [[\$08/\$09]] to the RWTS Input/Output Block
+at [[\$B7E8]].  Called once during [[GAME\_INIT]].  The game's disk I/O
+routines (relocated to \$B300--\$BFFF during [[game\_init]]) use this
+pointer to access the IOB fields via indirect-indexed addressing:
+e.g.\ [[STA (\$08),Y]] with [[Y]] selecting the field (track, sector,
+command code, buffer address, etc.).  The RWTS entry point is at [[\$B7B5]].
+
+<<zero page defines>>=
+RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
+@ %def RWTS_IOB_PTR
+
+<<defines>>=
+RWTS_IOB                EQU     $B7E8   ; RWTS Input/Output Block (14 bytes)
+RWTS_ENTRY              EQU     $B7B5   ; RWTS entry point
+@ %def RWTS_IOB RWTS_ENTRY
+
+<<init disk iob>>=
+    ORG     $6C2E
+INIT_DISK_IOB:
+    SUBROUTINE
+
+    LDA     #>RWTS_IOB              ; \ set RWTS IOB pointer
+    LDY     #<RWTS_IOB              ;  | $08/$09 = $B7E8
+    STA     RWTS_IOB_PTR+1          ;  |
+    STY     RWTS_IOB_PTR            ; /
+    RTS
+@ %def INIT_DISK_IOB
+
 \label{sec:scene_loop}
 
 This is the main scene display loop.  It is called with the scene number
@@ -5931,6 +5961,7 @@ The following root chunks produce the assembly files when tangled.
 <<draw blink char>>
 <<plot char>>
 <<print font char>>
+<<init disk iob>>
 <<scene loop>>
 <<text renderer>>
 <<display status bar>>
