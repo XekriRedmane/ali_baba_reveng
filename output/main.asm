@@ -196,6 +196,7 @@ DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random tests
 PRNG_STATE          EQU     $5A19   ; PRNG full state: val = 69*val + $53 (mod 256)
 PRNG_TEMP           EQU     $5A1A   ; PRNG temporary for multiplication
+GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
 LOCATION_FLAG       EQU     $5A55   ; location-change flag
 LOCATION_FLAG2      EQU     $5A56   ; secondary location flag
@@ -367,7 +368,7 @@ SCENE_SETUP:
     SUBROUTINE
 
     LDA     $5A29                   ; character/scene index
-    JSR     $1053                   ; load character record → $BE
+    JSR     GET_CHAR_RECORD         ; index → $BE/$BF = char record
     LDY     #$03
     LDA     ($BE),Y                 ; byte 3: min position (packed)
     JSR     POS_TO_COLROW           ; → A=min_col, Y=min_row
@@ -404,7 +405,7 @@ SCENE_SETUP:
     STA     $BD                     ; /
     LDA     #$00
     STA     $5A28                   ; clear player index
-    JSR     $0F84                   ; character record management
+    JSR     REORDER_CHAR            ; reorder character in linked list
     LDY     #$0D
     LDA     #$00                    ; \
     STA     ($F4),Y                 ;  | clear bytes 13-14 of record
@@ -419,6 +420,148 @@ SCENE_SETUP:
     JSR     DRAW_CHAR_AT_POS        ; draw character at position
 .done:
     RTS
+    ORG     $0F84
+REORDER_CHAR:
+    SUBROUTINE
+
+; --- Phase 1: unlink character $5A28 from its current chain ---
+    LDA     $5A28                   ; source character index
+    JSR     GET_CHAR_RECORD         ; $BE/$BF = record pointer
+    JSR     DECR_GROUP_COUNT        ; source group lost a member
+.walk1:
+    LDY     #$02                    ; \
+    LDA     ($BE),Y                 ;  | $5A2A = byte 2 of current record
+    STA     $5A2A                   ; /  (the "next" link we're removing)
+    JSR     GET_MOB_DATA            ; $BA/$BB = resolve link; $BC/$BD = mob data
+    LDA     $BA                     ; \
+    CMP     $BC                     ;  | compare $BA/$BB with $BC/$BD
+    BNE     .advance1               ;  | if different, keep walking
+    LDA     $BB                     ;  |
+    CMP     $BD                     ; /
+    BNE     .advance1
+    ; Found predecessor: $BC/$BD points to the node being removed
+    LDY     #$02
+    LDA     $5A2A                   ; \  if removed node's link == $5A03,
+    CMP     $5A03                   ;  |   update $5A03 to new link
+    BNE     .patch1                 ; /
+    LDA     ($BC),Y                 ; \
+    STA     $5A03                   ; /  $5A03 = ($BC)[2] (successor's link)
+.patch1:
+    LDA     ($BC),Y                 ; \  predecessor.byte2 = removed.byte2
+    STA     ($BE),Y                 ; /  (skip over removed node)
+    JMP     .phase2
+.advance1:
+    LDA     $BA                     ; \  $BE/$BF = $BA/$BB
+    STA     $BE                     ;  | (advance to next record)
+    LDA     $BB                     ;  |
+    STA     $BF                     ; /
+    JMP     .walk1
+
+; --- Phase 2: re-insert at correct sorted position in $5A29's chain ---
+.phase2:
+    LDY     #$0B                    ; \
+    LDA     ($BC),Y                 ;  | $5A2B = byte 11 of removed node
+    AND     #$1F                    ;  |   (level, 5-bit)
+    STA     $5A2B                   ; /
+    LDA     $5A29                   ; destination character index
+    JSR     GET_CHAR_RECORD         ; $BE/$BF = dest record pointer
+    JSR     INCR_GROUP_COUNT        ; dest group gained a member
+.walk2:
+    LDY     #$02                    ; \
+    LDA     ($BE),Y                 ;  | check byte 2 of current record
+    CMP     #$00                    ;  | if zero (end of chain) -> insert here
+    BEQ     .insert                 ; /
+    JSR     GET_MOB_DATA            ; resolve link
+    LDA     $5A29                   ; \
+    BEQ     .random                 ; /  if dest index = 0, use random decision
+    LDY     #$0B                    ; \
+    LDA     ($BA),Y                 ;  | compare candidate's level
+    AND     #$1F                    ;  | with removed node's level
+    CMP     $5A2B                   ;  |
+    BPL     .advance2               ; /  if >= , keep walking (insert later)
+.insert:
+    LDY     #$02                    ; \
+    LDA     ($BE),Y                 ;  | ($BC)[2] = ($BE)[2]  (link successor)
+    STA     ($BC),Y                 ;  |
+    LDA     $5A2A                   ;  | ($BE)[2] = saved link (insert node)
+    STA     ($BE),Y                 ; /
+    LDY     #$04                    ; \
+    LDA     ($BC),Y                 ;  | if byte 4 of ($BC) >= $15, done
+    CMP     #$15                    ;  |
+    BCC     .adjust                 ;  |
+    RTS                             ; /
+.adjust:
+    LDA     #$00                    ; \
+    CMP     $5A29                   ;  | if inserted into index 0's slot,
+    BNE     .chk28                  ;  |   decrement $5A01
+    DEC     $5A01                   ; /
+.chk28:
+    CMP     $5A28                   ; \  if removed from index 0's slot,
+    BNE     .done                   ;  |   increment $5A01
+    INC     $5A01                   ; /
+.done:
+    RTS
+.advance2:
+    LDA     $BA                     ; \  $BE/$BF = $BA/$BB
+    STA     $BE                     ;  | (advance to next record)
+    LDA     $BB                     ;  |
+    STA     $BF                     ; /
+    JMP     .walk2
+.random:
+    JSR     STEP_PRNG               ; \  random decision
+    LDA     PRNG_OUTPUT             ;  | if PRNG < 1 (i.e., == 0) -> insert
+    CMP     #$01                    ;  |
+    BMI     .insert                 ;  | else keep walking
+    BPL     .advance2               ; /
+    ORG     $102F
+DECR_GROUP_COUNT:
+    SUBROUTINE
+
+    LDA     #$FF                    ; delta = -1
+    BNE     .apply                  ; always taken
+INCR_GROUP_COUNT:
+    LDA     #$01                    ; delta = +1
+.apply:
+    STA     GROUP_COUNT_DELTA       ; save delta for later
+    LDA     $BE                     ; \
+    CMP     #$00                    ;  | bail if $BE/$BF is null
+    BNE     .not_null               ;  |
+    RTS                             ; /
+.not_null:
+    LDY     #$04                    ; \
+    LDA     ($BC),Y                 ;  | bail if byte 4 of ($BC) >= $15
+    CMP     #$15                    ;  |   ($15+ = inactive/dead)
+    BCC     .ok                     ;  |
+    RTS                             ; /
+.ok:
+    LDY     #$08                    ; \
+    LDA     ($BE),Y                 ;  | group count (low nibble) += delta
+    CLC                             ;  |
+    ADC     GROUP_COUNT_DELTA       ;  |
+    STA     ($BE),Y                 ; /
+    RTS
+    ORG     $1053
+GET_CHAR_RECORD:
+    SUBROUTINE
+
+    TAX                             ; X = index (loop counter)
+    LDA     #$00                    ; \
+    STA     $BE                     ;  | $BE/$BF = $4000 (base)
+    LDA     #$40                    ;  |
+    STA     $BF                     ; /
+.loop:
+    DEX
+    BPL     .advance                ; more records to skip
+    RTS                             ; done: $BE/$BF points to record
+.advance:
+    CLC                             ; \
+    LDA     $BE                     ;  | $BE/$BF += 9
+    ADC     #$09                    ;  | (9 bytes per record)
+    STA     $BE                     ;  |
+    LDA     $BF                     ;  |
+    ADC     #$00                    ;  |
+    STA     $BF                     ; /
+    BNE     .loop                   ; always taken ($BF >= $40)
     ORG      $0B62
     ; Takes A (pos) and TMP_PTR (pointer to room data)
 get_item_at_pos_in_room:

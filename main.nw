@@ -2489,8 +2489,9 @@ DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random tests
 PRNG_STATE          EQU     $5A19   ; PRNG full state: val = 69*val + $53 (mod 256)
 PRNG_TEMP           EQU     $5A1A   ; PRNG temporary for multiplication
+GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
-@ %def ROM_COUT1 DAT_5a17_pos PRNG_OUTPUT PRNG_STATE PRNG_TEMP is_at_outer_limits
+@ %def ROM_COUT1 DAT_5a17_pos PRNG_OUTPUT PRNG_STATE PRNG_TEMP GROUP_COUNT_DELTA is_at_outer_limits
 
 <<print font char>>=
     ORG     $80A4
@@ -2887,6 +2888,222 @@ ATTRACT_SCREEN:
 The attract screen starts with scene index 1 (the first story character
 setup) and begins playing scene \$26.
 
+\subsection{decr/incr\_group\_count (\$102F/\$1033)}
+
+Characters are organized into groups via linked lists threaded through
+byte~2 of each 16-byte mob data record (accessed via [[GET\_MOB\_DATA]]).
+Byte~8 of the \emph{group head}'s mob data record is a packed field:
+\begin{itemize}
+\item bits 3--0: \textbf{group member count} --- how many characters
+      are in this group's chain (0--4 in initial data)
+\item bits 6--4: \textbf{pending XP} --- experience points accumulated
+      but not yet applied to the character's level (0--7).
+      The XP award routine at~\$7248 writes new values here; the
+      flush routine at~\$6EE9 adds pending XP to byte~11's level
+      field and clears it.
+\item bit~7: \textbf{status flag} --- always zero in initial data;
+      set during gameplay (controls message selection at~\$18AB).
+      Preserved across XP flush.
+\end{itemize}
+
+These two entry points adjust the group member count (low nibble of
+byte~8) on the head record pointed to by~[[\$BE/\$BF]]:
+\begin{itemize}
+\item [[\$102F]] ([[DECR\_GROUP\_COUNT]]): decrements by~1 (source group lost a member)
+\item [[\$1033]] ([[INCR\_GROUP\_COUNT]]): increments by~1 (destination group gained a member)
+\end{itemize}
+Guards: bails out if [[\$BE]] is zero (null pointer) or if byte~4 of the
+record at~[[\$BC/\$BD]] is~$\ge$~\$15 (inactive/dead character).
+Called exclusively from [[REORDER\_CHAR]] (\$0F84).
+
+<<adjust char byte8>>=
+    ORG     $102F
+DECR_GROUP_COUNT:
+    SUBROUTINE
+
+    LDA     #$FF                    ; delta = -1
+    BNE     .apply                  ; always taken
+INCR_GROUP_COUNT:
+    LDA     #$01                    ; delta = +1
+.apply:
+    STA     GROUP_COUNT_DELTA       ; save delta for later
+    LDA     $BE                     ; \
+    CMP     #$00                    ;  | bail if $BE/$BF is null
+    BNE     .not_null               ;  |
+    RTS                             ; /
+.not_null:
+    LDY     #$04                    ; \
+    LDA     ($BC),Y                 ;  | bail if byte 4 of ($BC) >= $15
+    CMP     #$15                    ;  |   ($15+ = inactive/dead)
+    BCC     .ok                     ;  |
+    RTS                             ; /
+.ok:
+    LDY     #$08                    ; \
+    LDA     ($BE),Y                 ;  | group count (low nibble) += delta
+    CLC                             ;  |
+    ADC     GROUP_COUNT_DELTA       ;  |
+    STA     ($BE),Y                 ; /
+    RTS
+@ %def DECR_GROUP_COUNT INCR_GROUP_COUNT
+
+\subsection{reorder\_char (\$0F84)}
+
+Performs one step of an insertion-sort on a linked list of characters,
+ordered by byte~11 (level, masked to 5~bits).  It unlinks the character
+at index~[[\$5A28]] from the list and re-inserts it in sorted order
+relative to index~[[\$5A29]].
+
+The linked-list ``next'' pointer is byte~2 of each character record.
+[[GET\_MOB\_DATA]] (\$0C32) resolves a byte-2 value into a record pointer
+at [[\$BA/\$BB]].
+
+Phase~1 (removal): walks the chain from [[\$5A28]]'s record, following
+byte-2 links via [[GET\_MOB\_DATA]] until [[\$BA/\$BB]] equals
+[[\$BC/\$BD]] (found the predecessor).  Then patches the predecessor's
+byte~2 to skip the removed node.  Decrements the source group's
+member count via [[DECR\_GROUP\_COUNT]].
+
+Phase~2 (insertion): walks the chain from [[\$5A29]]'s record, comparing
+byte~11 (level) values.  Inserts the removed character before the first
+node with a lower level, or at the end if none found.  Increments the
+destination group's member count via [[INCR\_GROUP\_COUNT]].  Adjusts the
+[[\$5A01]] counter to track list membership changes.
+
+When [[\$5A29]] is zero, a random decision (via [[STEP\_PRNG]]) determines
+the insertion point instead of the level comparison.
+
+<<reorder char>>=
+    ORG     $0F84
+REORDER_CHAR:
+    SUBROUTINE
+
+; --- Phase 1: unlink character $5A28 from its current chain ---
+    LDA     $5A28                   ; source character index
+    JSR     GET_CHAR_RECORD         ; $BE/$BF = record pointer
+    JSR     DECR_GROUP_COUNT        ; source group lost a member
+.walk1:
+    LDY     #$02                    ; \
+    LDA     ($BE),Y                 ;  | $5A2A = byte 2 of current record
+    STA     $5A2A                   ; /  (the "next" link we're removing)
+    JSR     GET_MOB_DATA            ; $BA/$BB = resolve link; $BC/$BD = mob data
+    LDA     $BA                     ; \
+    CMP     $BC                     ;  | compare $BA/$BB with $BC/$BD
+    BNE     .advance1               ;  | if different, keep walking
+    LDA     $BB                     ;  |
+    CMP     $BD                     ; /
+    BNE     .advance1
+    ; Found predecessor: $BC/$BD points to the node being removed
+    LDY     #$02
+    LDA     $5A2A                   ; \  if removed node's link == $5A03,
+    CMP     $5A03                   ;  |   update $5A03 to new link
+    BNE     .patch1                 ; /
+    LDA     ($BC),Y                 ; \
+    STA     $5A03                   ; /  $5A03 = ($BC)[2] (successor's link)
+.patch1:
+    LDA     ($BC),Y                 ; \  predecessor.byte2 = removed.byte2
+    STA     ($BE),Y                 ; /  (skip over removed node)
+    JMP     .phase2
+.advance1:
+    LDA     $BA                     ; \  $BE/$BF = $BA/$BB
+    STA     $BE                     ;  | (advance to next record)
+    LDA     $BB                     ;  |
+    STA     $BF                     ; /
+    JMP     .walk1
+
+; --- Phase 2: re-insert at correct sorted position in $5A29's chain ---
+.phase2:
+    LDY     #$0B                    ; \
+    LDA     ($BC),Y                 ;  | $5A2B = byte 11 of removed node
+    AND     #$1F                    ;  |   (level, 5-bit)
+    STA     $5A2B                   ; /
+    LDA     $5A29                   ; destination character index
+    JSR     GET_CHAR_RECORD         ; $BE/$BF = dest record pointer
+    JSR     INCR_GROUP_COUNT        ; dest group gained a member
+.walk2:
+    LDY     #$02                    ; \
+    LDA     ($BE),Y                 ;  | check byte 2 of current record
+    CMP     #$00                    ;  | if zero (end of chain) -> insert here
+    BEQ     .insert                 ; /
+    JSR     GET_MOB_DATA            ; resolve link
+    LDA     $5A29                   ; \
+    BEQ     .random                 ; /  if dest index = 0, use random decision
+    LDY     #$0B                    ; \
+    LDA     ($BA),Y                 ;  | compare candidate's level
+    AND     #$1F                    ;  | with removed node's level
+    CMP     $5A2B                   ;  |
+    BPL     .advance2               ; /  if >= , keep walking (insert later)
+.insert:
+    LDY     #$02                    ; \
+    LDA     ($BE),Y                 ;  | ($BC)[2] = ($BE)[2]  (link successor)
+    STA     ($BC),Y                 ;  |
+    LDA     $5A2A                   ;  | ($BE)[2] = saved link (insert node)
+    STA     ($BE),Y                 ; /
+    LDY     #$04                    ; \
+    LDA     ($BC),Y                 ;  | if byte 4 of ($BC) >= $15, done
+    CMP     #$15                    ;  |
+    BCC     .adjust                 ;  |
+    RTS                             ; /
+.adjust:
+    LDA     #$00                    ; \
+    CMP     $5A29                   ;  | if inserted into index 0's slot,
+    BNE     .chk28                  ;  |   decrement $5A01
+    DEC     $5A01                   ; /
+.chk28:
+    CMP     $5A28                   ; \  if removed from index 0's slot,
+    BNE     .done                   ;  |   increment $5A01
+    INC     $5A01                   ; /
+.done:
+    RTS
+.advance2:
+    LDA     $BA                     ; \  $BE/$BF = $BA/$BB
+    STA     $BE                     ;  | (advance to next record)
+    LDA     $BB                     ;  |
+    STA     $BF                     ; /
+    JMP     .walk2
+.random:
+    JSR     STEP_PRNG               ; \  random decision
+    LDA     PRNG_OUTPUT             ;  | if PRNG < 1 (i.e., == 0) -> insert
+    CMP     #$01                    ;  |
+    BMI     .insert                 ;  | else keep walking
+    BPL     .advance2               ; /
+@ %def REORDER_CHAR
+
+\subsection{get\_char\_record (\$1053)}
+
+Computes a pointer to a character record from a 1-based index in~A.
+Each character record is 9~bytes, stored sequentially starting at [[\$4000]].
+Returns [[\$BE/\$BF = \$4000 + A $\times$ 9]].  If A~=~0, returns
+[[\$BE/\$BF = \$4000]] immediately (index 0 is the base/header record).
+
+Note: Ghidra groups this with a separate routine at [[\$106F]] (entered via
+JMP from other functions) that handles character elimination/death logic.
+That code is not part of this entry point's normal return path.
+
+<<get char record>>=
+    ORG     $1053
+GET_CHAR_RECORD:
+    SUBROUTINE
+
+    TAX                             ; X = index (loop counter)
+    LDA     #$00                    ; \
+    STA     $BE                     ;  | $BE/$BF = $4000 (base)
+    LDA     #$40                    ;  |
+    STA     $BF                     ; /
+.loop:
+    DEX
+    BPL     .advance                ; more records to skip
+    RTS                             ; done: $BE/$BF points to record
+.advance:
+    CLC                             ; \
+    LDA     $BE                     ;  | $BE/$BF += 9
+    ADC     #$09                    ;  | (9 bytes per record)
+    STA     $BE                     ;  |
+    LDA     $BF                     ;  |
+    ADC     #$00                    ;  |
+    STA     $BF                     ; /
+    BNE     .loop                   ; always taken ($BF >= $40)
+@ %def GET_CHAR_RECORD
+
 \subsection{scene\_setup (\$0A17)}
 
 Initializes a scene for display.  Loads the character record for index
@@ -2906,7 +3123,7 @@ SCENE_SETUP:
     SUBROUTINE
 
     LDA     $5A29                   ; character/scene index
-    JSR     $1053                   ; load character record → $BE
+    JSR     GET_CHAR_RECORD         ; index → $BE/$BF = char record
     LDY     #$03
     LDA     ($BE),Y                 ; byte 3: min position (packed)
     JSR     POS_TO_COLROW           ; → A=min_col, Y=min_row
@@ -2943,7 +3160,7 @@ SCENE_SETUP:
     STA     $BD                     ; /
     LDA     #$00
     STA     $5A28                   ; clear player index
-    JSR     $0F84                   ; character record management
+    JSR     REORDER_CHAR            ; reorder character in linked list
     LDY     #$0D
     LDA     #$00                    ; \
     STA     ($F4),Y                 ;  | clear bytes 13-14 of record
@@ -5171,6 +5388,9 @@ The following root chunks produce the assembly files when tangled.
 <<main entry>>
 <<attract screen>>
 <<scene setup>>
+<<reorder char>>
+<<adjust char byte8>>
+<<get char record>>
 <<Get item at pos in room>>
 <<pos to colrow>>
 <<get mob data>>
