@@ -2845,7 +2845,7 @@ is the same as an {\Tt{}END\nwendquote} instruction.
 \label{ch:attract}
 
 When the main program starts at {\Tt{}{\$}0800\nwendquote}, it calls {\Tt{}GAME{\_}INIT\nwendquote} to set up
-hardware and graphics, then checks {\Tt{}{\$}5A01\nwendquote}. If zero (first run), it enters
+hardware and graphics, then checks {\Tt{}TOTAL{\textbackslash}{\_}MOB{\textbackslash}{\_}COUNT\nwendquote}. If zero (first run), it enters
 the \emph{attract screen}---the title sequence that cycles through story scenes
 until the player presses a key.
 
@@ -2865,21 +2865,22 @@ The first thing the main program does:
     STA     $FA                     ;  | $FA/$FB = $4009 (character record base)
     LDA     #$40                    ;  |
     STA     $FB                     ; /
-    LDA     $5A01                   ; first-run flag
+    LDA     \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}         ; zero on first run (no mobs yet)
     BNE     .skip                   ; nonzero = game in progress
     JSR     \nwlinkedidentc{ATTRACT_SCREEN}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}
 .skip:
     ; ... continues to game loop ...
 \nwindexdefn{\nwixident{MAIN{\_}ENTRY}}{MAIN:unENTRY}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{MAIN{\_}ENTRY}}{MAIN:unENTRY}}}\nwidentuses{\\{{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}}\\{{\nwixident{GAME{\_}INIT}}{GAME:unINIT}}}\nwindexuse{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwindexuse{\nwixident{GAME{\_}INIT}}{GAME:unINIT}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwendcode{}\nwbegindocs{157}\nwdocspar
+\nwidentdefs{\\{{\nwixident{MAIN{\_}ENTRY}}{MAIN:unENTRY}}}\nwidentuses{\\{{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}}\\{{\nwixident{GAME{\_}INIT}}{GAME:unINIT}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwindexuse{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwindexuse{\nwixident{GAME{\_}INIT}}{GAME:unINIT}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwindexuse{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwendcode{}\nwbegindocs{157}\nwdocspar
 
 \nwenddocs{}\nwbegincode{158}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}\nwenddeflinemarkup
+\nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}     EQU     $5A01   ; total mobs across all groups (excl. group 0)
 \nwlinkedidentc{LOCATION_FLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}       EQU     $5A55   ; location-change flag
 \nwlinkedidentc{LOCATION_FLAG2}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}      EQU     $5A56   ; secondary location flag
 \nwlinkedidentc{SCENE_NUMBER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}        EQU     $5A99   ; current scene number
 \nwlinkedidentc{ATTRACT_FLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
-\nwindexdefn{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwindexdefn{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwindexdefn{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwindexdefn{\nwixident{SCENE{\_}NUMBER}}{SCENE:unNUMBER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\eatline
-\nwidentdefs{\\{{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}}\\{{\nwixident{SCENE{\_}NUMBER}}{SCENE:unNUMBER}}}\nwendcode{}\nwbegindocs{159}\nwdocspar
+\nwindexdefn{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwindexdefn{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwindexdefn{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwindexdefn{\nwixident{SCENE{\_}NUMBER}}{SCENE:unNUMBER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwindexdefn{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\eatline
+\nwidentdefs{\\{{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}}\\{{\nwixident{SCENE{\_}NUMBER}}{SCENE:unNUMBER}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwendcode{}\nwbegindocs{159}\nwdocspar
 
 \subsection{game\_init (\$78C7)}
 
@@ -3036,7 +3037,7 @@ Phase~2 (insertion): walks the chain from {\Tt{}{\textbackslash}{\$}5A29\nwendqu
 byte~11 (level) values.  Inserts the removed character before the first
 node with a lower level, or at the end if none found.  Increments the
 destination group's member count via {\Tt{}INCR{\textbackslash}{\_}GROUP{\textbackslash}{\_}COUNT\nwendquote}.  Adjusts the
-{\Tt{}{\textbackslash}{\$}5A01\nwendquote} counter to track list membership changes.
+{\Tt{}TOTAL{\textbackslash}{\_}MOB{\textbackslash}{\_}COUNT\nwendquote} to track list membership changes.
 
 When {\Tt{}{\textbackslash}{\$}5A29\nwendquote} is zero, a random decision (via {\Tt{}STEP{\textbackslash}{\_}PRNG\nwendquote}) determines
 the insertion point instead of the level comparison.
@@ -3115,12 +3116,12 @@ the insertion point instead of the level comparison.
 .adjust:
     LDA     #$00                    ; \\
     CMP     $5A29                   ;  | if inserted into index 0's slot,
-    BNE     .chk28                  ;  |   decrement $5A01
-    DEC     $5A01                   ; /
+    BNE     .chk28                  ;  |   decrement \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}
+    DEC     \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}         ; /
 .chk28:
     CMP     $5A28                   ; \\  if removed from index 0's slot,
-    BNE     .done                   ;  |   increment $5A01
-    INC     $5A01                   ; /
+    BNE     .done                   ;  |   increment \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}
+    INC     \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}         ; /
 .done:
     RTS
 .advance2:
@@ -3136,7 +3137,7 @@ the insertion point instead of the level comparison.
     BMI     .insert                 ;  | else keep walking
     BPL     .advance2               ; /
 \nwindexdefn{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}}\nwidentuses{\\{{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}}\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}}\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}}\nwindexuse{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwendcode{}\nwbegindocs{167}\nwdocspar
+\nwidentdefs{\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}}\nwidentuses{\\{{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}}\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}}\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwindexuse{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwendcode{}\nwbegindocs{167}\nwdocspar
 
 \subsection{get\_char\_record (\$1053)}
 
@@ -5362,7 +5363,7 @@ The attract screen call flow:
 
 \begin{itemize}
   \item {\Tt{}MAIN{\textbackslash}{\_}ENTRY\nwendquote} ({\Tt{}{\textbackslash}{\$}0800\nwendquote}): calls {\Tt{}GAME{\textbackslash}{\_}INIT\nwendquote}, then
-        {\Tt{}ATTRACT{\textbackslash}{\_}SCREEN\nwendquote} if {\Tt{}{\textbackslash}{\$}5A01\nwendquote} is zero.
+        {\Tt{}ATTRACT{\textbackslash}{\_}SCREEN\nwendquote} if {\Tt{}TOTAL{\textbackslash}{\_}MOB{\textbackslash}{\_}COUNT\nwendquote} is zero.
   \item {\Tt{}ATTRACT{\textbackslash}{\_}SCREEN\nwendquote} ({\Tt{}{\textbackslash}{\$}09F4\nwendquote}): sets scene index 1, calls
         {\Tt{}COMPUTE{\textbackslash}{\_}SCENE{\textbackslash}{\_}PTR\nwendquote}, tail-calls {\Tt{}SCENE{\textbackslash}{\_}LOOP\nwendquote} with scene \$26.
   \item {\Tt{}SCENE{\textbackslash}{\_}LOOP\nwendquote} ({\Tt{}{\textbackslash}{\$}6C37\nwendquote}): saves ZP pointers, steps PRNG,
@@ -5833,33 +5834,7 @@ LAB_162b:
     JMP      hit_mob?
 \nwnotused{Hit chance}\nwidentuses{\\{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}\\{{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}}}\nwindexuse{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}\nwindexuse{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}\nwendcode{}\nwbegindocs{316}\nwdocspar
 
-Personally, I find the Python version of {\Tt{}get{\_}item{\_}at{\_}pos{\_}in{\_}room\nwendquote} much easier to
-understand. It is much less verbose and doesn't involve self-modification.
-
-\nwenddocs{}\nwbegincode{317}\sublabel{PYNWmai0-6PS45JPTOMUDGO4LS736KGGDY4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-6PS45JPTOMUDGO4LS736KGGDY4000000-1}}}\moddef{py Get item at pos in room~{\nwtagstyle{}\subpageref{PYNWmai0-6PS45JPTOMUDGO4LS736KGGDY4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
-get_item_at_pos_in_room(pos, room_ptr):
-    # "Args" are A (a position) and \nwlinkedidentc{TMP_PTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2} (room data ptr).
-    # "Return value" is \nwlinkedidentc{DATA_PTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}.
-
-    # return 0x8000 | mob data ptr if mob at pos.
-    mob_ptr = room_ptr
-    while mob_ptr[MOB]:
-        mob_ptr = mob_data_ptr(mob_ptr[MOB])
-        if mob_ptr[POS] == pos:
-            return 0x8000 | mob_ptr
-
-    # return map record ptr if object at pos.
-    map_ptr = room_ptr[MAP]
-    while map_ptr[0] != 0xFF:
-        if map_ptr[0] == pos:
-            return map_ptr
-        map_ptr += 3
-
-    # return brick (1) or space (0) otherwise.
-    return \nwlinkedidentc{is_at_outer_limits}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}()
-\nwnotused{py Get item at pos in room}\nwidentuses{\\{{\nwixident{DATA{\_}PTR}}{DATA:unPTR}}\\{{\nwixident{TMP{\_}PTR}}{TMP:unPTR}}\\{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}}\nwindexuse{\nwixident{DATA{\_}PTR}}{DATA:unPTR}{PYNWmai0-6PS45JPTOMUDGO4LS736KGGDY4000000-1}\nwindexuse{\nwixident{TMP{\_}PTR}}{TMP:unPTR}{PYNWmai0-6PS45JPTOMUDGO4LS736KGGDY4000000-1}\nwindexuse{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}{PYNWmai0-6PS45JPTOMUDGO4LS736KGGDY4000000-1}\nwendcode{}\nwbegindocs{318}\nwdocspar
-
-\nwenddocs{}\nwbegincode{319}\sublabel{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}}}\moddef{Get item at pos in room~{\nwtagstyle{}\subpageref{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{317}\sublabel{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}}}\moddef{Get item at pos in room~{\nwtagstyle{}\subpageref{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG      $0B62
     ; Takes A (pos) and \nwlinkedidentc{TMP_PTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2} (pointer to room data)
 get_item_at_pos_in_room:
@@ -5948,7 +5923,7 @@ mob_dataptr_to_load4:
     JSR      \nwlinkedidentc{GET_MOB_DATA}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}
     \nwlinkedidentc{STOW}{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-1}     \nwlinkedidentc{DATA_PTR3}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}, .load4
     RTS
-\nwidentuses{\\{{\nwixident{DATA{\_}PTR}}{DATA:unPTR}}\\{{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}}\\{{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{INCW}}{INCW}}\\{{\nwixident{STOW}}{STOW}}\\{{\nwixident{TMP{\_}PTR}}{TMP:unPTR}}\\{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}}\nwindexuse{\nwixident{DATA{\_}PTR}}{DATA:unPTR}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{INCW}}{INCW}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{STOW}}{STOW}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{TMP{\_}PTR}}{TMP:unPTR}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwendcode{}\nwbegindocs{320}\nwdocspar
+\nwidentuses{\\{{\nwixident{DATA{\_}PTR}}{DATA:unPTR}}\\{{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}}\\{{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{INCW}}{INCW}}\\{{\nwixident{STOW}}{STOW}}\\{{\nwixident{TMP{\_}PTR}}{TMP:unPTR}}\\{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}}\nwindexuse{\nwixident{DATA{\_}PTR}}{DATA:unPTR}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{INCW}}{INCW}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{STOW}}{STOW}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{TMP{\_}PTR}}{TMP:unPTR}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwendcode{}\nwbegindocs{318}\nwdocspar
 
 \subsection{get\_mob\_data (\$0C32)}
 
@@ -5965,7 +5940,7 @@ The multiplication by 16 is done by rotating the decremented index
 left by 4 bits through carry, then splitting the result into high and
 low byte contributions.
 
-\nwenddocs{}\nwbegincode{321}\sublabel{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}}}\moddef{get mob data~{\nwtagstyle{}\subpageref{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{319}\sublabel{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}}}\moddef{get mob data~{\nwtagstyle{}\subpageref{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $0C32
 \nwlinkedidentc{GET_MOB_DATA}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}:
     SUBROUTINE
@@ -5992,7 +5967,51 @@ low byte contributions.
 .done:
     RTS
 \nwindexdefn{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}}\nwidentuses{\\{{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}}}\nwindexuse{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}\nwendcode{}\nwbegindocs{322}\nwdocspar
+\nwidentdefs{\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}}\nwidentuses{\\{{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}}}\nwindexuse{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}\nwendcode{}\nwbegindocs{320}\nwdocspar
+
+\subsection{init\_mob\_count (\$0C51)}
+
+Called once during {\Tt{}GAME{\textbackslash}{\_}INIT\nwendquote} to initialize {\Tt{}TOTAL{\textbackslash}{\_}MOB{\textbackslash}{\_}COUNT\nwendquote}.
+Walks all 9-byte character records starting from index~1 (skipping
+the group-0 header at {\Tt{}{\textbackslash}{\$}4000\nwendquote}), summing byte~8 (group member count)
+of each record until the end sentinel (byte~1 = {\Tt{}{\textbackslash}{\$}FF\nwendquote}) is reached.
+
+The result is the total number of mobs assigned to groups~1 and above.
+At startup, byte~8 contains only the group count in bits~3--0 (the
+upper bits---pending XP and status flag---are zero), so the sum is
+simply the total mob count.
+
+\nwenddocs{}\nwbegincode{321}\sublabel{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}}}\moddef{init mob count~{\nwtagstyle{}\subpageref{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $0C51
+\nwlinkedidentc{INIT_MOB_COUNT}{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}:
+    SUBROUTINE
+
+    LDA     #$00                    ; \\
+    STA     \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}         ; / clear total
+    LDA     #$09                    ; \\ $FA/$FB = $4009 (record 1)
+    STA     $FA                     ;  |
+    LDA     #$40                    ;  |
+    STA     $FB                     ; /
+.loop:
+    LDY     #$01
+    LDA     ($FA),Y                 ; byte 1 of record
+    CMP     #$FF                    ; $FF = end sentinel
+    BNE     .count
+    RTS
+.count:
+    LDY     #$08
+    LDA     ($FA),Y                 ; byte 8 = group member count
+    CLC
+    ADC     \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}         ; accumulate
+    STA     \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}
+    LDA     #$09                    ; \\ advance $FA by 9 (next record)
+    ADC     $FA                     ;  |
+    STA     $FA                     ;  |
+    BCC     .loop                   ;  |
+    INC     $FB                     ;  |
+    BCS     .loop                   ; / always taken
+\nwindexdefn{\nwixident{INIT{\_}MOB{\_}COUNT}}{INIT:unMOB:unCOUNT}{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{INIT{\_}MOB{\_}COUNT}}{INIT:unMOB:unCOUNT}}}\nwidentuses{\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwindexuse{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}\nwendcode{}\nwbegindocs{322}\nwdocspar
 
 \nwenddocs{}\nwbegindocs{323}\chapter{Assembly output}
 
@@ -6020,6 +6039,7 @@ The following root chunks produce the assembly files when tangled.
 \LA{}pos to colrow~{\nwtagstyle{}\subpageref{PYNWmai0-AMTAHZ55D6ORMSENT2EMDCDU24000000-1}}\RA{}
 \LA{}get mob data~{\nwtagstyle{}\subpageref{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}}\RA{}
 \LA{}compute scene ptr~{\nwtagstyle{}\subpageref{PYNWmai0-AW5VLYKLITE6VBTFNOR2WD6FNQ000000-1}}\RA{}
+\LA{}init mob count~{\nwtagstyle{}\subpageref{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}}\RA{}
 \LA{}appearance to fontchar~{\nwtagstyle{}\subpageref{PYNWmai0-ZV3SLJLMHDXQXGXKZHHC4ROVNQ000000-1}}\RA{}
 \LA{}delay with animation~{\nwtagstyle{}\subpageref{PYNWmai0-GR34WPZFUFAWF4EEF55HS6PMUU000000-1}}\RA{}
 \LA{}tick anim counter~{\nwtagstyle{}\subpageref{PYNWmai0-252H4ITL77INYHCEW5TFC3PMYE000000-1}}\RA{}
@@ -6473,6 +6493,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{get mob data}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}}}%
 \nwixlogsorted{c}{{high tone}{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}{\nwixd{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}}}%
 \nwixlogsorted{c}{{init hcrg}{PYNWmai0-26DEEOCSHWI7S5GYIOPZSCBG2Y000000-1}{\nwixd{PYNWmai0-26DEEOCSHWI7S5GYIOPZSCBG2Y000000-1}}}%
+\nwixlogsorted{c}{{init mob count}{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}}}%
 \nwixlogsorted{c}{{load scene data}{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}}}%
 \nwixlogsorted{c}{{main entry}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}}}%
 \nwixlogsorted{c}{{main.asm}{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}{\nwixd{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}}%
@@ -6488,7 +6509,6 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{print mob name}{PYNWmai0-U2DT53IODGLRLPVDYRFI4YX3IQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-U2DT53IODGLRLPVDYRFI4YX3IQ000000-1}}}%
 \nwixlogsorted{c}{{print string}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}\nwixd{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}}}%
 \nwixlogsorted{c}{{pull two ret addrs}{PYNWmai0-ZQ3HACWSYBTTFFJTEM5GLS64PU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-ZQ3HACWSYBTTFFJTEM5GLS64PU000000-1}}}%
-\nwixlogsorted{c}{{py Get item at pos in room}{PYNWmai0-6PS45JPTOMUDGO4LS736KGGDY4000000-1}{\nwixd{PYNWmai0-6PS45JPTOMUDGO4LS736KGGDY4000000-1}}}%
 \nwixlogsorted{c}{{random in range}{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}}}%
 \nwixlogsorted{c}{{relocate hires staging}{PYNWmai0-2NL3TPDIV6BH32KNILRIC2G5ZE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-2NL3TPDIV6BH32KNILRIC2G5ZE000000-1}}}%
 \nwixlogsorted{c}{{render font char}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}}}%
@@ -6595,6 +6615,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{HOSTILE{\_}Y}}{HOSTILE:unY}}%
 \nwixlogsorted{i}{{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}}%
 \nwixlogsorted{i}{{\nwixident{INCW}}{INCW}}%
+\nwixlogsorted{i}{{\nwixident{INIT{\_}MOB{\_}COUNT}}{INIT:unMOB:unCOUNT}}%
 \nwixlogsorted{i}{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}%
 \nwixlogsorted{i}{{\nwixident{LOAD{\_}SCENE{\_}DATA}}{LOAD:unSCENE:unDATA}}%
 \nwixlogsorted{i}{{\nwixident{LOCATION{\_}DATA}}{LOCATION:unDATA}}%
@@ -6694,6 +6715,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{TICK{\_}ANIM{\_}COUNTER}}{TICK:unANIM:unCOUNTER}}%
 \nwixlogsorted{i}{{\nwixident{TIMED{\_}WAIT}}{TIMED:unWAIT}}%
 \nwixlogsorted{i}{{\nwixident{TMP{\_}PTR}}{TMP:unPTR}}%
+\nwixlogsorted{i}{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}%
 \nwixlogsorted{i}{{\nwixident{WAIT{\_}DURATION}}{WAIT:unDURATION}}%
 \nwixlogsorted{i}{{\nwixident{WAIT{\_}LOOP{\_}COUNT}}{WAIT:unLOOP:unCOUNT}}%
 \nwixlogsorted{i}{{\nwixident{ealdr{\_}bot}}{ealdr:unbot}}%

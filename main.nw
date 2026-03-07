@@ -2784,7 +2784,7 @@ is the same as an [[END]] instruction.
 \label{ch:attract}
 
 When the main program starts at [[$0800]], it calls [[GAME_INIT]] to set up
-hardware and graphics, then checks [[$5A01]]. If zero (first run), it enters
+hardware and graphics, then checks [[TOTAL\_MOB\_COUNT]]. If zero (first run), it enters
 the \emph{attract screen}---the title sequence that cycles through story scenes
 until the player presses a key.
 
@@ -2804,7 +2804,7 @@ MAIN_ENTRY:
     STA     $FA                     ;  | $FA/$FB = $4009 (character record base)
     LDA     #$40                    ;  |
     STA     $FB                     ; /
-    LDA     $5A01                   ; first-run flag
+    LDA     TOTAL_MOB_COUNT         ; zero on first run (no mobs yet)
     BNE     .skip                   ; nonzero = game in progress
     JSR     ATTRACT_SCREEN
 .skip:
@@ -2812,11 +2812,12 @@ MAIN_ENTRY:
 @ %def MAIN_ENTRY
 
 <<defines>>=
+TOTAL_MOB_COUNT     EQU     $5A01   ; total mobs across all groups (excl. group 0)
 LOCATION_FLAG       EQU     $5A55   ; location-change flag
 LOCATION_FLAG2      EQU     $5A56   ; secondary location flag
 SCENE_NUMBER        EQU     $5A99   ; current scene number
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
-@ %def LOCATION_FLAG LOCATION_FLAG2 SCENE_NUMBER ATTRACT_FLAG
+@ %def TOTAL_MOB_COUNT LOCATION_FLAG LOCATION_FLAG2 SCENE_NUMBER ATTRACT_FLAG
 
 \subsection{game\_init (\$78C7)}
 
@@ -2970,7 +2971,7 @@ Phase~2 (insertion): walks the chain from [[\$5A29]]'s record, comparing
 byte~11 (level) values.  Inserts the removed character before the first
 node with a lower level, or at the end if none found.  Increments the
 destination group's member count via [[INCR\_GROUP\_COUNT]].  Adjusts the
-[[\$5A01]] counter to track list membership changes.
+[[TOTAL\_MOB\_COUNT]] to track list membership changes.
 
 When [[\$5A29]] is zero, a random decision (via [[STEP\_PRNG]]) determines
 the insertion point instead of the level comparison.
@@ -3049,12 +3050,12 @@ REORDER_CHAR:
 .adjust:
     LDA     #$00                    ; \
     CMP     $5A29                   ;  | if inserted into index 0's slot,
-    BNE     .chk28                  ;  |   decrement $5A01
-    DEC     $5A01                   ; /
+    BNE     .chk28                  ;  |   decrement TOTAL_MOB_COUNT
+    DEC     TOTAL_MOB_COUNT         ; /
 .chk28:
     CMP     $5A28                   ; \  if removed from index 0's slot,
-    BNE     .done                   ;  |   increment $5A01
-    INC     $5A01                   ; /
+    BNE     .done                   ;  |   increment TOTAL_MOB_COUNT
+    INC     TOTAL_MOB_COUNT         ; /
 .done:
     RTS
 .advance2:
@@ -5234,7 +5235,7 @@ The attract screen call flow:
 
 \begin{itemize}
   \item [[MAIN\_ENTRY]] ([[\$0800]]): calls [[GAME\_INIT]], then
-        [[ATTRACT\_SCREEN]] if [[\$5A01]] is zero.
+        [[ATTRACT\_SCREEN]] if [[TOTAL\_MOB\_COUNT]] is zero.
   \item [[ATTRACT\_SCREEN]] ([[\$09F4]]): sets scene index 1, calls
         [[COMPUTE\_SCENE\_PTR]], tail-calls [[SCENE\_LOOP]] with scene \$26.
   \item [[SCENE\_LOOP]] ([[\$6C37]]): saves ZP pointers, steps PRNG,
@@ -5834,6 +5835,49 @@ GET_MOB_DATA:
     RTS
 @ %def GET_MOB_DATA
 
+\subsection{init\_mob\_count (\$0C51)}
+
+Called once during [[GAME\_INIT]] to initialize [[TOTAL\_MOB\_COUNT]].
+Walks all 9-byte character records starting from index~1 (skipping
+the group-0 header at [[\$4000]]), summing byte~8 (group member count)
+of each record until the end sentinel (byte~1 = [[\$FF]]) is reached.
+
+The result is the total number of mobs assigned to groups~1 and above.
+At startup, byte~8 contains only the group count in bits~3--0 (the
+upper bits---pending XP and status flag---are zero), so the sum is
+simply the total mob count.
+
+<<init mob count>>=
+    ORG     $0C51
+INIT_MOB_COUNT:
+    SUBROUTINE
+
+    LDA     #$00                    ; \
+    STA     TOTAL_MOB_COUNT         ; / clear total
+    LDA     #$09                    ; \ $FA/$FB = $4009 (record 1)
+    STA     $FA                     ;  |
+    LDA     #$40                    ;  |
+    STA     $FB                     ; /
+.loop:
+    LDY     #$01
+    LDA     ($FA),Y                 ; byte 1 of record
+    CMP     #$FF                    ; $FF = end sentinel
+    BNE     .count
+    RTS
+.count:
+    LDY     #$08
+    LDA     ($FA),Y                 ; byte 8 = group member count
+    CLC
+    ADC     TOTAL_MOB_COUNT         ; accumulate
+    STA     TOTAL_MOB_COUNT
+    LDA     #$09                    ; \ advance $FA by 9 (next record)
+    ADC     $FA                     ;  |
+    STA     $FA                     ;  |
+    BCC     .loop                   ;  |
+    INC     $FB                     ;  |
+    BCS     .loop                   ; / always taken
+@ %def INIT_MOB_COUNT
+
 @ \chapter{Assembly output}
 
 The following root chunks produce the assembly files when tangled.
@@ -5860,6 +5904,7 @@ The following root chunks produce the assembly files when tangled.
 <<pos to colrow>>
 <<get mob data>>
 <<compute scene ptr>>
+<<init mob count>>
 <<appearance to fontchar>>
 <<delay with animation>>
 <<tick anim counter>>

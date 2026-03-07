@@ -201,6 +201,7 @@ NUM_DIVISOR         EQU     $5A1C   ; 16-bit divisor for decimal conversion (2 b
 NUM_LEADING         EQU     $5A1E   ; leading-zero suppress flag (0=suppress, 1=print)
 GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
+TOTAL_MOB_COUNT     EQU     $5A01   ; total mobs across all groups (excl. group 0)
 LOCATION_FLAG       EQU     $5A55   ; location-change flag
 LOCATION_FLAG2      EQU     $5A56   ; secondary location flag
 SCENE_NUMBER        EQU     $5A99   ; current scene number
@@ -352,7 +353,7 @@ MAIN_ENTRY:
     STA     $FA                     ;  | $FA/$FB = $4009 (character record base)
     LDA     #$40                    ;  |
     STA     $FB                     ; /
-    LDA     $5A01                   ; first-run flag
+    LDA     TOTAL_MOB_COUNT         ; zero on first run (no mobs yet)
     BNE     .skip                   ; nonzero = game in progress
     JSR     ATTRACT_SCREEN
 .skip:
@@ -505,12 +506,12 @@ REORDER_CHAR:
 .adjust:
     LDA     #$00                    ; \
     CMP     $5A29                   ;  | if inserted into index 0's slot,
-    BNE     .chk28                  ;  |   decrement $5A01
-    DEC     $5A01                   ; /
+    BNE     .chk28                  ;  |   decrement TOTAL_MOB_COUNT
+    DEC     TOTAL_MOB_COUNT         ; /
 .chk28:
     CMP     $5A28                   ; \  if removed from index 0's slot,
-    BNE     .done                   ;  |   increment $5A01
-    INC     $5A01                   ; /
+    BNE     .done                   ;  |   increment TOTAL_MOB_COUNT
+    INC     TOTAL_MOB_COUNT         ; /
 .done:
     RTS
 .advance2:
@@ -726,6 +727,34 @@ COMPUTE_SCENE_PTR:
     INC     $BB                     ; carry
 .done:
     RTS
+    ORG     $0C51
+INIT_MOB_COUNT:
+    SUBROUTINE
+
+    LDA     #$00                    ; \
+    STA     TOTAL_MOB_COUNT         ; / clear total
+    LDA     #$09                    ; \ $FA/$FB = $4009 (record 1)
+    STA     $FA                     ;  |
+    LDA     #$40                    ;  |
+    STA     $FB                     ; /
+.loop:
+    LDY     #$01
+    LDA     ($FA),Y                 ; byte 1 of record
+    CMP     #$FF                    ; $FF = end sentinel
+    BNE     .count
+    RTS
+.count:
+    LDY     #$08
+    LDA     ($FA),Y                 ; byte 8 = group member count
+    CLC
+    ADC     TOTAL_MOB_COUNT         ; accumulate
+    STA     TOTAL_MOB_COUNT
+    LDA     #$09                    ; \ advance $FA by 9 (next record)
+    ADC     $FA                     ;  |
+    STA     $FA                     ;  |
+    BCC     .loop                   ;  |
+    INC     $FB                     ;  |
+    BCS     .loop                   ; / always taken
     ORG     $0CF7
 APPEARANCE_TO_FONTCHAR:
     SUBROUTINE
