@@ -179,6 +179,7 @@ DATA_PTR                EQU     $BE     ; data pointer / return value (2 bytes)
 RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
 HRCG_INIT               EQU     $92A8   ; HRCG entry/init routine
 GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
+FUN_A44C                EQU     $A44C   ; resident: read keyboard input
 FONT_COL        EQU     $5A0C
 FONT_ROW        EQU     $5A0D
 FONT_CHARNUM        EQU     $5A0E
@@ -301,8 +302,8 @@ resident_jmp:
     ORG     $06D3
 RESIDENT_DISPATCH_TABLE:
     HEX     00 27 55 5F 6D 8A AD B9
-    HEX     4F A2 CE 26 79 A2 0F B5
-    HEX     50 48
+    HEX     4F A2 CE 26 79
+; last 5 bytes overlap with CONTEXT_SWAP code at $06E0
     ORG     $06E0
 CONTEXT_SWAP:
     SUBROUTINE
@@ -1387,9 +1388,32 @@ DRAW_CHAR_AT_POS:
     JSR     GET_ENTITY_FONTCHAR     ; determine font char from entity data
     JMP     RENDER_FONT_CHAR        ; render the font character
     ORG     $0925
-FUN_0925:
+LOAD_CHAR_NAME_PTR:
+    SUBROUTINE
+    LDY     #$00
+    LDA     ($F8),Y
+    STA     $BC
+    INY
+    LDA     ($F8),Y
+    STA     $BD
+    JMP     FUN_76D8
     ORG     $0933
-FUN_0933:
+SETUP_CHAR_SPRITE:
+    SUBROUTINE
+    LDY     #$03
+    LDA     ($F8),Y
+    JSR     POS_TO_COLROW
+    STA     $5A0C
+    STY     $5A0D
+    STA     $5AA2
+    STY     $5AA3
+    TAX
+    LDA     $5A04
+    STA     $5A0E
+    STA     $5AA4
+    LDA     #$01
+    STA     $5A0F
+    JMP     DRAW_SPRITE
     ORG     $106F
 APPLY_DAMAGE:
     SUBROUTINE
@@ -1517,6 +1541,10 @@ PRINT_ENTITY_NAME:
     STA     $BD
     JSR     PRINT_BOTTOM_CENTERED
     JMP     RESET_TEXT_WINDOW
+    ORG     $116B
+FUN_116B:
+    ORG     $11FC
+FUN_11FC:
     ORG     $12D0
 PICK_RANDOM_MEMBER:
     SUBROUTINE
@@ -1658,7 +1686,7 @@ CHECK_CAN_LEAVE:
     JMP     .fail
 .pass:
     JSR     SET_CURSOR_ROW21
-    JSR     FUN_0D8A
+    JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
     LDA     #$1C
     JSR     DISPLAY_MESSAGE
@@ -1666,7 +1694,7 @@ CHECK_CAN_LEAVE:
     RTS
 .fail:
     JSR     SET_CURSOR_ROW21
-    JSR     FUN_0D8A
+    JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
     LDA     #$1D
     JSR     DISPLAY_MESSAGE
@@ -1857,6 +1885,8 @@ APPLY_DAMAGE_TO_CURRENT:
     STA     $F7
     TXA
     JMP     APPLY_DAMAGE
+    ORG     $1432
+FUN_1432:
     ORG     $143F
 AUTO_HEAL:
     SUBROUTINE
@@ -1879,7 +1909,7 @@ AUTO_HEAL:
     LDA     #$00
     STA     $5A16
 .heal_loop:
-    JSR     FUN_1482
+    JSR     INCREMENT_HP
     JSR     FUN_78A8
     LDA     $5A18
     CMP     #$50
@@ -1894,14 +1924,41 @@ AUTO_HEAL:
     LDA     $5A16
     BNE     .done
     JSR     SET_CURSOR_ROW21
-    JSR     FUN_0D8A
+    JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
     LDA     #$21
     JMP     DISPLAY_MESSAGE
     ORG     $1482
-FUN_1482:
+INCREMENT_HP:
+    SUBROUTINE
+    LDY     #$06
+    LDA     ($F8),Y
+    CLC
+    ADC     #$01
+    STA     ($F8),Y
+    AND     #$3F
+    CMP     #$03
+    BEQ     .notify
+    RTS
+.notify:
+    JSR     SET_CURSOR_ROW21
+    JSR     PRINT_MOB_NAME
+    JSR     RESET_TEXT_WINDOW
+    LDA     #$22
+    STA     $5A16
+    JMP     DISPLAY_MESSAGE
     ORG     $14A3
-FUN_14A3:
+TURN_DISPATCH:
+    SUBROUTINE
+    LDA     $5A05
+    BEQ     .no_combat
+    JSR     FUN_18E4
+    CMP     #$02
+    BEQ     ENTER_COMBAT_STATE
+    BMI     START_COMBAT
+    JMP     AUTO_HEAL
+.no_combat:
+    JMP     TEARDOWN_INPUT
     ORG     $14B7
 ENTER_COMBAT_STATE:
     SUBROUTINE
@@ -1923,7 +1980,7 @@ START_COMBAT:
     ; Set char state to 3, call $199D, jump to combat logic at $15AB.
     LDA     #$03
     JSR     SET_CHAR_STATE
-    JSR     FUN_199D
+    JSR     LOAD_TARGET_PTR
     JMP     RESOLVE_ATTACK
     ORG     $15AB
 RESOLVE_ATTACK:
@@ -1951,20 +2008,20 @@ RESOLVE_ATTACK:
     AND     #$EF
     STA     ($F8),Y
     LDA     #$18
-    JSR     FUN_169B
+    JSR     ADD_WILLINGNESS
 .no_bit5:
     LDA     ($F4),Y
     TAY
     AND     #$40
     BEQ     .no_bit6
     LDA     #$FC
-    JSR     FUN_169B
+    JSR     ADD_WILLINGNESS
 .no_bit6:
     TYA
     AND     #$80
     BEQ     .no_bit7
     LDA     #$08
-    JSR     FUN_169B
+    JSR     ADD_WILLINGNESS
 .no_bit7:
     LDY     #$0F
     LDA     ($F4),Y
@@ -1972,25 +2029,25 @@ RESOLVE_ATTACK:
     AND     #$04
     BEQ     .no_restrict
     LDA     #$06
-    JSR     FUN_169B
+    JSR     ADD_WILLINGNESS
 .no_restrict:
     TXA
     AND     #$03
     CMP     #$01
     BPL     .ge1
     LDA     #$03
-    JSR     FUN_169B
+    JSR     ADD_WILLINGNESS
     JMP     .state_done
 .ge1:
     BNE     .ne1
     LDA     #$FF
-    JSR     FUN_169B
+    JSR     ADD_WILLINGNESS
     JMP     .state_done
 .ne1:
     CMP     #$03
     BNE     .state_done
     LDA     #$FD
-    JSR     FUN_169B
+    JSR     ADD_WILLINGNESS
 .state_done:
     LDY     #$06
     LDA     ($F4),Y
@@ -1998,7 +2055,7 @@ RESOLVE_ATTACK:
     CMP     #$03
     BCS     .hp_ok
     LDA     #$18
-    JSR     FUN_169B
+    JSR     ADD_WILLINGNESS
 .hp_ok:
     LDY     #$03
     LDA     ($F8),Y
@@ -2014,7 +2071,7 @@ RESOLVE_ATTACK:
     AND     #$0F
     SEC
     SBC     $5A77
-    JSR     FUN_169B
+    JSR     ADD_WILLINGNESS
 .diff_pos:
     LDA     $5A76
     BPL     .not_neg
@@ -2033,7 +2090,7 @@ RESOLVE_ATTACK:
     BMI     .attack
     BEQ     .attack
     JSR     SET_CURSOR_ROW21
-    JSR     FUN_0D8A
+    JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
     LDA     #$D2
     STA     $BC
@@ -2051,13 +2108,28 @@ RESOLVE_ATTACK:
 .attack:
     LDA     $5A74
     BEQ     .mob_attack
-    JMP     FUN_1751
+    JMP     PLAYER_ATTACK
 .mob_attack:
-    JMP     FUN_1860
+    JMP     MOB_ATTACK
     ORG     $169B
-FUN_169B:
+ADD_WILLINGNESS:
+    SUBROUTINE
+    CLC
+    ADC     $5A76
+    STA     $5A76
+    RTS
+    ORG     $16E0
+FUN_16E0:
     ORG     $199D
-FUN_199D:
+LOAD_TARGET_PTR:
+    SUBROUTINE
+    LDA     $5A86
+    STA     $F4
+    LDA     $5A87
+    STA     $F5
+    LDA     #$00
+    STA     $5A74
+    RTS
     ORG     $19AD
 GAME_TURN_LOOP:
     SUBROUTINE
@@ -2346,7 +2418,7 @@ END_TURN:
     JSR     CHECK_AND_RESTRICT
     LDA     $5A66
     BNE     .check_level
-    JMP     FUN_14A3
+    JMP     TURN_DISPATCH
 .check_level:
     LDY     #$0C
     LDA     ($F8),Y
@@ -2354,7 +2426,7 @@ END_TURN:
     AND     #$07
     CMP     $5A66
     BMI     .too_low
-    JMP     FUN_14A3
+    JMP     TURN_DISPATCH
 .too_low:
     ORG     $1BC6
 SET_STATE_FIGHT:
@@ -2527,7 +2599,7 @@ SHOW_LOCKED_MSG:
     SUBROUTINE
     ; Display message $0C and set char state to 0.
     JSR     SET_CURSOR_ROW21
-    JSR     FUN_0D8A
+    JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
     LDA     #$0C
     JSR     DISPLAY_MESSAGE
@@ -2598,7 +2670,7 @@ HANDLE_EVENT_SLOT:
     CMP     #$00
     BEQ     .no_remove
     LDA     #$0A
-    JSR     FUN_6C37
+    JSR     SCENE_LOOP
 .no_remove:
     JSR     COMMIT_MOVE
     JSR     CHECK_THREATS_HERE
@@ -2621,7 +2693,7 @@ HANDLE_EVENT_SLOT:
     JMP     SHOW_LOCKED_MSG
 .small_val:
     JSR     SET_CURSOR_ROW21
-    JSR     FUN_0D8A
+    JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
     LDA     #$0D
     JSR     DISPLAY_MESSAGE
@@ -2656,7 +2728,7 @@ HANDLE_EVENT_SLOT:
     LDA     #$11
     JSR     DISPLAY_MESSAGE
     JSR     SET_RESTRICTED
-    JSR     FUN_0D8A
+    JSR     PRINT_MOB_NAME
     JSR     FUN_0D10
     JSR     FUN_78A8
     LDA     $5A18
@@ -2673,7 +2745,7 @@ HANDLE_EVENT_SLOT:
     BPL     .big_treasure
     JSR     SET_CURSOR_ROW21
     LDA     #$13
-    JSR     FUN_6C37
+    JSR     SCENE_LOOP
     JMP     .clear_slot
 .big_treasure:
     JSR     SET_CURSOR_ROW21
@@ -2704,9 +2776,189 @@ HANDLE_EVENT_SLOT:
     ORG     $1DDC
 FUN_1DDC:
     ORG     $1751
-FUN_1751:
+PLAYER_ATTACK:
+    SUBROUTINE
+    JSR     FUN_16E0
+    JSR     SET_CURSOR_ROW21
+    JSR     PRINT_MOB_NAME
+    JSR     RESET_TEXT_WINDOW
+    LDA     $5A78
+    JSR     FUN_11FC
+    JSR     RESET_TEXT_WINDOW
+    LDA     $F4
+    STA     $BE
+    LDA     $F5
+    STA     $BF
+    JSR     FUN_116B
+    JSR     PRINT_BOTTOM_CENTERED
+    LDY     $5A78
+    LDX     #$02
+    JSR     SCRIPT_ENGINE
+    LDY     #$01
+    LDA     ($F4),Y
+    CMP     #$FE
+    BEQ     .check_event
+    CMP     #$40
+    BCC     .roll_hit
+.immune:
+    JSR     FUN_1F0C
+    JSR     RESET_TEXT_WINDOW
+    LDA     #$14
+    JMP     DISPLAY_MESSAGE
+.roll_hit:
+    LDA     #$0D
+    JSR     RANDOM_IN_RANGE
+    CMP     $5A78
+    BCS     .immune
+    JSR     FUN_1F0C
+    LDY     #$01
+    LDA     ($BE),Y
+    ORA     #$40
+    STA     ($BE),Y
+    DEY
+    LDA     ($BE),Y
+    JSR     POS_TO_COLROW
+    STY     $5A0D
+    STA     $5A0C
+    JSR     GET_ENTITY_FONTCHAR
+    JSR     DRAW_SPRITE
+    LDX     #$0C
+    JSR     SCRIPT_ENGINE
+    JSR     SET_CURSOR_ROW21
+    LDA     #$02
+    JMP     DISPLAY_MESSAGE
+.check_event:
+    LDY     #$02
+    LDA     ($F4),Y
+    TAX
+    AND     #$C0
+    CMP     #$C0
+    BNE     .check_type
+    TXA
+    AND     #$1F
+    CMP     #$1D
+    BPL     .immune
+    JSR     FUN_1849
+    JSR     SET_CURSOR_ROW21
+    LDA     #$02
+    JMP     SCENE_LOOP
+.check_type:
+    CMP     #$00
+    BEQ     .immune
+    LDA     $5A78
+    CMP     #$0A
+    BPL     .strong_enough
+    TXA
+    CMP     #$80
+    BPL     .blocked
+    LDA     $5A78
+    CMP     #$04
+    BMI     .blocked
+.strong_enough:
+    TXA
+    AND     #$1F
+    CMP     #$1F
+    BMI     .take_item
+    STX     $BA
+    DEC     $BA
+    LDA     $BA
+    LDY     #$02
+    STA     ($F4),Y
+    LDX     #$0E
+    JSR     SCRIPT_ENGINE
+    JSR     FUN_1F0C
+    LDY     #$00
+    LDA     ($F4),Y
+    JSR     DRAW_CHAR_AT_POS
+    JSR     SET_CURSOR_ROW21
+.show_found:
+    LDA     #$12
+    JSR     DISPLAY_MESSAGE
+    JMP     FUN_1DDC
+.take_item:
+    JSR     FUN_1849
+    JSR     SET_CURSOR_ROW21
+    LDY     #$02
+    LDA     ($F4),Y
+    AND     #$1F
+    CMP     #$1B
+    BPL     .show_found
+    LDA     #$03
+    JSR     SCENE_LOOP
+    JMP     FUN_1DDC
+.blocked:
+    JSR     FUN_1F0C
+    JSR     SET_CURSOR_ROW21
+    LDA     #$10
+    JMP     DISPLAY_MESSAGE
+    ORG     $1849
+FUN_1849:
     ORG     $1860
-FUN_1860:
+MOB_ATTACK:
+    SUBROUTINE
+    JSR     FUN_16E0
+    JSR     SET_CURSOR_ROW21
+    JSR     PRINT_MOB_NAME
+    JSR     RESET_TEXT_WINDOW
+    LDA     $5A78
+    JSR     FUN_11FC
+    JSR     RESET_TEXT_WINDOW
+    JSR     PRINT_MEMBER_NAME
+    LDY     $5A78
+    LDX     #$02
+    JSR     SCRIPT_ENGINE
+    LDY     #$04
+    LDA     ($F8),Y
+    CMP     #$15
+    BCS     .npc
+    LDA     #$00
+    STA     $423A
+.npc:
+    JSR     FUN_1F0C
+    LDY     #$08
+    LDA     ($F4),Y
+    STA     $5A79
+    AND     #$0F
+    CMP     #$00
+    BNE     .has_strength
+    LDA     $5A78
+    JMP     FUN_1432
+.has_strength:
+    JSR     RESET_TEXT_WINDOW
+    LDX     #$17
+    LDA     $5A79
+    BMI     .negative
+    LDX     #$18
+.negative:
+    LDA     $5A79
+    AND     #$0F
+    STA     $5A79
+    LDA     $5A78
+    SEC
+    SBC     $5A79
+    BEQ     .weak_hit
+    BPL     .partial
+.weak_hit:
+    INX
+    INX
+    LDY     #$06
+    LDA     ($F4),Y
+    AND     #$3F
+    CMP     #$03
+    BMI     .critical
+    TXA
+    JMP     DISPLAY_MESSAGE
+.critical:
+    LDA     #$34
+    JMP     DISPLAY_MESSAGE
+.partial:
+    STA     $5A78
+    TXA
+    JSR     DISPLAY_MESSAGE
+    LDA     $5A78
+    JMP     FUN_1432
+    ORG     $18E4
+FUN_18E4:
     ORG     $1E5A
 HANDLE_MOB_ENCOUNTER:
     SUBROUTINE
@@ -2748,7 +3000,7 @@ HANDLE_MOB_ENCOUNTER:
     CMP     $5A18
     BPL     .no_flee
     JSR     SET_CURSOR_ROW21
-    JSR     FUN_0D8A
+    JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
     LDA     #$1E
     JSR     DISPLAY_MESSAGE
@@ -2780,19 +3032,27 @@ HANDLE_MOB_ENCOUNTER:
     LDA     ($F8),Y
     CMP     ($F4),Y
     BNE     .next_member
-    JSR     FUN_1F03
+    JSR     SET_TARGET_RESTRICTED
 .next_member:
     JSR     NEXT_GROUP_MEMBER
     JMP     .walk_group
 .group_done:
     JSR     SET_CURSOR_ROW21
-    JSR     FUN_0D8A
+    JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
     LDA     #$1F
     JSR     DISPLAY_MESSAGE
     JMP     END_TURN
     ORG     $1F03
-FUN_1F03:
+SET_TARGET_RESTRICTED:
+    SUBROUTINE
+    LDY     #$0F
+    LDA     ($F4),Y
+    ORA     #$04
+    STA     ($F4),Y
+    RTS
+    ORG     $1F0C
+FUN_1F0C:
     ORG     $743B
 FILL_MAP:
     SUBROUTINE
@@ -3008,31 +3268,119 @@ INIT_WORLD:
     JMP     $5F19                   ; initialize world from data table
 
     ORG     $5F19
-FUN_5F19:
+INPUT_LOOP:
+    SUBROUTINE
+    JSR     SETUP_INPUT
+    LDY     #$01
+    LDA     ($C0),Y
+    STA     $5AAB
+.loop:
+    LDA     $5AAB
+    JSR     FUN_5F8C
+    JSR     FUN_5FA2
+    JSR     FUN_A44C
+    BEQ     .exit
+    JSR     FUN_5FDD
+    CMP     $5AAB
+    BEQ     .run_script
+    CMP     #$00
+    BEQ     .run_script
+    STA     $5AAB
+    JSR     FUN_5FA5
+    JMP     .loop
+.run_script:
+    LDX     #$12
+    JSR     SCRIPT_ENGINE
+    JMP     .loop
+.exit:
+    LDY     #$08
+    LDA     ($C2),Y
+    STA     $5F5E
+    INY
+    LDA     ($C2),Y
+    STA     $5F5F
+    JMP     ($5F5E)
     ORG     $5F60
 SETUP_INPUT:
     SUBROUTINE
     ; Set up input: store X/Y in $C1/$C0, call setup routines.
     STX     $C1
     STY     $C0
-    JSR     FUN_6014
-    JSR     FUN_6024
-    JSR     FUN_5F70
-    JMP     FUN_602F
+    JSR     CALL_INPUT_INIT
+    JSR     CLEAR_INPUT_BUFFER
+    JSR     DRAW_INPUT_OPTIONS
+    JMP     RENDER_INPUT_BUFFER
     ORG     $5F70
-FUN_5F70:
+DRAW_INPUT_OPTIONS:
+    SUBROUTINE
+    LDY     #$00
+    LDA     ($C0),Y
+    STA     $5AAA
+.loop:
+    LDA     $5AAA
+    JSR     FUN_5F8C
+    LDY     #$00
+    LDA     ($C2),Y
+    BEQ     .skip
+    JSR     FUN_604C
+.skip:
+    DEC     $5AAA
+    BNE     .loop
+    RTS
+    ORG     $5F8C
+FUN_5F8C:
+    ORG     $5FA2
+FUN_5FA2:
+    ORG     $5FA5
+FUN_5FA5:
+    ORG     $5FDD
+FUN_5FDD:
     ORG     $6014
-FUN_6014:
+CALL_INPUT_INIT:
+    SUBROUTINE
+    LDY     #$02
+    LDA     ($C0),Y
+    STA     $5F5E
+    INY
+    LDA     ($C0),Y
+    STA     $5F5F
+    JMP     ($5F5E)
     ORG     $6024
-FUN_6024:
+CLEAR_INPUT_BUFFER:
+    SUBROUTINE
+    LDY     #$77
+    LDA     #$A0
+.loop:
+    STA     $5AAC,Y
+    DEY
+    BPL     .loop
+    RTS
     ORG     $602F
-FUN_602F:
+RENDER_INPUT_BUFFER:
+    SUBROUTINE
+    LDA     #$15
+    STA     $25
+    LDA     #$00
+    STA     $24
+    JSR     PRINT_CTRL_AB
+    LDY     #$00
+.loop:
+    LDA     $5AAC,Y
+    STY     $BA
+    JSR     ROM_COUT1
+    LDY     $BA
+    INY
+    CPY     #$78
+    BNE     .loop
+    RTS
+    ORG     $604C
+FUN_604C:
     ORG     $60C7
 TEARDOWN_INPUT:
     SUBROUTINE
     ; Teardown input and jump to $5F19.
     JSR     GET_INPUT_TABLE_PTR
-    JMP     FUN_5F19
+    JMP     INPUT_LOOP
     ORG     $60CD
 GET_INPUT_TABLE_PTR:
     SUBROUTINE
@@ -3045,7 +3393,7 @@ CONFIGURE_INPUT:
     SUBROUTINE
     ; Configure input handler: set up self-modifying addresses
     ; from $5B25/$5B26/$5A65/$5B27.
-    JSR     FUN_750C
+    JSR     CHECK_COMBAT_ELIGIBILITY
     LDA     $5B26
     STA     $60B3
     LDA     $5B25
@@ -3066,7 +3414,11 @@ CONFIGURE_INPUT:
     STA     $6081
     RTS
     ORG     $6458
-FUN_6458:
+START_GAME_INPUT:
+    SUBROUTINE
+    LDX     #$64
+    LDY     #$36
+    JMP     INPUT_LOOP
     ORG     $645F
 CHECK_THREATS_HERE:
     SUBROUTINE
@@ -3074,7 +3426,7 @@ CHECK_THREATS_HERE:
     LDA     CURRENT_COL
     LDY     CURRENT_ROW
     JSR     COLROW_TO_POS
-    JMP     FUN_0EF1
+    JMP     CHECK_ADJACENT_THREATS
     ORG     $646B
 PICKUP_TREASURE:
     SUBROUTINE
@@ -3307,23 +3659,23 @@ NPC_MOVE_AI:
     SEC
     SBC     #$14
     STA     $5A70
-    JSR     FUN_6815
+    JSR     EVALUATE_DIRECTION
     INC     $5A6F
     LDA     $5A70
     CLC
     ADC     #$28
     STA     $5A70
-    JSR     FUN_6815
+    JSR     EVALUATE_DIRECTION
     INC     $5A6F
     LDA     $5A70
     SEC
     SBC     #$15
     STA     $5A70
-    JSR     FUN_6815
+    JSR     EVALUATE_DIRECTION
     INC     $5A6F
     INC     $5A70
     INC     $5A70
-    JSR     FUN_6815
+    JSR     EVALUATE_DIRECTION
     LDA     #$06
     STA     $5A6F
     LDA     $5A05
@@ -3370,7 +3722,83 @@ NPC_MOVE_AI:
     LDA     $BB
     RTS
     ORG     $6815
-FUN_6815:
+EVALUATE_DIRECTION:
+    SUBROUTINE
+    LDA     $5A71
+    CMP     $5A70
+    BEQ     .skip_target
+    LDY     #$09
+    JSR     FUN_689F
+.skip_target:
+    LDY     #$03
+    LDA     ($F8),Y
+    STA     $5A69
+    LDA     $5A70
+    STA     ($F8),Y
+    LDA     $5A71
+    BEQ     .no_distance
+    JSR     MANHATTAN_DISTANCE
+    CMP     $5A68
+    BCC     .no_distance
+    LDY     #$02
+    JSR     FUN_689F
+.no_distance:
+    LDY     #$03
+    LDA     $5A69
+    STA     ($F8),Y
+    LDA     $5A70
+    JSR     FIND_ENTITY_AT_POS
+    LDA     $BF
+    BNE     .has_entity
+    LDA     $BE
+    BNE     .wall
+    RTS
+.wall:
+    LDY     #$07
+    JMP     FUN_689F
+.has_entity:
+    CMP     #$80
+    BCC     .mob
+    RTS
+.mob:
+    LDY     #$01
+    LDA     ($BE),Y
+    CMP     #$80
+    BCS     .ge80
+    LDY     #$03
+    JMP     FUN_689F
+.ge80:
+    CMP     #$C0
+    BCS     .geC0
+    LDY     #$06
+    JMP     FUN_689F
+.geC0:
+    CMP     #$D2
+    BCS     .geD2
+    LDY     #$01
+    JMP     FUN_689F
+.geD2:
+    CMP     #$D5
+    BCS     .geD5
+    LDY     #$02
+    JMP     FUN_689F
+.geD5:
+    CMP     #$D8
+    BCS     .geD8
+    LDY     #$03
+    JMP     FUN_689F
+.geD8:
+    INY
+    LDA     ($BE),Y
+    CMP     #$40
+    BCS     .safe
+    LDY     #$07
+    JMP     FUN_689F
+.safe:
+    LDY     #$01
+; falls through to FUN_689F
+    ORG     $689F
+FUN_689F:
     ORG     $68AB
 AI_CHOOSE_TARGET:
     SUBROUTINE
@@ -3646,7 +4074,7 @@ DISPLAY_SHOP:
 .count_loop:
     DEX
     BMI     .counted
-    JSR     FUN_71F0
+    JSR     ADVANCE_SHOP_PTR
     JMP     .count_loop
 .counted:
     LDY     #$02
@@ -3655,9 +4083,9 @@ DISPLAY_SHOP:
     JSR     SET_CURSOR_ROW21
     LDY     #$28
     LDA     ($E6),Y
-    JSR     FUN_6C37
-    JSR     FUN_0925
-    JSR     FUN_0933
+    JSR     SCENE_LOOP
+    JSR     LOAD_CHAR_NAME_PTR
+    JSR     SETUP_CHAR_SPRITE
 .item_start:
     LDA     #$80
     STA     $5A80
@@ -3686,7 +4114,7 @@ DISPLAY_SHOP:
     TAX
     STA     $5A84
 .price_loop:
-    JSR     FUN_71FC
+    JSR     ADD_PRICE_COMPONENT
     DEX
     BPL     .price_loop
     LDA     #$20
@@ -3728,7 +4156,7 @@ DISPLAY_SHOP:
     DEY
     DEX
     BPL     .copy_name
-    JMP     FUN_6458
+    JMP     START_GAME_INPUT
 .next_item:
     CLC
     LDA     $5A80
@@ -3742,9 +4170,27 @@ DISPLAY_SHOP:
     STA     $5A85
     JMP     .item_loop
     ORG     $71F0
-FUN_71F0:
+ADVANCE_SHOP_PTR:
+    SUBROUTINE
+    CLC
+    LDA     $E6
+    ADC     #$29
+    STA     $E6
+    BCC     .done
+    INC     $E7
+.done:
+    RTS
     ORG     $71FC
-FUN_71FC:
+ADD_PRICE_COMPONENT:
+    SUBROUTINE
+    CLC
+    LDA     ($E6),Y
+    ADC     $5A81
+    STA     $5A81
+    BCC     .done
+    INC     $5A82
+.done:
+    RTS
     ORG     $7489
 DRAW_SPRITE:
     SUBROUTINE
@@ -3787,7 +4233,49 @@ DRAW_SPRITE:
     STA     $BD
     JMP     PRINT_STRING
     ORG     $750C
-FUN_750C:
+CHECK_COMBAT_ELIGIBILITY:
+    SUBROUTINE
+    LDA     #$00
+    STA     $5B26
+    STA     $5B25
+    LDY     #$0C
+    LDA     ($F8),Y
+    ROR
+    AND     #$07
+    CMP     $5A66
+    BMI     .under_level
+    LDA     $5A66
+    BNE     .done
+    LDY     #$05
+    LDA     ($F8),Y
+    AND     #$1F
+    STA     $BA
+    INY
+    LDA     ($F8),Y
+    AND     #$3F
+    CMP     $BA
+    BPL     .done
+    LDY     #$03
+    LDA     ($F8),Y
+    JSR     CHECK_ADJACENT_THREATS
+    LDA     $5A26
+    BNE     .done
+    LDY     #$03
+    LDA     ($F8),Y
+    JSR     CHECK_ENCOUNTER
+    LDA     $5A1F
+    CMP     #$02
+    BEQ     .done
+    LDA     #$01
+    STA     $5B26
+    JMP     .done
+.under_level:
+    LDA     #$01
+    STA     $5B25
+.done:
+    RTS
+    ORG     $76D8
+FUN_76D8:
     ORG     $769B
 RESET_TEXT_WINDOW:
     SUBROUTINE
@@ -4091,7 +4579,7 @@ PRINT_CENTERED_PLUS_COL:
     LSR                             ; accumulator
     ADC     TEXT_COL
     STA     TEXT_COL
-    JSR     SET_CHARSET_0
+    JSR     PRINT_CTRL_AB
     JMP     PRINT_STRING
     ORG     $7723
 FONT_POS_TO_TEXT_POS:
@@ -4128,7 +4616,7 @@ SET_TEXT_WINDOW_SCROLL:
     LDA     #$93        ; ctrl-S
     JMP     ROM_COUT1
 
-; PRINT_CTRL_AB (SET_CHARSET_0) follows at $774E, defined in its own chunk
+; PRINT_CTRL_AB (PRINT_CTRL_AB) follows at $774E, defined in its own chunk
 
     ORG     $7735
 PRINT_CTRL_N:
