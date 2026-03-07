@@ -252,6 +252,18 @@ SCRIPT_LOOP_ADDR    EQU     $5A8E   ; script loop address (2 bytes)
 SCRIPT_GOSUB_ADDR   EQU     $5A90   ; script gosub return address (2 bytes)
 SCRIPT_PRNG_MASK    EQU     $5A92   ; PRNG mask for action randomization
 SCRIPT_ACTION_VEC   EQU     $5A93   ; action handler vector (2 bytes)
+CHAR_AI_MODE    EQU     $5A05   ; 0 = player, 2-5 = AI behavior modes
+TURN_START_COL  EQU     $5A61   ; column at start of turn
+TURN_START_ROW  EQU     $5A62   ; row at start of turn
+CURRENT_COL     EQU     $5A63   ; current column during turn
+CURRENT_ROW     EQU     $5A64   ; current row during turn
+MOVE_POINTS     EQU     $5A65   ; movement points remaining
+STEPS_TAKEN     EQU     $5A66   ; steps taken this turn
+INPUT_DIR       EQU     $5A67   ; direction/command from input (1-9)
+TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
+AI_CHOOSE_TARGET    EQU     $68AB   ; NPC: pick movement target
+PICKUP_TREASURE     EQU     $646B   ; handle treasure pickup ($C0-$D1)
+TRIGGER_SCENE_EVENT EQU     $1D04   ; handle scene event ($D2-$D4)
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
     ORG     $0569
 ATTRACT_LOOP:
@@ -1477,6 +1489,242 @@ NEXT_GROUP_MEMBER:
     LDA     $BB                     ;  | (advance cursor to next record)
     STA     $F5                     ; /
     RTS
+    ORG     $19AD
+GAME_TURN_LOOP:
+    SUBROUTINE
+
+    ; --- setup: save position, clear flags ---
+    LDA     #$01
+    STA     TURN_ACTIVE
+    LDY     #$03
+    LDA     ($F8),Y             ; char field 3 = packed position
+    JSR     POS_TO_COLROW
+    STA     CURRENT_COL
+    STA     TURN_START_COL
+    STY     CURRENT_ROW
+    STY     TURN_START_ROW
+    LDA     #$00
+    STA     STEPS_TAKEN
+    JSR     FUN_1BEF            ; clear restricted flag (bit 2 of field 15)
+
+    ; --- check constitution and encounters ---
+    LDY     #$06
+    LDA     ($F8),Y             ; char field 6 (constitution/HP)
+    AND     #$3F
+    CMP     #$03
+    BPL     .con_ok
+    JSR     FUN_1BF8            ; set restricted (too weak)
+.con_ok:
+    LDY     #$03
+    LDA     ($F8),Y
+    JSR     CHECK_ENCOUNTER
+    LDA     ENCOUNTER_RESULT
+    CMP     #$02
+    BNE     .enc_ok
+    JSR     FUN_1BF8            ; set restricted (hostile territory)
+.enc_ok:
+    LDA     CHAR_AI_MODE
+    BEQ     .get_speed
+    JSR     AI_CHOOSE_TARGET    ; NPC: pick a destination
+
+    ; --- determine movement points ---
+.get_speed:
+    LDY     #$0C
+    LDA     ($F8),Y             ; char field 12
+    AND     #$0F                ; low nibble = speed
+    STA     MOVE_POINTS
+
+    ; --- adjust points based on threats ---
+    LDA     ENCOUNTER_RESULT
+    CMP     #$02
+    BEQ     .chk_limit          ; hostile → check if enough to limit
+    JSR     FUN_645F            ; check adjacent threats
+    CMP     #$01
+    BEQ     .move_loop          ; exactly 1 threat → keep full
+    LDA     MOVE_POINTS
+    CMP     #$02
+    BCC     .move_loop          ; < 2 points → keep as is
+    JSR     RANDOM_IN_RANGE     ; random(move_points)
+    CMP     #$00
+    BEQ     .do_limit           ; random == 0 → force limit
+    STA     MOVE_POINTS         ; reduce randomly
+    BNE     .move_loop
+.chk_limit:
+    LDA     MOVE_POINTS
+    CMP     #$02
+    BCC     .move_loop          ; < 2 → use as is
+.do_limit:
+    LDA     #$01
+    JSR     RANDOM_IN_RANGE     ; random(1) → 0 or 1
+    CLC
+    ADC     #$01                ; 1 or 2
+    STA     MOVE_POINTS
+    BNE     .move_loop          ; always
+
+    ; === MOVEMENT LOOP ===
+.move_loop:
+    LDA     #$00
+    CMP     MOVE_POINTS
+    BNE     .has_points
+    CMP     STEPS_TAKEN
+    BNE     .end_turn           ; out of points, took steps → done
+    CMP     CHAR_AI_MODE
+    BEQ     .has_points         ; player with 0 points, 0 steps → still prompt
+.end_turn:
+    JMP     FUN_1BA7            ; end turn
+
+.has_points:
+    CMP     CHAR_AI_MODE
+    BEQ     .player_input
+    JSR     FUN_6742            ; NPC movement AI
+    JMP     .dispatch_cmd
+
+    ; --- player input ---
+.player_input:
+    JSR     FUN_60D2            ; set up input UI
+    LDA     $6081               ; check if input available
+    BNE     .have_input
+    JMP     FUN_60C7            ; no input → exit
+.have_input:
+    JSR     FUN_60CD
+    JSR     FUN_5F60
+    JSR     $A44C               ; resident: read keyboard
+    STA     INPUT_DIR
+    CMP     #$00
+    BNE     .do_move            ; player goes straight to movement
+    JMP     FUN_60C7            ; cancelled
+
+    ; --- NPC command dispatch (player skips this) ---
+.dispatch_cmd:
+    STA     INPUT_DIR
+    CMP     #$05
+    BCC     .do_move            ; 1-4: movement direction
+    BNE     .not_pass
+    JMP     .move_loop          ; 5: pass
+.not_pass:
+    CMP     #$09
+    BNE     .not_fight
+    JSR     FUN_1BF8            ; 9: fight → set restricted
+    LDA     #$00
+    JSR     FUN_1BE0
+    JMP     FUN_143F
+.not_fight:
+    PHA
+    JSR     FUN_1BCB            ; re-check encounter
+    PLA
+    CMP     #$07
+    BNE     .not_cmd7
+    JMP     FUN_14B7            ; 7: action
+.not_cmd7:
+    BCS     .cmd8
+    JMP     FUN_14CD            ; 6: action
+.cmd8:
+    JMP     FUN_1BC6            ; 8: set state 1
+
+    ; --- apply movement direction ---
+.do_move:
+    LDA     ENCOUNTER_RESULT
+    CMP     #$02
+    BMI     .move_ok
+    JSR     FUN_1231            ; can we leave hostile zone?
+    CMP     #$01
+    BEQ     .move_ok
+    JMP     FUN_1BA7            ; blocked → end turn
+.move_ok:
+    LDA     #$00
+    STA     ENCOUNTER_RESULT
+    LDA     INPUT_DIR
+    DEC     MOVE_POINTS
+    INC     STEPS_TAKEN
+    CMP     #$02
+    BPL     .not_north
+    DEC     CURRENT_ROW         ; 1: north
+    JMP     .check_dest
+.not_north:
+    BNE     .not_south
+    INC     CURRENT_ROW         ; 2: south
+    JMP     .check_dest
+.not_south:
+    CMP     #$03
+    BNE     .go_east
+    DEC     CURRENT_COL         ; 3: west
+    JMP     .check_dest
+.go_east:
+    INC     CURRENT_COL         ; 4: east
+
+    ; --- check what's at the destination ---
+.check_dest:
+    LDA     CURRENT_COL
+    LDY     CURRENT_ROW
+    JSR     COLROW_TO_POS
+    JSR     FIND_ENTITY_AT_POS  ; → $BE/$BF
+    LDA     #$00
+    CMP     $BF
+    BNE     .something          ; $BF != 0 → occupied
+    CMP     $BE
+    BEQ     .empty              ; $BE == 0 → empty cell
+    LDX     #$0E
+    JSR     SCRIPT_ENGINE       ; display blocked message?
+    JMP     FUN_1CF1
+
+.empty:
+    JSR     FUN_1B52            ; commit move (update pos, draw sprite)
+    JSR     FUN_645F            ; check adjacent threats
+    CMP     #$00
+    BNE     .keep_moving        ; threats remain → continue
+    STA     MOVE_POINTS         ; no threats → stop
+    STA     TURN_ACTIVE
+.keep_moving:
+    JMP     .move_loop
+
+    ; --- destination occupied: dispatch by type ---
+.something:
+    LDA     $BF
+    CMP     #$80
+    BMI     .event              ; $BF < $80 → event entry
+    JMP     FUN_1E5A            ; $BF >= $80 → mob encounter
+
+.event:
+    LDY     #$01
+    LDA     ($BE),Y             ; event byte 1
+    TAX
+    AND     #$C0
+    CMP     #$C0
+    BEQ     .activated
+    JMP     HANDLE_ENCOUNTER    ; non-activated → encounter
+
+.activated:
+    TXA
+    CMP     #$D2
+    BPL     .not_treasure
+    JMP     PICKUP_TREASURE     ; $C0-$D1: treasure
+
+.not_treasure:
+    CMP     #$D5
+    BPL     .not_scene
+    JMP     TRIGGER_SCENE_EVENT ; $D2-$D4: scene event
+
+.not_scene:
+    CMP     #$DB
+    BPL     .not_map_event
+    LDA     $BE                 ; $D5-$DA: map/area event
+    PHA
+    LDA     $BF
+    PHA
+    JSR     FUN_1B52            ; commit move first
+    PLA
+    STA     $BF
+    PLA
+    STA     $BE
+    JMP     FUN_70DF
+
+.not_map_event:
+    CMP     #$FE
+    BEQ     .empty_slot
+    JMP     FUN_60C7            ; $DB-$FD: unknown
+
+.empty_slot:
+    JMP     FUN_1D4D            ; $FE: empty slot interaction
     ORG     $743B
 FILL_MAP:
     SUBROUTINE
