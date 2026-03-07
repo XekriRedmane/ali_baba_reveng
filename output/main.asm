@@ -1387,7 +1387,120 @@ DRAW_CHAR_AT_POS:
     JSR     GET_ENTITY_FONTCHAR     ; determine font char from entity data
     JMP     RENDER_FONT_CHAR        ; render the font character
     ORG     $106F
-FUN_106F:                       ; apply damage/effect (via FUN_1425)
+FUN_106F:
+    SUBROUTINE
+    ; Apply damage A to char at ($F6).
+    ; Subtracts from field 6 (HP). Displays damage message,
+    ; runs script. If HP drops to 0: death handling.
+    AND     #$1F
+    STA     $5A10               ; damage amount
+    JSR     SET_CURSOR_ROW21
+    LDA     $5A10
+    LDX     #$03
+.ror_loop:
+    INX
+    CLC
+    ROR
+    BNE     .ror_loop           ; count leading zeros → message index
+    TXA
+    JSR     DISPLAY_MESSAGE     ; show damage message
+    LDY     $5A10
+    LDX     #$04
+    JSR     SCRIPT_ENGINE       ; run damage script
+    LDY     #$06
+    LDA     ($F6),Y             ; field 6 (HP + flags)
+    TAX
+    AND     #$3F                ; HP only
+    SEC
+    SBC     $5A10               ; HP - damage
+    BCC     .dead               ; underflow → dead
+    BEQ     .dead               ; zero → dead
+    STA     $5A10               ; new HP
+    TXA
+    AND     #$C0                ; preserve high bits
+    ORA     $5A10
+    STA     ($F6),Y             ; store updated field 6
+    JSR     SET_CURSOR_ROW21
+    LDA     $5A10
+    CMP     #$03
+    BPL     .check8
+    LDY     #$0F
+    LDA     ($F6),Y             ; field 15
+    AND     #$F8
+    ORA     #$04                ; set restricted flag
+    STA     ($F6),Y
+    JSR     FUN_1142
+    LDA     #$09
+    JSR     DISPLAY_MESSAGE     ; "badly hurt" message
+    RTS
+.check8:
+    CMP     #$08
+    BPL     .ge8
+    JSR     FUN_1142
+    LDA     #$0A
+    JMP     DISPLAY_MESSAGE     ; "wounded" message
+.ge8:
+    JSR     FUN_1142
+    LDA     #$0B
+    JMP     DISPLAY_MESSAGE     ; "scratched" message
+
+    ; --- character dies ---
+.dead:
+    LDY     #$04
+    LDA     ($F6),Y             ; field 4
+    LDX     #$08                ; default script
+    CMP     #$15
+    BCC     .skip_flag
+    LDY     #$0F
+    LDA     ($F6),Y
+    ORA     #$10                ; set death flag
+    STA     ($F6),Y
+    LDX     #$0A                ; NPC death script
+.skip_flag:
+    TXA
+    PHA
+    JSR     FUN_1142
+    LDA     #$03
+    JSR     RANDOM_IN_RANGE     ; random(3)
+    CMP     #$00
+    BEQ     .rand0
+    LDA     #$0E
+    BNE     .show_death
+.rand0:
+    LDA     #$02
+    JSR     RANDOM_IN_RANGE     ; random(2)
+    CLC
+    ADC     #$27                ; message $27 or $28
+.show_death:
+    JSR     DISPLAY_MESSAGE     ; death message
+    PLA
+    TAX
+    JSR     SCRIPT_ENGINE       ; death script
+    LDA     #$00
+    STA     $5A29
+    LDA     $5A02
+    STA     $5A28
+    LDA     $F6
+    STA     $BC
+    LDA     $F7
+    STA     $BD
+    JSR     REORDER_CHAR        ; cleanup
+    LDY     #$0D
+    LDA     ($F6),Y             ; gold low
+    STA     $BC
+    INY
+    LDA     ($F6),Y             ; gold high
+    STA     $BD
+    LDY     #$00
+    JSR     MODIFY_CHAR_STATS   ; subtract gold (Y=0 → subtract)
+    LDY     #$03
+    LDA     ($F6),Y
+    JSR     FUN_1260            ; handle death at position
+    LDY     #$03
+    LDA     ($F6),Y
+    JMP     DRAW_CHAR_AT_POS    ; redraw position
+    ORG     $1142
+FUN_1142:
     ORG     $12D0
 FUN_12D0:
     SUBROUTINE
@@ -1439,6 +1552,8 @@ NEXT_GROUP_MEMBER:
     LDA     $BB                     ;  | (advance cursor to next record)
     STA     $F5                     ; /
     RTS
+    ORG     $1260
+FUN_1260:
     ORG     $1300
 FUN_1300:
     SUBROUTINE
@@ -1629,7 +1744,7 @@ FUN_1414:
     STA     $BD
     LDA     $5A02
     STA     $5A28
-    JMP     FUN_0F84
+    JMP     REORDER_CHAR
     ORG     $1425
 FUN_1425:
     SUBROUTINE
@@ -1906,7 +2021,7 @@ FUN_1B81:
     LDA     TURN_START_COL
     LDY     TURN_START_ROW
     JSR     COLROW_TO_POS
-    JSR     FUN_1156
+    JSR     DRAW_CHAR_AT_POS
     LDA     CURRENT_COL
     STA     TURN_START_COL
     LDA     CURRENT_ROW
@@ -2644,7 +2759,96 @@ AI_CHOOSE_TARGET:
     STY     $5A73               ; target row
     RTS
     ORG     $704D
-FUN_704D:                       ; treasure data lookup (via FUN_70D4)
+MODIFY_CHAR_STATS:
+    SUBROUTINE
+    ; Add or subtract gold from char record at ($F6).
+    ; Y=0: subtract $BC/$BD from field 13/14
+    ; Y≠0: add $BC/$BD to field 13/14
+    ; Then recompute field 12 (level/XP encoding).
+    CPY     #$00
+    BEQ     .subtract
+    LDY     #$0D
+    LDA     ($F6),Y
+    CLC
+    ADC     $BC
+    STA     ($F6),Y
+    INY
+    LDA     ($F6),Y
+    ADC     $BD
+    STA     ($F6),Y
+    JMP     .aftermath
+.subtract:
+    LDY     #$0D
+    SEC
+    LDA     ($F6),Y
+    SBC     $BC
+    STA     ($F6),Y
+    INY
+    LDA     ($F6),Y
+    SBC     $BD
+    STA     ($F6),Y
+.aftermath:
+    LDY     #$05
+    LDA     ($F6),Y
+    ROL
+    ROL
+    ROL
+    AND     #$F8
+    STA     $5A7E
+    LDY     #$0C
+    LDA     ($F6),Y
+    PHA
+    AND     #$0F
+    TAX
+    PLA
+    ROR
+    ROR
+    ROR
+    ROR
+    AND     #$0F
+    TAY
+.decy:
+    DEY
+    BMI     .done_cnt
+    INX
+    BPL     .decy
+.done_cnt:
+    INY
+    STY     $5A7F
+    STY     $BA
+    STY     $BB
+.outer_loop:
+    LDY     #$0E
+    CPX     #$00
+    BEQ     .store_final
+    CLC
+    LDA     $BA
+    ADC     $5A7E
+    STA     $BA
+    BCC     .no_carry
+    INC     $BB
+.no_carry:
+    LDA     ($F6),Y
+    CMP     $BB
+    BCC     .store_final
+    BNE     .next_iter
+    DEY
+    LDA     ($F6),Y
+    CMP     $BA
+    BCC     .store_final
+.next_iter:
+    DEX
+    CLC
+    LDA     $5A7F
+    ADC     #$10
+    STA     $5A7F
+    BNE     .outer_loop
+.store_final:
+    TXA
+    ORA     $5A7F
+    LDY     #$0C
+    STA     ($F6),Y
+    RTS
     ORG     $70D4
 FUN_70D4:
     SUBROUTINE
@@ -2653,25 +2857,19 @@ FUN_70D4:
     STA     $F6
     LDA     $F9
     STA     $F7
-    JMP     FUN_704D
-    ORG     $764A
-FUN_764A:                       ; display message (via FUN_65A1)
+    JMP     MODIFY_CHAR_STATS
     ORG     $769B
 FUN_769B:
     SUBROUTINE
     ; Text display: init HRCG, set window bottom, output char $83, reset
-    JSR     FUN_7744
-    JSR     FUN_7932
+    JSR     SET_TEXT_WINDOW_SCROLL
+    JSR     SET_TEXT_WINDOW_UPPER_LEFT_LOW
     LDA     #$17
     STA     $25                 ; WNDBTM = 23
     LDA     #$83
     JSR     $FDED               ; ROM COUT
-    JSR     FUN_792D
-    JMP     FUN_773A
-    ORG     $7744
-FUN_7744:                       ; HRCG init
-    ORG     $7932
-FUN_7932:                       ; HRCG setup
+    JSR     SET_TEXT_WINDOW_UPPER_LEFT_ALL
+    JMP     SET_TEXT_WINDOW_WRAP
     ORG     $6B94
 INIT_STUB2:
     RTS
@@ -3068,6 +3266,7 @@ DISPLAY_MESSAGE:
     CPX     #$00
     BNE     .skip_entry             ; more entries to skip
 
+FUN_764A:
 .print_loop:
     LDY     #$00
     LDA     (PRINT_STRING_ADDR),Y   ; get length of current string
