@@ -1229,7 +1229,7 @@ ealdr_funny_inc:
     STA      ealdr_bot
     INC      ealdr_top
     RTS
-@ %def ealdr_funny_inc ealdr_bot ealdr_top
+@ %def ealdr_funny_inc
 
 \subsection{DXR decryption step}
 
@@ -2006,8 +2006,11 @@ from an address stored in [[PRINT_STRING_ADDR]], at the current cursor
 position.
 
 <<zero page defines>>=
+TMP_PTR                 EQU     $FA     ; temporary pointer (2 bytes)
+DATA_PTR3               EQU     $BA     ; data pointer 3 (2 bytes)
 PRINT_STRING_ADDR       EQU     $BC     ; 2 bytes (same pointer as PRINT_FROM_PTR)
-@ %def PRINT_STRING_ADDR
+DATA_PTR                EQU     $BE     ; data pointer / return value (2 bytes)
+@ %def TMP_PTR DATA_PTR3 PRINT_STRING_ADDR DATA_PTR
 
 <<print string>>=
     ORG     $7758
@@ -2043,7 +2046,7 @@ PRINT_CENTERED_PLUS_COL:
     LDY     #$00
     SBC     (PRINT_STRING_ADDR),Y
     CLC
-    LSR     A
+    LSR                             ; accumulator
     ADC     TEXT_COL
     STA     TEXT_COL
     JSR     SET_CHARSET_0
@@ -2139,6 +2142,13 @@ BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
 BLINK_ROW       EQU     $5AA3   ; font row
 BLINK_CHAR      EQU     $5AA4   ; font character number
 @ %def BLINK_COL BLINK_ROW BLINK_CHAR
+
+<<defines>>=
+ROM_COUT            EQU     $FDF0   ; Apple II ROM character output
+DAT_5a17_pos        EQU     $5A17   ; saved position for room search
+get_mob_data        EQU     $0C32   ; convert mob index to data pointer ($BA/$BB)
+is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
+@ %def ROM_COUT DAT_5a17_pos get_mob_data is_at_outer_limits
 
 <<print font char>>=
     ORG     $80A4
@@ -2735,7 +2745,7 @@ STEP_PRNG:
     CLC
     ADC     #$53                    ; + $53
     STA     $5A19                   ; store full result
-    LSR     A                       ; val >> 1
+    LSR                             ; val >> 1
     STA     $5A18                   ; shifted copy (used for random tests)
     RTS
 @ %def STEP_PRNG
@@ -4162,49 +4172,49 @@ The following root chunks produce the assembly files when tangled.
 
 <<main.asm>>=
     PROCESSOR 6502
-    <<Macros>>
-    <<zero page defines>>
-    <<defines>>
-    <<attract loop>>
-    <<resident dispatch>>
-    <<resident dispatch table>>
-    <<context swap>>
-    <<resident decode dispatch>>
-    <<decode encrypted addr>>
-    <<pull two ret addrs>>
-    <<main entry>>
-    <<attract screen>>
-    <<Get item at pos in room>>
-    <<compute scene ptr>>
-    <<plot char>>
-    <<print font char>>
-    <<scene loop>>
-    <<text renderer>>
-    <<display status bar>>
-    <<save zp pointers>>
-    <<restore zp pointers>>
-    <<relocate hires staging>>
-    <<load scene data>>
-    <<print bottom centered>>
-    <<print centered plus col>>
-    <<font pos>>
-    <<control routines>>
-    <<print string>>
-    <<set cursor compressed>>
-    <<print ctrl ab>>
-    <<print from ptr>>
-    <<set text window bottom>>
-    <<step prng>>
-    <<game init>>
-    <<script engine>>
-    <<script helpers>>
-    <<script advance>>
-    <<set text window upper left>>
-    <<status border data>>
-    <<status bar strings>>
-    <<font data>>
-    <<std font data>>
-    <<script pointer table>>
+<<Macros>>
+<<zero page defines>>
+<<defines>>
+<<attract loop>>
+<<resident dispatch>>
+<<resident dispatch table>>
+<<context swap>>
+<<resident decode dispatch>>
+<<decode encrypted addr>>
+<<pull two ret addrs>>
+<<main entry>>
+<<attract screen>>
+<<Get item at pos in room>>
+<<compute scene ptr>>
+<<plot char>>
+<<print font char>>
+<<scene loop>>
+<<text renderer>>
+<<display status bar>>
+<<save zp pointers>>
+<<restore zp pointers>>
+<<relocate hires staging>>
+<<load scene data>>
+<<print bottom centered>>
+<<print centered plus col>>
+<<font pos>>
+<<control routines>>
+<<print string>>
+<<set cursor compressed>>
+<<print ctrl ab>>
+<<print from ptr>>
+<<set text window bottom>>
+<<step prng>>
+<<game init>>
+<<script engine>>
+<<script helpers>>
+<<script advance>>
+<<set text window upper left>>
+<<status border data>>
+<<status bar strings>>
+<<font data>>
+<<std font data>>
+<<script pointer table>>
 @
 
 <<fontdata.asm>>=
@@ -4501,22 +4511,33 @@ The following root chunks produce the assembly files when tangled.
     HEX     2C 1A 00 00 00 00 00 00 7F 7F 7F 7F 7F 7F 7F 7F
 @
 
+<<ealdr defines>>=
+ealdr_ptr           EQU     $46     ; VM instruction pointer (2 bytes)
+EALDR_psuedoacc     EQU     $48     ; VM accumulator
+ealdr_src           EQU     $4C     ; VM source pointer (2 bytes)
+ealdr_dest          EQU     $4E     ; VM dest pointer (2 bytes)
+ealdr_vm_dispatch   EQU     $AA45   ; dispatch loop entry (linear continuation)
+ealdr_bot           EQU     $AC60   ; funny-increment low counter
+ealdr_top           EQU     $AC61   ; funny-increment high counter
+@ %def ealdr_ptr EALDR_psuedoacc ealdr_src ealdr_dest ealdr_vm_dispatch ealdr_bot ealdr_top
+
 <<ealdr.asm>>=
     PROCESSOR 6502
-    <<EALDR entry>>
-    <<EALDR copy subroutine>>
-    <<EALDR VM exec>>
-    <<EALDR clear text screen>>
-    <<EALDR reboot handler>>
-    <<EALDR funny increment>>
-    <<EALDR track pages>>
-    <<EALDR VM interpreter>>
-    <<EALDR dispatch table>>
-    <<EALDR VM arg reader>>
-    <<EALDR VM init>>
-    <<EALDR opcode handlers>>
-    <<EALDR DXR step>>
-    <<EALDR disk entry points>>
+<<ealdr defines>>
+<<EALDR entry>>
+<<EALDR copy subroutine>>
+<<EALDR VM exec>>
+<<EALDR clear text screen>>
+<<EALDR reboot handler>>
+<<EALDR funny increment>>
+<<EALDR track pages>>
+<<EALDR VM interpreter>>
+<<EALDR dispatch table>>
+<<EALDR VM arg reader>>
+<<EALDR VM init>>
+<<EALDR opcode handlers>>
+<<EALDR DXR step>>
+<<EALDR disk entry points>>
 @
 
 \chapter{Index}\par\noindent
