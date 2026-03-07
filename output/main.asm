@@ -1391,7 +1391,7 @@ FUN_0925:
     ORG     $0933
 FUN_0933:
     ORG     $106F
-FUN_106F:
+APPLY_DAMAGE:
     SUBROUTINE
     ; Apply damage A to char at ($F6).
     ; Subtracts from field 6 (HP). Displays damage message,
@@ -1516,9 +1516,9 @@ PRINT_ENTITY_NAME:
     LDA     ($F6),Y             ; name pointer high
     STA     $BD
     JSR     PRINT_BOTTOM_CENTERED
-    JMP     FUN_769B
+    JMP     RESET_TEXT_WINDOW
     ORG     $12D0
-FUN_12D0:
+PICK_RANDOM_MEMBER:
     SUBROUTINE
     ; Pick a random eligible group member (field 4 in $00-$14 range)
     ; Uses ($FA)[8] as group size, calls RANDOM_IN_RANGE to pick Nth
@@ -1541,7 +1541,7 @@ FUN_12D0:
     BNE     .next               ; not Nth yet
     RTS                         ; found: $F4/$F5 points to member
 .next:
-    JSR     FUN_1300
+    JSR     NEXT_GROUP_MEMBER
     JMP     .check
 .zero:
     STA     $F4                 ; clear pointer
@@ -1646,25 +1646,8 @@ UPDATE_EVENT_LIST:
     INC     $BF
 .no_carry:
     JMP     .scan
-    ORG     $1300
-FUN_1300:
-    SUBROUTINE
-    ; Follow group link: ($F4)[2] → next member via GET_MOB_DATA
-    LDY     #$02
-    LDA     ($F4),Y             ; link field
-    BNE     .follow
-    STA     $F4                 ; zero → end of list
-    STA     $F5
-    RTS
-.follow:
-    JSR     GET_MOB_DATA        ; A → ($BA/$BB) = data pointer
-    LDA     $BA
-    STA     $F4
-    LDA     $BB
-    STA     $F5
-    RTS
     ORG     $1231
-FUN_1231:
+CHECK_CAN_LEAVE:
     SUBROUTINE
     ; Check hostility threshold: if $5A18 >= $40, show message $1C
     ; and return 1; else show message $1D and return 0.
@@ -1676,7 +1659,7 @@ FUN_1231:
 .pass:
     JSR     SET_CURSOR_ROW21
     JSR     FUN_0D8A
-    JSR     FUN_769B
+    JSR     RESET_TEXT_WINDOW
     LDA     #$1C
     JSR     DISPLAY_MESSAGE
     LDA     #$01
@@ -1684,7 +1667,7 @@ FUN_1231:
 .fail:
     JSR     SET_CURSOR_ROW21
     JSR     FUN_0D8A
-    JSR     FUN_769B
+    JSR     RESET_TEXT_WINDOW
     LDA     #$1D
     JSR     DISPLAY_MESSAGE
     LDA     #$00
@@ -1769,7 +1752,7 @@ RANDOM_IN_RANGE:
     ROR     A                       ;  |
     BCC     .accept                 ; / (always taken: masked bit is 0)
     ORG     $138D
-FUN_138D:
+FIND_NEAREST_EVENT:
     SUBROUTINE
     ; Find nearest non-activated event (byte 1 < $C0) by Manhattan distance
     ; Returns position in A ($5A13)
@@ -1790,7 +1773,7 @@ FUN_138D:
     LDY     #$00
     LDA     ($BE),Y             ; event byte 0 = position
     STA     $5A15
-    JSR     FUN_13DB            ; Manhattan distance
+    JSR     MANHATTAN_DISTANCE            ; Manhattan distance
     CMP     $5A14
     BPL     .advance            ; not closer
     STA     $5A14               ; new minimum
@@ -1813,7 +1796,7 @@ FUN_138D:
     LDA     $5A13               ; return nearest position
     RTS
     ORG     $13DB
-FUN_13DB:
+MANHATTAN_DISTANCE:
     SUBROUTINE
     ; Manhattan distance: |col(A) - col(char)| + |row(A) - row(char)|
     ; Input: A = packed position to measure from
@@ -1842,7 +1825,7 @@ FUN_13DB:
     ADC     $BA                 ; |delta col| + |delta row|
     RTS
     ORG     $1406
-FUN_1406:
+PRINT_MEMBER_NAME:
     SUBROUTINE
     ; Copy ($F4)[0..1] → $BC/$BD, then JMP $7705
     LDY     #$00
@@ -1853,7 +1836,7 @@ FUN_1406:
     STA     $BD
     JMP     PRINT_BOTTOM_CENTERED
     ORG     $1414
-FUN_1414:
+REORDER_CURRENT_CHAR:
     SUBROUTINE
     ; Copy $F8/$F9 → $BC/$BD, store $5A02 → $5A28, JMP $0F84
     LDA     $F8
@@ -1864,7 +1847,7 @@ FUN_1414:
     STA     $5A28
     JMP     REORDER_CHAR
     ORG     $1425
-FUN_1425:
+APPLY_DAMAGE_TO_CURRENT:
     SUBROUTINE
     ; Apply effect: copy $F8/$F9 → $F6/$F7, JMP $106F with A
     TAX
@@ -1873,9 +1856,9 @@ FUN_1425:
     LDA     $F9
     STA     $F7
     TXA
-    JMP     FUN_106F
+    JMP     APPLY_DAMAGE
     ORG     $143F
-FUN_143F:
+AUTO_HEAL:
     SUBROUTINE
     ; Auto-heal: if HP < $28, randomly attempt healing via $1482.
     ; Loops while $5A18 >= $50 (still injured). Shows message $21
@@ -1912,7 +1895,7 @@ FUN_143F:
     BNE     .done
     JSR     SET_CURSOR_ROW21
     JSR     FUN_0D8A
-    JSR     FUN_769B
+    JSR     RESET_TEXT_WINDOW
     LDA     #$21
     JMP     DISPLAY_MESSAGE
     ORG     $1482
@@ -1920,30 +1903,30 @@ FUN_1482:
     ORG     $14A3
 FUN_14A3:
     ORG     $14B7
-FUN_14B7:
+ENTER_COMBAT_STATE:
     SUBROUTINE
     ; Check encounter, clear restricted flag, conditionally set it,
     ; then set char state to 2.
     JSR     CHECK_ENCOUNTER
-    JSR     FUN_1BEF
+    JSR     CLEAR_RESTRICTED
     LDA     #$02
     CMP     $5A1F
     BNE     .skip
-    JSR     FUN_1BF8
+    JSR     SET_RESTRICTED
 .skip:
     LDA     #$02
-    JSR     FUN_1BE0
+    JSR     SET_CHAR_STATE
     RTS
     ORG     $14CD
-FUN_14CD:
+START_COMBAT:
     SUBROUTINE
     ; Set char state to 3, call $199D, jump to combat logic at $15AB.
     LDA     #$03
-    JSR     FUN_1BE0
+    JSR     SET_CHAR_STATE
     JSR     FUN_199D
-    JMP     FUN_15AB
+    JMP     RESOLVE_ATTACK
     ORG     $15AB
-FUN_15AB:
+RESOLVE_ATTACK:
     SUBROUTINE
     ; Combat willingness calculation and attack resolution.
     ; Computes willingness score in $5A76 based on char/target stats,
@@ -2051,17 +2034,17 @@ FUN_15AB:
     BEQ     .attack
     JSR     SET_CURSOR_ROW21
     JSR     FUN_0D8A
-    JSR     FUN_769B
+    JSR     RESET_TEXT_WINDOW
     LDA     #$D2
     STA     $BC
     LDA     #$7C
     STA     $BD
     JSR     PRINT_BOTTOM_CENTERED
-    JSR     FUN_769B
+    JSR     RESET_TEXT_WINDOW
     LDA     #$01
     CMP     $5A74
     BEQ     .is_player
-    JSR     FUN_1406
+    JSR     PRINT_MEMBER_NAME
 .is_player:
     JSR     FUN_0D10
     RTS
@@ -2091,7 +2074,7 @@ GAME_TURN_LOOP:
     STY     TURN_START_ROW
     LDA     #$00
     STA     STEPS_TAKEN
-    JSR     FUN_1BEF            ; clear restricted flag (bit 2 of field 15)
+    JSR     CLEAR_RESTRICTED            ; clear restricted flag (bit 2 of field 15)
 
     ; --- check constitution and encounters ---
     LDY     #$06
@@ -2099,7 +2082,7 @@ GAME_TURN_LOOP:
     AND     #$3F
     CMP     #$03
     BPL     .con_ok
-    JSR     FUN_1BF8            ; set restricted (too weak)
+    JSR     SET_RESTRICTED            ; set restricted (too weak)
 .con_ok:
     LDY     #$03
     LDA     ($F8),Y
@@ -2107,7 +2090,7 @@ GAME_TURN_LOOP:
     LDA     ENCOUNTER_RESULT
     CMP     #$02
     BNE     .enc_ok
-    JSR     FUN_1BF8            ; set restricted (hostile territory)
+    JSR     SET_RESTRICTED            ; set restricted (hostile territory)
 .enc_ok:
     LDA     CHAR_AI_MODE
     BEQ     .get_speed
@@ -2124,7 +2107,7 @@ GAME_TURN_LOOP:
     LDA     ENCOUNTER_RESULT
     CMP     #$02
     BEQ     .chk_limit          ; hostile → check if enough to limit
-    JSR     FUN_645F            ; check adjacent threats
+    JSR     CHECK_THREATS_HERE            ; check adjacent threats
     CMP     #$01
     BEQ     .move_loop          ; exactly 1 threat → keep full
     LDA     MOVE_POINTS
@@ -2157,28 +2140,28 @@ GAME_TURN_LOOP:
     CMP     CHAR_AI_MODE
     BEQ     .has_points         ; player with 0 points, 0 steps → still prompt
 .end_turn:
-    JMP     FUN_1BA7            ; end turn
+    JMP     END_TURN            ; end turn
 
 .has_points:
     CMP     CHAR_AI_MODE
     BEQ     .player_input
-    JSR     FUN_6742            ; NPC movement AI
+    JSR     NPC_MOVE_AI            ; NPC movement AI
     JMP     .dispatch_cmd
 
     ; --- player input ---
 .player_input:
-    JSR     FUN_60D2            ; set up input UI
+    JSR     CONFIGURE_INPUT            ; set up input UI
     LDA     $6081               ; check if input available
     BNE     .have_input
-    JMP     FUN_60C7            ; no input → exit
+    JMP     TEARDOWN_INPUT            ; no input → exit
 .have_input:
-    JSR     FUN_60CD
-    JSR     FUN_5F60
+    JSR     GET_INPUT_TABLE_PTR
+    JSR     SETUP_INPUT
     JSR     $A44C               ; resident: read keyboard
     STA     INPUT_DIR
     CMP     #$00
     BNE     .do_move            ; player goes straight to movement
-    JMP     FUN_60C7            ; cancelled
+    JMP     TEARDOWN_INPUT            ; cancelled
 
     ; --- NPC command dispatch (player skips this) ---
 .dispatch_cmd:
@@ -2190,32 +2173,32 @@ GAME_TURN_LOOP:
 .not_pass:
     CMP     #$09
     BNE     .not_fight
-    JSR     FUN_1BF8            ; 9: fight → set restricted
+    JSR     SET_RESTRICTED            ; 9: fight → set restricted
     LDA     #$00
-    JSR     FUN_1BE0
-    JMP     FUN_143F
+    JSR     SET_CHAR_STATE
+    JMP     AUTO_HEAL
 .not_fight:
     PHA
-    JSR     FUN_1BCB            ; re-check encounter
+    JSR     CHECK_AND_RESTRICT            ; re-check encounter
     PLA
     CMP     #$07
     BNE     .not_cmd7
-    JMP     FUN_14B7            ; 7: action
+    JMP     ENTER_COMBAT_STATE            ; 7: action
 .not_cmd7:
     BCS     .cmd8
-    JMP     FUN_14CD            ; 6: action
+    JMP     START_COMBAT            ; 6: action
 .cmd8:
-    JMP     FUN_1BC6            ; 8: set state 1
+    JMP     SET_STATE_FIGHT            ; 8: set state 1
 
     ; --- apply movement direction ---
 .do_move:
     LDA     ENCOUNTER_RESULT
     CMP     #$02
     BMI     .move_ok
-    JSR     FUN_1231            ; can we leave hostile zone?
+    JSR     CHECK_CAN_LEAVE            ; can we leave hostile zone?
     CMP     #$01
     BEQ     .move_ok
-    JMP     FUN_1BA7            ; blocked → end turn
+    JMP     END_TURN            ; blocked → end turn
 .move_ok:
     LDA     #$00
     STA     ENCOUNTER_RESULT
@@ -2251,11 +2234,11 @@ GAME_TURN_LOOP:
     BEQ     .empty              ; $BE == 0 → empty cell
     LDX     #$0E
     JSR     SCRIPT_ENGINE       ; display blocked message?
-    JMP     FUN_1CF1
+    JMP     SHOW_LOCKED_MSG
 
 .empty:
-    JSR     FUN_1B52            ; commit move (update pos, draw sprite)
-    JSR     FUN_645F            ; check adjacent threats
+    JSR     COMMIT_MOVE            ; commit move (update pos, draw sprite)
+    JSR     CHECK_THREATS_HERE            ; check adjacent threats
     CMP     #$00
     BNE     .keep_moving        ; threats remain → continue
     STA     MOVE_POINTS         ; no threats → stop
@@ -2268,7 +2251,7 @@ GAME_TURN_LOOP:
     LDA     $BF
     CMP     #$80
     BMI     .event              ; $BF < $80 → event entry
-    JMP     FUN_1E5A            ; $BF >= $80 → mob encounter
+    JMP     HANDLE_MOB_ENCOUNTER            ; $BF >= $80 → mob encounter
 
 .event:
     LDY     #$01
@@ -2297,24 +2280,24 @@ GAME_TURN_LOOP:
     PHA
     LDA     $BF
     PHA
-    JSR     FUN_1B52            ; commit move first
+    JSR     COMMIT_MOVE            ; commit move first
     PLA
     STA     $BF
     PLA
     STA     $BE
-    JMP     FUN_70DF
+    JMP     DISPLAY_SHOP
 
 .not_map_event:
     CMP     #$FE
     BEQ     .empty_slot
-    JMP     FUN_60C7            ; $DB-$FD: unknown
+    JMP     TEARDOWN_INPUT            ; $DB-$FD: unknown
 
 .empty_slot:
-    JMP     FUN_1D4D            ; $FE: empty slot interaction
+    JMP     HANDLE_EVENT_SLOT            ; $FE: empty slot interaction
     ORG     $1A31
 FUN_1A31:
     ORG     $1B52
-FUN_1B52:
+COMMIT_MOVE:
     SUBROUTINE
     ; Commit move: store CURRENT_COL/ROW, convert to packed pos,
     ; update char field 3, set font char, draw sprite
@@ -2332,11 +2315,11 @@ FUN_1B52:
     STA     $5AA4
     LDA     #$01
     STA     $5A0F
-    JSR     FUN_7489            ; draw sprite
+    JSR     DRAW_SPRITE            ; draw sprite
     LDX     #$16
     STX     $5AA9
-    ; falls through to FUN_1B81
-FUN_1B81:
+    ; falls through to RESET_TURN_POS
+RESET_TURN_POS:
     ; Reset to turn start: convert start col/row to packed pos,
     ; call $1156, update current→start, conditionally run script
     LDA     TURN_START_COL
@@ -2355,12 +2338,12 @@ FUN_1B81:
     DEC     $5AA9
     JMP     SCRIPT_ENGINE
     ORG     $1BA7
-FUN_1BA7:
+END_TURN:
     SUBROUTINE
     ; End turn: clear $5B27, check encounter, compare level vs $5A66
     LDA     #$00
     STA     $5B27
-    JSR     FUN_1BCB
+    JSR     CHECK_AND_RESTRICT
     LDA     $5A66
     BNE     .check_level
     JMP     FUN_14A3
@@ -2374,28 +2357,28 @@ FUN_1BA7:
     JMP     FUN_14A3
 .too_low:
     ORG     $1BC6
-FUN_1BC6:
+SET_STATE_FIGHT:
     SUBROUTINE
     ; Set char field 15 state to 1
     LDA     #$01
-    JMP     FUN_1BE0
+    JMP     SET_CHAR_STATE
     ORG     $1BCB
-FUN_1BCB:
+CHECK_AND_RESTRICT:
     SUBROUTINE
     ; Check encounter at char position, clear restricted flag,
     ; set it if encounter type is 2.
     LDY     #$03
     LDA     ($F8),Y
     JSR     CHECK_ENCOUNTER
-    JSR     FUN_1BEF
+    JSR     CLEAR_RESTRICTED
     LDA     $5A1F
     CMP     #$02
     BNE     .done
-    JSR     FUN_1BF8
+    JSR     SET_RESTRICTED
 .done:
     RTS
     ORG     $1BE0
-FUN_1BE0:
+SET_CHAR_STATE:
     SUBROUTINE
     ; Set char field 15 low 2 bits to A
     STA     $5A60
@@ -2406,7 +2389,7 @@ FUN_1BE0:
     STA     ($F8),Y
     RTS
     ORG     $1BEF
-FUN_1BEF:
+CLEAR_RESTRICTED:
     SUBROUTINE
     ; Clear restricted flag (bit 2 of char field 15)
     LDY     #$0F
@@ -2415,7 +2398,7 @@ FUN_1BEF:
     STA     ($F8),Y
     RTS
     ORG     $1BF8
-FUN_1BF8:
+SET_RESTRICTED:
     SUBROUTINE
     ; Set restricted flag (bit 2 of char field 15)
     LDY     #$0F
@@ -2429,7 +2412,7 @@ HANDLE_ENCOUNTER:
 
     ; --- random encounter path (event type $00-$3F) ---
     LDA     #$00
-    JSR     FUN_1BE0            ; set char field 15 state to 0
+    JSR     SET_CHAR_STATE            ; set char field 15 state to 0
     LDY     #$01
     LDA     ($BE),Y             ; event byte 1 = type
     CMP     #$40
@@ -2462,7 +2445,7 @@ HANDLE_ENCOUNTER:
     LDA     ($BE),Y             ; event byte 0 = position
     STA     $5A5E
     LDA     #$01
-    JSR     FUN_1BE0            ; set state 1
+    JSR     SET_CHAR_STATE            ; set state 1
     LDY     #$01
     LDA     ($BE),Y
     AND     #$3F                ; low 6 bits = encounter ID
@@ -2490,10 +2473,10 @@ HANDLE_ENCOUNTER:
     LDY     #$02
     LDA     ($BE),Y             ; event byte 2 = destination pos
     STA     $5A5F
-    JSR     FUN_1B52            ; commit move
+    JSR     COMMIT_MOVE            ; commit move
     LDA     $7ABE
     STA     $5A8C
-    JSR     FUN_1414
+    JSR     REORDER_CURRENT_CHAR
     JSR     TIMED_WAIT
     LDY     #$03
     LDA     $5A5F
@@ -2501,13 +2484,13 @@ HANDLE_ENCOUNTER:
     LDA     $5A29
     CMP     $5A02               ; compare encounter ID with current scene
     BEQ     .same_scene
-    JMP     FUN_1B81            ; different → reset position
+    JMP     RESET_TURN_POS            ; different → reset position
 .same_scene:
     LDA     $5A5F
     JSR     POS_TO_COLROW
     STA     CURRENT_COL
     STY     CURRENT_ROW
-    JMP     FUN_1B52            ; commit to new position
+    JMP     COMMIT_MOVE            ; commit to new position
 
     ; --- encounter avoided ---
 .avoided:
@@ -2519,7 +2502,7 @@ HANDLE_ENCOUNTER:
     STA     TURN_START_COL
     LDA     CURRENT_ROW
     STA     TURN_START_ROW
-    JSR     FUN_1B81            ; reset to turn start
+    JSR     RESET_TURN_POS            ; reset to turn start
     LDA     TURN_START_COL
     STA     $5AA2
     LDA     TURN_START_ROW
@@ -2538,29 +2521,29 @@ HANDLE_ENCOUNTER:
     LDA     #$09
     JSR     SCENE_LOOP          ; trigger scene 9
     LDA     #$01
-    JMP     FUN_1425
+    JMP     APPLY_DAMAGE_TO_CURRENT
     ORG     $1CF1
-FUN_1CF1:
+SHOW_LOCKED_MSG:
     SUBROUTINE
     ; Display message $0C and set char state to 0.
     JSR     SET_CURSOR_ROW21
     JSR     FUN_0D8A
-    JSR     FUN_769B
+    JSR     RESET_TEXT_WINDOW
     LDA     #$0C
     JSR     DISPLAY_MESSAGE
     LDA     #$00
-    JMP     FUN_1BE0
+    JMP     SET_CHAR_STATE
     ORG     $1D04
 TRIGGER_SCENE_EVENT:
     SUBROUTINE
 
     LDA     #$00
-    JSR     FUN_1BE0            ; set char field 15 state to 0
+    JSR     SET_CHAR_STATE            ; set char field 15 state to 0
     LDA     $BE
     STA     $5A5B               ; save event pointer low
     LDA     $BF
     STA     $5A5C               ; save event pointer high
-    JSR     FUN_1B52            ; commit move
+    JSR     COMMIT_MOVE            ; commit move
     LDA     $5A5B
     STA     $BE                 ; restore event pointer
     LDA     $5A5C
@@ -2589,14 +2572,14 @@ TRIGGER_SCENE_EVENT:
     JSR     RANDOM_IN_RANGE     ; random(3)
     CLC
     ADC     #$01                ; 1-3
-    JMP     FUN_1425            ; apply effect to char
+    JMP     APPLY_DAMAGE_TO_CURRENT            ; apply effect to char
     ORG     $1D4D
-FUN_1D4D:
+HANDLE_EVENT_SLOT:
     SUBROUTINE
     ; Handle empty slot interaction: treasure pickup, traps,
     ; and event activation.
     LDA     #$00
-    JSR     FUN_1BE0
+    JSR     SET_CHAR_STATE
     LDY     #$02
     LDA     ($BE),Y
     STA     $5A59
@@ -2617,8 +2600,8 @@ FUN_1D4D:
     LDA     #$0A
     JSR     FUN_6C37
 .no_remove:
-    JSR     FUN_1B52
-    JSR     FUN_645F
+    JSR     COMMIT_MOVE
+    JSR     CHECK_THREATS_HERE
     CMP     #$00
     BNE     .has_threat
     STA     $5A65
@@ -2635,15 +2618,15 @@ FUN_1D4D:
     AND     #$1F
     CMP     #$1B
     BMI     .small_val
-    JMP     FUN_1CF1
+    JMP     SHOW_LOCKED_MSG
 .small_val:
     JSR     SET_CURSOR_ROW21
     JSR     FUN_0D8A
-    JSR     FUN_769B
+    JSR     RESET_TEXT_WINDOW
     LDA     #$0D
     JSR     DISPLAY_MESSAGE
     LDA     #$01
-    JMP     FUN_1425
+    JMP     APPLY_DAMAGE_TO_CURRENT
 .has_type:
     CMP     #$40
     BEQ     .type40
@@ -2672,7 +2655,7 @@ FUN_1D4D:
     JSR     SET_CURSOR_ROW21
     LDA     #$11
     JSR     DISPLAY_MESSAGE
-    JSR     FUN_1BF8
+    JSR     SET_RESTRICTED
     JSR     FUN_0D8A
     JSR     FUN_0D10
     JSR     FUN_78A8
@@ -2681,7 +2664,7 @@ FUN_1D4D:
     ROL
     LDA     #$01
     ADC     #$00
-    JMP     FUN_1425
+    JMP     APPLY_DAMAGE_TO_CURRENT
 .type40:
     LDA     $5A59
     AND     #$1F
@@ -2715,7 +2698,7 @@ FUN_1D4D:
     STA     TURN_START_COL
     LDA     CURRENT_ROW
     STA     TURN_START_ROW
-    JSR     FUN_1B81
+    JSR     RESET_TURN_POS
     JSR     FUN_0D30
     JMP     FUN_1DDC
     ORG     $1DDC
@@ -2725,7 +2708,7 @@ FUN_1751:
     ORG     $1860
 FUN_1860:
     ORG     $1E5A
-FUN_1E5A:
+HANDLE_MOB_ENCOUNTER:
     SUBROUTINE
     ; Mob encounter on movement: check flee chance, commit move,
     ; check encounter type, walk group for combat.
@@ -2766,26 +2749,26 @@ FUN_1E5A:
     BPL     .no_flee
     JSR     SET_CURSOR_ROW21
     JSR     FUN_0D8A
-    JSR     FUN_769B
+    JSR     RESET_TEXT_WINDOW
     LDA     #$1E
     JSR     DISPLAY_MESSAGE
     LDA     TURN_START_COL
     STA     CURRENT_COL
     LDA     TURN_START_ROW
     STA     CURRENT_ROW
-    JMP     FUN_1BA7
+    JMP     END_TURN
 .no_flee:
-    JSR     FUN_1B52
+    JSR     COMMIT_MOVE
     LDY     #$03
     LDA     ($F8),Y
     JSR     CHECK_ENCOUNTER
     LDA     $5A1F
     CMP     #$02
     BPL     .hostile
-    JSR     FUN_645F
+    JSR     CHECK_THREATS_HERE
     CMP     #$01
     BEQ     .one_threat
-    JMP     FUN_1BA7
+    JMP     END_TURN
 .one_threat:
     JMP     FUN_1A31
 .hostile:
@@ -2799,15 +2782,15 @@ FUN_1E5A:
     BNE     .next_member
     JSR     FUN_1F03
 .next_member:
-    JSR     FUN_1300
+    JSR     NEXT_GROUP_MEMBER
     JMP     .walk_group
 .group_done:
     JSR     SET_CURSOR_ROW21
     JSR     FUN_0D8A
-    JSR     FUN_769B
+    JSR     RESET_TEXT_WINDOW
     LDA     #$1F
     JSR     DISPLAY_MESSAGE
-    JMP     FUN_1BA7
+    JMP     END_TURN
     ORG     $1F03
 FUN_1F03:
     ORG     $743B
@@ -3027,7 +3010,7 @@ INIT_WORLD:
     ORG     $5F19
 FUN_5F19:
     ORG     $5F60
-FUN_5F60:
+SETUP_INPUT:
     SUBROUTINE
     ; Set up input: store X/Y in $C1/$C0, call setup routines.
     STX     $C1
@@ -3045,20 +3028,20 @@ FUN_6024:
     ORG     $602F
 FUN_602F:
     ORG     $60C7
-FUN_60C7:
+TEARDOWN_INPUT:
     SUBROUTINE
     ; Teardown input and jump to $5F19.
-    JSR     FUN_60CD
+    JSR     GET_INPUT_TABLE_PTR
     JMP     FUN_5F19
     ORG     $60CD
-FUN_60CD:
+GET_INPUT_TABLE_PTR:
     SUBROUTINE
     ; Return X=$60, Y=$7D (pointer to input table).
     LDX     #$60
     LDY     #$7D
     RTS
     ORG     $60D2
-FUN_60D2:
+CONFIGURE_INPUT:
     SUBROUTINE
     ; Configure input handler: set up self-modifying addresses
     ; from $5B25/$5B26/$5A65/$5B27.
@@ -3085,7 +3068,7 @@ FUN_60D2:
     ORG     $6458
 FUN_6458:
     ORG     $645F
-FUN_645F:
+CHECK_THREATS_HERE:
     SUBROUTINE
     ; Check adjacent threats at current col/row position.
     LDA     CURRENT_COL
@@ -3097,12 +3080,12 @@ PICKUP_TREASURE:
     SUBROUTINE
 
     LDA     #$00
-    JSR     FUN_1BE0            ; set char field 15 state to 0
+    JSR     SET_CHAR_STATE            ; set char field 15 state to 0
     LDA     $BE
     STA     $F4                 ; copy event ptr → $F4/$F5
     LDA     $BF
     STA     $F5
-    JSR     FUN_1B52            ; commit move
+    JSR     COMMIT_MOVE            ; commit move
     LDY     #$01
     LDA     ($F4),Y             ; event byte 1 = treasure type
     CMP     #$C9
@@ -3115,12 +3098,12 @@ PICKUP_TREASURE:
     LDA     ($F4),Y             ; event byte 2 = quantity
     STA     $BC
     LDY     #$01
-    JSR     FUN_70D4            ; look up treasure data
+    JSR     MODIFY_CURRENT_STATS            ; look up treasure data
     LDY     #$04
     LDA     ($F8),Y             ; char field 4
     CMP     #$15
     BCS     .mark_used          ; inventory full → skip pickup
-    JSR     FUN_6593            ; add item to inventory
+    JSR     CLEAR_STATUS_SLOTS            ; add item to inventory
     LDA     #$AB
     STA     $BA
     LDA     #$7B
@@ -3142,7 +3125,7 @@ PICKUP_TREASURE:
     STA     $BC
     LDA     #$7B
     STA     $BD
-    JSR     FUN_65A1            ; display pickup message
+    JSR     CLEAR_AND_DISPLAY            ; display pickup message
 .mark_used:
     LDY     #$00
     LDA     #$FE                ; mark event slot as empty
@@ -3182,14 +3165,14 @@ PICKUP_TREASURE:
     JSR     RANDOM_IN_RANGE
     CLC
     ADC     #$01                ; 1-5 damage
-    JSR     FUN_1425
+    JSR     APPLY_DAMAGE_TO_CURRENT
     JMP     .after_trap
 .trap1:
     LDA     #$08
     JSR     RANDOM_IN_RANGE
     CLC
     ADC     #$02                ; 2-9 damage
-    JSR     FUN_1425
+    JSR     APPLY_DAMAGE_TO_CURRENT
     JMP     .after_trap
 .trap2:
     LDY     #$0B
@@ -3230,8 +3213,8 @@ PICKUP_TREASURE:
 .handle_d1:
     LDA     #$0B
     JSR     SCENE_LOOP          ; show scene $0B
-    JSR     FUN_657B
-    JSR     FUN_6580
+    JSR     INC_FIELD5_COUNTER
+    JSR     INC_FIELD_COUNTER
     LDA     #$03
     JSR     RANDOM_IN_RANGE     ; random(3)
     CMP     #$00
@@ -3242,12 +3225,12 @@ PICKUP_TREASURE:
     JSR     SCENE_LOOP          ; show bonus scene $0C
     JMP     .mark_used          ; mark event used
     ORG     $657B
-FUN_657B:
+INC_FIELD5_COUNTER:
     SUBROUTINE
     ; Increment char field 5 low 5 bits (capped at $1F)
     LDY     #$05
     JMP     .body
-FUN_6580:
+INC_FIELD_COUNTER:
     ; Increment char field Y low 5 bits (capped at $1F)
     LDY     #$0B
 .body:
@@ -3264,7 +3247,7 @@ FUN_6580:
     STA     ($F8),Y
     RTS
     ORG     $6593
-FUN_6593:
+CLEAR_STATUS_SLOTS:
     SUBROUTINE
     ; Clear 5 bytes at $7BAB-$7BAF and $7BCC-$7BD0 (spaces)
     LDA     #$20
@@ -3276,14 +3259,14 @@ FUN_6593:
     BPL     .loop
     RTS
     ORG     $65A1
-FUN_65A1:
+CLEAR_AND_DISPLAY:
     SUBROUTINE
     ; Clear $5A57 and JMP $764A (display message)
     LDA     #$00
     STA     $5A57
     JMP     FUN_764A
     ORG     $6742
-FUN_6742:
+NPC_MOVE_AI:
     SUBROUTINE
     ; NPC movement AI: evaluate 4 directions + stay, pick best
     ; direction based on distance to target and randomized scoring.
@@ -3304,7 +3287,7 @@ FUN_6742:
     LDA     #$0A
     STA     $5A6A
     LDA     $5A71
-    JSR     FUN_13DB
+    JSR     MANHATTAN_DISTANCE
     STA     $5A68
     CMP     #$00
     BEQ     .no_target
@@ -3400,15 +3383,15 @@ AI_CHOOSE_TARGET:
     BPL     .mode_ge2
 
     ; --- mode 0/1: check if NPC should join party ---
-    JSR     FUN_12D0
+    JSR     PICK_RANDOM_MEMBER
     LDA     $F5
     CMP     #$00
     BEQ     .simple_target      ; no match → simple target
     JSR     SET_CURSOR_ROW21
     LDA     #$24
     JSR     DISPLAY_MESSAGE     ; "joins party" message
-    JSR     FUN_1406
-    JSR     FUN_769B
+    JSR     PRINT_MEMBER_NAME
+    JSR     RESET_TEXT_WINDOW
     JSR     DELAY_WITH_ANIMATION
     LDA     #$25
     JSR     DISPLAY_MESSAGE
@@ -3452,7 +3435,7 @@ AI_CHOOSE_TARGET:
     STA     $5A71               ; no target
     JMP     .done
 .use_encounter:
-    JSR     FUN_138D            ; find encounter position
+    JSR     FIND_NEAREST_EVENT            ; find encounter position
     STA     $5A71
     JMP     .done
 
@@ -3473,7 +3456,7 @@ AI_CHOOSE_TARGET:
     BEQ     .skip3
     LDY     #$03
     LDA     ($F4),Y             ; mob packed position
-    JSR     FUN_13DB            ; compute distance
+    JSR     MANHATTAN_DISTANCE            ; compute distance
     CMP     $5A72
     BCS     .skip3              ; not closer
     STA     $5A72               ; new minimum
@@ -3481,7 +3464,7 @@ AI_CHOOSE_TARGET:
     LDA     ($F4),Y
     STA     $5A71               ; target = this mob's position
 .skip3:
-    JSR     FUN_1300            ; next group member
+    JSR     NEXT_GROUP_MEMBER            ; next group member
     LDA     $F5
     BNE     .loop3
     LDA     $5A72
@@ -3522,7 +3505,7 @@ AI_CHOOSE_TARGET:
     LDA     ($F4),Y
     STA     $BE                 ; target position
 .skip5:
-    JSR     FUN_1300            ; next group member
+    JSR     NEXT_GROUP_MEMBER            ; next group member
     LDA     $F5
     BNE     .loop5
     LDA     $BF
@@ -3634,7 +3617,7 @@ MODIFY_CHAR_STATS:
     STA     ($F6),Y
     RTS
     ORG     $70D4
-FUN_70D4:
+MODIFY_CURRENT_STATS:
     SUBROUTINE
     ; Copy $F8/$F9 → $F6/$F7, JMP $704D (treasure lookup)
     LDA     $F8
@@ -3643,7 +3626,7 @@ FUN_70D4:
     STA     $F7
     JMP     MODIFY_CHAR_STATS
     ORG     $70DF
-FUN_70DF:
+DISPLAY_SHOP:
     SUBROUTINE
     ; Shop/store display: iterate through item bitmask,
     ; show prices and names for available items.
@@ -3763,7 +3746,7 @@ FUN_71F0:
     ORG     $71FC
 FUN_71FC:
     ORG     $7489
-FUN_7489:
+DRAW_SPRITE:
     SUBROUTINE
     ; Draw sprite: set up HRCG parameters from font char number
     ; and direction, then call PRINT_STRING.
@@ -3806,7 +3789,7 @@ FUN_7489:
     ORG     $750C
 FUN_750C:
     ORG     $769B
-FUN_769B:
+RESET_TEXT_WINDOW:
     SUBROUTINE
     ; Text display: init HRCG, set window bottom, output char $83, reset
     JSR     SET_TEXT_WINDOW_SCROLL
