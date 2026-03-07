@@ -7840,9 +7840,9 @@ If something occupies the destination cell, the result from
     INY
     LDA     ($F4),Y
     STA     $BD
-    JMP     FUN_7705
+    JMP     \nwlinkedidentc{PRINT_BOTTOM_CENTERED}{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}
 \nwindexdefn{\nwixident{FUN{\_}1406}}{FUN:un1406}{PYNWmai0-VXBWVWIETO76ZLXVOHQURZSFW4000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{FUN{\_}1406}}{FUN:un1406}}}\nwendcode{}\nwbegindocs{360}\nwdocspar
+\nwidentdefs{\\{{\nwixident{FUN{\_}1406}}{FUN:un1406}}}\nwidentuses{\\{{\nwixident{PRINT{\_}BOTTOM{\_}CENTERED}}{PRINT:unBOTTOM:unCENTERED}}}\nwindexuse{\nwixident{PRINT{\_}BOTTOM{\_}CENTERED}}{PRINT:unBOTTOM:unCENTERED}{PYNWmai0-VXBWVWIETO76ZLXVOHQURZSFW4000000-1}\nwendcode{}\nwbegindocs{360}\nwdocspar
 
 \nwenddocs{}\nwbegincode{361}\sublabel{PYNWmai0-L43GPHDOGYAESQOO4UGQZ55M5U000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-L43GPHDOGYAESQOO4UGQZ55M5U000000-1}}}\moddef{fun 1414~{\nwtagstyle{}\subpageref{PYNWmai0-L43GPHDOGYAESQOO4UGQZ55M5U000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $1414
@@ -8060,18 +8060,18 @@ If something occupies the destination cell, the result from
     AND     #$F8
     ORA     #$04                ; set restricted flag
     STA     ($F6),Y
-    JSR     \nwlinkedidentc{FUN_1142}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}
+    JSR     \nwlinkedidentc{PRINT_ENTITY_NAME}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}
     LDA     #$09
     JSR     \nwlinkedidentc{DISPLAY_MESSAGE}{PYNWmai0-PLQAK2MUE37THNKRCI7RJB7UJY000000-1}     ; "badly hurt" message
     RTS
 .check8:
     CMP     #$08
     BPL     .ge8
-    JSR     \nwlinkedidentc{FUN_1142}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}
+    JSR     \nwlinkedidentc{PRINT_ENTITY_NAME}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}
     LDA     #$0A
     JMP     \nwlinkedidentc{DISPLAY_MESSAGE}{PYNWmai0-PLQAK2MUE37THNKRCI7RJB7UJY000000-1}     ; "wounded" message
 .ge8:
-    JSR     \nwlinkedidentc{FUN_1142}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}
+    JSR     \nwlinkedidentc{PRINT_ENTITY_NAME}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}
     LDA     #$0B
     JMP     \nwlinkedidentc{DISPLAY_MESSAGE}{PYNWmai0-PLQAK2MUE37THNKRCI7RJB7UJY000000-1}     ; "scratched" message
 
@@ -8090,7 +8090,7 @@ If something occupies the destination cell, the result from
 .skip_flag:
     TXA
     PHA
-    JSR     \nwlinkedidentc{FUN_1142}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}
+    JSR     \nwlinkedidentc{PRINT_ENTITY_NAME}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}
     LDA     #$03
     JSR     \nwlinkedidentc{RANDOM_IN_RANGE}{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}     ; random(3)
     CMP     #$00
@@ -8126,24 +8126,112 @@ If something occupies the destination cell, the result from
     JSR     \nwlinkedidentc{MODIFY_CHAR_STATS}{PYNWmai0-ZD5J5NYKHC2UDBV4IQA4EZDYQE000000-1}   ; subtract gold (Y=0 → subtract)
     LDY     #$03
     LDA     ($F6),Y
-    JSR     \nwlinkedidentc{FUN_1260}{PYNWmai0-MRILQSXRUPVDHTVVU52XV2XOQA000000-1}            ; handle death at position
+    JSR     \nwlinkedidentc{UPDATE_EVENT_LIST}{PYNWmai0-MRILQSXRUPVDHTVVU52XV2XOQA000000-1}            ; handle death at position
     LDY     #$03
     LDA     ($F6),Y
     JMP     \nwlinkedidentc{DRAW_CHAR_AT_POS}{PYNWmai0-RAACK23HC5EFMXFBXXME6ZKJTE000000-1}    ; redraw position
 \nwindexdefn{\nwixident{FUN{\_}106F}}{FUN:un106F}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{FUN{\_}106F}}{FUN:un106F}}}\nwidentuses{\\{{\nwixident{DISPLAY{\_}MESSAGE}}{DISPLAY:unMESSAGE}}\\{{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}}\\{{\nwixident{FUN{\_}1142}}{FUN:un1142}}\\{{\nwixident{FUN{\_}1260}}{FUN:un1260}}\\{{\nwixident{MODIFY{\_}CHAR{\_}STATS}}{MODIFY:unCHAR:unSTATS}}\\{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}\\{{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}}\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}}\nwindexuse{\nwixident{DISPLAY{\_}MESSAGE}}{DISPLAY:unMESSAGE}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{FUN{\_}1142}}{FUN:un1142}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{FUN{\_}1260}}{FUN:un1260}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{MODIFY{\_}CHAR{\_}STATS}}{MODIFY:unCHAR:unSTATS}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwendcode{}\nwbegindocs{380}\nwdocspar
+\nwidentdefs{\\{{\nwixident{FUN{\_}106F}}{FUN:un106F}}}\nwidentuses{\\{{\nwixident{DISPLAY{\_}MESSAGE}}{DISPLAY:unMESSAGE}}\\{{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}}\\{{\nwixident{MODIFY{\_}CHAR{\_}STATS}}{MODIFY:unCHAR:unSTATS}}\\{{\nwixident{PRINT{\_}ENTITY{\_}NAME}}{PRINT:unENTITY:unNAME}}\\{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}\\{{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}}\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}\\{{\nwixident{UPDATE{\_}EVENT{\_}LIST}}{UPDATE:unEVENT:unLIST}}}\nwindexuse{\nwixident{DISPLAY{\_}MESSAGE}}{DISPLAY:unMESSAGE}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{MODIFY{\_}CHAR{\_}STATS}}{MODIFY:unCHAR:unSTATS}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{PRINT{\_}ENTITY{\_}NAME}}{PRINT:unENTITY:unNAME}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwindexuse{\nwixident{UPDATE{\_}EVENT{\_}LIST}}{UPDATE:unEVENT:unLIST}{PYNWmai0-4HLK6PBQJMGXW2NFVH6OY47B5U000000-1}\nwendcode{}\nwbegindocs{380}\nwdocspar
 
 \nwenddocs{}\nwbegincode{381}\sublabel{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}}}\moddef{fun 1142~{\nwtagstyle{}\subpageref{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $1142
-\nwlinkedidentc{FUN_1142}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}:
-\nwindexdefn{\nwixident{FUN{\_}1142}}{FUN:un1142}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{FUN{\_}1142}}{FUN:un1142}}}\nwendcode{}\nwbegindocs{382}\nwdocspar
+\nwlinkedidentc{PRINT_ENTITY_NAME}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}:
+    SUBROUTINE
+    ; Print entity name: cursor to row 21, load name ptr from ($F6)[0..1],
+    ; print centered at bottom, then reset text window.
+    JSR     \nwlinkedidentc{SET_CURSOR_ROW21}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}
+    LDY     #$00
+    LDA     ($F6),Y             ; name pointer low
+    STA     $BC
+    INY
+    LDA     ($F6),Y             ; name pointer high
+    STA     $BD
+    JSR     \nwlinkedidentc{PRINT_BOTTOM_CENTERED}{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}
+    JMP     \nwlinkedidentc{FUN_769B}{PYNWmai0-HFLOGQNIX4BG5XFWGKDVLOXD6Q000000-1}
+\nwindexdefn{\nwixident{PRINT{\_}ENTITY{\_}NAME}}{PRINT:unENTITY:unNAME}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{PRINT{\_}ENTITY{\_}NAME}}{PRINT:unENTITY:unNAME}}}\nwidentuses{\\{{\nwixident{FUN{\_}769B}}{FUN:un769B}}\\{{\nwixident{PRINT{\_}BOTTOM{\_}CENTERED}}{PRINT:unBOTTOM:unCENTERED}}\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}}\nwindexuse{\nwixident{FUN{\_}769B}}{FUN:un769B}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}\nwindexuse{\nwixident{PRINT{\_}BOTTOM{\_}CENTERED}}{PRINT:unBOTTOM:unCENTERED}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}\nwindexuse{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}{PYNWmai0-CZ3MELV3VNRBDPJ735N7ENDE2E000000-1}\nwendcode{}\nwbegindocs{382}\nwdocspar
 
 \nwenddocs{}\nwbegincode{383}\sublabel{PYNWmai0-MRILQSXRUPVDHTVVU52XV2XOQA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-MRILQSXRUPVDHTVVU52XV2XOQA000000-1}}}\moddef{fun 1260~{\nwtagstyle{}\subpageref{PYNWmai0-MRILQSXRUPVDHTVVU52XV2XOQA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $1260
-\nwlinkedidentc{FUN_1260}{PYNWmai0-MRILQSXRUPVDHTVVU52XV2XOQA000000-1}:
-\nwindexdefn{\nwixident{FUN{\_}1260}}{FUN:un1260}{PYNWmai0-MRILQSXRUPVDHTVVU52XV2XOQA000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{FUN{\_}1260}}{FUN:un1260}}}\nwendcode{}\nwbegindocs{384}\nwdocspar
+\nwlinkedidentc{UPDATE_EVENT_LIST}{PYNWmai0-MRILQSXRUPVDHTVVU52XV2XOQA000000-1}:
+    SUBROUTINE
+    ; Update event list for position A with value $BC/$BD.
+    ; If $BC/$BD = 0, return immediately.
+    ; Scans 3-byte event entries at ($FA)[6..7]:
+    ;   $FF = end of list → display message $2A
+    ;   $FE = empty slot → insert new entry
+    ;   matching pos + type $C0-$D0 → add to existing entry
+    ;   else → advance to next entry
+    STA     $BA                 ; save position
+    LDA     #$00
+    CMP     $BC
+    BNE     .has_value
+    CMP     $BD
+    BNE     .has_value
+    RTS
+.has_value:
+    LDY     #$06
+    LDA     ($FA),Y             ; event list pointer low
+    STA     $BE
+    INY
+    LDA     ($FA),Y             ; event list pointer high
+    STA     $BF
+.scan:
+    LDY     #$00
+    LDA     ($BE),Y             ; entry byte 0 = position
+    CMP     #$FF
+    BNE     .not_end
+    JSR     \nwlinkedidentc{SET_CURSOR_ROW21}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}
+    LDA     #$2A
+    JMP     \nwlinkedidentc{DISPLAY_MESSAGE}{PYNWmai0-PLQAK2MUE37THNKRCI7RJB7UJY000000-1}     ; "event list full" message
+.not_end:
+    CMP     #$FE
+    BNE     .check_match
+    ; Empty slot: insert new entry
+    LDA     $BA
+    STA     ($BE),Y             ; byte 0 = position
+    INY
+    LDA     $BD
+    AND     #$07
+    ORA     #$C0                ; byte 1 = type + high bits
+    STA     ($BE),Y
+    INY
+    LDA     $BC
+    STA     ($BE),Y             ; byte 2 = value low
+    RTS
+.check_match:
+    CMP     $BA                 ; same position?
+    BNE     .next
+    INY
+    LDA     ($BE),Y             ; byte 1 = type
+    BPL     .next               ; not activated
+    CMP     #$C0
+    BMI     .next               ; below $C0
+    CMP     #$D1
+    BPL     .next               ; above $D0
+    ; Add to existing entry
+    CLC
+    LDA     $BC
+    INY
+    ADC     ($BE),Y             ; byte 2 += value low
+    STA     ($BE),Y
+    DEY
+    LDA     $BD
+    AND     #$07
+    ADC     ($BE),Y             ; byte 1 += value high (with carry)
+    STA     ($BE),Y
+    RTS
+.next:
+    CLC
+    LDA     $BE
+    ADC     #$03                ; next 3-byte entry
+    STA     $BE
+    BCC     .no_carry
+    INC     $BF
+.no_carry:
+    JMP     .scan
+\nwindexdefn{\nwixident{UPDATE{\_}EVENT{\_}LIST}}{UPDATE:unEVENT:unLIST}{PYNWmai0-MRILQSXRUPVDHTVVU52XV2XOQA000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{UPDATE{\_}EVENT{\_}LIST}}{UPDATE:unEVENT:unLIST}}}\nwidentuses{\\{{\nwixident{DISPLAY{\_}MESSAGE}}{DISPLAY:unMESSAGE}}\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}}\nwindexuse{\nwixident{DISPLAY{\_}MESSAGE}}{DISPLAY:unMESSAGE}{PYNWmai0-MRILQSXRUPVDHTVVU52XV2XOQA000000-1}\nwindexuse{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}{PYNWmai0-MRILQSXRUPVDHTVVU52XV2XOQA000000-1}\nwendcode{}\nwbegindocs{384}\nwdocspar
 
 \nwenddocs{}\nwbegincode{385}\sublabel{PYNWmai0-ZD5J5NYKHC2UDBV4IQA4EZDYQE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ZD5J5NYKHC2UDBV4IQA4EZDYQE000000-1}}}\moddef{fun 704d~{\nwtagstyle{}\subpageref{PYNWmai0-ZD5J5NYKHC2UDBV4IQA4EZDYQE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $704D
@@ -9293,8 +9381,6 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}}%
 \nwixlogsorted{i}{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}%
 \nwixlogsorted{i}{{\nwixident{FUN{\_}106F}}{FUN:un106F}}%
-\nwixlogsorted{i}{{\nwixident{FUN{\_}1142}}{FUN:un1142}}%
-\nwixlogsorted{i}{{\nwixident{FUN{\_}1260}}{FUN:un1260}}%
 \nwixlogsorted{i}{{\nwixident{FUN{\_}12D0}}{FUN:un12D0}}%
 \nwixlogsorted{i}{{\nwixident{FUN{\_}1300}}{FUN:un1300}}%
 \nwixlogsorted{i}{{\nwixident{FUN{\_}138D}}{FUN:un138D}}%
@@ -9363,6 +9449,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{PRINT{\_}CENTERED{\_}PLUS{\_}COL}}{PRINT:unCENTERED:unPLUS:unCOL}}%
 \nwixlogsorted{i}{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}%
 \nwixlogsorted{i}{{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}}%
+\nwixlogsorted{i}{{\nwixident{PRINT{\_}ENTITY{\_}NAME}}{PRINT:unENTITY:unNAME}}%
 \nwixlogsorted{i}{{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}}%
 \nwixlogsorted{i}{{\nwixident{PRINT{\_}FONTCHAR{\_}AT{\_}TEXT{\_}POS}}{PRINT:unFONTCHAR:unAT:unTEXT:unPOS}}%
 \nwixlogsorted{i}{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}%
@@ -9451,6 +9538,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{TURN{\_}ACTIVE}}{TURN:unACTIVE}}%
 \nwixlogsorted{i}{{\nwixident{TURN{\_}START{\_}COL}}{TURN:unSTART:unCOL}}%
 \nwixlogsorted{i}{{\nwixident{TURN{\_}START{\_}ROW}}{TURN:unSTART:unROW}}%
+\nwixlogsorted{i}{{\nwixident{UPDATE{\_}EVENT{\_}LIST}}{UPDATE:unEVENT:unLIST}}%
 \nwixlogsorted{i}{{\nwixident{WAIT{\_}DURATION}}{WAIT:unDURATION}}%
 \nwixlogsorted{i}{{\nwixident{WAIT{\_}LOOP{\_}COUNT}}{WAIT:unLOOP:unCOUNT}}%
 \nwixlogsorted{i}{{\nwixident{WORLD{\_}INIT{\_}DATA}}{WORLD:unINIT:unDATA}}%

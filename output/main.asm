@@ -1429,18 +1429,18 @@ FUN_106F:
     AND     #$F8
     ORA     #$04                ; set restricted flag
     STA     ($F6),Y
-    JSR     FUN_1142
+    JSR     PRINT_ENTITY_NAME
     LDA     #$09
     JSR     DISPLAY_MESSAGE     ; "badly hurt" message
     RTS
 .check8:
     CMP     #$08
     BPL     .ge8
-    JSR     FUN_1142
+    JSR     PRINT_ENTITY_NAME
     LDA     #$0A
     JMP     DISPLAY_MESSAGE     ; "wounded" message
 .ge8:
-    JSR     FUN_1142
+    JSR     PRINT_ENTITY_NAME
     LDA     #$0B
     JMP     DISPLAY_MESSAGE     ; "scratched" message
 
@@ -1459,7 +1459,7 @@ FUN_106F:
 .skip_flag:
     TXA
     PHA
-    JSR     FUN_1142
+    JSR     PRINT_ENTITY_NAME
     LDA     #$03
     JSR     RANDOM_IN_RANGE     ; random(3)
     CMP     #$00
@@ -1495,12 +1495,24 @@ FUN_106F:
     JSR     MODIFY_CHAR_STATS   ; subtract gold (Y=0 → subtract)
     LDY     #$03
     LDA     ($F6),Y
-    JSR     FUN_1260            ; handle death at position
+    JSR     UPDATE_EVENT_LIST            ; handle death at position
     LDY     #$03
     LDA     ($F6),Y
     JMP     DRAW_CHAR_AT_POS    ; redraw position
     ORG     $1142
-FUN_1142:
+PRINT_ENTITY_NAME:
+    SUBROUTINE
+    ; Print entity name: cursor to row 21, load name ptr from ($F6)[0..1],
+    ; print centered at bottom, then reset text window.
+    JSR     SET_CURSOR_ROW21
+    LDY     #$00
+    LDA     ($F6),Y             ; name pointer low
+    STA     $BC
+    INY
+    LDA     ($F6),Y             ; name pointer high
+    STA     $BD
+    JSR     PRINT_BOTTOM_CENTERED
+    JMP     FUN_769B
     ORG     $12D0
 FUN_12D0:
     SUBROUTINE
@@ -1553,7 +1565,83 @@ NEXT_GROUP_MEMBER:
     STA     $F5                     ; /
     RTS
     ORG     $1260
-FUN_1260:
+UPDATE_EVENT_LIST:
+    SUBROUTINE
+    ; Update event list for position A with value $BC/$BD.
+    ; If $BC/$BD = 0, return immediately.
+    ; Scans 3-byte event entries at ($FA)[6..7]:
+    ;   $FF = end of list → display message $2A
+    ;   $FE = empty slot → insert new entry
+    ;   matching pos + type $C0-$D0 → add to existing entry
+    ;   else → advance to next entry
+    STA     $BA                 ; save position
+    LDA     #$00
+    CMP     $BC
+    BNE     .has_value
+    CMP     $BD
+    BNE     .has_value
+    RTS
+.has_value:
+    LDY     #$06
+    LDA     ($FA),Y             ; event list pointer low
+    STA     $BE
+    INY
+    LDA     ($FA),Y             ; event list pointer high
+    STA     $BF
+.scan:
+    LDY     #$00
+    LDA     ($BE),Y             ; entry byte 0 = position
+    CMP     #$FF
+    BNE     .not_end
+    JSR     SET_CURSOR_ROW21
+    LDA     #$2A
+    JMP     DISPLAY_MESSAGE     ; "event list full" message
+.not_end:
+    CMP     #$FE
+    BNE     .check_match
+    ; Empty slot: insert new entry
+    LDA     $BA
+    STA     ($BE),Y             ; byte 0 = position
+    INY
+    LDA     $BD
+    AND     #$07
+    ORA     #$C0                ; byte 1 = type + high bits
+    STA     ($BE),Y
+    INY
+    LDA     $BC
+    STA     ($BE),Y             ; byte 2 = value low
+    RTS
+.check_match:
+    CMP     $BA                 ; same position?
+    BNE     .next
+    INY
+    LDA     ($BE),Y             ; byte 1 = type
+    BPL     .next               ; not activated
+    CMP     #$C0
+    BMI     .next               ; below $C0
+    CMP     #$D1
+    BPL     .next               ; above $D0
+    ; Add to existing entry
+    CLC
+    LDA     $BC
+    INY
+    ADC     ($BE),Y             ; byte 2 += value low
+    STA     ($BE),Y
+    DEY
+    LDA     $BD
+    AND     #$07
+    ADC     ($BE),Y             ; byte 1 += value high (with carry)
+    STA     ($BE),Y
+    RTS
+.next:
+    CLC
+    LDA     $BE
+    ADC     #$03                ; next 3-byte entry
+    STA     $BE
+    BCC     .no_carry
+    INC     $BF
+.no_carry:
+    JMP     .scan
     ORG     $1300
 FUN_1300:
     SUBROUTINE
@@ -1733,7 +1821,7 @@ FUN_1406:
     INY
     LDA     ($F4),Y
     STA     $BD
-    JMP     FUN_7705
+    JMP     PRINT_BOTTOM_CENTERED
     ORG     $1414
 FUN_1414:
     SUBROUTINE
