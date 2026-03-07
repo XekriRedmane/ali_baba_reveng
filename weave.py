@@ -4,14 +4,12 @@ import base64
 import dataclasses
 import hashlib
 from io import TextIOWrapper
-import itertools
 import pathlib
 import pprint
 import re
 from typing import Sequence
 
 from absl import app
-from absl import flags
 
 
 # TODO: Handle '@<<' as an escape in code chunks.
