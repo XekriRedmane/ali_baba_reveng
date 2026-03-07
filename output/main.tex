@@ -3578,33 +3578,35 @@ Output: A~=~random value in {\Tt{}0..limit{\$}-{\$}1\nwendquote}.
 \nwindexdefn{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}\eatline
 \nwidentdefs{\\{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}}\nwidentuses{\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{RNG{\_}LIMIT}}{RNG:unLIMIT}}\\{{\nwixident{RNG{\_}MASK}}{RNG:unMASK}}\\{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}}\nwindexuse{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}\nwindexuse{\nwixident{RNG{\_}LIMIT}}{RNG:unLIMIT}{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}\nwindexuse{\nwixident{RNG{\_}MASK}}{RNG:unMASK}{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}\nwindexuse{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}\nwendcode{}\nwbegindocs{188}\nwdocspar
 
-\subsection{advance\_group\_link (\$12FA/\$1300)}
+\subsection{first/next\_group\_member (\$12FA/\$1300)}
 
-Advances the group-chain pointer {\Tt{}{\textbackslash}{\$}F4/{\textbackslash}{\$}F5\nwendquote} to the next mob record
-by following the ``next'' link in byte~2.  Has two entry points:
+Group iteration uses two zero-page pointer pairs: {\Tt{}{\textbackslash}{\$}FA/{\textbackslash}{\$}FB\nwendquote} points
+to the group head (or the member currently being processed), and
+{\Tt{}{\textbackslash}{\$}F4/{\textbackslash}{\$}F5\nwendquote} is the iteration cursor that advances through the chain.
+Both routines follow the ``next'' link in byte~2 of a mob data record,
+resolve it via {\Tt{}GET{\textbackslash}{\_}MOB{\textbackslash}{\_}DATA\nwendquote}, and store the result in~{\Tt{}{\textbackslash}{\$}F4/{\textbackslash}{\$}F5\nwendquote}.
+If the link is zero (end of chain), {\Tt{}{\textbackslash}{\$}F4/{\textbackslash}{\$}F5\nwendquote} is set to null.
+
 \begin{itemize}
-\item {\Tt{}{\textbackslash}{\$}12FA\nwendquote} ({\Tt{}ADVANCE{\textbackslash}{\_}FA{\textbackslash}{\_}F4\nwendquote}): first checks byte~2 of {\Tt{}{\textbackslash}{\$}FA/{\textbackslash}{\$}FB\nwendquote};
-      if nonzero, resolves that link.  If zero, falls through to check
-      {\Tt{}{\textbackslash}{\$}F4/{\textbackslash}{\$}F5\nwendquote}.
-\item {\Tt{}{\textbackslash}{\$}1300\nwendquote} ({\Tt{}ADVANCE{\textbackslash}{\_}F4\nwendquote}): checks byte~2 of {\Tt{}{\textbackslash}{\$}F4/{\textbackslash}{\$}F5\nwendquote} only.
+\item {\Tt{}{\textbackslash}{\$}12FA\nwendquote} ({\Tt{}FIRST{\textbackslash}{\_}GROUP{\textbackslash}{\_}MEMBER\nwendquote}): begins iteration by following
+      byte~2 of the group head at~{\Tt{}{\textbackslash}{\$}FA/{\textbackslash}{\$}FB\nwendquote}.  If that link is zero,
+      falls through to check {\Tt{}{\textbackslash}{\$}F4/{\textbackslash}{\$}F5\nwendquote} as a fallback.
+\item {\Tt{}{\textbackslash}{\$}1300\nwendquote} ({\Tt{}NEXT{\textbackslash}{\_}GROUP{\textbackslash}{\_}MEMBER\nwendquote}): continues iteration by following
+      byte~2 of the current cursor at~{\Tt{}{\textbackslash}{\$}F4/{\textbackslash}{\$}F5\nwendquote}.
 \end{itemize}
-If the link is nonzero, calls {\Tt{}GET{\textbackslash}{\_}MOB{\textbackslash}{\_}DATA\nwendquote} to resolve it and stores
-the result in~{\Tt{}{\textbackslash}{\$}F4/{\textbackslash}{\$}F5\nwendquote}.  If the link is zero (end of chain), nulls
-out~{\Tt{}{\textbackslash}{\$}F4/{\textbackslash}{\$}F5\nwendquote}.  Used by 7~callers each in the combat and interaction
-code to iterate through group member chains.
 
 \nwenddocs{}\nwbegincode{189}\sublabel{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}}}\moddef{advance group link~{\nwtagstyle{}\subpageref{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $12FA
-\nwlinkedidentc{ADVANCE_FA_F4}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}:
+\nwlinkedidentc{FIRST_GROUP_MEMBER}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}:
     SUBROUTINE
 
     LDY     #$02                    ; \\
-    LDA     ($FA),Y                 ;  | check byte 2 of ($FA)
-    BNE     .resolve                ; /  if nonzero, resolve it
-\nwlinkedidentc{ADVANCE_F4}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}:
+    LDA     ($FA),Y                 ;  | check byte 2 of group head ($FA)
+    BNE     .resolve                ; /  if nonzero, follow it
+\nwlinkedidentc{NEXT_GROUP_MEMBER}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}:
     LDY     #$02                    ; \\
-    LDA     ($F4),Y                 ;  | check byte 2 of ($F4)
-    BNE     .resolve                ; /  if nonzero, resolve it
+    LDA     ($F4),Y                 ;  | check byte 2 of cursor ($F4)
+    BNE     .resolve                ; /  if nonzero, follow it
     STA     $F4                     ; \\  end of chain:
     STA     $F5                     ; /  null out $F4/$F5
     RTS
@@ -3612,11 +3614,11 @@ code to iterate through group member chains.
     JSR     \nwlinkedidentc{GET_MOB_DATA}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}            ; resolve link -> $BA/$BB
     LDA     $BA                     ; \\
     STA     $F4                     ;  | $F4/$F5 = $BA/$BB
-    LDA     $BB                     ;  | (advance to next record)
+    LDA     $BB                     ;  | (advance cursor to next record)
     STA     $F5                     ; /
     RTS
-\nwindexdefn{\nwixident{ADVANCE{\_}F4}}{ADVANCE:unF4}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}\nwindexdefn{\nwixident{ADVANCE{\_}FA{\_}F4}}{ADVANCE:unFA:unF4}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{ADVANCE{\_}F4}}{ADVANCE:unF4}}\\{{\nwixident{ADVANCE{\_}FA{\_}F4}}{ADVANCE:unFA:unF4}}}\nwidentuses{\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}\nwendcode{}\nwbegindocs{190}\nwdocspar
+\nwindexdefn{\nwixident{FIRST{\_}GROUP{\_}MEMBER}}{FIRST:unGROUP:unMEMBER}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}\nwindexdefn{\nwixident{NEXT{\_}GROUP{\_}MEMBER}}{NEXT:unGROUP:unMEMBER}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{FIRST{\_}GROUP{\_}MEMBER}}{FIRST:unGROUP:unMEMBER}}\\{{\nwixident{NEXT{\_}GROUP{\_}MEMBER}}{NEXT:unGROUP:unMEMBER}}}\nwidentuses{\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}\nwendcode{}\nwbegindocs{190}\nwdocspar
 
 \subsection{clamp\_char\_field (\$0A93)}
 
@@ -6168,8 +6170,6 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{ADDB2}}{ADDB2}}%
 \nwixlogsorted{i}{{\nwixident{ADDW}}{ADDW}}%
 \nwixlogsorted{i}{{\nwixident{ADDWC}}{ADDWC}}%
-\nwixlogsorted{i}{{\nwixident{ADVANCE{\_}F4}}{ADVANCE:unF4}}%
-\nwixlogsorted{i}{{\nwixident{ADVANCE{\_}FA{\_}F4}}{ADVANCE:unFA:unF4}}%
 \nwixlogsorted{i}{{\nwixident{ANIM{\_}FRAME{\_}CTR}}{ANIM:unFRAME:unCTR}}%
 \nwixlogsorted{i}{{\nwixident{ANIM{\_}FRAME{\_}TABLE}}{ANIM:unFRAME:unTABLE}}%
 \nwixlogsorted{i}{{\nwixident{ANIM{\_}INDEX}}{ANIM:unINDEX}}%
@@ -6212,6 +6212,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{EALDR{\_}track{\_}pages}}{EALDR:untrack:unpages}}%
 \nwixlogsorted{i}{{\nwixident{EALDR{\_}tracks}}{EALDR:untracks}}%
 \nwixlogsorted{i}{{\nwixident{FIND{\_}ENTITY{\_}AT{\_}POS}}{FIND:unENTITY:unAT:unPOS}}%
+\nwixlogsorted{i}{{\nwixident{FIRST{\_}GROUP{\_}MEMBER}}{FIRST:unGROUP:unMEMBER}}%
 \nwixlogsorted{i}{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}%
 \nwixlogsorted{i}{{\nwixident{FONT{\_}DATA}}{FONT:unDATA}}%
 \nwixlogsorted{i}{{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}}%
@@ -6235,6 +6236,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{MOVW}}{MOVW}}%
 \nwixlogsorted{i}{{\nwixident{MSG{\_}LINE{\_}COUNT}}{MSG:unLINE:unCOUNT}}%
 \nwixlogsorted{i}{{\nwixident{MSG{\_}TABLE{\_}PTR}}{MSG:unTABLE:unPTR}}%
+\nwixlogsorted{i}{{\nwixident{NEXT{\_}GROUP{\_}MEMBER}}{NEXT:unGROUP:unMEMBER}}%
 \nwixlogsorted{i}{{\nwixident{NUM{\_}DIGIT}}{NUM:unDIGIT}}%
 \nwixlogsorted{i}{{\nwixident{NUM{\_}DIVISOR}}{NUM:unDIVISOR}}%
 \nwixlogsorted{i}{{\nwixident{NUM{\_}LEADING}}{NUM:unLEADING}}%

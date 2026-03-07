@@ -3501,33 +3501,35 @@ RANDOM_IN_RANGE:
     BCC     .accept                 ; / (always taken: masked bit is 0)
 @ %def RANDOM_IN_RANGE
 
-\subsection{advance\_group\_link (\$12FA/\$1300)}
+\subsection{first/next\_group\_member (\$12FA/\$1300)}
 
-Advances the group-chain pointer [[\$F4/\$F5]] to the next mob record
-by following the ``next'' link in byte~2.  Has two entry points:
+Group iteration uses two zero-page pointer pairs: [[\$FA/\$FB]] points
+to the group head (or the member currently being processed), and
+[[\$F4/\$F5]] is the iteration cursor that advances through the chain.
+Both routines follow the ``next'' link in byte~2 of a mob data record,
+resolve it via [[GET\_MOB\_DATA]], and store the result in~[[\$F4/\$F5]].
+If the link is zero (end of chain), [[\$F4/\$F5]] is set to null.
+
 \begin{itemize}
-\item [[\$12FA]] ([[ADVANCE\_FA\_F4]]): first checks byte~2 of [[\$FA/\$FB]];
-      if nonzero, resolves that link.  If zero, falls through to check
-      [[\$F4/\$F5]].
-\item [[\$1300]] ([[ADVANCE\_F4]]): checks byte~2 of [[\$F4/\$F5]] only.
+\item [[\$12FA]] ([[FIRST\_GROUP\_MEMBER]]): begins iteration by following
+      byte~2 of the group head at~[[\$FA/\$FB]].  If that link is zero,
+      falls through to check [[\$F4/\$F5]] as a fallback.
+\item [[\$1300]] ([[NEXT\_GROUP\_MEMBER]]): continues iteration by following
+      byte~2 of the current cursor at~[[\$F4/\$F5]].
 \end{itemize}
-If the link is nonzero, calls [[GET\_MOB\_DATA]] to resolve it and stores
-the result in~[[\$F4/\$F5]].  If the link is zero (end of chain), nulls
-out~[[\$F4/\$F5]].  Used by 7~callers each in the combat and interaction
-code to iterate through group member chains.
 
 <<advance group link>>=
     ORG     $12FA
-ADVANCE_FA_F4:
+FIRST_GROUP_MEMBER:
     SUBROUTINE
 
     LDY     #$02                    ; \
-    LDA     ($FA),Y                 ;  | check byte 2 of ($FA)
-    BNE     .resolve                ; /  if nonzero, resolve it
-ADVANCE_F4:
+    LDA     ($FA),Y                 ;  | check byte 2 of group head ($FA)
+    BNE     .resolve                ; /  if nonzero, follow it
+NEXT_GROUP_MEMBER:
     LDY     #$02                    ; \
-    LDA     ($F4),Y                 ;  | check byte 2 of ($F4)
-    BNE     .resolve                ; /  if nonzero, resolve it
+    LDA     ($F4),Y                 ;  | check byte 2 of cursor ($F4)
+    BNE     .resolve                ; /  if nonzero, follow it
     STA     $F4                     ; \  end of chain:
     STA     $F5                     ; /  null out $F4/$F5
     RTS
@@ -3535,10 +3537,10 @@ ADVANCE_F4:
     JSR     GET_MOB_DATA            ; resolve link -> $BA/$BB
     LDA     $BA                     ; \
     STA     $F4                     ;  | $F4/$F5 = $BA/$BB
-    LDA     $BB                     ;  | (advance to next record)
+    LDA     $BB                     ;  | (advance cursor to next record)
     STA     $F5                     ; /
     RTS
-@ %def ADVANCE_FA_F4 ADVANCE_F4
+@ %def FIRST_GROUP_MEMBER NEXT_GROUP_MEMBER
 
 \subsection{clamp\_char\_field (\$0A93)}
 

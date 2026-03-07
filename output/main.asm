@@ -1162,16 +1162,16 @@ RANDOM_IN_RANGE:
     ROR     A                       ;  |
     BCC     .accept                 ; / (always taken: masked bit is 0)
     ORG     $12FA
-ADVANCE_FA_F4:
+FIRST_GROUP_MEMBER:
     SUBROUTINE
 
     LDY     #$02                    ; \
-    LDA     ($FA),Y                 ;  | check byte 2 of ($FA)
-    BNE     .resolve                ; /  if nonzero, resolve it
-ADVANCE_F4:
+    LDA     ($FA),Y                 ;  | check byte 2 of group head ($FA)
+    BNE     .resolve                ; /  if nonzero, follow it
+NEXT_GROUP_MEMBER:
     LDY     #$02                    ; \
-    LDA     ($F4),Y                 ;  | check byte 2 of ($F4)
-    BNE     .resolve                ; /  if nonzero, resolve it
+    LDA     ($F4),Y                 ;  | check byte 2 of cursor ($F4)
+    BNE     .resolve                ; /  if nonzero, follow it
     STA     $F4                     ; \  end of chain:
     STA     $F5                     ; /  null out $F4/$F5
     RTS
@@ -1179,7 +1179,7 @@ ADVANCE_F4:
     JSR     GET_MOB_DATA            ; resolve link -> $BA/$BB
     LDA     $BA                     ; \
     STA     $F4                     ;  | $F4/$F5 = $BA/$BB
-    LDA     $BB                     ;  | (advance to next record)
+    LDA     $BB                     ;  | (advance cursor to next record)
     STA     $F5                     ; /
     RTS
     ORG     $7489
