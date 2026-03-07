@@ -2158,6 +2158,97 @@ BLINK_ROW       EQU     $5AA3   ; font row
 BLINK_CHAR      EQU     $5AA4   ; font character number
 @ %def BLINK_COL BLINK_ROW BLINK_CHAR
 
+\subsection{draw\_blink\_alt (\$74CB)}
+
+Draws the ``alternate'' blink character (the blink-off frame).
+Temporarily replaces [[BLINK\_CHAR]] with the alternate character from
+[[\$7AC3]], calls [[DRAW\_BLINK\_CHAR]] to render it, then restores
+the original [[BLINK\_CHAR]].  Called by [[TICK\_ANIM\_COUNTER]] when
+the animation frame counter reaches zero.
+
+<<defines>>=
+BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
+@ %def BLINK_ALT_CHAR
+
+<<draw blink alt>>=
+    ORG     $74CB
+DRAW_BLINK_ALT:
+    SUBROUTINE
+
+    LDA     BLINK_CHAR              ; save current blink char
+    PHA
+    LDA     BLINK_ALT_CHAR          ; load alternate char
+    STA     BLINK_CHAR              ; swap it in
+    JSR     DRAW_BLINK_CHAR         ; draw at blink position
+    PLA
+    STA     BLINK_CHAR              ; restore original char
+    RTS
+@ %def DRAW_BLINK_ALT
+
+\subsection{draw\_blink\_normal (\$74DD) / draw\_blink\_char (\$74E0)}
+
+[[DRAW\_BLINK\_NORMAL]] sets normal video mode (via [[SET\_NORMAL\_VIDEO]])
+then falls through into [[DRAW\_BLINK\_CHAR]].  Called by
+[[ANIM\_TICK\_AND\_WAIT]] when the animation frame expires.
+
+[[DRAW\_BLINK\_CHAR]] copies the blink state ([[BLINK\_COL]],
+[[BLINK\_ROW]], [[BLINK\_CHAR]]) into [[FONT\_COL]], [[FONT\_ROW]],
+[[FONT\_CHARNUM]], sets [[FONT\_CHARSET]]~=~1, and calls
+[[PRINT\_FONTCHAR]] to render the character.  If [[BLINK\_COL]]~$\ge$~20
+(the disabled sentinel), it returns immediately.  Saves and restores
+[[\$BC/\$BD]] since [[PRINT\_FONTCHAR]] uses that pointer.
+
+<<draw blink char>>=
+    ORG     $74DD
+DRAW_BLINK_NORMAL:
+    JSR     SET_NORMAL_VIDEO        ; Ctrl-N → normal video
+
+DRAW_BLINK_CHAR:
+    SUBROUTINE
+
+    LDA     BLINK_COL               ; load blink column
+    CMP     #$14                    ; >= 20? (disabled sentinel)
+    BCC     .draw
+    RTS                             ; disabled — do nothing
+
+.draw:
+    STA     FONT_COL                ; copy blink state to font vars
+    LDA     BLINK_ROW
+    STA     FONT_ROW
+    LDA     BLINK_CHAR
+    STA     FONT_CHARNUM
+    LDA     #$01
+    STA     FONT_CHARSET            ; charset 1
+    LDA     PRINT_STRING_ADDR       ; save $BC/$BD (used by PRINT_FONTCHAR)
+    PHA
+    LDA     PRINT_STRING_ADDR+1
+    PHA
+    JSR     PRINT_FONTCHAR          ; render the character
+    PLA
+    STA     PRINT_STRING_ADDR+1     ; restore $BC/$BD
+    PLA
+    STA     PRINT_STRING_ADDR
+    RTS
+@ %def DRAW_BLINK_NORMAL DRAW_BLINK_CHAR
+
+\subsection{set\_normal\_video (\$7735)}
+
+Outputs Ctrl-N (normal video mode) to the Apple~II character output
+routine.  [[\$8E]] is [[Ctrl-N]] with the high bit set.
+
+<<defines>>=
+ROM_COUT1               EQU     $FDED   ; Apple II ROM COUT1 (direct screen output)
+@ %def ROM_COUT1
+
+<<set normal video>>=
+    ORG     $7735
+SET_NORMAL_VIDEO:
+    SUBROUTINE
+
+    LDA     #$8E                    ; Ctrl-N with high bit
+    JMP     ROM_COUT1               ; output via COUT1
+@ %def SET_NORMAL_VIDEO
+
 <<defines>>=
 ROM_COUT            EQU     $FDF0   ; Apple II ROM character output
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
@@ -3133,7 +3224,7 @@ TICK_ANIM_COUNTER:
 
     DEC     ANIM_FRAME_CTR          ; tick frame counter
     BNE     .reload                 ; not zero → just reload wait count
-    JSR     $74CB                   ; counter hit zero → advance frame
+    JSR     DRAW_BLINK_ALT          ; counter hit zero → draw alt char
 .reload:
     LDX     ANIM_INDEX              ; current animation index
     LDA     ANIM_WAIT_TABLE,X       ; look up wait count for this frame
@@ -3162,7 +3253,7 @@ ANIM_TICK_AND_WAIT:
     RTS                             ; no → return
 
 .advance:
-    JSR     $74DD                   ; update animation display
+    JSR     DRAW_BLINK_NORMAL       ; redraw blink char in normal video
     LDX     ANIM_INDEX              ; reload animation index
     LDA     ANIM_FRAME_TABLE,X      ; look up frame duration
     STA     ANIM_FRAME_CTR          ; reset frame counter
@@ -4558,8 +4649,11 @@ The following root chunks produce the assembly files when tangled.
 <<anim tick and wait>>
 <<timed wait>>
 <<call rom wait>>
+<<draw blink alt>>
+<<draw blink char>>
 <<plot char>>
 <<print font char>>
+<<set normal video>>
 <<scene loop>>
 <<text renderer>>
 <<display status bar>>
