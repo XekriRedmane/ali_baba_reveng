@@ -2489,9 +2489,12 @@ DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random tests
 PRNG_STATE          EQU     $5A19   ; PRNG full state: val = 69*val + $53 (mod 256)
 PRNG_TEMP           EQU     $5A1A   ; PRNG temporary for multiplication
+NUM_DIGIT           EQU     $5A1B   ; current digit accumulator (ASCII $B0-$B9)
+NUM_DIVISOR         EQU     $5A1C   ; 16-bit divisor for decimal conversion (2 bytes)
+NUM_LEADING         EQU     $5A1E   ; leading-zero suppress flag (0=suppress, 1=print)
 GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
-@ %def ROM_COUT1 DAT_5a17_pos PRNG_OUTPUT PRNG_STATE PRNG_TEMP GROUP_COUNT_DELTA is_at_outer_limits
+@ %def ROM_COUT1 DAT_5a17_pos PRNG_OUTPUT PRNG_STATE PRNG_TEMP NUM_DIGIT NUM_DIVISOR NUM_LEADING GROUP_COUNT_DELTA is_at_outer_limits
 
 <<print font char>>=
     ORG     $80A4
@@ -3498,6 +3501,45 @@ RANDOM_IN_RANGE:
     BCC     .accept                 ; / (always taken: masked bit is 0)
 @ %def RANDOM_IN_RANGE
 
+\subsection{advance\_group\_link (\$12FA/\$1300)}
+
+Advances the group-chain pointer [[\$F4/\$F5]] to the next mob record
+by following the ``next'' link in byte~2.  Has two entry points:
+\begin{itemize}
+\item [[\$12FA]] ([[ADVANCE\_FA\_F4]]): first checks byte~2 of [[\$FA/\$FB]];
+      if nonzero, resolves that link.  If zero, falls through to check
+      [[\$F4/\$F5]].
+\item [[\$1300]] ([[ADVANCE\_F4]]): checks byte~2 of [[\$F4/\$F5]] only.
+\end{itemize}
+If the link is nonzero, calls [[GET\_MOB\_DATA]] to resolve it and stores
+the result in~[[\$F4/\$F5]].  If the link is zero (end of chain), nulls
+out~[[\$F4/\$F5]].  Used by 7~callers each in the combat and interaction
+code to iterate through group member chains.
+
+<<advance group link>>=
+    ORG     $12FA
+ADVANCE_FA_F4:
+    SUBROUTINE
+
+    LDY     #$02                    ; \
+    LDA     ($FA),Y                 ;  | check byte 2 of ($FA)
+    BNE     .resolve                ; /  if nonzero, resolve it
+ADVANCE_F4:
+    LDY     #$02                    ; \
+    LDA     ($F4),Y                 ;  | check byte 2 of ($F4)
+    BNE     .resolve                ; /  if nonzero, resolve it
+    STA     $F4                     ; \  end of chain:
+    STA     $F5                     ; /  null out $F4/$F5
+    RTS
+.resolve:
+    JSR     GET_MOB_DATA            ; resolve link -> $BA/$BB
+    LDA     $BA                     ; \
+    STA     $F4                     ;  | $F4/$F5 = $BA/$BB
+    LDA     $BB                     ;  | (advance to next record)
+    STA     $F5                     ; /
+    RTS
+@ %def ADVANCE_FA_F4 ADVANCE_F4
+
 \subsection{clamp\_char\_field (\$0A93)}
 
 Ensures that byte~6 of the character record at [[$F4]] has its lower 6~bits
@@ -3809,6 +3851,27 @@ POS_TO_COLROW:
     RTS                        ; A = column (0-19), Y = row (0-9)
 @ %def POS_TO_COLROW
 
+\subsection{print\_mob\_name (\$0D8A)}
+
+Loads the name pointer from bytes~0--1 of the mob record at~[[\$F8/\$F9]]
+into~[[\$BC/\$BD]], then tail-calls the text centering routine
+at~\$7705, which centers and prints the name on screen row~23.
+Used by 13~callers throughout the combat and interaction code.
+
+<<print mob name>>=
+    ORG     $0D8A
+PRINT_MOB_NAME:
+    SUBROUTINE
+
+    LDY     #$00                    ; \
+    LDA     ($F8),Y                 ;  | $BC/$BD = bytes 0-1 of ($F8)
+    STA     $BC                     ;  | (name string pointer)
+    INY                             ;  |
+    LDA     ($F8),Y                 ;  |
+    STA     $BD                     ; /
+    JMP     $7705                   ; center and print on row 23
+@ %def PRINT_MOB_NAME
+
 \subsection{colrow\_to\_pos (\$0D98)}
 
 The inverse of [[POS\_TO\_COLROW]]: converts a column in~A and row in~Y
@@ -3831,6 +3894,97 @@ COLROW_TO_POS:
     BCC     .loop               ; no overflow → continue
                                 ; carry set → return (overflow)
 @ %def COLROW_TO_POS
+
+\subsection{num\_to\_decimal (\$0DA1)}
+
+Converts a 16-bit unsigned value in~[[\$BC/\$BD]] to up to 5~ASCII
+decimal digits, stored sequentially at [[$(\$BA),Y$]] (with Y incrementing).
+Leading zeros are suppressed unless the value is exactly zero (prints
+``0'').  The output uses Apple~II high-ASCII ($\$B0$--$\$B9$).
+
+The driver at~\$0DA1 calls the digit-extraction helper at~\$0DE1 five
+times with divisors 10000, 1000, 100, 10, and~1.  The helper performs
+repeated subtraction of [[\$5A1C/\$5A1D]] from [[\$BC/\$BD]], counting
+iterations as the digit value.
+
+A second entry point at~[[\$0DA4]] (1~caller) skips the initialization
+of~Y and the leading-zero flag, allowing the caller to control the
+starting output position and suppression behavior.
+
+<<num to decimal>>=
+    ORG     $0DA1
+NUM_TO_DECIMAL:
+    SUBROUTINE
+
+    LDY     #$00                    ; output index = 0
+    STY     NUM_LEADING             ; leading-zero flag = 0 (suppress)
+NUM_TO_DECIMAL_CONT:
+    LDA     #$10                    ; \  divisor = $2710 = 10000
+    STA     NUM_DIVISOR             ;  |
+    LDA     #$27                    ;  |
+    STA     NUM_DIVISOR+1           ; /
+    JSR     .extract_digit          ; ten-thousands digit
+    LDA     #$E8                    ; \  divisor = $03E8 = 1000
+    STA     NUM_DIVISOR             ;  |
+    LDA     #$03                    ;  |
+    STA     NUM_DIVISOR+1           ; /
+    JSR     .extract_digit          ; thousands digit
+    LDA     #$64                    ; \  divisor = $0064 = 100
+    STA     NUM_DIVISOR             ;  |
+    LDA     #$00                    ;  |
+    STA     NUM_DIVISOR+1           ; /
+    JSR     .extract_digit          ; hundreds digit
+    LDA     #$0A                    ; \  divisor = $000A = 10
+    STA     NUM_DIVISOR             ; /  (high byte already 0)
+    JSR     .extract_digit          ; tens digit
+    LDA     #$01                    ; \  divisor = $0001 = 1
+    STA     NUM_DIVISOR             ;  |
+    STA     NUM_LEADING             ; /  force output (no suppress)
+    JSR     .extract_digit          ; ones digit
+    RTS
+
+; --- Digit extraction helper ($0DE1) ---
+; Divides $BC/$BD by $5A1C/$5A1D via repeated subtraction.
+; Stores ASCII digit at ($BA),Y. Suppresses leading zeros.
+.extract_digit:
+    LDA     #$B0                    ; digit = '0' (high ASCII)
+    STA     NUM_DIGIT
+.cmp_loop:
+    LDX     #$01                    ; start comparing high byte
+.cmp_x:
+    LDA     $BC,X                   ; \
+    CMP     NUM_DIVISOR,X           ;  | compare $BC/$BD with divisor
+    BCC     .output                 ;  | if less, done (digit found)
+    BNE     .subtract               ; /  if greater, subtract
+    DEX                             ; \  high bytes equal: check low
+    BNE     .subtract               ; /  (if X was 1, now 0 -> recompare)
+    JMP     .cmp_x                  ;    compare low byte (X=0)
+.subtract:
+    SEC                             ; \
+    LDA     $BC                     ;  | $BC/$BD -= divisor
+    SBC     NUM_DIVISOR             ;  |
+    STA     $BC                     ;  |
+    LDA     $BD                     ;  |
+    SBC     NUM_DIVISOR+1           ;  |
+    STA     $BD                     ; /
+    INC     NUM_DIGIT               ; digit++
+    JMP     .cmp_loop               ; try again (reset X=1)
+.output:
+    LDA     NUM_DIGIT               ; \
+    CMP     #$B0                    ;  | if digit is '0'
+    BNE     .store                  ;  |   and leading-zero suppress active
+    LDA     NUM_LEADING             ;  |   skip output
+    CMP     #$01                    ;  |
+    BNE     .skip                   ; /
+    LDA     #$B0                    ; (reload '0' for final digit)
+.store:
+    STA     ($BA),Y                 ; store digit at output buffer
+    LDA     #$01                    ; \  clear leading-zero suppress
+    STA     NUM_LEADING             ; /  (first nonzero digit seen)
+.skip:
+    INY                             ; advance output index
+    RTS
+@ %def NUM_TO_DECIMAL NUM_TO_DECIMAL_CONT
 
 \subsection{compute\_scene\_ptr (\$0C32)}
 
@@ -5404,9 +5558,12 @@ The following root chunks produce the assembly files when tangled.
 <<clamp char field>>
 <<find entity at pos>>
 <<get entity fontchar>>
+<<print mob name>>
 <<colrow to pos>>
+<<num to decimal>>
 <<draw char at pos>>
 <<random in range>>
+<<advance group link>>
 <<render font char>>
 <<draw blink alt>>
 <<draw blink char>>

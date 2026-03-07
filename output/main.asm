@@ -196,6 +196,9 @@ DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random tests
 PRNG_STATE          EQU     $5A19   ; PRNG full state: val = 69*val + $53 (mod 256)
 PRNG_TEMP           EQU     $5A1A   ; PRNG temporary for multiplication
+NUM_DIGIT           EQU     $5A1B   ; current digit accumulator (ASCII $B0-$B9)
+NUM_DIVISOR         EQU     $5A1C   ; 16-bit divisor for decimal conversion (2 bytes)
+NUM_LEADING         EQU     $5A1E   ; leading-zero suppress flag (0=suppress, 1=print)
 GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
 LOCATION_FLAG       EQU     $5A55   ; location-change flag
@@ -972,6 +975,17 @@ GET_ENTITY_FONTCHAR:
     LDA     ($BA),Y                 ; byte 4 = appearance
     JSR     APPEARANCE_TO_FONTCHAR
     JMP     .store
+    ORG     $0D8A
+PRINT_MOB_NAME:
+    SUBROUTINE
+
+    LDY     #$00                    ; \
+    LDA     ($F8),Y                 ;  | $BC/$BD = bytes 0-1 of ($F8)
+    STA     $BC                     ;  | (name string pointer)
+    INY                             ;  |
+    LDA     ($F8),Y                 ;  |
+    STA     $BD                     ; /
+    JMP     $7705                   ; center and print on row 23
     ORG     $0D98
 COLROW_TO_POS:
     SUBROUTINE
@@ -985,6 +999,78 @@ COLROW_TO_POS:
     ADC     #$14                ; A += 20
     BCC     .loop               ; no overflow → continue
                                 ; carry set → return (overflow)
+    ORG     $0DA1
+NUM_TO_DECIMAL:
+    SUBROUTINE
+
+    LDY     #$00                    ; output index = 0
+    STY     NUM_LEADING             ; leading-zero flag = 0 (suppress)
+NUM_TO_DECIMAL_CONT:
+    LDA     #$10                    ; \  divisor = $2710 = 10000
+    STA     NUM_DIVISOR             ;  |
+    LDA     #$27                    ;  |
+    STA     NUM_DIVISOR+1           ; /
+    JSR     .extract_digit          ; ten-thousands digit
+    LDA     #$E8                    ; \  divisor = $03E8 = 1000
+    STA     NUM_DIVISOR             ;  |
+    LDA     #$03                    ;  |
+    STA     NUM_DIVISOR+1           ; /
+    JSR     .extract_digit          ; thousands digit
+    LDA     #$64                    ; \  divisor = $0064 = 100
+    STA     NUM_DIVISOR             ;  |
+    LDA     #$00                    ;  |
+    STA     NUM_DIVISOR+1           ; /
+    JSR     .extract_digit          ; hundreds digit
+    LDA     #$0A                    ; \  divisor = $000A = 10
+    STA     NUM_DIVISOR             ; /  (high byte already 0)
+    JSR     .extract_digit          ; tens digit
+    LDA     #$01                    ; \  divisor = $0001 = 1
+    STA     NUM_DIVISOR             ;  |
+    STA     NUM_LEADING             ; /  force output (no suppress)
+    JSR     .extract_digit          ; ones digit
+    RTS
+
+; --- Digit extraction helper ($0DE1) ---
+; Divides $BC/$BD by $5A1C/$5A1D via repeated subtraction.
+; Stores ASCII digit at ($BA),Y. Suppresses leading zeros.
+.extract_digit:
+    LDA     #$B0                    ; digit = '0' (high ASCII)
+    STA     NUM_DIGIT
+.cmp_loop:
+    LDX     #$01                    ; start comparing high byte
+.cmp_x:
+    LDA     $BC,X                   ; \
+    CMP     NUM_DIVISOR,X           ;  | compare $BC/$BD with divisor
+    BCC     .output                 ;  | if less, done (digit found)
+    BNE     .subtract               ; /  if greater, subtract
+    DEX                             ; \  high bytes equal: check low
+    BNE     .subtract               ; /  (if X was 1, now 0 -> recompare)
+    JMP     .cmp_x                  ;    compare low byte (X=0)
+.subtract:
+    SEC                             ; \
+    LDA     $BC                     ;  | $BC/$BD -= divisor
+    SBC     NUM_DIVISOR             ;  |
+    STA     $BC                     ;  |
+    LDA     $BD                     ;  |
+    SBC     NUM_DIVISOR+1           ;  |
+    STA     $BD                     ; /
+    INC     NUM_DIGIT               ; digit++
+    JMP     .cmp_loop               ; try again (reset X=1)
+.output:
+    LDA     NUM_DIGIT               ; \
+    CMP     #$B0                    ;  | if digit is '0'
+    BNE     .store                  ;  |   and leading-zero suppress active
+    LDA     NUM_LEADING             ;  |   skip output
+    CMP     #$01                    ;  |
+    BNE     .skip                   ; /
+    LDA     #$B0                    ; (reload '0' for final digit)
+.store:
+    STA     ($BA),Y                 ; store digit at output buffer
+    LDA     #$01                    ; \  clear leading-zero suppress
+    STA     NUM_LEADING             ; /  (first nonzero digit seen)
+.skip:
+    INY                             ; advance output index
+    RTS
     ORG     $1156
 DRAW_CHAR_AT_POS:
     SUBROUTINE
@@ -1075,6 +1161,27 @@ RANDOM_IN_RANGE:
     CLC                             ;  |
     ROR     A                       ;  |
     BCC     .accept                 ; / (always taken: masked bit is 0)
+    ORG     $12FA
+ADVANCE_FA_F4:
+    SUBROUTINE
+
+    LDY     #$02                    ; \
+    LDA     ($FA),Y                 ;  | check byte 2 of ($FA)
+    BNE     .resolve                ; /  if nonzero, resolve it
+ADVANCE_F4:
+    LDY     #$02                    ; \
+    LDA     ($F4),Y                 ;  | check byte 2 of ($F4)
+    BNE     .resolve                ; /  if nonzero, resolve it
+    STA     $F4                     ; \  end of chain:
+    STA     $F5                     ; /  null out $F4/$F5
+    RTS
+.resolve:
+    JSR     GET_MOB_DATA            ; resolve link -> $BA/$BB
+    LDA     $BA                     ; \
+    STA     $F4                     ;  | $F4/$F5 = $BA/$BB
+    LDA     $BB                     ;  | (advance to next record)
+    STA     $F5                     ; /
+    RTS
     ORG     $7489
 RENDER_FONT_CHAR:
     SUBROUTINE
