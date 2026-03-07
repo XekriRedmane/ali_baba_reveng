@@ -5702,81 +5702,567 @@ skip first-visit logic on subsequent entries.
 
 The sentinel {\Tt{}FFFF\nwendquote} in the name pointer marks the end of the table.
 
-; name_ptr mob  min   max   map  event_ptr cnt
-;            hd  pos   pos   id             ;
 \nwenddocs{}\nwbegincode{333}\sublabel{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}}}\moddef{Location data~{\nwtagstyle{}\subpageref{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
 \nwlinkedidentc{LOCATION_DATA}{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}:
-    ;  0: ALI BABA HOME         mob=01 (6,9)-(9,13) map=01 cnt=01
+    ; --- 0: ALI BABA HOME ---
     DC.W s_ALI_BABA_HOME
-    HEX  01
-    DC.B 20*6+9
-    DC.B 20*9+13
-    HEX  01
-    DC.W 451E
-    DC.B 01
+    DC.B $01                     ; mob head $01
+    DC.B 20*6+9                  ; min pos (6,9)
+    DC.B 20*9+13                 ; max pos (9,13)
+    DC.B $01                     ; map 1
+    DC.W ev_ali_baba_home
+    DC.B $01
 
-    HEX 4E 42 00 43 8B 01 27 45 00 ;  1: DUSTY ROAD              mob=00 (3,7)-(6,19)   map=01
-    HEX 59 42 3F 00 BB 01 42 45 00 ;  2: SULTAN'S PALACE          mob=3F (0,0)-(9,7)    map=01
-    HEX 69 42 00 07 4C 01 5D 45 00 ;  3: ROYAL LIBRARY            mob=00 (0,7)-(3,16)   map=01
-    HEX 77 42 4A 03 C4 25 78 45 00 ;  4: ASTROLOGER'S LAB         mob=4A (0,3)-(9,16)   map=25
-    HEX 88 42 51 00 72 29 AB 45 00 ;  5: BEAR CAVE                mob=51 (0,0)-(5,14)   map=29
-    HEX 92 42 52 64 C2 29 CF 45 00 ;  6: RATS NEST                mob=52 (5,0)-(9,14)   map=29
-    HEX 9C 42 5F 52 BD 49 DE 45 00 ;  7: DRAGON LAIR              mob=5F (4,2)-(9,9)    map=49
-    HEX A8 42 60 59 C4 49 ED 45 00 ;  8: GOLD FOR THE LUCKY       mob=60 (4,9)-(9,16)   map=49
-    HEX BB 42 00 02 60 49 11 46 00 ;  9: SAVE THE WHALES          mob=00 (0,2)-(4,16)   map=49
-    HEX CB 42 00 01 B7 60 3E 46 00 ; 10: SLIDE                    mob=00 (0,1)-(9,3)    map=60
-    HEX D1 42 00 17 95 61 56 46 00 ; 11: DEEP DARK STAIRWAY       mob=00 (1,3)-(7,9)    map=61
-    HEX E4 42 6A 03 C4 62 8C 46 00 ; 12: MINOTAUR LABYRINTH       mob=6A (0,3)-(9,16)   map=62
-    HEX F7 42 5C 67 BC 48 22 47 00 ; 13: STINGER STREWN CELL      mob=5C (5,3)-(9,8)    map=48
-    HEX 0B 43 57 03 74 48 34 47 00 ; 14: GUARD ROOM               mob=57 (0,3)-(5,16)   map=48
-    HEX 16 43 5E 6F C4 48 43 47 00 ; 15: LONG WAY FROM HOME       mob=5E (5,11)-(9,16)  map=48
-    HEX 29 43 43 00 C1 04 55 47 00 ; 16: FOREST                   mob=43 (0,0)-(9,13)   map=04
-    HEX 30 43 00 21 9F 04 8E 47 00 ; 17: VIEW FROM A TREE         mob=00 (1,13)-(7,19)  map=04
-    HEX 41 43 6B 14 AE 64 A9 47 00 ; 18: FAILING WALL             mob=6B (1,0)-(8,14)   map=64
-    HEX 4E 43 6C 19 B3 65 D0 47 00 ; 19: MINOTAUR PLAYROOM        mob=6C (1,5)-(8,19)   map=65
-    HEX 60 43 00 03 C4 21 EB 47 00 ; 20: THIEVES CAVE             mob=00 (0,3)-(9,16)   map=21
-    HEX 6D 43 62 1E B2 40 18 48 00 ; 21: O                        mob=62 (1,10)-(8,18)  map=40
-    HEX 6F 43 00 1A 96 46 2D 48 00 ; 22: SPIRAL STAIRCASE         mob=00 (1,6)-(7,10)   map=46
-    HEX 80 43 63 15 B2 41 45 48 00 ; 23: Y                        mob=63 (1,1)-(8,18)   map=41
-    HEX 82 43 00 6D C1 60 60 48 00 ; 24: MAGIC TOURBILLION        mob=00 (5,9)-(9,13)   map=60
-    HEX 94 43 64 15 B2 42 72 48 00 ; 25: G.                       mob=64 (1,1)-(8,18)   map=42
-    HEX 97 43 00 2B AF 22 81 48 00 ; 26: CRYSTAL CAVE             mob=00 (2,3)-(8,15)   map=22
-    HEX A4 43 00 15 B2 43 CF 48 00 ; 27: B                        mob=00 (1,1)-(8,18)   map=43
-    HEX A6 43 1B 54 C1 05 EA 48 00 ; 28: THIEVES CLEARING         mob=1B (4,4)-(9,13)   map=05
-    HEX B7 43 47 14 63 05 F9 48 00 ; 29: OLD MINE ROAD            mob=47 (1,0)-(4,19)   map=05
-    HEX C5 43 45 15 B2 02 20 49 00 ; 30: FOOTHILLS CEMETERY       mob=45 (1,1)-(8,18)   map=02
-    HEX D8 43 68 15 B2 44 44 49 00 ; 31: I                        mob=68 (1,1)-(8,18)   map=44
-    HEX DA 43 00 07 4A 60 62 49 00 ; 32: UNDERGROUND STREAM       mob=00 (0,7)-(3,14)   map=60
-    HEX ED 43 69 15 B2 45 86 49 00 ; 33: V                        mob=69 (1,1)-(8,18)   map=45
-    HEX EF 43 55 02 60 20 95 49 00 ; 34: GEMINI                   mob=55 (0,2)-(4,16)   map=20
-    HEX F6 43 61 15 AA 40 A1 49 00 ; 35: R                        mob=61 (1,1)-(8,10)   map=40
-    HEX F8 43 00 40 72 06 C5 49 00 ; 36: OLD MINE SHAFT           mob=00 (3,4)-(5,14)   map=06
-    HEX 07 44 00 06 BE 47 D7 49 00 ; 37: GILDED PATHWAY           mob=00 (0,6)-(9,10)   map=47
-    HEX 16 44 6D 3C BB 63 F8 49 00 ; 38: MINOTAUR'S DEN           mob=6D (3,0)-(9,7)    map=63
-    HEX 25 44 00 7F C4 63 07 4A 00 ; 39: MINOTAUR'S VAULT         mob=00 (6,7)-(9,16)   map=63
-    HEX 36 44 00 0B 88 63 19 4A 00 ; 40: INNER STAIRCASE          mob=00 (0,11)-(6,16)  map=63
-    HEX 46 44 00 14 47 63 3D 4A 00 ; 41: SECRET PASSAGEWAY        mob=00 (1,0)-(3,11)   map=63
-    HEX 58 44 3A 18 A9 26 49 4A 00 ; 42: VIRGO                    mob=3A (1,4)-(8,9)    map=26
-    HEX 5E 44 4B 14 A4 26 55 4A 00 ; 43: LEO                      mob=4B (1,0)-(8,4)    map=26
-    HEX 62 44 00 1D AE 26 64 4A 00 ; 44: LIBRA                    mob=00 (1,9)-(8,14)   map=26
-    HEX 68 44 4C 22 B3 26 73 4A 00 ; 45: SCORPIUS                 mob=4C (1,14)-(8,19)  map=26
-    HEX 71 44 12 50 C4 27 82 4A 00 ; 46: SAGITTARIUS              mob=12 (4,0)-(9,16)   map=27
-    HEX 7D 44 00 00 60 27 94 4A 00 ; 47: CAPRICORNUS              mob=00 (0,0)-(4,16)   map=27
-    HEX 89 44 00 23 B3 24 B8 4A 00 ; 48: AQUARIUS                 mob=00 (1,15)-(8,19)  map=24
-    HEX 92 44 00 1F AF 24 CA 4A 00 ; 49: PISCES                   mob=00 (1,11)-(8,15)  map=24
-    HEX 99 44 00 1C AB 24 DC 4A 00 ; 50: HALLWAY                  mob=00 (1,8)-(8,11)   map=24
-    HEX A1 44 4E 18 A8 24 EB 4A 00 ; 51: ARIES                    mob=4E (1,4)-(8,8)    map=24
-    HEX A7 44 4D 14 A4 24 FA 4A 00 ; 52: TAURUS                   mob=4D (1,0)-(8,4)    map=24
-    HEX AE 44 00 02 60 20 0C 4B 00 ; 53: GEMINI                   mob=00 (0,2)-(4,16)   map=20
-    HEX B5 44 4F 66 C4 20 21 4B 00 ; 54: CANCER                   mob=4F (5,2)-(9,16)   map=20
-    HEX BC 44 49 02 C4 07 33 4B 00 ; 55: THE MOUNTAIN             mob=49 (0,2)-(9,16)   map=07
-    HEX C9 44 3C 18 AD 03 7B 4B 00 ; 56: SHAHRIAR TREASURY        mob=3C (1,4)-(8,13)   map=03
-    HEX DB 44 00 0E C4 28 93 4B 00 ; 57: AIR VENT                 mob=00 (0,14)-(9,16)  map=28
-    HEX E4 44 00 7E C2 28 AB 4B 00 ; 58: DESERTED TUNNEL          mob=00 (6,6)-(9,14)   map=28
-    HEX F4 44 00 3C B6 28 C6 4B 00 ; 59: ROY G. BIV               mob=00 (3,0)-(9,2)    map=28
-    HEX FF 44 50 02 86 28 DE 4B 00 ; 60: JACKAL ALTAR             mob=50 (0,2)-(6,14)   map=28
-    HEX 0C 45 14 03 C4 23 0E 4C 00 ; 61: ASTROLOGER'S MAZE        mob=14 (0,3)-(9,16)   map=23
-    HEX FF FF
+    ; --- 1: DUSTY ROAD ---
+    DC.W s_DUSTY_ROAD
+    DC.B $00                     ; no mobs
+    DC.B 20*3+7                  ; min pos (3,7)
+    DC.B 20*6+19                 ; max pos (6,19)
+    DC.B $01                     ; map 1
+    DC.W ev_dusty_road
+    DC.B $00
+
+    ; --- 2: SULTAN'S PALACE ---
+    DC.W s_SULTANS_PALACE
+    DC.B $3F                     ; mob head $3F
+    DC.B 20*0+0                  ; min pos (0,0)
+    DC.B 20*9+7                  ; max pos (9,7)
+    DC.B $01                     ; map 1
+    DC.W ev_sultans_palace
+    DC.B $00
+
+    ; --- 3: ROYAL LIBRARY ---
+    DC.W s_ROYAL_LIBRARY
+    DC.B $00                     ; no mobs
+    DC.B 20*0+7                  ; min pos (0,7)
+    DC.B 20*3+16                 ; max pos (3,16)
+    DC.B $01                     ; map 1
+    DC.W ev_royal_library
+    DC.B $00
+
+    ; --- 4: ASTROLOGER'S LAB ---
+    DC.W s_ASTROLOGERS_LAB
+    DC.B $4A                     ; mob head $4A
+    DC.B 20*0+3                  ; min pos (0,3)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $25                     ; map 37
+    DC.W ev_astrologers_lab
+    DC.B $00
+
+    ; --- 5: BEAR CAVE ---
+    DC.W s_BEAR_CAVE
+    DC.B $51                     ; mob head $51
+    DC.B 20*0+0                  ; min pos (0,0)
+    DC.B 20*5+14                 ; max pos (5,14)
+    DC.B $29                     ; map 41
+    DC.W ev_bear_cave
+    DC.B $00
+
+    ; --- 6: RATS NEST ---
+    DC.W s_RATS_NEST
+    DC.B $52                     ; mob head $52
+    DC.B 20*5+0                  ; min pos (5,0)
+    DC.B 20*9+14                 ; max pos (9,14)
+    DC.B $29                     ; map 41
+    DC.W ev_rats_nest
+    DC.B $00
+
+    ; --- 7: DRAGON LAIR ---
+    DC.W s_DRAGON_LAIR
+    DC.B $5F                     ; mob head $5F
+    DC.B 20*4+2                  ; min pos (4,2)
+    DC.B 20*9+9                  ; max pos (9,9)
+    DC.B $49                     ; map 73
+    DC.W ev_dragon_lair
+    DC.B $00
+
+    ; --- 8: GOLD FOR THE LUCKY ---
+    DC.W s_GOLD_FOR_THE_LUCKY
+    DC.B $60                     ; mob head $60
+    DC.B 20*4+9                  ; min pos (4,9)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $49                     ; map 73
+    DC.W ev_gold_for_the_lucky
+    DC.B $00
+
+    ; --- 9: SAVE THE WHALES ---
+    DC.W s_SAVE_THE_WHALES
+    DC.B $00                     ; no mobs
+    DC.B 20*0+2                  ; min pos (0,2)
+    DC.B 20*4+16                 ; max pos (4,16)
+    DC.B $49                     ; map 73
+    DC.W ev_save_the_whales
+    DC.B $00
+
+    ; --- 10: SLIDE ---
+    DC.W s_SLIDE
+    DC.B $00                     ; no mobs
+    DC.B 20*0+1                  ; min pos (0,1)
+    DC.B 20*9+3                  ; max pos (9,3)
+    DC.B $60                     ; map 96
+    DC.W ev_slide
+    DC.B $00
+
+    ; --- 11: DEEP DARK STAIRWAY ---
+    DC.W s_DEEP_DARK_STAIRWAY
+    DC.B $00                     ; no mobs
+    DC.B 20*1+3                  ; min pos (1,3)
+    DC.B 20*7+9                  ; max pos (7,9)
+    DC.B $61                     ; map 97
+    DC.W ev_deep_dark_stairway
+    DC.B $00
+
+    ; --- 12: MINOTAUR LABYRINTH ---
+    DC.W s_MINOTAUR_LABYRINTH
+    DC.B $6A                     ; mob head $6A
+    DC.B 20*0+3                  ; min pos (0,3)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $62                     ; map 98
+    DC.W ev_minotaur_labyrinth
+    DC.B $00
+
+    ; --- 13: STINGER STREWN CELL ---
+    DC.W s_STINGER_STREWN_CELL
+    DC.B $5C                     ; mob head $5C
+    DC.B 20*5+3                  ; min pos (5,3)
+    DC.B 20*9+8                  ; max pos (9,8)
+    DC.B $48                     ; map 72
+    DC.W ev_stinger_strewn_cell
+    DC.B $00
+
+    ; --- 14: GUARD ROOM ---
+    DC.W s_GUARD_ROOM
+    DC.B $57                     ; mob head $57
+    DC.B 20*0+3                  ; min pos (0,3)
+    DC.B 20*5+16                 ; max pos (5,16)
+    DC.B $48                     ; map 72
+    DC.W ev_guard_room
+    DC.B $00
+
+    ; --- 15: LONG WAY FROM HOME ---
+    DC.W s_LONG_WAY_FROM_HOME
+    DC.B $5E                     ; mob head $5E
+    DC.B 20*5+11                 ; min pos (5,11)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $48                     ; map 72
+    DC.W ev_long_way_from_home
+    DC.B $00
+
+    ; --- 16: FOREST ---
+    DC.W s_FOREST
+    DC.B $43                     ; mob head $43
+    DC.B 20*0+0                  ; min pos (0,0)
+    DC.B 20*9+13                 ; max pos (9,13)
+    DC.B $04                     ; map 4
+    DC.W ev_forest
+    DC.B $00
+
+    ; --- 17: VIEW FROM A TREE ---
+    DC.W s_VIEW_FROM_A_TREE
+    DC.B $00                     ; no mobs
+    DC.B 20*1+13                 ; min pos (1,13)
+    DC.B 20*7+19                 ; max pos (7,19)
+    DC.B $04                     ; map 4
+    DC.W ev_view_from_a_tree
+    DC.B $00
+
+    ; --- 18: FAILING WALL ---
+    DC.W s_FAILING_WALL
+    DC.B $6B                     ; mob head $6B
+    DC.B 20*1+0                  ; min pos (1,0)
+    DC.B 20*8+14                 ; max pos (8,14)
+    DC.B $64                     ; map 100
+    DC.W ev_failing_wall
+    DC.B $00
+
+    ; --- 19: MINOTAUR PLAYROOM ---
+    DC.W s_MINOTAUR_PLAYROOM
+    DC.B $6C                     ; mob head $6C
+    DC.B 20*1+5                  ; min pos (1,5)
+    DC.B 20*8+19                 ; max pos (8,19)
+    DC.B $65                     ; map 101
+    DC.W ev_minotaur_playroom
+    DC.B $00
+
+    ; --- 20: THIEVES CAVE ---
+    DC.W s_THIEVES_CAVE
+    DC.B $00                     ; no mobs
+    DC.B 20*0+3                  ; min pos (0,3)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $21                     ; map 33
+    DC.W ev_thieves_cave
+    DC.B $00
+
+    ; --- 21: O ---
+    DC.W s_O
+    DC.B $62                     ; mob head $62
+    DC.B 20*1+10                 ; min pos (1,10)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $40                     ; map 64
+    DC.W ev_o
+    DC.B $00
+
+    ; --- 22: SPIRAL STAIRCASE ---
+    DC.W s_SPIRAL_STAIRCASE
+    DC.B $00                     ; no mobs
+    DC.B 20*1+6                  ; min pos (1,6)
+    DC.B 20*7+10                 ; max pos (7,10)
+    DC.B $46                     ; map 70
+    DC.W ev_spiral_staircase
+    DC.B $00
+
+    ; --- 23: Y ---
+    DC.W s_Y
+    DC.B $63                     ; mob head $63
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $41                     ; map 65
+    DC.W ev_y
+    DC.B $00
+
+    ; --- 24: MAGIC TOURBILLION ---
+    DC.W s_MAGIC_TOURBILLION
+    DC.B $00                     ; no mobs
+    DC.B 20*5+9                  ; min pos (5,9)
+    DC.B 20*9+13                 ; max pos (9,13)
+    DC.B $60                     ; map 96
+    DC.W ev_magic_tourbillion
+    DC.B $00
+
+    ; --- 25: G. ---
+    DC.W s_G
+    DC.B $64                     ; mob head $64
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $42                     ; map 66
+    DC.W ev_g
+    DC.B $00
+
+    ; --- 26: CRYSTAL CAVE ---
+    DC.W s_CRYSTAL_CAVE
+    DC.B $00                     ; no mobs
+    DC.B 20*2+3                  ; min pos (2,3)
+    DC.B 20*8+15                 ; max pos (8,15)
+    DC.B $22                     ; map 34
+    DC.W ev_crystal_cave
+    DC.B $00
+
+    ; --- 27: B ---
+    DC.W s_B
+    DC.B $00                     ; no mobs
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $43                     ; map 67
+    DC.W ev_b
+    DC.B $00
+
+    ; --- 28: THIEVES CLEARING ---
+    DC.W s_THIEVES_CLEARING
+    DC.B $1B                     ; mob head $1B
+    DC.B 20*4+4                  ; min pos (4,4)
+    DC.B 20*9+13                 ; max pos (9,13)
+    DC.B $05                     ; map 5
+    DC.W ev_thieves_clearing
+    DC.B $00
+
+    ; --- 29: OLD MINE ROAD ---
+    DC.W s_OLD_MINE_ROAD
+    DC.B $47                     ; mob head $47
+    DC.B 20*1+0                  ; min pos (1,0)
+    DC.B 20*4+19                 ; max pos (4,19)
+    DC.B $05                     ; map 5
+    DC.W ev_old_mine_road
+    DC.B $00
+
+    ; --- 30: FOOTHILLS CEMETERY ---
+    DC.W s_FOOTHILLS_CEMETERY
+    DC.B $45                     ; mob head $45
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $02                     ; map 2
+    DC.W ev_foothills_cemetery
+    DC.B $00
+
+    ; --- 31: I ---
+    DC.W s_I
+    DC.B $68                     ; mob head $68
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $44                     ; map 68
+    DC.W ev_i
+    DC.B $00
+
+    ; --- 32: UNDERGROUND STREAM ---
+    DC.W s_UNDERGROUND_STREAM
+    DC.B $00                     ; no mobs
+    DC.B 20*0+7                  ; min pos (0,7)
+    DC.B 20*3+14                 ; max pos (3,14)
+    DC.B $60                     ; map 96
+    DC.W ev_underground_stream
+    DC.B $00
+
+    ; --- 33: V ---
+    DC.W s_V
+    DC.B $69                     ; mob head $69
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $45                     ; map 69
+    DC.W ev_v
+    DC.B $00
+
+    ; --- 34: GEMINI ---
+    DC.W s_GEMINI
+    DC.B $55                     ; mob head $55
+    DC.B 20*0+2                  ; min pos (0,2)
+    DC.B 20*4+16                 ; max pos (4,16)
+    DC.B $20                     ; map 32
+    DC.W ev_gemini
+    DC.B $00
+
+    ; --- 35: R ---
+    DC.W s_R
+    DC.B $61                     ; mob head $61
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+10                 ; max pos (8,10)
+    DC.B $40                     ; map 64
+    DC.W ev_r
+    DC.B $00
+
+    ; --- 36: OLD MINE SHAFT ---
+    DC.W s_OLD_MINE_SHAFT
+    DC.B $00                     ; no mobs
+    DC.B 20*3+4                  ; min pos (3,4)
+    DC.B 20*5+14                 ; max pos (5,14)
+    DC.B $06                     ; map 6
+    DC.W ev_old_mine_shaft
+    DC.B $00
+
+    ; --- 37: GILDED PATHWAY ---
+    DC.W s_GILDED_PATHWAY
+    DC.B $00                     ; no mobs
+    DC.B 20*0+6                  ; min pos (0,6)
+    DC.B 20*9+10                 ; max pos (9,10)
+    DC.B $47                     ; map 71
+    DC.W ev_gilded_pathway
+    DC.B $00
+
+    ; --- 38: MINOTAUR'S DEN ---
+    DC.W s_MINOTAURS_DEN
+    DC.B $6D                     ; mob head $6D
+    DC.B 20*3+0                  ; min pos (3,0)
+    DC.B 20*9+7                  ; max pos (9,7)
+    DC.B $63                     ; map 99
+    DC.W ev_minotaurs_den
+    DC.B $00
+
+    ; --- 39: MINOTAUR'S VAULT ---
+    DC.W s_MINOTAURS_VAULT
+    DC.B $00                     ; no mobs
+    DC.B 20*6+7                  ; min pos (6,7)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $63                     ; map 99
+    DC.W ev_minotaurs_vault
+    DC.B $00
+
+    ; --- 40: INNER STAIRCASE ---
+    DC.W s_INNER_STAIRCASE
+    DC.B $00                     ; no mobs
+    DC.B 20*0+11                 ; min pos (0,11)
+    DC.B 20*6+16                 ; max pos (6,16)
+    DC.B $63                     ; map 99
+    DC.W ev_inner_staircase
+    DC.B $00
+
+    ; --- 41: SECRET PASSAGEWAY ---
+    DC.W s_SECRET_PASSAGEWAY
+    DC.B $00                     ; no mobs
+    DC.B 20*1+0                  ; min pos (1,0)
+    DC.B 20*3+11                 ; max pos (3,11)
+    DC.B $63                     ; map 99
+    DC.W ev_secret_passageway
+    DC.B $00
+
+    ; --- 42: VIRGO ---
+    DC.W s_VIRGO
+    DC.B $3A                     ; mob head $3A
+    DC.B 20*1+4                  ; min pos (1,4)
+    DC.B 20*8+9                  ; max pos (8,9)
+    DC.B $26                     ; map 38
+    DC.W ev_virgo
+    DC.B $00
+
+    ; --- 43: LEO ---
+    DC.W s_LEO
+    DC.B $4B                     ; mob head $4B
+    DC.B 20*1+0                  ; min pos (1,0)
+    DC.B 20*8+4                  ; max pos (8,4)
+    DC.B $26                     ; map 38
+    DC.W ev_leo
+    DC.B $00
+
+    ; --- 44: LIBRA ---
+    DC.W s_LIBRA
+    DC.B $00                     ; no mobs
+    DC.B 20*1+9                  ; min pos (1,9)
+    DC.B 20*8+14                 ; max pos (8,14)
+    DC.B $26                     ; map 38
+    DC.W ev_libra
+    DC.B $00
+
+    ; --- 45: SCORPIUS ---
+    DC.W s_SCORPIUS
+    DC.B $4C                     ; mob head $4C
+    DC.B 20*1+14                 ; min pos (1,14)
+    DC.B 20*8+19                 ; max pos (8,19)
+    DC.B $26                     ; map 38
+    DC.W ev_scorpius
+    DC.B $00
+
+    ; --- 46: SAGITTARIUS ---
+    DC.W s_SAGITTARIUS
+    DC.B $12                     ; mob head $12
+    DC.B 20*4+0                  ; min pos (4,0)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $27                     ; map 39
+    DC.W ev_sagittarius
+    DC.B $00
+
+    ; --- 47: CAPRICORNUS ---
+    DC.W s_CAPRICORNUS
+    DC.B $00                     ; no mobs
+    DC.B 20*0+0                  ; min pos (0,0)
+    DC.B 20*4+16                 ; max pos (4,16)
+    DC.B $27                     ; map 39
+    DC.W ev_capricornus
+    DC.B $00
+
+    ; --- 48: AQUARIUS ---
+    DC.W s_AQUARIUS
+    DC.B $00                     ; no mobs
+    DC.B 20*1+15                 ; min pos (1,15)
+    DC.B 20*8+19                 ; max pos (8,19)
+    DC.B $24                     ; map 36
+    DC.W ev_aquarius
+    DC.B $00
+
+    ; --- 49: PISCES ---
+    DC.W s_PISCES
+    DC.B $00                     ; no mobs
+    DC.B 20*1+11                 ; min pos (1,11)
+    DC.B 20*8+15                 ; max pos (8,15)
+    DC.B $24                     ; map 36
+    DC.W ev_pisces
+    DC.B $00
+
+    ; --- 50: HALLWAY ---
+    DC.W s_HALLWAY
+    DC.B $00                     ; no mobs
+    DC.B 20*1+8                  ; min pos (1,8)
+    DC.B 20*8+11                 ; max pos (8,11)
+    DC.B $24                     ; map 36
+    DC.W ev_hallway
+    DC.B $00
+
+    ; --- 51: ARIES ---
+    DC.W s_ARIES
+    DC.B $4E                     ; mob head $4E
+    DC.B 20*1+4                  ; min pos (1,4)
+    DC.B 20*8+8                  ; max pos (8,8)
+    DC.B $24                     ; map 36
+    DC.W ev_aries
+    DC.B $00
+
+    ; --- 52: TAURUS ---
+    DC.W s_TAURUS
+    DC.B $4D                     ; mob head $4D
+    DC.B 20*1+0                  ; min pos (1,0)
+    DC.B 20*8+4                  ; max pos (8,4)
+    DC.B $24                     ; map 36
+    DC.W ev_taurus
+    DC.B $00
+
+    ; --- 53: GEMINI (south) ---
+    DC.W s_GEMINI2
+    DC.B $00                     ; no mobs
+    DC.B 20*0+2                  ; min pos (0,2)
+    DC.B 20*4+16                 ; max pos (4,16)
+    DC.B $20                     ; map 32
+    DC.W ev_gemini2
+    DC.B $00
+
+    ; --- 54: CANCER ---
+    DC.W s_CANCER
+    DC.B $4F                     ; mob head $4F
+    DC.B 20*5+2                  ; min pos (5,2)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $20                     ; map 32
+    DC.W ev_cancer
+    DC.B $00
+
+    ; --- 55: THE MOUNTAIN ---
+    DC.W s_THE_MOUNTAIN
+    DC.B $49                     ; mob head $49
+    DC.B 20*0+2                  ; min pos (0,2)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $07                     ; map 7
+    DC.W ev_the_mountain
+    DC.B $00
+
+    ; --- 56: SHAHRIAR TREASURY ---
+    DC.W s_SHAHRIAR_TREASURY
+    DC.B $3C                     ; mob head $3C
+    DC.B 20*1+4                  ; min pos (1,4)
+    DC.B 20*8+13                 ; max pos (8,13)
+    DC.B $03                     ; map 3
+    DC.W ev_shahriar_treasury
+    DC.B $00
+
+    ; --- 57: AIR VENT ---
+    DC.W s_AIR_VENT
+    DC.B $00                     ; no mobs
+    DC.B 20*0+14                 ; min pos (0,14)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $28                     ; map 40
+    DC.W ev_air_vent
+    DC.B $00
+
+    ; --- 58: DESERTED TUNNEL ---
+    DC.W s_DESERTED_TUNNEL
+    DC.B $00                     ; no mobs
+    DC.B 20*6+6                  ; min pos (6,6)
+    DC.B 20*9+14                 ; max pos (9,14)
+    DC.B $28                     ; map 40
+    DC.W ev_deserted_tunnel
+    DC.B $00
+
+    ; --- 59: ROY G. BIV ---
+    DC.W s_ROY_G_BIV
+    DC.B $00                     ; no mobs
+    DC.B 20*3+0                  ; min pos (3,0)
+    DC.B 20*9+2                  ; max pos (9,2)
+    DC.B $28                     ; map 40
+    DC.W ev_roy_g_biv
+    DC.B $00
+
+    ; --- 60: JACKAL ALTAR ---
+    DC.W s_JACKAL_ALTAR
+    DC.B $50                     ; mob head $50
+    DC.B 20*0+2                  ; min pos (0,2)
+    DC.B 20*6+14                 ; max pos (6,14)
+    DC.B $28                     ; map 40
+    DC.W ev_jackal_altar
+    DC.B $00
+
+    ; --- 61: ASTROLOGER'S MAZE ---
+    DC.W s_ASTROLOGERS_MAZE
+    DC.B $14                     ; mob head $14
+    DC.B 20*0+3                  ; min pos (0,3)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $23                     ; map 35
+    DC.W ev_astrologers_maze
+    DC.B $00
+
+    DC.W $FFFF                  ; end sentinel
 \nwindexdefn{\nwixident{LOCATION{\_}DATA}}{LOCATION:unDATA}{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}\eatline
 \nwidentdefs{\\{{\nwixident{LOCATION{\_}DATA}}{LOCATION:unDATA}}}\nwnotused{Location data}\nwendcode{}\nwbegindocs{334}\nwdocspar
 
@@ -5784,8 +6270,487 @@ The sentinel {\Tt{}FFFF\nwendquote} in the name pointer marks the end of the tab
 \nwlinkedidentc{LOCATION_NAMES}{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}:
 s_ALI_BABA_HOME:
     APSTR "ALI BABA HOME"
+s_DUSTY_ROAD:
+    APSTR "DUSTY ROAD"
+s_SULTANS_PALACE:
+    APSTR "SULTAN'S PALACE"
+s_ROYAL_LIBRARY:
+    APSTR "ROYAL LIBRARY"
+s_ASTROLOGERS_LAB:
+    APSTR "ASTROLOGER'S LAB"
+s_BEAR_CAVE:
+    APSTR "BEAR CAVE"
+s_RATS_NEST:
+    APSTR "RATS NEST"
+s_DRAGON_LAIR:
+    APSTR "DRAGON LAIR"
+s_GOLD_FOR_THE_LUCKY:
+    APSTR "GOLD FOR THE LUCKY"
+s_SAVE_THE_WHALES:
+    APSTR "SAVE THE WHALES"
+s_SLIDE:
+    APSTR "SLIDE"
+s_DEEP_DARK_STAIRWAY:
+    APSTR "DEEP DARK STAIRWAY"
+s_MINOTAUR_LABYRINTH:
+    APSTR "MINOTAUR LABYRINTH"
+s_STINGER_STREWN_CELL:
+    APSTR "STINGER STREWN CELL"
+s_GUARD_ROOM:
+    APSTR "GUARD ROOM"
+s_LONG_WAY_FROM_HOME:
+    APSTR "LONG WAY FROM HOME"
+s_FOREST:
+    APSTR "FOREST"
+s_VIEW_FROM_A_TREE:
+    APSTR "VIEW FROM A TREE"
+s_FAILING_WALL:
+    APSTR "FAILING WALL"
+s_MINOTAUR_PLAYROOM:
+    APSTR "MINOTAUR PLAYROOM"
+s_THIEVES_CAVE:
+    APSTR "THIEVES CAVE"
+s_O:
+    APSTR "O"
+s_SPIRAL_STAIRCASE:
+    APSTR "SPIRAL STAIRCASE"
+s_Y:
+    APSTR "Y"
+s_MAGIC_TOURBILLION:
+    APSTR "MAGIC TOURBILLION"
+s_G:
+    APSTR "G."
+s_CRYSTAL_CAVE:
+    APSTR "CRYSTAL CAVE"
+s_B:
+    APSTR "B"
+s_THIEVES_CLEARING:
+    APSTR "THIEVES CLEARING"
+s_OLD_MINE_ROAD:
+    APSTR "OLD MINE ROAD"
+s_FOOTHILLS_CEMETERY:
+    APSTR "FOOTHILLS CEMETERY"
+s_I:
+    APSTR "I"
+s_UNDERGROUND_STREAM:
+    APSTR "UNDERGROUND STREAM"
+s_V:
+    APSTR "V"
+s_GEMINI:
+    APSTR "GEMINI"
+s_R:
+    APSTR "R"
+s_OLD_MINE_SHAFT:
+    APSTR "OLD MINE SHAFT"
+s_GILDED_PATHWAY:
+    APSTR "GILDED PATHWAY"
+s_MINOTAURS_DEN:
+    APSTR "MINOTAUR'S DEN"
+s_MINOTAURS_VAULT:
+    APSTR "MINOTAUR'S VAULT"
+s_INNER_STAIRCASE:
+    APSTR "INNER STAIRCASE"
+s_SECRET_PASSAGEWAY:
+    APSTR "SECRET PASSAGEWAY"
+s_VIRGO:
+    APSTR "VIRGO"
+s_LEO:
+    APSTR "LEO"
+s_LIBRA:
+    APSTR "LIBRA"
+s_SCORPIUS:
+    APSTR "SCORPIUS"
+s_SAGITTARIUS:
+    APSTR "SAGITTARIUS"
+s_CAPRICORNUS:
+    APSTR "CAPRICORNUS"
+s_AQUARIUS:
+    APSTR "AQUARIUS"
+s_PISCES:
+    APSTR "PISCES"
+s_HALLWAY:
+    APSTR "HALLWAY"
+s_ARIES:
+    APSTR "ARIES"
+s_TAURUS:
+    APSTR "TAURUS"
+s_GEMINI2:
+    APSTR "GEMINI"
+s_CANCER:
+    APSTR "CANCER"
+s_THE_MOUNTAIN:
+    APSTR "THE MOUNTAIN"
+s_SHAHRIAR_TREASURY:
+    APSTR "SHAHRIAR TREASURY"
+s_AIR_VENT:
+    APSTR "AIR VENT"
+s_DESERTED_TUNNEL:
+    APSTR "DESERTED TUNNEL"
+s_ROY_G_BIV:
+    APSTR "ROY G. BIV"
+s_JACKAL_ALTAR:
+    APSTR "JACKAL ALTAR"
+s_ASTROLOGERS_MAZE:
+    APSTR "ASTROLOGER'S MAZE"
 \nwindexdefn{\nwixident{LOCATION{\_}NAMES}}{LOCATION:unNAMES}{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}\eatline
 \nwidentdefs{\\{{\nwixident{LOCATION{\_}NAMES}}{LOCATION:unNAMES}}}\nwnotused{Location names}\nwendcode{}\nwbegindocs{336}\nwdocspar
+
+Each location has an event list: variable-length 3-byte entries terminated
+by {\Tt{}{\textbackslash}{\$}FF\nwendquote}, followed by two {\Tt{}{\textbackslash}{\$}FF\nwendquote} padding bytes.  Entry byte~0 is a
+map position key ({\Tt{}{\textbackslash}{\$}FE\nwendquote}~=~empty slot, {\Tt{}{\textbackslash}{\$}FF\nwendquote}~=~end); bytes~1--2
+contain action/parameter data.
+
+\nwenddocs{}\nwbegincode{337}\sublabel{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}}}\moddef{Location events~{\nwtagstyle{}\subpageref{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwlinkedidentc{LOCATION_EVENTS}{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}:
+ev_ali_baba_home:                       ; 0: ALI BABA HOME
+    HEX FE 00 00 83 82 6F FF FF FF
+
+ev_dusty_road:                          ; 1: DUSTY ROAD
+    HEX FE 00 00 6B 03 6A 45 04 31
+    HEX 83 81 97 4B 04 37 73 D4 48
+    HEX 8A 91 1E 63 9F 3E FF FF FF
+
+ev_sultans_palace:                      ; 2: SULTAN'S PALACE
+    HEX FE 00 00 1B 44 1C 51 C0 19
+    HEX 65 D4 4C 65 79 5C 79 C0 2D
+    HEX 69 D3 46 6B 42 6C FF FF FF
+
+ev_royal_library:                       ; 3: ROYAL LIBRARY
+    HEX FE 00 00 1B 43 1A 1D D2 47
+    HEX 45 02 59 1F D2 51 21 D2 5E
+    HEX 23 D2 5C 4B 02 5F FF FF FF
+
+ev_astrologers_lab:                     ; 4: ASTROLOGER'S LAB
+    HEX FE 00 00 FE 00 00 04 75 8E
+    HEX 07 74 92 0A 73 96 0C 72 99
+    HEX 0F 71 9D 3F 36 37 46 D2 56
+    HEX 4C 70 29 7B 77 9B 88 6F 8D
+    HEX B8 6C 2A BB 2B 2E BF 6D 34
+    HEX C3 6E 38 FF FF FF
+
+ev_bear_cave:                           ; 5: BEAR CAVE
+    HEX FE 00 00 19 FE 1F 1C FE DF
+    HEX 28 BA 37 2D FE 1F 2E C0 96
+    HEX 30 FE 1F 42 FE 1F 43 FE 1F
+    HEX 20 C0 64 70 47 84 FF FF FF
+
+ev_rats_nest:                           ; 6: RATS NEST
+    HEX FE 00 00 70 46 5C 78 BA 87
+    HEX 90 C0 32 FF FF FF
+
+ev_dragon_lair:                         ; 7: DRAGON LAIR
+    HEX FE 00 00 55 0A 41 A5 C1 2C
+    HEX A9 89 AA FF FF FF
+
+ev_gold_for_the_lucky:                  ; 8: GOLD FOR THE LUCKY
+    HEX FE 00 00 5D 0A 49 98 FE 1F
+    HEX 99 FE 1F 9A D3 59 A9 88 A8
+    HEX AB FE 1F AD C0 32 AD C1 F4
+    HEX AE FE 1F C1 AC 2B FF FF FF
+
+ev_save_the_whales:                     ; 9: SAVE THE WHALES
+    HEX FE 00 00 05 4E A5 0E 50 AE
+    HEX 1D FE D6 2A A9 23 30 FE D6
+    HEX 32 FE D6 45 FE D6 31 FE 95
+    HEX 31 D4 5A 31 C9 56 55 08 69
+    HEX 37 D6 E0 5D 09 85 FF FF FF
+
+ev_slide:                               ; 10: SLIDE
+    HEX 2A D3 5D 66 C0 64 02 BE 7E
+    HEX 3E 8B 52 66 8B 7A 8E 8B A2
+    HEX B6 8D 83 FF FF FF
+
+ev_deep_dark_stairway:                  ; 11: DEEP DARK STAIRWAY
+    HEX FE 00 00 18 A2 90 2E FE 1F
+    HEX 2F FE 9F 30 FE 1F 43 FE 9F
+    HEX 44 FE 1F 54 FE 1F 58 FE 1F
+    HEX 68 FE 1F 69 FE 9F 7C FE 1F
+    HEX 7D FE 9F 7E FE 1F 6D 8D 54
+    HEX 81 8D 68 93 13 29 FF FF FF
+
+ev_minotaur_labyrinth:                  ; 12: MINOTAUR LABYRINTH
+    HEX FE 00 00 19 FE DF 1E 8D 1D
+    HEX 1F C0 4B 23 AA 29 2E 8D 19
+    HEX 33 FE 1F 34 FE DF 35 FE 1F
+    HEX 36 FE 1F 37 FE 1F 40 FE DF
+    HEX 43 FE 1F 46 FE 1F 53 8C 6C
+    HEX 55 D3 5F 55 FE DF 58 FE 1F
+    HEX 59 FE DF 5E FE 12 60 A7 51
+    HEX 67 8C 80 68 8D 2C 6A FE 1F
+    HEX 6D 8D 6C 6E 8D 5A 6F FE 1F
+    HEX 71 FE C0 71 FE DA 71 FE 1F
+    HEX 7D 8D 83 7E FE C0 7E 99 AB
+    HEX 80 FE DF 82 8D 81 84 FE 1F
+    HEX 90 FE 04 93 8D 92 94 FE 1F
+    HEX 95 FE 1F 96 FE 9F 97 FE 1F
+    HEX 99 FE 9E 9A FE 1F A5 C0 7D
+    HEX A7 8D 93 A8 A1 1C A9 FE DB
+    HEX AE FE 1E FF FF FF
+
+ev_stinger_strewn_cell:                 ; 13: STINGER STREWN CELL
+    HEX FE 00 00 6A 0F 56 94 59 96
+    HEX A4 C0 E4 B9 0A 19 FF FF FF
+
+ev_guard_room:                          ; 14: GUARD ROOM
+    HEX FE 00 00 09 26 A8 6A 4E 7E
+    HEX 71 50 85 FF FF FF
+
+ev_long_way_from_home:                  ; 15: LONG WAY FROM HOME
+    HEX FE 00 00 71 0F 5D 97 59 98
+    HEX AF C0 88 C2 0A 22 FF FF FF
+
+ev_forest:                              ; 16: FOREST
+    HEX FE 00 00 0A 82 76 17 C0 03
+    HEX 2E D5 90 67 D6 58 33 FE 1F
+    HEX 3F FE 1F 40 FE 1F 45 FE 1F
+    HEX 46 FE 1F 6B FE 1F 7C FE 1F
+    HEX 7F FE 1F 95 FE 1F A1 C0 2F
+    HEX A9 FE 1F 85 92 86 AD 9E 29
+    HEX FF FF FF
+
+ev_view_from_a_tree:                    ; 17: VIEW FROM A TREE
+    HEX FE 00 00 24 95 A5 37 FE 1F
+    HEX 38 FE DF 39 FE 1F 4C D2 4E
+    HEX 85 91 84 9C 9E 2B FF FF FF
+
+ev_failing_wall:                        ; 18: FAILING WALL
+    HEX FE 00 00 31 FE 9E 44 FE 1E
+    HEX 57 FE 1E 6A FE 1E 7E FE 1E
+    HEX 91 FE C0 91 CA 2C 92 FE 1E
+    HEX 8F D5 46 6C FE 19 72 54 6A
+    HEX FF FF FF
+
+ev_minotaur_playroom:                   ; 19: MINOTAUR PLAYROOM
+    HEX FE 00 00 6B FE 19 97 C0 C8
+    HEX 38 94 38 4C 94 4C 61 94 61
+    HEX 76 94 76 26 67 A3 FF FF FF
+
+ev_thieves_cave:                        ; 20: THIEVES CAVE
+    HEX 1A C9 AF 1D C0 1E 20 C0 3C
+    HEX 60 1B 68 7C D3 50 7D FE 1F
+    HEX 7E FE 1F 92 FE 1F A5 D2 4F
+    HEX A6 FE 1F A9 C0 0A AC C9 C8
+    HEX AF C0 19 B9 92 4C FF FF FF
+
+ev_o:                                   ; 21: O
+    HEX FE 00 00 5C D3 57 82 56 83
+    HEX 73 C0 2D 74 FE 89 8A 58 2A
+    HEX FF FF FF
+
+ev_spiral_staircase:                    ; 22: SPIRAL STAIRCASE
+    HEX FE 00 00 1D 7E 23 44 FE 1F
+    HEX 45 FE 1F 6B FE 1F 6C FE 1F
+    HEX 93 18 38 FF FF FF
+
+ev_y:                                   ; 23: Y
+    HEX FE 00 00 24 57 7F 81 FE 1F
+    HEX 82 FE 1F 83 FE 1F 97 FE DF
+    HEX 95 5A 31 96 C9 E6 FF FF FF
+
+ev_magic_tourbillion:                   ; 24: MAGIC TOURBILLION
+    HEX FE 00 00 83 C0 64 97 80 97
+    HEX 82 D5 92 84 D6 A8 FF FF FF
+
+ev_g:                                   ; 25: G.
+    HEX FE 00 00 31 A2 90 8D 1C 39
+    HEX 97 C0 46 FF FF FF
+
+ev_crystal_cave:                        ; 26: CRYSTAL CAVE
+    HEX 31 BA AF 42 FE C0 42 C0 23
+    HEX 5C FE C0 5C C0 19 67 15 5F
+    HEX 6D C0 19 6D FE C0 6D FE C0
+    HEX 6D C0 32 72 FE C0 72 FE C0
+    HEX 72 C0 1E 73 BE 54 90 FE C0
+    HEX 90 FE C0 90 C0 32 94 D3 4D
+    HEX 94 FE C0 94 C0 23 A8 24 2D
+    HEX 84 FE C0 84 FE C0 84 FE C0
+    HEX 84 C0 46 FF FF FF
+
+ev_b:                                   ; 27: B
+    HEX 29 20 9D FE 00 00 33 9C 39
+    HEX 3F 9C 39 59 9C 39 6D 40 AC
+    HEX 8F D6 58 6E 9C 39 FF FF FF
+
+ev_thieves_clearing:                    ; 28: THIEVES CLEARING
+    HEX FE 00 00 58 1E 44 A6 C0 4B
+    HEX 97 C0 19 FF FF FF
+
+ev_old_mine_road:                       ; 29: OLD MINE ROAD
+    HEX FE 00 00 17 92 88 22 B8 AC
+    HEX 4B D6 A8 28 91 AC 43 FE 1F
+    HEX 44 FE DF 58 5D 6C 45 FE 1F
+    HEX 3A D3 4B 3A C0 14 3A 65 55
+    HEX FF FF FF
+
+ev_foothills_cemetery:                  ; 30: FOOTHILLS CEMETERY
+    HEX FE 00 00 3D 82 62 45 FE 5F
+    HEX 58 FE 5F 59 FE 9F 59 C0 64
+    HEX 5A FE 5F 6D FE 5F 81 FE 5F
+    HEX 7E C0 05 9E B8 7B FF FF FF
+
+ev_i:                                   ; 31: I
+    HEX FE 00 00 18 22 90 31 FE 1F
+    HEX 45 FE 1F 59 FE 1F 6D FE 1F
+    HEX 81 FE 9E 90 C0 7D 95 FE 1F
+    HEX FF FF FF
+
+ev_underground_stream:                  ; 32: UNDERGROUND STREAM
+    HEX 1D D3 5B 1D FE D6 1D D1 00
+    HEX 1D C0 32 1D FE D6 1D C0 32
+    HEX 1D FE D6 FE 00 00 34 D6 50
+    HEX 0D 40 AA 49 4D A8 FF FF FF
+
+ev_v:                                   ; 33: V
+    HEX FE 00 00 2E C0 41 3A 24 8E
+    HEX A4 8C 2C FF FF FF
+
+ev_gemini:                              ; 34: GEMINI
+    HEX FE 00 00 38 45 40 55 66 1C
+    HEX FF FF FF
+
+ev_r:                                   ; 35: R
+    HEX FE 00 00 19 1B 94 55 FE 1F
+    HEX 53 D5 82 69 FE 1F 7D FE 1F
+    HEX 91 FE 1F 90 C0 64 92 FE C0
+    HEX 92 C0 41 82 56 83 FF FF FF
+
+ev_old_mine_shaft:                      ; 36: OLD MINE SHAFT
+    HEX FE 00 00 54 9E 3A 59 D3 49
+    HEX 59 FE 1F 5E B5 29 FF FF FF
+
+ev_gilded_pathway:                      ; 37: GILDED PATHWAY
+    HEX FE 00 00 08 A3 41 31 80 97
+    HEX 43 80 AA 44 FE DF 59 C9 00
+    HEX 6B C9 00 93 8F 59 95 FE C9
+    HEX BC 4F 1D FF FF FF
+
+ev_minotaurs_den:                       ; 38: MINOTAUR'S DEN
+    HEX FE 00 00 FE 00 00 50 8D 5F
+    HEX A7 28 A8 FF FF FF
+
+ev_minotaurs_vault:                     ; 39: MINOTAUR'S VAULT
+    HEX FE 00 00 84 29 70 93 27 92
+    HEX AA CA 2C AE C9 C8 FF FF FF
+
+ev_inner_staircase:                     ; 40: INNER STAIRCASE
+    HEX FE 00 00 24 0A 2B 20 FE 1F
+    HEX 21 FE 9F 34 FE 1F 48 FE C0
+    HEX 48 AA 32 5F FE 1F 72 FE 5F
+    HEX 73 FE 1F 84 28 98 FF FF FF
+
+ev_secret_passageway:                   ; 41: SECRET PASSAGEWAY
+    HEX FE 00 00 28 0D 23 33 29 48
+    HEX FF FF FF
+
+ev_virgo:                               ; 42: VIRGO
+    HEX FE 00 00 1A 45 A7 81 6D 82
+    HEX FF FF FF
+
+ev_leo:                                 ; 43: LEO
+    HEX FE 00 00 16 45 A4 8E C0 FA
+    HEX 7C 2B 7D FF FF FF
+
+ev_libra:                               ; 44: LIBRA
+    HEX 20 45 AB 86 6E 87 6F FE B7
+    HEX 98 C9 64 FF FF FF
+
+ev_scorpius:                            ; 45: SCORPIUS
+    HEX 24 45 AF FE 00 00 8B 6F AC
+    HEX 9C C0 96 FF FF FF
+
+ev_sagittarius:                         ; 46: SAGITTARIUS
+    HEX FE 00 00 5C 70 48 7E FE 19
+    HEX 84 D3 53 8C 45 87 FF FF FF
+
+ev_capricornus:                         ; 47: CAPRICORNUS
+    HEX FE 00 00 0C 71 4E 1E FE 1F
+    HEX 28 45 4B 2D FE 0D 31 D4 55
+    HEX 32 FE 1F 37 C9 FA 41 FE 15
+    HEX 34 D6 F8 46 FE 1F FF FF FF
+
+ev_aquarius:                            ; 48: AQUARIUS
+    HEX FE 00 00 39 D1 00 4B 72 4A
+    HEX 61 FE 16 B1 45 23 FF FF FF
+
+ev_pisces:                              ; 49: PISCES
+    HEX FE 00 00 5D FE 95 71 D4 52
+    HEX 85 FE 55 AD 45 20 FF FF FF
+
+ev_hallway:                             ; 50: HALLWAY
+    HEX FE 00 00 1D BE A9 1E BE AA
+    HEX AA 45 1E FF FF FF
+
+ev_aries:                               ; 51: ARIES
+    HEX FE 00 00 40 75 3F 2E C0 64
+    HEX A6 45 1B FF FF FF
+
+ev_taurus:                              ; 52: TAURUS
+    HEX FE 00 00 28 A5 5D 3C 36 19
+    HEX 51 B5 52 A2 45 18 FF FF FF
+
+ev_gemini2:                             ; 53: GEMINI (south)
+    HEX FE 00 00 1C FE 01 44 FE 01
+    HEX 2D C9 64 38 45 40 55 77 7D
+    HEX FF FF FF
+
+ev_cancer:                              ; 54: CANCER
+    HEX FE 00 00 8F C0 32 9C 45 7C
+    HEX 84 D3 60 B9 6C 79 FF FF FF
+
+ev_the_mountain:                        ; 55: THE MOUNTAIN
+    HEX FE 00 00 17 D4 4A 18 FE 1F
+    HEX 23 7A 23 46 FE 1F 59 FE 1F
+    HEX 6C FE 1F 7F FE 1F AF D5 44
+    HEX 2B FE C0 2B 92 3A 2C FE 1F
+    HEX 40 FE 1F 4A FE 1F 4B FE 1F
+    HEX 5E FE 1F 5F C0 32 72 FE 1F
+    HEX 7A 9F 9D 82 C0 05 86 FE 1F
+    HEX A4 D4 58 C0 9E 36 FF FF FF
+
+ev_shahriar_treasury:                   ; 56: SHAHRIAR TREASURY
+    HEX FE 00 00 43 C9 FA 56 C0 32
+    HEX 57 C0 64 58 C0 32 6B C0 32
+    HEX 5D 83 66 FF FF FF
+
+ev_air_vent:                            ; 57: AIR VENT
+    HEX 0F B8 23 38 86 29 FE 00 00
+    HEX 5E BD 5D 88 87 79 AE BB AD
+    HEX C3 9B 45 FF FF FF
+
+ev_deserted_tunnel:                     ; 58: DESERTED TUNNEL
+    HEX FE 00 00 93 C0 2D 94 D3 54
+    HEX 95 FE 1F A7 FE 1F A8 FE C0
+    HEX A8 B8 73 AE BA AF FF FF FF
+
+ev_roy_g_biv:                           ; 59: ROY G. BIV
+    HEX 52 BD 53 65 FE C1 65 C0 64
+    HEX 8D FE C1 8D BC 79 A1 FE C0
+    HEX A1 63 2B FF FF FF
+
+ev_jackal_altar:                        ; 60: JACKAL ALTAR
+    HEX FE 00 00 17 C0 37 20 FE 1F
+    HEX 30 FE 1F 31 FE 1F 32 FE 1F
+    HEX 33 FE 1F 34 FE 1F 41 FE 1F
+    HEX 42 FE 1F 57 FE 1F 58 FE 1F
+    HEX 59 FE 1F 52 BC 51 5E BA 5F
+    HEX FF FF FF
+
+ev_astrologers_maze:                    ; 61: ASTROLOGER'S MAZE
+    HEX FE 00 00 1E FE 1F 23 97 31
+    HEX 2E FE 1F 33 FE 1F 35 FE 1F
+    HEX 36 FE 1F 37 FE 1F 43 FE 1F
+    HEX 46 FE 1F 53 9B 72 58 FE 1F
+    HEX 5E FE 1F 6A FE 1F 6D FE 1F
+    HEX 6E FE 1F 6F FE 1F 71 FE 1F
+    HEX 7D FE 1F 7E FE C0 7E 8B 16
+    HEX 83 C9 78 84 FE 1F 90 FE 1F
+    HEX 93 FE 1F 94 FE 1F 95 FE 1F
+    HEX 96 FE 1F 97 FE 1F 9A FE 1F
+    HEX A4 C0 32 A7 FE 1F AE FE 1F
+    HEX AF C0 0A BD B4 2F BE B3 32
+    HEX 1F D5 C6 FF FF FF
+\nwindexdefn{\nwixident{LOCATION{\_}EVENTS}}{LOCATION:unEVENTS}{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{LOCATION{\_}EVENTS}}{LOCATION:unEVENTS}}}\nwnotused{Location events}\nwendcode{}\nwbegindocs{338}\nwdocspar
 
 \chapter{Combat}
 
@@ -5901,12 +6866,12 @@ and its appearance (byte 4) is converted to a font character number.
 On the player's turn, the player's column and row are taken directly from
 {\Tt{}{\textbackslash}{\$}5A63\nwendquote}/{\Tt{}{\textbackslash}{\$}5A64\nwendquote}, and the font character is looked up via {\Tt{}{\textbackslash}{\$}0C7E\nwendquote}.
 
-\nwenddocs{}\nwbegincode{337}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-24}{\relax}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{339}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-24}{\relax}\nwenddeflinemarkup
 \nwlinkedidentc{IS_PLAYER_TURN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
 \nwindexdefn{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\eatline
-\nwidentdefs{\\{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}}\nwendcode{}\nwbegindocs{338}\nwdocspar
+\nwidentdefs{\\{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}}\nwendcode{}\nwbegindocs{340}\nwdocspar
 
-\nwenddocs{}\nwbegincode{339}\sublabel{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}}}\moddef{set blink target~{\nwtagstyle{}\subpageref{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{341}\sublabel{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}}}\moddef{set blink target~{\nwtagstyle{}\subpageref{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
     ORG     $16A3
 \nwlinkedidentc{SET_BLINK_TARGET}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}:
     SUBROUTINE
@@ -5942,9 +6907,9 @@ On the player's turn, the player's column and row are taken directly from
     STA     \nwlinkedidentc{BLINK_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
     RTS
 \nwindexdefn{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}}}\nwnotused{set blink target}\nwidentuses{\\{{\nwixident{APPEARANCE{\_}TO{\_}FONTCHAR}}{APPEARANCE:unTO:unFONTCHAR}}\\{{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}}\\{{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}}\\{{\nwixident{BLINK{\_}ROW}}{BLINK:unROW}}\\{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}\\{{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}}}\nwindexuse{\nwixident{APPEARANCE{\_}TO{\_}FONTCHAR}}{APPEARANCE:unTO:unFONTCHAR}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwindexuse{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwindexuse{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwindexuse{\nwixident{BLINK{\_}ROW}}{BLINK:unROW}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwindexuse{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwindexuse{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwendcode{}\nwbegindocs{340}\nwdocspar
+\nwidentdefs{\\{{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}}}\nwnotused{set blink target}\nwidentuses{\\{{\nwixident{APPEARANCE{\_}TO{\_}FONTCHAR}}{APPEARANCE:unTO:unFONTCHAR}}\\{{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}}\\{{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}}\\{{\nwixident{BLINK{\_}ROW}}{BLINK:unROW}}\\{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}\\{{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}}}\nwindexuse{\nwixident{APPEARANCE{\_}TO{\_}FONTCHAR}}{APPEARANCE:unTO:unFONTCHAR}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwindexuse{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwindexuse{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwindexuse{\nwixident{BLINK{\_}ROW}}{BLINK:unROW}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwindexuse{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwindexuse{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}\nwendcode{}\nwbegindocs{342}\nwdocspar
 
-\nwenddocs{}\nwbegincode{341}\sublabel{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}}}\moddef{Hit chance~{\nwtagstyle{}\subpageref{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{343}\sublabel{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}}}\moddef{Hit chance~{\nwtagstyle{}\subpageref{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
 (15AB)
 .compute_to_hit:
     JSR      \nwlinkedidentc{SET_BLINK_TARGET}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}
@@ -6104,9 +7069,9 @@ LAB_162b:
     JMP      hit_nonmob?
 .hit_mob:
     JMP      hit_mob?
-\nwnotused{Hit chance}\nwidentuses{\\{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}\\{{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}}}\nwindexuse{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}\nwindexuse{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}\nwendcode{}\nwbegindocs{342}\nwdocspar
+\nwnotused{Hit chance}\nwidentuses{\\{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}\\{{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}}}\nwindexuse{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}\nwindexuse{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}\nwendcode{}\nwbegindocs{344}\nwdocspar
 
-\nwenddocs{}\nwbegincode{343}\sublabel{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}}}\moddef{Get item at pos in room~{\nwtagstyle{}\subpageref{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{345}\sublabel{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}}}\moddef{Get item at pos in room~{\nwtagstyle{}\subpageref{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG      $0B62
     ; Takes A (pos) and \nwlinkedidentc{TMP_PTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2} (pointer to room data)
 get_item_at_pos_in_room:
@@ -6195,7 +7160,7 @@ mob_dataptr_to_load4:
     JSR      \nwlinkedidentc{GET_MOB_DATA}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}
     \nwlinkedidentc{STOW}{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-1}     \nwlinkedidentc{DATA_PTR3}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}, .load4
     RTS
-\nwidentuses{\\{{\nwixident{DATA{\_}PTR}}{DATA:unPTR}}\\{{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}}\\{{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{INCW}}{INCW}}\\{{\nwixident{STOW}}{STOW}}\\{{\nwixident{TMP{\_}PTR}}{TMP:unPTR}}\\{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}}\nwindexuse{\nwixident{DATA{\_}PTR}}{DATA:unPTR}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{INCW}}{INCW}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{STOW}}{STOW}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{TMP{\_}PTR}}{TMP:unPTR}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwendcode{}\nwbegindocs{344}\nwdocspar
+\nwidentuses{\\{{\nwixident{DATA{\_}PTR}}{DATA:unPTR}}\\{{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}}\\{{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{INCW}}{INCW}}\\{{\nwixident{STOW}}{STOW}}\\{{\nwixident{TMP{\_}PTR}}{TMP:unPTR}}\\{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}}\nwindexuse{\nwixident{DATA{\_}PTR}}{DATA:unPTR}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{INCW}}{INCW}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{STOW}}{STOW}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{TMP{\_}PTR}}{TMP:unPTR}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwindexuse{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}\nwendcode{}\nwbegindocs{346}\nwdocspar
 
 \subsection{get\_mob\_data (\$0C32)}
 
@@ -6212,7 +7177,7 @@ The multiplication by 16 is done by rotating the decremented index
 left by 4 bits through carry, then splitting the result into high and
 low byte contributions.
 
-\nwenddocs{}\nwbegincode{345}\sublabel{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}}}\moddef{get mob data~{\nwtagstyle{}\subpageref{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{347}\sublabel{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}}}\moddef{get mob data~{\nwtagstyle{}\subpageref{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $0C32
 \nwlinkedidentc{GET_MOB_DATA}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}:
     SUBROUTINE
@@ -6239,7 +7204,7 @@ low byte contributions.
 .done:
     RTS
 \nwindexdefn{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}}\nwidentuses{\\{{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}}}\nwindexuse{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}\nwendcode{}\nwbegindocs{346}\nwdocspar
+\nwidentdefs{\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}}\nwidentuses{\\{{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}}}\nwindexuse{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}\nwendcode{}\nwbegindocs{348}\nwdocspar
 
 \subsection{init\_mob\_count (\$0C51)}
 
@@ -6253,7 +7218,7 @@ At startup, byte~8 contains only the group count in bits~3--0 (the
 upper bits---pending XP and status flag---are zero), so the sum is
 simply the total mob count.
 
-\nwenddocs{}\nwbegincode{347}\sublabel{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}}}\moddef{init mob count~{\nwtagstyle{}\subpageref{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{349}\sublabel{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}}}\moddef{init mob count~{\nwtagstyle{}\subpageref{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $0C51
 \nwlinkedidentc{INIT_MOB_COUNT}{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}:
     SUBROUTINE
@@ -6283,13 +7248,13 @@ simply the total mob count.
     INC     $FB                     ;  |
     BCS     .loop                   ; / always taken
 \nwindexdefn{\nwixident{INIT{\_}MOB{\_}COUNT}}{INIT:unMOB:unCOUNT}{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{INIT{\_}MOB{\_}COUNT}}{INIT:unMOB:unCOUNT}}}\nwidentuses{\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwindexuse{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}\nwendcode{}\nwbegindocs{348}\nwdocspar
+\nwidentdefs{\\{{\nwixident{INIT{\_}MOB{\_}COUNT}}{INIT:unMOB:unCOUNT}}}\nwidentuses{\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwindexuse{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}\nwendcode{}\nwbegindocs{350}\nwdocspar
 
-\nwenddocs{}\nwbegindocs{349}\chapter{Assembly output}
+\nwenddocs{}\nwbegindocs{351}\chapter{Assembly output}
 
 The following root chunks produce the assembly files when tangled.
 
-\nwenddocs{}\nwbegincode{350}\sublabel{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}}\moddef{main.asm~{\nwtagstyle{}\subpageref{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{352}\sublabel{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}}\moddef{main.asm~{\nwtagstyle{}\subpageref{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
     PROCESSOR 6502
 \LA{}Macros~{\nwtagstyle{}\subpageref{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-1}}\RA{}
 \LA{}zero page defines~{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}}\RA{}
@@ -6376,9 +7341,9 @@ The following root chunks produce the assembly files when tangled.
 \LA{}font data~{\nwtagstyle{}\subpageref{PYNWmai0-4CWZL3QTPT6M6623ENDBZQ3P5E000000-1}}\RA{}
 \LA{}std font data~{\nwtagstyle{}\subpageref{PYNWmai0-4GKD57O4UDC4T2RQHRJRRNKC7M000000-1}}\RA{}
 \LA{}script pointer table~{\nwtagstyle{}\subpageref{PYNWmai0-33FGP2UXYD5EEQJUC5DEXEFVLE000000-1}}\RA{}
-\nwnotused{main.asm}\nwendcode{}\nwbegindocs{351}\nwdocspar
+\nwnotused{main.asm}\nwendcode{}\nwbegindocs{353}\nwdocspar
 
-\nwenddocs{}\nwbegincode{352}\sublabel{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}}}\moddef{fontdata.asm~{\nwtagstyle{}\subpageref{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{354}\sublabel{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}}}\moddef{fontdata.asm~{\nwtagstyle{}\subpageref{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     78 7C 66 66 7C 78 60 60 03 07 0C 0C 07 03 00 00
@@ -6619,9 +7584,9 @@ The following root chunks produce the assembly files when tangled.
     HEX     7F 03 00 7F 7F 00 78 70 7F 7E 00 7F 1F 00 7F 7F
     HEX     7F 01 00 7F 00 00 7F 7F 7F 78 00 7F 70 00 7F 7F
     HEX     07 07 00 1F 1F 00 7F 7F 00 00 00 00 00 00 00 00
-\nwnotused{fontdata.asm}\nwendcode{}\nwbegindocs{353}\nwdocspar
+\nwnotused{fontdata.asm}\nwendcode{}\nwbegindocs{355}\nwdocspar
 
-\nwenddocs{}\nwbegincode{354}\sublabel{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}}}\moddef{stdfontdata.asm~{\nwtagstyle{}\subpageref{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{356}\sublabel{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}}}\moddef{stdfontdata.asm~{\nwtagstyle{}\subpageref{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
     HEX     00 00 00 00 00 00 00 00 08 08 08 08 08 00 08 00
     HEX     14 14 14 00 00 00 00 00 08 1C 3E 7F 1C 1C 1C 1C
     HEX     08 3C 0A 1C 28 1E 08 00 06 26 10 08 04 32 30 00
@@ -6670,9 +7635,9 @@ The following root chunks produce the assembly files when tangled.
     HEX     00 00 3E 10 08 04 3E 00 38 0C 0C 06 0C 0C 38 00
     HEX     08 08 08 08 08 08 08 08 0E 18 18 30 18 18 0E 00
     HEX     2C 1A 00 00 00 00 00 00 7F 7F 7F 7F 7F 7F 7F 7F
-\nwnotused{stdfontdata.asm}\nwendcode{}\nwbegindocs{355}\nwdocspar
+\nwnotused{stdfontdata.asm}\nwendcode{}\nwbegindocs{357}\nwdocspar
 
-\nwenddocs{}\nwbegincode{356}\sublabel{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}}}\moddef{ealdr defines~{\nwtagstyle{}\subpageref{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{358}\sublabel{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}}}\moddef{ealdr defines~{\nwtagstyle{}\subpageref{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}\nwenddeflinemarkup
 \nwlinkedidentc{ealdr_ptr}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}           EQU     $46     ; VM instruction pointer (2 bytes)
 \nwlinkedidentc{EALDR_psuedoacc}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}     EQU     $48     ; VM accumulator
 \nwlinkedidentc{ealdr_src}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}           EQU     $4C     ; VM source pointer (2 bytes)
@@ -6681,9 +7646,9 @@ The following root chunks produce the assembly files when tangled.
 \nwlinkedidentc{ealdr_bot}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}           EQU     $AC60   ; funny-increment low counter
 \nwlinkedidentc{ealdr_top}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}           EQU     $AC61   ; funny-increment high counter
 \nwindexdefn{\nwixident{EALDR{\_}psuedoacc}}{EALDR:unpsuedoacc}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}bot}}{ealdr:unbot}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}dest}}{ealdr:undest}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}ptr}}{ealdr:unptr}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}src}}{ealdr:unsrc}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}top}}{ealdr:untop}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}vm{\_}dispatch}}{ealdr:unvm:undispatch}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{EALDR{\_}psuedoacc}}{EALDR:unpsuedoacc}}\\{{\nwixident{ealdr{\_}bot}}{ealdr:unbot}}\\{{\nwixident{ealdr{\_}dest}}{ealdr:undest}}\\{{\nwixident{ealdr{\_}ptr}}{ealdr:unptr}}\\{{\nwixident{ealdr{\_}src}}{ealdr:unsrc}}\\{{\nwixident{ealdr{\_}top}}{ealdr:untop}}\\{{\nwixident{ealdr{\_}vm{\_}dispatch}}{ealdr:unvm:undispatch}}}\nwendcode{}\nwbegindocs{357}\nwdocspar
+\nwidentdefs{\\{{\nwixident{EALDR{\_}psuedoacc}}{EALDR:unpsuedoacc}}\\{{\nwixident{ealdr{\_}bot}}{ealdr:unbot}}\\{{\nwixident{ealdr{\_}dest}}{ealdr:undest}}\\{{\nwixident{ealdr{\_}ptr}}{ealdr:unptr}}\\{{\nwixident{ealdr{\_}src}}{ealdr:unsrc}}\\{{\nwixident{ealdr{\_}top}}{ealdr:untop}}\\{{\nwixident{ealdr{\_}vm{\_}dispatch}}{ealdr:unvm:undispatch}}}\nwendcode{}\nwbegindocs{359}\nwdocspar
 
-\nwenddocs{}\nwbegincode{358}\sublabel{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}}\moddef{ealdr.asm~{\nwtagstyle{}\subpageref{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{360}\sublabel{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}}\moddef{ealdr.asm~{\nwtagstyle{}\subpageref{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
     PROCESSOR 6502
 \LA{}ealdr defines~{\nwtagstyle{}\subpageref{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}}\RA{}
 \LA{}EALDR entry~{\nwtagstyle{}\subpageref{PYNWmai0-OTUBKXG6AYXKRRP43MRXPLDVQU000000-1}}\RA{}
@@ -6700,7 +7665,7 @@ The following root chunks produce the assembly files when tangled.
 \LA{}EALDR VM init~{\nwtagstyle{}\subpageref{PYNWmai0-JVSHYFZ5LSJCRGOWKY22MRDYOQ000000-1}}\RA{}
 \LA{}EALDR opcode handlers~{\nwtagstyle{}\subpageref{PYNWmai0-2T6DGWJW5W5V7YAHVDFFWQCSSY000000-1}}\RA{}
 \LA{}EALDR disk entry points~{\nwtagstyle{}\subpageref{PYNWmai0-6JYY2SO57ZRYJR7W2OZS4RWYYQ000000-1}}\RA{}
-\nwnotused{ealdr.asm}\nwendcode{}\nwbegindocs{359}\nwdocspar
+\nwnotused{ealdr.asm}\nwendcode{}\nwbegindocs{361}\nwdocspar
 
 \chapter{Index}\par\noindent
 \nowebindex
@@ -6726,6 +7691,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{Get item at pos in room}{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-QT6ETJXFJSZ45KITEMECPS3GYA000000-1}}}%
 \nwixlogsorted{c}{{Hit chance}{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}{\nwixd{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}}}%
 \nwixlogsorted{c}{{Location data}{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}{\nwixd{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}}}%
+\nwixlogsorted{c}{{Location events}{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}{\nwixd{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}}}%
 \nwixlogsorted{c}{{Location names}{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}{\nwixd{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}}}%
 \nwixlogsorted{c}{{Macros}{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-1}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-2}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-3}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-4}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-5}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-6}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-7}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-8}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-9}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-10}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-11}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-12}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-13}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-14}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-15}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-16}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-17}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-18}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-19}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-20}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-21}}}%
 \nwixlogsorted{c}{{Message data}{PYNWmai0-MA3WDYAYUKINVQ6W4447HHOCBE000000-1}{\nwixd{PYNWmai0-MA3WDYAYUKINVQ6W4447HHOCBE000000-1}}}%
@@ -6916,6 +7882,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}%
 \nwixlogsorted{i}{{\nwixident{LOAD{\_}SCENE{\_}DATA}}{LOAD:unSCENE:unDATA}}%
 \nwixlogsorted{i}{{\nwixident{LOCATION{\_}DATA}}{LOCATION:unDATA}}%
+\nwixlogsorted{i}{{\nwixident{LOCATION{\_}EVENTS}}{LOCATION:unEVENTS}}%
 \nwixlogsorted{i}{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}%
 \nwixlogsorted{i}{{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}}%
 \nwixlogsorted{i}{{\nwixident{LOCATION{\_}NAMES}}{LOCATION:unNAMES}}%
@@ -7056,6 +8023,6 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{high{\_}tone}}{high:untone}}%
 \nwixlogsorted{i}{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}%
 \nwixlogsorted{i}{{\nwixident{tone}}{tone}}%
-\nwbegindocs{360}\nwdocspar
+\nwbegindocs{362}\nwdocspar
 \end{document}
 \nwenddocs{}
