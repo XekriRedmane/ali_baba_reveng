@@ -791,21 +791,22 @@ ealdr_entry:
     INC      ealdr_src+1
     BPL      .fill             ; loop until page $80 (sign bit set)
 
-    LDX      #$00              ; Copy splash screen from $B000+
 .copy_lo:
+    LDX      #$00              ; Copy splash screen from $B000+
+.copy_next:
     JSR      ealdr_copy_byte   ; copy byte, advance source
     INX
     CPX      #$20              ; X = $00..$1F (first 32 bytes)
-    BNE      .copy_lo
+    BNE      .copy_next
     LDX      #$80
 .copy_hi:
     JSR      ealdr_copy_byte   ; X = $80..$9F (next 32 bytes)
     INX
     CPX      #$A0
     BNE      .copy_hi
-    INC      ealdr_copy_src+1  ; self-modify: advance source page
-    LDA      ealdr_copy_src+1
-    CMP      #$40              ; done when source page reaches $40
+    INC      ealdr_copy_dst    ; self-modify: advance dest page
+    LDA      ealdr_copy_dst
+    CMP      #$40              ; done when dest page reaches $40
     BNE      .copy_lo
     JMP      ealdr_vm_exec     ; enter VM
 @ %def ealdr_entry
@@ -818,6 +819,7 @@ is incremented after each byte:
 ealdr_copy_byte:
 ealdr_copy_src = *+1
     LDA      $B000             ; self-modified source address
+ealdr_copy_dst = *+2
     STA      $202C,X           ; dest = HGR page + offset
     INC      ealdr_copy_src    ; advance source (low byte)
     BNE      .done
@@ -846,6 +848,7 @@ address, then enters the dispatch loop:
 
 <<EALDR VM interpreter>>=
     ORG     $AA35
+    SUBROUTINE ealdr_vm_interp
 ealdr_vm_interp:
     LDA      EALDR_psuedoacc   ; save VM accumulator
     PHA
@@ -861,7 +864,7 @@ ealdr_vm_interp:
 
     ; Dispatch loop
     LDY      #$04              ; skip 4 bytes (DEX/BPL/offset + JSR addr byte)
-.dispatch:                      ; $AA45
+ealdr_dispatch:                 ; $AA45
     LDA      (ealdr_ptr),Y     ; read opcode byte
     INY
     BNE      .no_carry
@@ -877,17 +880,7 @@ ealdr_vm_interp:
     STA      ealdr_vm_jmp+2    ; self-modify JMP high byte
 ealdr_vm_jmp:
     JMP      ealdr_vm_loop     ; self-modified: jump to handler
-
-    ; --- Handler return point (goto path) ---
-ealdr_vm_loop:                  ; $AA72
-    JSR      ealdr_read_arg16  ; read 2-byte encoded address -> $42/$43
-    LDA      $42
-    STA      ealdr_ptr         ; update bytecode pointer
-    LDA      $43
-    STA      ealdr_ptr+1
-    LDY      #$00
-    JMP      .dispatch         ; read next opcode
-@ %def ealdr_vm_interp ealdr_vm_loop
+@ %def ealdr_vm_interp ealdr_dispatch
 
 The argument reader decodes a 2-byte address from the bytecode stream:
 
@@ -917,6 +910,7 @@ back to the instruction after [[JSR ealdr\_vm\_init]]:
 
 <<EALDR VM init>>=
     ORG     $AA99
+    SUBROUTINE ealdr_vm_init
 ealdr_vm_init:
     PLA
     STA      $42               ; return addr low
@@ -949,6 +943,22 @@ ealdr_dispatch_table:
     ;    INC  ADD  DXR  BNE  SUB  COPY (trampolines)
 @ %def ealdr_dispatch_table
 
+The goto path at [[$AA72]] is entered when an opcode handler needs to
+set the instruction pointer from a decoded address in [[$42]]/[[$43]]:
+
+<<EALDR VM goto path>>=
+    ORG     $AA72
+ealdr_vm_loop:
+    JSR      ealdr_read_arg16  ; read 2-byte encoded address -> $42/$43
+ealdr_vm_goto:                  ; $AA75 - entry when addr already in $42/$43
+    LDA      $42
+    STA      ealdr_ptr         ; update bytecode pointer
+    LDA      $43
+    STA      ealdr_ptr+1
+    LDY      #$00
+    JMP      ealdr_dispatch    ; read next opcode
+@ %def ealdr_vm_loop ealdr_vm_goto
+
 \subsection{Opcode handlers}
 
 Each handler is reached via the self-modifying [[JMP]] at [[$AA5D]].
@@ -958,6 +968,7 @@ opcode from current stream position) or [[$AA75]] (goto: set IP from
 
 <<EALDR opcode handlers>>=
     ORG     $AAAE
+    SUBROUTINE ealdr_op_call1
 ; --- Opcode 01: CALL1 addr ---
 ; Call 6502 subroutine; result -> VM acc.  Handler at $AAAE.
 ealdr_op_call1:
@@ -971,14 +982,13 @@ ealdr_op_call1:
     TAY                        ; restore Y
     JMP      ealdr_vm_dispatch ; linear
 
-; Helper: indirect jump through $42/$43.  Used by CALL1 and CALL0.
-ealdr_jmp_ind:                  ; $AAC2
-    JMP      ($0042)
-
 ; --- Opcode 08: CALL0 addr ---
 ; Terminal jump to 6502 code (no return).  Handler at $AABF.
+; Falls through into ealdr_jmp_ind.
 ealdr_op_call0:
     JSR      ealdr_read_arg16
+; Helper: indirect jump through $42/$43.  Used by CALL1 and CALL0.
+ealdr_jmp_ind:                  ; $AAC2
     JMP      ($0042)
 
 ; --- Opcode 02: BEQ addr ---
@@ -986,9 +996,10 @@ ealdr_op_call0:
 ealdr_op_beq:
     JSR      ealdr_read_arg16
     LDA      EALDR_psuedoacc
-    BEQ      ealdr_vm_loop     ; zero -> goto path (IP = $42/$43)
+    BEQ      ealdr_vm_goto     ; zero -> goto path (IP = $42/$43)
     JMP      ealdr_vm_dispatch ; nonzero -> linear
 
+    SUBROUTINE ealdr_op_ldi
 ; --- Opcode 03: LDI val ---
 ; Load 1-byte immediate (XOR $4C) into VM acc.  Handler at $AACF.
 ealdr_op_ldi:
@@ -1011,6 +1022,7 @@ ealdr_op_ld_do:                 ; $AAE0 (shared by LDX)
     STA      EALDR_psuedoacc
     JMP      ealdr_vm_dispatch
 
+    SUBROUTINE ealdr_op_ldx
 ; --- Opcode 0A: LDX addr ---
 ; Indexed load: A <- (addr + A).  Handler at $AAE9.
 ealdr_op_ldx:
@@ -1024,6 +1036,7 @@ ealdr_op_ldx:
 .nc:
     JMP      ealdr_op_ld_do   ; fall into LD handler
 
+    SUBROUTINE ealdr_op_call
 ; --- Opcode 05: CALL addr ---
 ; VM subroutine call: push return IP, goto addr.  Handler at $AAFA.
 ealdr_op_call:
@@ -1040,7 +1053,7 @@ ealdr_op_call:
     LDA      ealdr_ptr+1
     PHA
     LDY      #$00
-    JMP      ealdr_vm_loop     ; goto path (IP = target)
+    JMP      ealdr_vm_goto     ; goto path (IP = target)
 
 ; --- Opcode 09: RET ---
 ; Return from VM subroutine.  Handler at $AB12.
@@ -1067,6 +1080,7 @@ ealdr_op_asl:
     ASL      EALDR_psuedoacc
     JMP      ealdr_vm_dispatch
 
+    SUBROUTINE ealdr_op_subi
 ; --- Opcode 07: SUBI val ---
 ; Subtract 1-byte immediate (XOR $4C) from VM acc.  Handler at $AB2E.
 ealdr_op_subi:
@@ -1099,7 +1113,7 @@ ealdr_tramp_copy:
     JMP      ealdr_op_copy
 
 ; --- Opcode 0E: DXR ---
-; (see <<EALDR DXR step>>)
+<<EALDR DXR step>>
 
 ; --- Opcode 0F: BNE addr ---
 ; Branch if VM acc != 0.  Handler at $AB6E.
@@ -1107,7 +1121,7 @@ ealdr_op_bne:
     JSR      ealdr_read_arg16
     LDA      EALDR_psuedoacc
     BEQ      .skip
-    JMP      ealdr_vm_loop     ; nonzero -> goto path
+    JMP      ealdr_vm_goto     ; nonzero -> goto path
 .skip:
     JMP      ealdr_vm_dispatch ; zero -> linear
 
@@ -1239,6 +1253,7 @@ every other byte), and derives the new accumulator from the pointer's high byte:
 
 <<EALDR DXR step>>=
     ORG     $AB55
+    SUBROUTINE ealdr_dxr_step
 ealdr_dxr_step:
     LDX      #$00
     LDA      (ealdr_src,X)     ; load byte at (src)
@@ -4576,10 +4591,10 @@ ealdr_top           EQU     $AC61   ; funny-increment high counter
 <<EALDR track pages>>
 <<EALDR VM interpreter>>
 <<EALDR dispatch table>>
+<<EALDR VM goto path>>
 <<EALDR VM arg reader>>
 <<EALDR VM init>>
 <<EALDR opcode handlers>>
-<<EALDR DXR step>>
 <<EALDR disk entry points>>
 @
 
