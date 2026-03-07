@@ -2258,6 +2258,47 @@ Each charset holds 24~characters (\$18).  Characters beyond~\$18 bump the
 charset index.  The four glyph indices are consecutive starting at
 [[charnum * 4 + \$20]].
 
+\subsection{fill\_map (\$743B)}
+
+Fills the entire 20$\times$10 map grid with a single character.  The fill
+character is read from [[MAP\_FILL\_CHAR]] ([[\$7AC1]], default [[\$25]]).
+The routine renders the glyph once via [[RENDER\_FONT\_CHAR]] to build the
+HRCG control string, then loops over all 200 grid positions (from
+bottom-right to top-left), re-printing the same string at each position
+via [[PRINT\_STRING]].
+
+<<defines>>=
+MAP_FILL_CHAR           EQU     $7AC1   ; character used to fill the map grid
+@ %def MAP_FILL_CHAR
+
+<<fill map>>=
+    ORG     $743B
+FILL_MAP:
+    SUBROUTINE
+
+    LDA     #$13                    ; \ start at column 19, row 9
+    STA     FONT_COL                ;  | (bottom-right corner)
+    LDA     #$09                    ;  |
+    STA     FONT_ROW                ; /
+    LDA     MAP_FILL_CHAR           ; fill character (default $25)
+    STA     FONT_CHARNUM
+    LDA     #$01                    ; charset 1 (custom font)
+    STA     FONT_CHARSET
+    JSR     RENDER_FONT_CHAR        ; render glyph once (builds control string)
+.loop:
+    DEC     FONT_COL                ; next column left
+    BPL     .draw                   ; still >= 0 → draw
+    LDA     #$13                    ; \ wrap to column 19
+    STA     FONT_COL                ; /
+    DEC     FONT_ROW                ; next row up
+    BPL     .draw                   ; still >= 0 → draw
+    RTS                             ; all 200 positions filled
+.draw:
+    JSR     FONT_POS_TO_TEXT_POS    ; set text cursor to font position
+    JSR     PRINT_STRING            ; re-print the same glyph string
+    JMP     .loop
+@ %def FILL_MAP
+
 <<render font char>>=
     ORG     $7489
 RENDER_FONT_CHAR:
@@ -2941,7 +2982,7 @@ GAME_INIT:
     JSR     SET_TEXT_WINDOW_WRAP
     JSR     INIT_STUB
     JSR     INIT_GAME_STATE
-    JSR     $743B
+    JSR     FILL_MAP
     JSR     SET_TEXT_WINDOW_BOTTOM
     JSR     $6B94
     LDA     #$00                    ; \
@@ -6051,6 +6092,7 @@ The following root chunks produce the assembly files when tangled.
 <<draw char at pos>>
 <<random in range>>
 <<advance group link>>
+<<fill map>>
 <<render font char>>
 <<draw blink alt>>
 <<draw blink char>>

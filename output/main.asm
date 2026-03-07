@@ -192,6 +192,7 @@ CHAR_LOWER_RIGHT    EQU     $80AC
 BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
 BLINK_ROW       EQU     $5AA3   ; font row
 BLINK_CHAR      EQU     $5AA4   ; font character number
+MAP_FILL_CHAR           EQU     $7AC1   ; character used to fill the map grid
 DEFAULT_CHAR            EQU     $7AC2   ; default entity character ($2C)
 BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
 ROM_COUT1            EQU     $FDED   ; Apple II ROM COUT1 (character output)
@@ -1437,6 +1438,31 @@ NEXT_GROUP_MEMBER:
     LDA     $BB                     ;  | (advance cursor to next record)
     STA     $F5                     ; /
     RTS
+    ORG     $743B
+FILL_MAP:
+    SUBROUTINE
+
+    LDA     #$13                    ; \ start at column 19, row 9
+    STA     FONT_COL                ;  | (bottom-right corner)
+    LDA     #$09                    ;  |
+    STA     FONT_ROW                ; /
+    LDA     MAP_FILL_CHAR           ; fill character (default $25)
+    STA     FONT_CHARNUM
+    LDA     #$01                    ; charset 1 (custom font)
+    STA     FONT_CHARSET
+    JSR     RENDER_FONT_CHAR        ; render glyph once (builds control string)
+.loop:
+    DEC     FONT_COL                ; next column left
+    BPL     .draw                   ; still >= 0 → draw
+    LDA     #$13                    ; \ wrap to column 19
+    STA     FONT_COL                ; /
+    DEC     FONT_ROW                ; next row up
+    BPL     .draw                   ; still >= 0 → draw
+    RTS                             ; all 200 positions filled
+.draw:
+    JSR     FONT_POS_TO_TEXT_POS    ; set text cursor to font position
+    JSR     PRINT_STRING            ; re-print the same glyph string
+    JMP     .loop
     ORG     $7489
 RENDER_FONT_CHAR:
     SUBROUTINE
@@ -2158,7 +2184,7 @@ GAME_INIT:
     JSR     SET_TEXT_WINDOW_WRAP
     JSR     INIT_STUB
     JSR     INIT_GAME_STATE
-    JSR     $743B
+    JSR     FILL_MAP
     JSR     SET_TEXT_WINDOW_BOTTOM
     JSR     $6B94
     LDA     #$00                    ; \
