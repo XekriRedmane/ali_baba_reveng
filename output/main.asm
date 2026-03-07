@@ -189,6 +189,7 @@ CHAR_LOWER_RIGHT    EQU     $80AC
 BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
 BLINK_ROW       EQU     $5AA3   ; font row
 BLINK_CHAR      EQU     $5AA4   ; font character number
+DEFAULT_CHAR            EQU     $7AC2   ; default entity character ($2C)
 BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
 ROM_COUT1            EQU     $FDED   ; Apple II ROM COUT1 (character output)
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
@@ -674,6 +675,160 @@ CLAMP_CHAR_FIELD:
     ORA     $BA                     ; set low bits to minimum
     STA     ($F4),Y
     RTS
+    ORG     $0B62
+FIND_ENTITY_AT_POS:
+    SUBROUTINE
+
+    STA     DAT_5a17_pos            ; save target position
+    LDA     $FB                     ; \ patch base address into
+    STA     .load3+2                ;  | player search (high byte)
+    STA     .load2+2                ;  | mob search (high byte)
+    LDA     $FA                     ;  |
+    STA     .load3+1                ;  | player search (low byte)
+    STA     .load2+1                ; / mob search (low byte)
+    JMP     .mob_search
+
+    ; --- Player character search ---
+.player_search:
+    LDX     #$06                    ; copy bytes 6-7 of record
+.load3:
+    LDA     $0B7B,X                 ; (self-modified base address)
+    STA     .load4-5,X              ; patch .load4 operand (+6→low, +7→high)
+    INX
+    CPX     #$08
+    BNE     .load3
+.load4:
+    LDY     $0B86                   ; (self-modified: read position from table)
+    CPY     #$FF
+    BNE     .check_player
+    JMP     is_at_outer_limits      ; $FF = end of table
+.check_player:
+    CPY     DAT_5a17_pos            ; matches target?
+    BEQ     .found_player
+    INC     .load4+1                ; \
+    BNE     .no_carry1              ;  |
+    INC     .load4+2                ;  | advance address by 3
+.no_carry1:                         ;  | (3-byte table entries)
+    INC     .load4+1                ;  |
+    BNE     .no_carry2              ;  |
+    INC     .load4+2                ;  |
+.no_carry2:                         ;  |
+    INC     .load4+1                ;  |
+    BNE     .load4                  ;  |
+    INC     .load4+2                ; /
+    JMP     .load4
+.found_player:
+    LDA     .load4+1                ; \ $BE/$BF = table entry address
+    STA     $BE                     ;  |
+    LDA     .load4+2                ;  |
+    STA     $BF                     ; /
+    RTS
+
+    ; --- Mob linked-list search ---
+.mob_search:
+    LDX     #$02                    ; byte 2 = mob index
+.load2:
+    LDA     $0BBD,X                 ; (self-modified base address)
+    CMP     #$00
+    BEQ     .player_search          ; zero → no more mobs, try players
+    JSR     .get_mob                ; get mob data → patch .load1
+    LDX     #$03                    ; byte 3 = position
+.load1:
+    LDY     $0BC9,X                 ; (self-modified: read from mob record)
+    CPY     DAT_5a17_pos
+    BEQ     .found_mob              ; position matches!
+    LDA     .load1+1                ; \ copy mob link address
+    STA     .load2+1                ;  | back to .load2 for next iteration
+    LDA     .load1+2                ;  |
+    STA     .load2+2                ; /
+    JMP     .mob_search
+.found_mob:
+    LDA     #$80                    ; \ set bit 7 = mob flag
+    ORA     .load1+2                ;  |
+    STA     $BF                     ;  |
+    LDA     .load1+1                ;  |
+    STA     $BE                     ; / $BE/$BF = mob pointer | $80
+    RTS
+
+    ; --- Helper: get mob data and patch .load1 ---
+.get_mob:
+    JSR     GET_MOB_DATA            ; A = mob index → $BA/$BB = data ptr
+    LDA     $BA                     ; \
+    STA     .load1+1                ;  | patch .load1 operand
+    LDA     $BB                     ;  |
+    STA     .load1+2                ; /
+    RTS
+    ORG     $0C7E
+GET_ENTITY_FONTCHAR:
+    SUBROUTINE
+
+    LDA     #$01
+    STA     FONT_CHARSET            ; custom font
+    LDA     #$00
+    CMP     $BF                     ; high byte of pointer
+    BNE     .has_entity             ; non-zero → entity exists
+    CMP     $BE                     ; low byte
+    BNE     .low_only               ; low ≠ 0 → partial pointer
+.empty:
+    LDA     BLINK_ALT_CHAR          ; \
+    STA     FONT_CHARNUM            ;  | empty cell → blink char
+    RTS                             ; /
+.low_only:
+    LDA     DEFAULT_CHAR            ; \
+    STA     FONT_CHARNUM            ;  | $BE≠0, $BF=0 → default char
+    RTS                             ; /
+.has_entity:
+    LDA     $BF
+    CMP     #$80                    ; bit 7 set?
+    BPL     .mob                    ; yes → mob record
+    ; --- character record ---
+    LDY     #$01
+    LDA     ($BE),Y                 ; byte 1 of character record
+    AND     #$C0                    ; top 2 bits
+    CMP     #$C0                    ; both set?
+    BEQ     .both_bits              ; → detailed check
+    CMP     #$40
+    BEQ     .bit6                   ; bit 6 only → char $1C
+    BPL     .empty                  ; bit 7 only → blink alt char
+    LDA     #$1B                    ; neither bit → char $1B
+    BNE     .store
+.bit6:
+    LDA     #$1C
+.store:
+    STA     FONT_CHARNUM
+    RTS
+.both_bits:
+    LDA     ($BE),Y                 ; reload byte 1
+    CMP     #$FE
+    BEQ     .check_byte2            ; $FE → check byte 2
+    CMP     #$D5
+    BMI     .lt_d5
+    LDA     #$1D                    ; >= $D5 → char $1D
+    JMP     .store
+.lt_d5:
+    CMP     #$D2
+    BMI     .lt_d2
+    LDA     #$18                    ; $D2-$D4 → char $18
+    JMP     .store
+.lt_d2:
+    LDA     #$1A                    ; < $D2 → char $1A
+    JMP     .store
+.check_byte2:
+    LDY     #$02
+    LDA     ($BE),Y                 ; byte 2
+    AND     #$1F                    ; low 5 bits
+    BEQ     .empty                  ; zero → blink alt char
+    JMP     .store                  ; non-zero → use as charnum
+.mob:
+    LDA     $BE                     ; \
+    STA     $BA                     ;  | $BA/$BB = $BE/$BF with bit 7 cleared
+    LDA     $BF                     ;  |
+    AND     #$7F                    ;  |
+    STA     $BB                     ; /
+    LDY     #$04
+    LDA     ($BA),Y                 ; byte 4 = appearance
+    JSR     APPEARANCE_TO_FONTCHAR
+    JMP     .store
     ORG     $0D98
 COLROW_TO_POS:
     SUBROUTINE
@@ -695,9 +850,9 @@ DRAW_CHAR_AT_POS:
     STA     FONT_COL                ; set font column
     STY     FONT_ROW                ; set font row
     JSR     COLROW_TO_POS           ; re-linearize (A = col + row*20)
-    JSR     $0B62                   ; look up entity at position → $BE
-    JSR     $0C7E                   ; determine font char from entity data
-    JMP     $7489                   ; render the font character
+    JSR     FIND_ENTITY_AT_POS      ; look up entity at position → $BE
+    JSR     GET_ENTITY_FONTCHAR     ; determine font char from entity data
+    JMP     RENDER_FONT_CHAR        ; render the font character
     ORG     $1317
 RANDOM_IN_RANGE:
     SUBROUTINE
@@ -777,6 +932,46 @@ RANDOM_IN_RANGE:
     CLC                             ;  |
     ROR     A                       ;  |
     BCC     .accept                 ; / (always taken: masked bit is 0)
+    ORG     $7489
+RENDER_FONT_CHAR:
+    SUBROUTINE
+
+    JSR     FONT_POS_TO_TEXT_POS    ; set TEXT_COL/TEXT_ROW from font pos
+    LDX     #$B1                    ; base charset page
+    LDA     FONT_CHARSET
+    CMP     #$02
+    BNE     .charset_ok
+    INX                             ; charset 2 → page $B3
+    INX
+.charset_ok:
+    STX     CHAR_CHARSET            ; patch charset in control string
+    LDA     FONT_CHARNUM
+.check_range:
+    CMP     #$18                    ; fits in current charset page?
+    BCC     .compute_glyphs         ; yes → compute glyph indices
+    INX                             ; no → next charset page
+    STX     CHAR_CHARSET
+    SEC
+    SBC     #$18                    ; charnum -= 24
+    JMP     .check_range
+.compute_glyphs:
+    ASL                             ; charnum * 4
+    ASL
+    CLC
+    ADC     #$20                    ; + $20 = base glyph code
+    TAY
+    STY     CHAR_UPPER_LEFT
+    INY
+    STY     CHAR_UPPER_RIGHT
+    INY
+    STY     CHAR_LOWER_LEFT
+    INY
+    STY     CHAR_LOWER_RIGHT
+    LDA     #<s_PRINT_FONT_CHAR    ; \
+    STA     PRINT_STRING_ADDR       ;  | $BC/$BD → control string
+    LDA     #>s_PRINT_FONT_CHAR    ;  |
+    STA     PRINT_STRING_ADDR+1     ; /
+    JMP     PRINT_STRING            ; output the 2×2 character
     ORG     $74CB
 DRAW_BLINK_ALT:
     SUBROUTINE
