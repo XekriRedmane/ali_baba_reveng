@@ -2872,6 +2872,34 @@ SET_TEXT_WINDOW_BOTTOM:
     JMP     ROM_COUT
 @ %def SET_CURSOR_ROW21 SET_TEXT_WINDOW_BOTTOM
 
+\subsection{pos\_to\_colrow (\$0C25)}
+
+Converts a packed map position (0--199) into separate column and row
+values by dividing by~20.  The map is 20~columns wide, so
+[[column = pos mod 20]] and [[row = pos / 20]].
+
+The loop repeatedly subtracts~20 (via [[ADC \#\$EC]] with carry clear,
+since [[\$EC = 256 $-$ 20]]), counting iterations in~[[Y]].  When the
+subtraction underflows (carry clear on exit), it adds~20 back to recover
+the remainder.
+
+<<pos to colrow>>=
+    ORG     $0C25
+POS_TO_COLROW:
+    SUBROUTINE
+
+    LDY      #$00              ; row = 0
+.loop:
+    CLC
+    ADC      #$EC              ; A -= 20 (unsigned)
+    BCC      .done             ; underflow → remainder is negative
+    INY                        ; row++
+    BCS      .loop             ; always taken (carry set)
+.done:
+    ADC      #$14              ; add 20 back → A = column (remainder)
+    RTS                        ; A = column (0-19), Y = row (0-9)
+@ %def POS_TO_COLROW
+
 \subsection{compute\_scene\_ptr (\$0C32)}
 
 Computes a pointer into the game data from a 1-based scene index in~A.
@@ -2906,6 +2934,44 @@ COMPUTE_SCENE_PTR:
 .done:
     RTS
 @ %def COMPUTE_SCENE_PTR
+
+\subsection{appearance\_to\_fontchar (\$0CF7)}
+
+Converts a mob appearance index (byte~4 of mob data) into a font
+character number.  The custom font has 120 characters in groups of~32,
+but only 21~mob glyphs occupy each group (characters 1--21 and 33--36).
+Characters 5--21 repeat cyclically for higher appearance values.
+
+The routine divides the appearance value by~21 (via repeated subtraction
+of~21), producing a quotient in~[[Y]] and a 1-based remainder in~[[A]].
+If the remainder is~$\ge5$, it is returned directly.  If~$<5$ and the
+quotient is nonzero, 32 is added to index into the next font group.
+
+<<appearance to fontchar>>=
+    ORG     $0CF7
+APPEARANCE_TO_FONTCHAR:
+    SUBROUTINE
+
+    LDY      #$00              ; Y = quotient (font group)
+.loop:
+    CLC
+    ADC      #$EB              ; A -= 21 (unsigned: $EB = 256-21)
+    BCC      .done             ; underflow → done dividing
+    INY                        ; group++
+    BCS      .loop             ; always taken
+.done:
+    ADC      #$16              ; restore remainder+1 (carry clear, so +22)
+    CMP      #$05              ; remainder >= 5?
+    BCC      .low              ; no → check group
+    RTS                        ; yes → return as-is (chars 5-21)
+.low:
+    CPY      #$00              ; first group?
+    BEQ      .ret              ; yes → return as-is (chars 1-4)
+    CLC
+    ADC      #$20              ; add 32 → next font group (chars 33-36)
+.ret:
+    RTS
+@ %def APPEARANCE_TO_FONTCHAR
 
 \section{Text renderer}
 \label{sec:text_renderer}
@@ -3880,12 +3946,12 @@ SET_BLINK_TARGET:
     ; --- mob path: convert packed position to col/row ---
     LDY     #$03
     LDA     ($F4),Y                 ; mob data[3] = packed position
-    JSR     $0C25                   ; divmod by 20 → A=col, Y=row
+    JSR     POS_TO_COLROW           ; A=col, Y=row
     STA     BLINK_COL
     STY     BLINK_ROW
     LDY     #$04
     LDA     ($F4),Y                 ; mob data[4] = appearance
-    JSR     $0CF7                   ; appearance → font char number
+    JSR     APPEARANCE_TO_FONTCHAR  ; appearance → font char number
     STA     BLINK_CHAR
     RTS
 
@@ -4246,8 +4312,10 @@ The following root chunks produce the assembly files when tangled.
 <<main entry>>
 <<attract screen>>
 <<Get item at pos in room>>
+<<pos to colrow>>
 <<get mob data>>
 <<compute scene ptr>>
+<<appearance to fontchar>>
 <<plot char>>
 <<print font char>>
 <<scene loop>>

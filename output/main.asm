@@ -417,6 +417,20 @@ mob_dataptr_to_load4:
     JSR      GET_MOB_DATA
     STOW     DATA_PTR3, .load4
     RTS
+    ORG     $0C25
+POS_TO_COLROW:
+    SUBROUTINE
+
+    LDY      #$00              ; row = 0
+.loop:
+    CLC
+    ADC      #$EC              ; A -= 20 (unsigned)
+    BCC      .done             ; underflow → remainder is negative
+    INY                        ; row++
+    BCS      .loop             ; always taken (carry set)
+.done:
+    ADC      #$14              ; add 20 back → A = column (remainder)
+    RTS                        ; A = column (0-19), Y = row (0-9)
     ORG     $0C32
 GET_MOB_DATA:
     SUBROUTINE
@@ -466,6 +480,29 @@ COMPUTE_SCENE_PTR:
     BCC     .done
     INC     $BB                     ; carry
 .done:
+    RTS
+    ORG     $0CF7
+APPEARANCE_TO_FONTCHAR:
+    SUBROUTINE
+
+    LDY      #$00              ; Y = quotient (font group)
+.loop:
+    CLC
+    ADC      #$EB              ; A -= 21 (unsigned: $EB = 256-21)
+    BCC      .done             ; underflow → done dividing
+    INY                        ; group++
+    BCS      .loop             ; always taken
+.done:
+    ADC      #$16              ; restore remainder+1 (carry clear, so +22)
+    CMP      #$05              ; remainder >= 5?
+    BCC      .low              ; no → check group
+    RTS                        ; yes → return as-is (chars 5-21)
+.low:
+    CPY      #$00              ; first group?
+    BEQ      .ret              ; yes → return as-is (chars 1-4)
+    CLC
+    ADC      #$20              ; add 32 → next font group (chars 33-36)
+.ret:
     RTS
     ORG     $5D7D
 PLOT_CHAR:
