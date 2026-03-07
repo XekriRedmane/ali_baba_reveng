@@ -1386,6 +1386,31 @@ DRAW_CHAR_AT_POS:
     JSR     FIND_ENTITY_AT_POS      ; look up entity at position → $BE
     JSR     GET_ENTITY_FONTCHAR     ; determine font char from entity data
     JMP     RENDER_FONT_CHAR        ; render the font character
+    ORG     $12D0
+FUN_12D0:                       ; check NPC join condition
+    ORG     $12FA
+FIRST_GROUP_MEMBER:
+    SUBROUTINE
+
+    LDY     #$02                    ; \
+    LDA     ($FA),Y                 ;  | check byte 2 of group head ($FA)
+    BNE     .resolve                ; /  if nonzero, follow it
+NEXT_GROUP_MEMBER:
+    LDY     #$02                    ; \
+    LDA     ($F4),Y                 ;  | check byte 2 of cursor ($F4)
+    BNE     .resolve                ; /  if nonzero, follow it
+    STA     $F4                     ; \  end of chain:
+    STA     $F5                     ; /  null out $F4/$F5
+    RTS
+.resolve:
+    JSR     GET_MOB_DATA            ; resolve link -> $BA/$BB
+    LDA     $BA                     ; \
+    STA     $F4                     ;  | $F4/$F5 = $BA/$BB
+    LDA     $BB                     ;  | (advance cursor to next record)
+    STA     $F5                     ; /
+    RTS
+    ORG     $1300
+FUN_1300:                       ; advance to next group member
     ORG     $1317
 RANDOM_IN_RANGE:
     SUBROUTINE
@@ -1465,27 +1490,16 @@ RANDOM_IN_RANGE:
     CLC                             ;  |
     ROR     A                       ;  |
     BCC     .accept                 ; / (always taken: masked bit is 0)
-    ORG     $12FA
-FIRST_GROUP_MEMBER:
-    SUBROUTINE
-
-    LDY     #$02                    ; \
-    LDA     ($FA),Y                 ;  | check byte 2 of group head ($FA)
-    BNE     .resolve                ; /  if nonzero, follow it
-NEXT_GROUP_MEMBER:
-    LDY     #$02                    ; \
-    LDA     ($F4),Y                 ;  | check byte 2 of cursor ($F4)
-    BNE     .resolve                ; /  if nonzero, follow it
-    STA     $F4                     ; \  end of chain:
-    STA     $F5                     ; /  null out $F4/$F5
-    RTS
-.resolve:
-    JSR     GET_MOB_DATA            ; resolve link -> $BA/$BB
-    LDA     $BA                     ; \
-    STA     $F4                     ;  | $F4/$F5 = $BA/$BB
-    LDA     $BB                     ;  | (advance cursor to next record)
-    STA     $F5                     ; /
-    RTS
+    ORG     $138D
+FUN_138D:                       ; find encounter position
+    ORG     $13DB
+FUN_13DB:                       ; compute distance to position
+    ORG     $1406
+FUN_1406:                       ; party join setup
+    ORG     $1414
+FUN_1414:                       ; encounter setup
+    ORG     $1425
+FUN_1425:                       ; apply damage/effect to char
     ORG     $19AD
 GAME_TURN_LOOP:
     SUBROUTINE
@@ -1722,10 +1736,168 @@ GAME_TURN_LOOP:
 
 .empty_slot:
     JMP     FUN_1D4D            ; $FE: empty slot interaction
+    ORG     $1B52
+FUN_1B52:                       ; commit move (update pos, draw sprite)
+    ORG     $1B81
+FUN_1B81:                       ; reset to turn start position
+    ORG     $1BE0
+FUN_1BE0:                       ; set char field 15 low 2 bits to A
     ORG     $1C01
-HANDLE_ENCOUNTER:               ; non-activated encounter dispatch
+HANDLE_ENCOUNTER:
+    SUBROUTINE
+
+    ; --- random encounter path (event type $00-$3F) ---
+    LDA     #$00
+    JSR     FUN_1BE0            ; set char field 15 state to 0
+    LDY     #$01
+    LDA     ($BE),Y             ; event byte 1 = type
+    CMP     #$40
+    BPL     .specific           ; type >= $40 → specific encounter
+    LDA     #$14
+    JSR     RANDOM_IN_RANGE     ; random(20)
+    STA     $5A18
+    LDY     #$05
+    LDA     ($F8),Y             ; char field 5
+    AND     #$1F                ; low 5 bits = avoidance stat
+    CMP     $5A18
+    BMI     .roll_type          ; stat < random → encounter happens
+    JMP     .avoided            ; stat >= random → avoid encounter
+.roll_type:
+    JSR     STEP_PRNG
+    LDA     #$74
+    CMP     $5A18
+    BPL     .normal             ; $74 >= random → normal encounter
+    JMP     .special            ; rare: special encounter
+.normal:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$01
+    JSR     DISPLAY_MESSAGE     ; "encounter" message
+    LDX     #$14
+    JMP     SCRIPT_ENGINE       ; run encounter script
+
+    ; --- specific encounter path (type >= $40) ---
+.specific:
+    LDY     #$00
+    LDA     ($BE),Y             ; event byte 0 = position
+    STA     $5A5E
+    LDA     #$01
+    JSR     FUN_1BE0            ; set state 1
+    LDY     #$01
+    LDA     ($BE),Y
+    AND     #$3F                ; low 6 bits = encounter ID
+    BNE     .have_id
+    JSR     STEP_PRNG           ; ID 0 → derive from PRNG
+    LDA     $5A18
+    ROR
+    ROR
+    AND     #$1C
+    ORA     #$01
+.have_id:
+    STA     $5A29               ; store encounter ID
+    ROR
+    BCC     .no_clear
+    LDY     #$04
+    LDA     ($F8),Y             ; char field 4
+    BMI     .no_clear
+    CMP     #$2A
+    BMI     .no_clear
+    CMP     #$3F
+    BPL     .no_clear
+    LDA     #$00
+    STA     $5A29               ; clear ID if char in range $2A-$3E
+.no_clear:
+    LDY     #$02
+    LDA     ($BE),Y             ; event byte 2 = destination pos
+    STA     $5A5F
+    JSR     FUN_1B52            ; commit move
+    LDA     $7ABE
+    STA     $5A8C
+    JSR     FUN_1414
+    JSR     TIMED_WAIT
+    LDY     #$03
+    LDA     $5A5F
+    STA     ($F8),Y             ; update char packed position
+    LDA     $5A29
+    CMP     $5A02               ; compare encounter ID with current scene
+    BEQ     .same_scene
+    JMP     FUN_1B81            ; different → reset position
+.same_scene:
+    LDA     $5A5F
+    JSR     POS_TO_COLROW
+    STA     CURRENT_COL
+    STY     CURRENT_ROW
+    JMP     FUN_1B52            ; commit to new position
+
+    ; --- encounter avoided ---
+.avoided:
+    LDY     #$01
+    LDA     ($BE),Y
+    ORA     #$40                ; mark event as activated
+    STA     ($BE),Y
+    LDA     CURRENT_COL
+    STA     TURN_START_COL
+    LDA     CURRENT_ROW
+    STA     TURN_START_ROW
+    JSR     FUN_1B81            ; reset to turn start
+    LDA     TURN_START_COL
+    STA     $5AA2
+    LDA     TURN_START_ROW
+    STA     $5AA3
+    LDA     FONT_CHARNUM
+    STA     $5AA4
+    LDX     #$0C
+    JSR     SCRIPT_ENGINE       ; run "avoided" script
+    JSR     SET_CURSOR_ROW21
+    LDA     #$02
+    JMP     DISPLAY_MESSAGE     ; "avoided encounter" message
+
+    ; --- special encounter (rare) ---
+.special:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$09
+    JSR     SCENE_LOOP          ; trigger scene 9
+    LDA     #$01
+    JMP     FUN_1425
     ORG     $1D04
-TRIGGER_SCENE_EVENT:            ; scene event handler ($D2-$D4)
+TRIGGER_SCENE_EVENT:
+    SUBROUTINE
+
+    LDA     #$00
+    JSR     FUN_1BE0            ; set char field 15 state to 0
+    LDA     $BE
+    STA     $5A5B               ; save event pointer low
+    LDA     $BF
+    STA     $5A5C               ; save event pointer high
+    JSR     FUN_1B52            ; commit move
+    LDA     $5A5B
+    STA     $BE                 ; restore event pointer
+    LDA     $5A5C
+    STA     $BF
+    LDY     #$02
+    LDA     ($BE),Y             ; event byte 2 = scene index
+    JSR     SCENE_LOOP          ; trigger scene
+    LDY     #$01
+    LDA     ($BE),Y             ; event byte 1 = type
+    CMP     #$D3
+    BPL     .d3_or_above
+    RTS                         ; $D2: trigger scene only
+.d3_or_above:
+    BNE     .d4
+    LDA     #$FE                ; $D3: mark event as empty
+    DEY
+    STA     ($BE),Y
+    RTS
+.d4:
+    LDA     #$FE                ; $D4: mark event as empty
+    DEY
+    STA     ($BE),Y
+    LDA     #$0F
+    JSR     SCENE_LOOP          ; trigger bonus scene $0F
+    LDA     #$03
+    JSR     RANDOM_IN_RANGE     ; random(3)
+    CLC
+    ADC     #$01                ; 1-3
+    JMP     FUN_1425            ; apply effect to char
     ORG     $743B
 FILL_MAP:
     SUBROUTINE
@@ -1941,9 +2113,320 @@ INIT_WORLD:
     JMP     $5F19                   ; initialize world from data table
 
     ORG     $646B
-PICKUP_TREASURE:                ; treasure pickup handler ($C0-$D1)
+PICKUP_TREASURE:
+    SUBROUTINE
+
+    LDA     #$00
+    JSR     FUN_1BE0            ; set char field 15 state to 0
+    LDA     $BE
+    STA     $F4                 ; copy event ptr → $F4/$F5
+    LDA     $BF
+    STA     $F5
+    JSR     FUN_1B52            ; commit move
+    LDY     #$01
+    LDA     ($F4),Y             ; event byte 1 = treasure type
+    CMP     #$C9
+    BPL     .trapped            ; >= $C9 → trapped chest or special
+    SEC
+    SBC     #$C0                ; $C0-$C8: treasure index 0-8
+    STA     $BD
+.rejoin:
+    LDY     #$02
+    LDA     ($F4),Y             ; event byte 2 = quantity
+    STA     $BC
+    LDY     #$01
+    JSR     FUN_70D4            ; look up treasure data
+    LDY     #$04
+    LDA     ($F8),Y             ; char field 4
+    CMP     #$15
+    BCS     .mark_used          ; inventory full → skip pickup
+    JSR     FUN_6593            ; add item to inventory
+    LDA     #$AB
+    STA     $BA
+    LDA     #$7B
+    STA     $BB
+    JSR     NUM_TO_DECIMAL      ; format quantity
+    LDY     #$0D
+    LDA     ($F8),Y             ; char field 13 (gold low)
+    STA     $BC
+    INY
+    LDA     ($F8),Y             ; char field 14 (gold high)
+    STA     $BD
+    LDA     #$CC
+    STA     $BA
+    LDA     #$7B
+    STA     $BB
+    JSR     NUM_TO_DECIMAL      ; format gold amount
+    JSR     SET_CURSOR_ROW21
+    LDA     #$84
+    STA     $BC
+    LDA     #$7B
+    STA     $BD
+    JSR     FUN_65A1            ; display pickup message
+.mark_used:
+    LDY     #$00
+    LDA     #$FE                ; mark event slot as empty
+    STA     ($F4),Y
+    RTS
+
+    ; --- trapped chest (type >= $C9) ---
+.trapped:
+    CMP     #$D1
+    BNE     .not_d1
+    JMP     .handle_d1          ; $D1: special chest
+.not_d1:
+    LDA     #$06
+    JSR     RANDOM_IN_RANGE     ; random(6)
+    AND     #$03                ; trap type 0-3
+    STA     $5A58
+    LDY     #$04
+    LDA     ($F8),Y             ; char field 4
+    BMI     .apply_trap
+    CMP     #$15
+    BPL     .apply_trap
+    JSR     SET_CURSOR_ROW21
+    LDA     #$36
+    CLC
+    ADC     $5A58               ; scene $36 + trap type
+    JSR     SCENE_LOOP          ; show trap scene
+.apply_trap:
+    LDA     $5A58
+    CMP     #$01
+    BMI     .trap0              ; trap 0: lose 1-5 HP
+    BEQ     .trap1              ; trap 1: lose 2-9 HP
+    CMP     #$02
+    BEQ     .trap2              ; trap 2: decrement counter
+    BNE     .trap3              ; trap 3: zero gold
+.trap0:
+    LDA     #$05
+    JSR     RANDOM_IN_RANGE
+    CLC
+    ADC     #$01                ; 1-5 damage
+    JSR     FUN_1425
+    JMP     .after_trap
+.trap1:
+    LDA     #$08
+    JSR     RANDOM_IN_RANGE
+    CLC
+    ADC     #$02                ; 2-9 damage
+    JSR     FUN_1425
+    JMP     .after_trap
+.trap2:
+    LDY     #$0B
+    LDA     ($F8),Y             ; char field 11
+    AND     #$1F
+    BEQ     .after_trap         ; already zero
+    LDA     ($F8),Y
+    SEC
+    SBC     #$01                ; decrement
+    STA     ($F8),Y
+    JMP     .after_trap
+.trap3:
+    LDY     #$0D
+    LDA     #$00
+    STA     ($F8),Y             ; zero gold low
+    INY
+    STA     ($F8),Y             ; zero gold high
+.after_trap:
+    LDY     #$02
+    LDA     ($F8),Y             ; char field 2 = room
+    CMP     $5A03               ; current room?
+    BEQ     .same_room
+    DEY
+    LDA     ($F4),Y             ; event byte 1
+    SEC
+    SBC     #$09                ; step back 9 in treasure table
+    STA     ($F4),Y
+    RTS
+.same_room:
+    DEY
+    LDA     ($F4),Y             ; event byte 1
+    SEC
+    SBC     #$C9                ; convert to treasure index
+    STA     $BD
+    JMP     .rejoin             ; loop: process next treasure
+
+    ; --- special chest $D1 ---
+.handle_d1:
+    LDA     #$0B
+    JSR     SCENE_LOOP          ; show scene $0B
+    JSR     FUN_657B
+    JSR     FUN_6580
+    LDA     #$03
+    JSR     RANDOM_IN_RANGE     ; random(3)
+    CMP     #$00
+    BEQ     .lucky
+    RTS                         ; 2/3 chance: nothing
+.lucky:
+    LDA     #$0C
+    JSR     SCENE_LOOP          ; show bonus scene $0C
+    JMP     .mark_used          ; mark event used
+    ORG     $657B
+FUN_657B:                       ; special chest helper 1
+    ORG     $6580
+FUN_6580:                       ; special chest helper 2
+    ORG     $6593
+FUN_6593:                       ; add item to inventory
+    ORG     $65A1
+FUN_65A1:                       ; display treasure pickup message
     ORG     $68AB
-AI_CHOOSE_TARGET:               ; NPC: choose movement target
+AI_CHOOSE_TARGET:
+    SUBROUTINE
+
+    ; --- dispatch by AI mode ---
+    LDA     #$00
+    STA     $5A5D
+    LDA     CHAR_AI_MODE
+    CMP     #$02
+    BPL     .mode_ge2
+
+    ; --- mode 0/1: check if NPC should join party ---
+    JSR     FUN_12D0
+    LDA     $F5
+    CMP     #$00
+    BEQ     .simple_target      ; no match → simple target
+    JSR     SET_CURSOR_ROW21
+    LDA     #$24
+    JSR     DISPLAY_MESSAGE     ; "joins party" message
+    JSR     FUN_1406
+    JSR     FUN_769B
+    JSR     DELAY_WITH_ANIMATION
+    LDA     #$25
+    JSR     DISPLAY_MESSAGE
+    LDA     #$00
+    STA     CHAR_AI_MODE        ; switch to player control
+    LDY     #$04
+    LDA     ($F8),Y
+    SEC
+    SBC     #$15                ; adjust char field 4
+    STA     ($F8),Y
+    LDY     #$0F
+    LDA     ($F4),Y             ; source field 15 high bits
+    AND     #$C0
+    STA     $BA
+    LDA     ($F8),Y             ; target field 15 low bits
+    AND     #$3F
+    ORA     $BA                 ; merge high bits from source
+    STA     ($F8),Y
+    LDY     #$08
+    LDA     ($FA),Y             ; group field 8
+    CLC
+    ADC     #$01                ; increment party size
+    STA     ($FA),Y
+    INC     $5A01               ; increment global party count
+    RTS
+
+    ; --- mode 2: compare stats for target ---
+.mode_ge2:
+    BNE     .mode_ge3
+.simple_target:
+    LDY     #$05
+    LDA     ($F8),Y             ; char field 5
+    AND     #$1F
+    STA     $BA
+    INY
+    LDA     ($F8),Y             ; char field 6
+    AND     #$3F
+    CMP     $BA
+    BPL     .use_encounter
+    LDA     #$00
+    STA     $5A71               ; no target
+    JMP     .done
+.use_encounter:
+    JSR     FUN_138D            ; find encounter position
+    STA     $5A71
+    JMP     .done
+
+    ; --- mode 3: find nearest hostile ---
+.mode_ge3:
+    CMP     #$04
+    BPL     .mode_ge4
+    LDA     $F8
+    STA     $BC
+    LDA     $F9
+    STA     $BD
+    LDA     #$3C                ; initial min distance
+    STA     $5A72
+    JSR     FIRST_GROUP_MEMBER
+.loop3:
+    JSR     CHECK_HOSTILE
+    CMP     #$00
+    BEQ     .skip3
+    LDY     #$03
+    LDA     ($F4),Y             ; mob packed position
+    JSR     FUN_13DB            ; compute distance
+    CMP     $5A72
+    BCS     .skip3              ; not closer
+    STA     $5A72               ; new minimum
+    LDY     #$03
+    LDA     ($F4),Y
+    STA     $5A71               ; target = this mob's position
+.skip3:
+    JSR     FUN_1300            ; next group member
+    LDA     $F5
+    BNE     .loop3
+    LDA     $5A72
+    CMP     #$3C
+    BNE     .found3
+    LDA     $5A5E               ; no hostile found → use default
+    STA     $5A71
+.found3:
+    JMP     .done
+
+    ; --- mode 4: no target ---
+.mode_ge4:
+    BNE     .mode_gt4
+    LDA     #$00
+    STA     $5A71
+    JMP     .done
+
+    ; --- mode 5+: find strongest hostile ---
+.mode_gt4:
+    LDA     #$00
+    STA     $BF                 ; max strength seen
+    LDA     $F8
+    STA     $BC
+    LDA     $F9
+    STA     $BD
+    JSR     FIRST_GROUP_MEMBER
+.loop5:
+    JSR     CHECK_HOSTILE
+    CMP     #$00
+    BEQ     .skip5
+    LDY     #$05
+    LDA     ($F4),Y             ; mob field 5
+    AND     #$1F                ; strength stat
+    CMP     $BF
+    BMI     .skip5              ; not stronger
+    STA     $BF                 ; new max
+    LDY     #$03
+    LDA     ($F4),Y
+    STA     $BE                 ; target position
+.skip5:
+    JSR     FUN_1300            ; next group member
+    LDA     $F5
+    BNE     .loop5
+    LDA     $BF
+    BEQ     .no_target5
+    LDA     $BE
+    STA     $5A71               ; strongest mob's position
+    JMP     .done
+.no_target5:
+    LDA     $5A5E               ; no hostile → use default
+    STA     $5A71
+    JMP     .done
+
+    ; --- convert target position to col/row ---
+.done:
+    LDA     $5A71
+    JSR     POS_TO_COLROW
+    STA     $5A72               ; target column
+    STY     $5A73               ; target row
+    RTS
+    ORG     $769B
+FUN_769B:                       ; party join display
+    ORG     $70D4
+FUN_70D4:                       ; look up treasure data
     ORG     $6B94
 INIT_STUB2:
     RTS
