@@ -1644,6 +1644,9 @@ INIT_GAME_STATE:
     STA     $7A4B                   ; /
     RTS
 
+    ORG     $6B94
+INIT_STUB2:
+    RTS
     ORG     $6C2E
 INIT_DISK_IOB:
     SUBROUTINE
@@ -2186,7 +2189,7 @@ GAME_INIT:
     JSR     INIT_GAME_STATE
     JSR     FILL_MAP
     JSR     SET_TEXT_WINDOW_BOTTOM
-    JSR     $6B94
+    JSR     INIT_STUB2
     LDA     #$00                    ; \
     STA     LOCATION_FLAG           ;  | clear state variables
     STA     LOCATION_FLAG2          ;  |

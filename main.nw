@@ -1847,24 +1847,6 @@ contains Animatrix, which is a utility used to create fonts for the HRCG.
 The \href{https://archive.org/details/applesoft-toolkit}{manual for the Applesoft Toolkit}
 can be found on the Internet Archive.
 
-<<init hcrg>>=
-init_HRCG:
-    SUBROUTINE
-
-    ; Overwrites part of HRCG so it returns immediately after setting TXTPAGE1
-    ; instead of continuing on to set TXTPAGE2.
-    LDA     #$60                        ; RTS
-    STA     $94B6
-
-    ; Overwrites part of HRCG so that it does not call DOS_VEC_RECONNECT upon
-    ; initialization.
-    LDA     #$EA                        ; NOP
-    STA     HRCG_overwritten_with_NOP
-    STA     HRCG_overwritten_with_NOP+1
-    STA     HRCG_overwritten_with_NOP+2
-    JMP     HRCG_link_and_set_mode_jmp
-@
-
 The new output handler installed by the HRCG is called whenever [[COUT]] is called.
 [[A]] contains the character to output.
 
@@ -2984,7 +2966,7 @@ GAME_INIT:
     JSR     INIT_GAME_STATE
     JSR     FILL_MAP
     JSR     SET_TEXT_WINDOW_BOTTOM
-    JSR     $6B94
+    JSR     INIT_STUB2
     LDA     #$00                    ; \
     STA     LOCATION_FLAG           ;  | clear state variables
     STA     LOCATION_FLAG2          ;  |
@@ -3335,6 +3317,17 @@ RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
 RWTS_IOB                EQU     $B7E8   ; RWTS Input/Output Block (14 bytes)
 RWTS_ENTRY              EQU     $B7B5   ; RWTS entry point
 @ %def RWTS_IOB RWTS_ENTRY
+
+\subsection{init\_stub2 (\$6B94)}
+
+A single [[RTS]]---another no-op stub called from [[GAME\_INIT]], like
+[[INIT\_STUB]] at [[\$7919]].
+
+<<init stub2>>=
+    ORG     $6B94
+INIT_STUB2:
+    RTS
+@ %def INIT_STUB2
 
 <<init disk iob>>=
     ORG     $6C2E
@@ -6099,6 +6092,7 @@ The following root chunks produce the assembly files when tangled.
 <<plot char>>
 <<print font char>>
 <<init game state>>
+<<init stub2>>
 <<init disk iob>>
 <<scene loop>>
 <<text renderer>>

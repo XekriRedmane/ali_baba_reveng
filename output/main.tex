@@ -1883,24 +1883,6 @@ contains Animatrix, which is a utility used to create fonts for the HRCG.
 The \href{https://archive.org/details/applesoft-toolkit}{manual for the Applesoft Toolkit}
 can be found on the Internet Archive.
 
-\nwenddocs{}\nwbegincode{96}\sublabel{PYNWmai0-26DEEOCSHWI7S5GYIOPZSCBG2Y000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-26DEEOCSHWI7S5GYIOPZSCBG2Y000000-1}}}\moddef{init hcrg~{\nwtagstyle{}\subpageref{PYNWmai0-26DEEOCSHWI7S5GYIOPZSCBG2Y000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
-init_HRCG:
-    SUBROUTINE
-
-    ; Overwrites part of HRCG so it returns immediately after setting TXTPAGE1
-    ; instead of continuing on to set TXTPAGE2.
-    LDA     #$60                        ; RTS
-    STA     $94B6
-
-    ; Overwrites part of HRCG so that it does not call DOS_VEC_RECONNECT upon
-    ; initialization.
-    LDA     #$EA                        ; NOP
-    STA     HRCG_overwritten_with_NOP
-    STA     HRCG_overwritten_with_NOP+1
-    STA     HRCG_overwritten_with_NOP+2
-    JMP     HRCG_link_and_set_mode_jmp
-\nwnotused{init hcrg}\nwendcode{}\nwbegindocs{97}\nwdocspar
-
 The new output handler installed by the HRCG is called whenever {\Tt{}COUT\nwendquote} is called.
 {\Tt{}A\nwendquote} contains the character to output.
 
@@ -1927,19 +1909,19 @@ Here are the font characters. There are 120 defined: 96 for character set 1,
 and 24 for character set 2. Characters 114-119 (character set 2, characters 18-23)
 form the EA logo that is displayed on the splash screen.
 
-\nwenddocs{}\nwbegincode{98}\sublabel{PYNWmai0-4CWZL3QTPT6M6623ENDBZQ3P5E000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4CWZL3QTPT6M6623ENDBZQ3P5E000000-1}}}\moddef{font data~{\nwtagstyle{}\subpageref{PYNWmai0-4CWZL3QTPT6M6623ENDBZQ3P5E000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{96}\sublabel{PYNWmai0-4CWZL3QTPT6M6623ENDBZQ3P5E000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4CWZL3QTPT6M6623ENDBZQ3P5E000000-1}}}\moddef{font data~{\nwtagstyle{}\subpageref{PYNWmai0-4CWZL3QTPT6M6623ENDBZQ3P5E000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $83A5
 \nwlinkedidentc{FONT_DATA}{PYNWmai0-4CWZL3QTPT6M6623ENDBZQ3P5E000000-1}:
     INCLUDE "fontdata.asm"
 \nwindexdefn{\nwixident{FONT{\_}DATA}}{FONT:unDATA}{PYNWmai0-4CWZL3QTPT6M6623ENDBZQ3P5E000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{FONT{\_}DATA}}{FONT:unDATA}}}\nwendcode{}\nwbegindocs{99}\nwdocspar
+\nwidentdefs{\\{{\nwixident{FONT{\_}DATA}}{FONT:unDATA}}}\nwendcode{}\nwbegindocs{97}\nwdocspar
 
-\nwenddocs{}\nwbegincode{100}\sublabel{PYNWmai0-4GKD57O4UDC4T2RQHRJRRNKC7M000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4GKD57O4UDC4T2RQHRJRRNKC7M000000-1}}}\moddef{std font data~{\nwtagstyle{}\subpageref{PYNWmai0-4GKD57O4UDC4T2RQHRJRRNKC7M000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{98}\sublabel{PYNWmai0-4GKD57O4UDC4T2RQHRJRRNKC7M000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4GKD57O4UDC4T2RQHRJRRNKC7M000000-1}}}\moddef{std font data~{\nwtagstyle{}\subpageref{PYNWmai0-4GKD57O4UDC4T2RQHRJRRNKC7M000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $97A5
 \nwlinkedidentc{STD_FONT_DATA}{PYNWmai0-4GKD57O4UDC4T2RQHRJRRNKC7M000000-1}:
     INCLUDE "stdfontdata.asm"
 \nwindexdefn{\nwixident{STD{\_}FONT{\_}DATA}}{STD:unFONT:unDATA}{PYNWmai0-4GKD57O4UDC4T2RQHRJRRNKC7M000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{STD{\_}FONT{\_}DATA}}{STD:unFONT:unDATA}}}\nwendcode{}\nwbegindocs{101}\nwdocspar
+\nwidentdefs{\\{{\nwixident{STD{\_}FONT{\_}DATA}}{STD:unFONT:unDATA}}}\nwendcode{}\nwbegindocs{99}\nwdocspar
 
 \input{font_data.tex}
 
@@ -1947,7 +1929,7 @@ form the EA logo that is displayed on the splash screen.
 
 Ali Baba provides several convenience routines which translate to HRCG control codes.
 
-\nwenddocs{}\nwbegincode{102}\sublabel{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}}}\moddef{control routines~{\nwtagstyle{}\subpageref{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{100}\sublabel{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}}}\moddef{control routines~{\nwtagstyle{}\subpageref{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $7730
 \nwlinkedidentc{SET_INVERSE_VIDEO}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}:
     SUBROUTINE
@@ -1975,7 +1957,7 @@ Ali Baba provides several convenience routines which translate to HRCG control c
 ; \nwlinkedidentc{PRINT_CTRL_AB}{PYNWmai0-UD4UC22WSFS3NXK2ZFCXIN73PU000000-1} (SET_CHARSET_0) follows at $774E, defined in its own chunk
 
 \nwindexdefn{\nwixident{SET{\_}INVERSE{\_}VIDEO}}{SET:unINVERSE:unVIDEO}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwindexdefn{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}SCROLL}}{SET:unTEXT:unWINDOW:unSCROLL}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwindexdefn{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}WRAP}}{SET:unTEXT:unWINDOW:unWRAP}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{SET{\_}INVERSE{\_}VIDEO}}{SET:unINVERSE:unVIDEO}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}SCROLL}}{SET:unTEXT:unWINDOW:unSCROLL}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}WRAP}}{SET:unTEXT:unWINDOW:unWRAP}}}\nwidentuses{\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwendcode{}\nwbegindocs{103}\nwdocspar
+\nwidentdefs{\\{{\nwixident{SET{\_}INVERSE{\_}VIDEO}}{SET:unINVERSE:unVIDEO}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}SCROLL}}{SET:unTEXT:unWINDOW:unSCROLL}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}WRAP}}{SET:unTEXT:unWINDOW:unWRAP}}}\nwidentuses{\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwendcode{}\nwbegindocs{101}\nwdocspar
 
 \subsection{Printing routines}
 
@@ -2006,12 +1988,12 @@ the game's environment:
 After patching, the routine tail-calls the HRCG init via {\Tt{}JMP\ {\textbackslash}{\$}92A8\nwendquote},
 which returns to {\Tt{}GAME{\textbackslash}{\_}INIT\nwendquote} via the patched RTS.
 
-\nwenddocs{}\nwbegincode{104}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{\relax}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{102}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{\relax}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}\nwenddeflinemarkup
 \nwlinkedidentc{HRCG_INIT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}               EQU     $92A8   ; HRCG entry/init routine
 \nwindexdefn{\nwixident{HRCG{\_}INIT}}{HRCG:unINIT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{HRCG{\_}INIT}}{HRCG:unINIT}}}\nwendcode{}\nwbegindocs{105}\nwdocspar
+\nwidentdefs{\\{{\nwixident{HRCG{\_}INIT}}{HRCG:unINIT}}}\nwendcode{}\nwbegindocs{103}\nwdocspar
 
-\nwenddocs{}\nwbegincode{106}\sublabel{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}}}\moddef{init hrcg~{\nwtagstyle{}\subpageref{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{104}\sublabel{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}}}\moddef{init hrcg~{\nwtagstyle{}\subpageref{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $791A
 \nwlinkedidentc{INIT_HRCG}{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}:
     SUBROUTINE
@@ -2024,19 +2006,19 @@ which returns to {\Tt{}GAME{\textbackslash}{\_}INIT\nwendquote} via the patched 
     STA     $92D7                   ; /
     JMP     \nwlinkedidentc{HRCG_INIT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}               ; enter HRCG initialization
 \nwindexdefn{\nwixident{INIT{\_}HRCG}}{INIT:unHRCG}{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{INIT{\_}HRCG}}{INIT:unHRCG}}}\nwidentuses{\\{{\nwixident{HRCG{\_}INIT}}{HRCG:unINIT}}}\nwindexuse{\nwixident{HRCG{\_}INIT}}{HRCG:unINIT}{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}\nwendcode{}\nwbegindocs{107}\nwdocspar
+\nwidentdefs{\\{{\nwixident{INIT{\_}HRCG}}{INIT:unHRCG}}}\nwidentuses{\\{{\nwixident{HRCG{\_}INIT}}{HRCG:unINIT}}}\nwindexuse{\nwixident{HRCG{\_}INIT}}{HRCG:unINIT}{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}\nwendcode{}\nwbegindocs{105}\nwdocspar
 
 \subsection{init\_stub (\$7919)}
 
 A single {\Tt{}RTS\nwendquote}---a no-op stub called from {\Tt{}GAME{\textbackslash}{\_}INIT\nwendquote}.  Likely a
 hook point or a disabled feature from development.
 
-\nwenddocs{}\nwbegincode{108}\sublabel{PYNWmai0-A5IDJFPW4YOQ5EAI2Y4LCAAB5U000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-A5IDJFPW4YOQ5EAI2Y4LCAAB5U000000-1}}}\moddef{init stub~{\nwtagstyle{}\subpageref{PYNWmai0-A5IDJFPW4YOQ5EAI2Y4LCAAB5U000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{106}\sublabel{PYNWmai0-A5IDJFPW4YOQ5EAI2Y4LCAAB5U000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-A5IDJFPW4YOQ5EAI2Y4LCAAB5U000000-1}}}\moddef{init stub~{\nwtagstyle{}\subpageref{PYNWmai0-A5IDJFPW4YOQ5EAI2Y4LCAAB5U000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $7919
 \nwlinkedidentc{INIT_STUB}{PYNWmai0-A5IDJFPW4YOQ5EAI2Y4LCAAB5U000000-1}:
     RTS
 \nwindexdefn{\nwixident{INIT{\_}STUB}}{INIT:unSTUB}{PYNWmai0-A5IDJFPW4YOQ5EAI2Y4LCAAB5U000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{INIT{\_}STUB}}{INIT:unSTUB}}}\nwendcode{}\nwbegindocs{109}\nwdocspar
+\nwidentdefs{\\{{\nwixident{INIT{\_}STUB}}{INIT:unSTUB}}}\nwendcode{}\nwbegindocs{107}\nwdocspar
 
 \subsection{init\_game\_state (\$5B00)}
 
@@ -2056,7 +2038,7 @@ opening script.  Steps:
   disabling the indirect action handler now that init is complete.
 \end{enumerate}
 
-\nwenddocs{}\nwbegincode{110}\sublabel{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}}}\moddef{init game state~{\nwtagstyle{}\subpageref{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{108}\sublabel{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}}}\moddef{init game state~{\nwtagstyle{}\subpageref{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $5B00
 INIT_GAME_STATE:
     SUBROUTINE
@@ -2080,20 +2062,20 @@ INIT_GAME_STATE:
     STA     $7A4B                   ; /
     RTS
 
-\nwidentuses{\\{{\nwixident{GAME{\_}ACTION{\_}HANDLER}}{GAME:unACTION:unHANDLER}}\\{{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}}}\nwindexuse{\nwixident{GAME{\_}ACTION{\_}HANDLER}}{GAME:unACTION:unHANDLER}{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}\nwindexuse{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}\nwendcode{}\nwbegincode{111}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}\nwenddeflinemarkup
+\nwidentuses{\\{{\nwixident{GAME{\_}ACTION{\_}HANDLER}}{GAME:unACTION:unHANDLER}}\\{{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}}}\nwindexuse{\nwixident{GAME{\_}ACTION{\_}HANDLER}}{GAME:unACTION:unHANDLER}{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}\nwindexuse{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}\nwendcode{}\nwbegincode{109}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}\nwenddeflinemarkup
 \nwlinkedidentc{GAME_ACTION_HANDLER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}     EQU     $5B2A   ; game action dispatch target
 \nwindexdefn{\nwixident{GAME{\_}ACTION{\_}HANDLER}}{GAME:unACTION:unHANDLER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}\eatline
-\nwidentdefs{\\{{\nwixident{GAME{\_}ACTION{\_}HANDLER}}{GAME:unACTION:unHANDLER}}}\nwendcode{}\nwbegindocs{112}\nwdocspar
+\nwidentdefs{\\{{\nwixident{GAME{\_}ACTION{\_}HANDLER}}{GAME:unACTION:unHANDLER}}}\nwendcode{}\nwbegindocs{110}\nwdocspar
 
-\nwenddocs{}\nwbegindocs{113}\nwdocspar
+\nwenddocs{}\nwbegindocs{111}\nwdocspar
 
-\nwenddocs{}\nwbegincode{114}\sublabel{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}}}\moddef{zero page defines~{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{\relax}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{112}\sublabel{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}}}\moddef{zero page defines~{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{\relax}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\nwenddeflinemarkup
 \nwlinkedidentc{TEXT_COL}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}                EQU     $24     ; Cursor position
 \nwlinkedidentc{TEXT_ROW}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}                EQU     $25
 \nwindexdefn{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}\nwindexdefn{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwendcode{}\nwbegindocs{115}\nwdocspar
+\nwidentdefs{\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwendcode{}\nwbegindocs{113}\nwdocspar
 
-\nwenddocs{}\nwbegincode{116}\sublabel{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}}}\moddef{set text window upper left~{\nwtagstyle{}\subpageref{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{114}\sublabel{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}}}\moddef{set text window upper left~{\nwtagstyle{}\subpageref{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $792D
 SET_TEXT_WINDOW_UPPER_LEFT_ALL:
     SUBROUTINE
@@ -2113,13 +2095,13 @@ SET_TEXT_WINDOW_UPPER_LEFT:
     STA     \nwlinkedidentc{TEXT_COL}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}
     LDA     #$96        ; ctrl-V (set text window upper left)
     JMP     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}
-\nwidentuses{\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwendcode{}\nwbegindocs{117}\nwdocspar
+\nwidentuses{\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwendcode{}\nwbegindocs{115}\nwdocspar
 
 Since text on the lower part always starts at row 21, and the column number only
 needs 6 bits, we can specify a compressed 8-bit version of the cursor, where the
 row number can be specified by upper two bits (so 20 through 23).
 
-\nwenddocs{}\nwbegincode{118}\sublabel{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}}}\moddef{set cursor compressed~{\nwtagstyle{}\subpageref{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{116}\sublabel{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}}}\moddef{set cursor compressed~{\nwtagstyle{}\subpageref{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $776E
 SET_CURSOR_COMPRESSED:
     SUBROUTINE
@@ -2138,21 +2120,21 @@ SET_CURSOR_COMPRESSED:
     ADC     #20
     STA     \nwlinkedidentc{TEXT_ROW}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}
     RTS
-\nwidentuses{\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}\nwendcode{}\nwbegindocs{119}\nwdocspar
+\nwidentuses{\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}\nwendcode{}\nwbegindocs{117}\nwdocspar
 
 The {\Tt{}PRINT{\_}STRING\nwendquote} routine prints a Pascal-style string (length first),
 from an address stored in {\Tt{}PRINT{\_}STRING{\_}ADDR\nwendquote}, at the current cursor
 position.
 
-\nwenddocs{}\nwbegincode{120}\sublabel{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}}}\moddef{zero page defines~{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-3}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{118}\sublabel{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}}}\moddef{zero page defines~{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-3}\nwenddeflinemarkup
 \nwlinkedidentc{TMP_PTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}                 EQU     $FA     ; temporary pointer (2 bytes)
 \nwlinkedidentc{DATA_PTR3}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}               EQU     $BA     ; data pointer 3 (2 bytes)
 \nwlinkedidentc{PRINT_STRING_ADDR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}       EQU     $BC     ; 2 bytes (same pointer as \nwlinkedidentc{PRINT_FROM_PTR}{PYNWmai0-XAPVU72S6LIKQGYUGORXPGRLK4000000-1})
 \nwlinkedidentc{DATA_PTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}                EQU     $BE     ; data pointer / return value (2 bytes)
 \nwindexdefn{\nwixident{DATA{\_}PTR}}{DATA:unPTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\nwindexdefn{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\nwindexdefn{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\nwindexdefn{\nwixident{TMP{\_}PTR}}{TMP:unPTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\eatline
-\nwidentdefs{\\{{\nwixident{DATA{\_}PTR}}{DATA:unPTR}}\\{{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}}\\{{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}}\\{{\nwixident{TMP{\_}PTR}}{TMP:unPTR}}}\nwidentuses{\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\nwendcode{}\nwbegindocs{121}\nwdocspar
+\nwidentdefs{\\{{\nwixident{DATA{\_}PTR}}{DATA:unPTR}}\\{{\nwixident{DATA{\_}PTR3}}{DATA:unPTR3}}\\{{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}}\\{{\nwixident{TMP{\_}PTR}}{TMP:unPTR}}}\nwidentuses{\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\nwendcode{}\nwbegindocs{119}\nwdocspar
 
-\nwenddocs{}\nwbegincode{122}\sublabel{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}}}\moddef{print string~{\nwtagstyle{}\subpageref{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{\relax}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{120}\sublabel{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}}}\moddef{print string~{\nwtagstyle{}\subpageref{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{\relax}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}\nwenddeflinemarkup
     ORG     $7758
 \nwlinkedidentc{PRINT_STRING_AT_ADDR}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}:
     SUBROUTINE
@@ -2162,23 +2144,23 @@ position.
 
     ; falls through to \nwlinkedidentc{PRINT_STRING}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2} / \nwlinkedidentc{PRINT_FROM_PTR}{PYNWmai0-XAPVU72S6LIKQGYUGORXPGRLK4000000-1} at $775C
 \nwindexdefn{\nwixident{PRINT{\_}STRING{\_}AT{\_}ADDR}}{PRINT:unSTRING:unAT:unADDR}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{PRINT{\_}STRING{\_}AT{\_}ADDR}}{PRINT:unSTRING:unAT:unADDR}}}\nwidentuses{\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}\\{{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}}\\{{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}}}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}\nwendcode{}\nwbegindocs{123}\nwdocspar
+\nwidentdefs{\\{{\nwixident{PRINT{\_}STRING{\_}AT{\_}ADDR}}{PRINT:unSTRING:unAT:unADDR}}}\nwidentuses{\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}\\{{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}}\\{{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}}}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}\nwendcode{}\nwbegindocs{121}\nwdocspar
 
 {\Tt{}PRINT{\_}STRING\nwendquote} is the same entry point as {\Tt{}PRINT{\_}FROM{\_}PTR\nwendquote} at {\Tt{}{\textbackslash}{\$}775C\nwendquote}:
 both print a length-prefixed string from {\Tt{}{\textbackslash}{\$}BC/{\textbackslash}{\$}BD\nwendquote}.
 {\Tt{}PRINT{\_}STRING{\_}AT{\_}ADDR\nwendquote} at {\Tt{}{\textbackslash}{\$}7758\nwendquote} stores {\Tt{}X/Y\nwendquote} into {\Tt{}{\textbackslash}{\$}BC/{\textbackslash}{\$}BD\nwendquote}
 first, then falls through.
 
-\nwenddocs{}\nwbegincode{124}\sublabel{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}}}\moddef{print string~{\nwtagstyle{}\subpageref{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}{\relax}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{122}\sublabel{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}}}\moddef{print string~{\nwtagstyle{}\subpageref{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-1}{\relax}\nwenddeflinemarkup
     ORG     $775C
 \nwlinkedidentc{PRINT_STRING}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}             ; same entry as \nwlinkedidentc{PRINT_FROM_PTR}{PYNWmai0-XAPVU72S6LIKQGYUGORXPGRLK4000000-1}
 \nwindexdefn{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}\eatline
-\nwidentdefs{\\{{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}}}\nwidentuses{\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}\nwendcode{}\nwbegindocs{125}\nwdocspar
+\nwidentdefs{\\{{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}}}\nwidentuses{\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}\nwendcode{}\nwbegindocs{123}\nwdocspar
 
 The {\Tt{}PRINT{\_}CENTERED{\_}PLUS{\_}COL\nwendquote} centers text, but moves it right by the
 current cursor's column. If the column is zero, the routine would center the text on the screen.
 
-\nwenddocs{}\nwbegincode{126}\sublabel{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}}}\moddef{print centered plus col~{\nwtagstyle{}\subpageref{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{124}\sublabel{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}}}\moddef{print centered plus col~{\nwtagstyle{}\subpageref{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $7710
 \nwlinkedidentc{PRINT_CENTERED_PLUS_COL}{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}:
     SUBROUTINE
@@ -2194,12 +2176,12 @@ current cursor's column. If the column is zero, the routine would center the tex
     JSR     SET_CHARSET_0
     JMP     \nwlinkedidentc{PRINT_STRING}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}
 \nwindexdefn{\nwixident{PRINT{\_}CENTERED{\_}PLUS{\_}COL}}{PRINT:unCENTERED:unPLUS:unCOL}{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{PRINT{\_}CENTERED{\_}PLUS{\_}COL}}{PRINT:unCENTERED:unPLUS:unCOL}}}\nwidentuses{\\{{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}}\\{{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}}\nwindexuse{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}\nwendcode{}\nwbegindocs{127}\nwdocspar
+\nwidentdefs{\\{{\nwixident{PRINT{\_}CENTERED{\_}PLUS{\_}COL}}{PRINT:unCENTERED:unPLUS:unCOL}}}\nwidentuses{\\{{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}}\\{{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}}\nwindexuse{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}\nwendcode{}\nwbegindocs{125}\nwdocspar
 
 The {\Tt{}PRINT{\_}BOTTOM{\_}CENTERED\nwendquote} centers text on row 23, which is the bottom of
 the screen.
 
-\nwenddocs{}\nwbegincode{128}\sublabel{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}}}\moddef{print bottom centered~{\nwtagstyle{}\subpageref{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{126}\sublabel{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}}}\moddef{print bottom centered~{\nwtagstyle{}\subpageref{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $7705
 \nwlinkedidentc{PRINT_BOTTOM_CENTERED}{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}:
     SUBROUTINE
@@ -2210,7 +2192,7 @@ the screen.
     STA     \nwlinkedidentc{TEXT_COL}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}
     JMP     \nwlinkedidentc{PRINT_CENTERED_PLUS_COL}{PYNWmai0-FABDTMIXI4WKO6TJCYFWWW4P4U000000-1}
 \nwindexdefn{\nwixident{PRINT{\_}BOTTOM{\_}CENTERED}}{PRINT:unBOTTOM:unCENTERED}{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{PRINT{\_}BOTTOM{\_}CENTERED}}{PRINT:unBOTTOM:unCENTERED}}}\nwidentuses{\\{{\nwixident{PRINT{\_}CENTERED{\_}PLUS{\_}COL}}{PRINT:unCENTERED:unPLUS:unCOL}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{PRINT{\_}CENTERED{\_}PLUS{\_}COL}}{PRINT:unCENTERED:unPLUS:unCOL}{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}\nwendcode{}\nwbegindocs{129}\nwdocspar
+\nwidentdefs{\\{{\nwixident{PRINT{\_}BOTTOM{\_}CENTERED}}{PRINT:unBOTTOM:unCENTERED}}}\nwidentuses{\\{{\nwixident{PRINT{\_}CENTERED{\_}PLUS{\_}COL}}{PRINT:unCENTERED:unPLUS:unCOL}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{PRINT{\_}CENTERED{\_}PLUS{\_}COL}}{PRINT:unCENTERED:unPLUS:unCOL}{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}\nwendcode{}\nwbegindocs{127}\nwdocspar
 
 \subsection{HRCG font character routines}
 
@@ -2219,13 +2201,13 @@ there is a routine to convert from font coordinate to text cursor coordinate
 so that the HRCG can locate the font character at the text coordinate (at
 the upper left of the font character).
 
-\nwenddocs{}\nwbegincode{130}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{128}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}\nwenddeflinemarkup
 \nwlinkedidentc{FONT_COL}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}        EQU     $5A0C
 \nwlinkedidentc{FONT_ROW}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}        EQU     $5A0D
 \nwindexdefn{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}\nwindexdefn{\nwixident{FONT{\_}ROW}}{FONT:unROW}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}\eatline
-\nwidentdefs{\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}}\nwendcode{}\nwbegindocs{131}\nwdocspar
+\nwidentdefs{\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}}\nwendcode{}\nwbegindocs{129}\nwdocspar
 
-\nwenddocs{}\nwbegincode{132}\sublabel{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}}}\moddef{font pos~{\nwtagstyle{}\subpageref{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{130}\sublabel{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}}}\moddef{font pos~{\nwtagstyle{}\subpageref{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $7723
 \nwlinkedidentc{FONT_POS_TO_TEXT_POS}{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}:
     SUBROUTINE
@@ -2238,7 +2220,7 @@ the upper left of the font character).
     STA     \nwlinkedidentc{TEXT_ROW}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}
     RTS
 \nwindexdefn{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}}}\nwidentuses{\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}\nwindexuse{\nwixident{FONT{\_}ROW}}{FONT:unROW}{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}\nwendcode{}\nwbegindocs{133}\nwdocspar
+\nwidentdefs{\\{{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}}}\nwidentuses{\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}\nwindexuse{\nwixident{FONT{\_}ROW}}{FONT:unROW}{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-RYW3JHATWASGD7OSRVNXJ325E4000000-1}\nwendcode{}\nwbegindocs{131}\nwdocspar
 
 Two basic routines print the font character stored in {\Tt{}FONT{\_}CHARNUM\nwendquote}.
 One routine simply does the font position to text position conversion before
@@ -2261,7 +2243,7 @@ Not only that, but the first character in the character set is ASCII 32
 This is what the {\Tt{}PRINT{\_}FONTCHAR\nwendquote}, {\Tt{}PRINT{\_}FONTCHAR{\_}AT{\_}TEXT{\_}POS\nwendquote}, and
 {\Tt{}PLOT{\_}FONTCHAR\nwendquote} routines do.
 
-\nwenddocs{}\nwbegincode{134}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{132}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwenddeflinemarkup
 FONT_CHARNUM        EQU     $5A0E
 FONT_CHARSET        EQU     $5A0F
 s_PRINT_FONT_CHAR   EQU     $80A4   ; 10 bytes
@@ -2270,7 +2252,7 @@ CHAR_UPPER_LEFT     EQU     $80A8
 CHAR_UPPER_RIGHT    EQU     $80A9
 CHAR_LOWER_LEFT     EQU     $80AB
 CHAR_LOWER_RIGHT    EQU     $80AC
-\nwendcode{}\nwbegindocs{135}\nwdocspar
+\nwendcode{}\nwbegindocs{133}\nwdocspar
 
 The blink cursor is a saved font position used to flash a character on the
 hi-res screen.  Three bytes at {\Tt{}{\$}5AA2\nwendquote}--{\Tt{}{\$}5AA4\nwendquote} mirror {\Tt{}FONT{\_}COL\nwendquote},
@@ -2283,12 +2265,12 @@ blink position,'' since valid font--column values are 0--19.  Both
 {\Tt{}game{\textbackslash}{\_}init\nwendquote} and {\Tt{}scene{\textbackslash}{\_}loop\nwendquote} store {\Tt{}{\textbackslash}{\$}14\nwendquote} here to disable the blink
 cursor at startup and at each new scene.
 
-\nwenddocs{}\nwbegincode{136}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{134}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}\nwenddeflinemarkup
 \nwlinkedidentc{BLINK_COL}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
 \nwlinkedidentc{BLINK_ROW}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}       EQU     $5AA3   ; font row
 \nwlinkedidentc{BLINK_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}      EQU     $5AA4   ; font character number
 \nwindexdefn{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwindexdefn{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwindexdefn{\nwixident{BLINK{\_}ROW}}{BLINK:unROW}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\eatline
-\nwidentdefs{\\{{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}}\\{{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}}\\{{\nwixident{BLINK{\_}ROW}}{BLINK:unROW}}}\nwendcode{}\nwbegindocs{137}\nwdocspar
+\nwidentdefs{\\{{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}}\\{{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}}\\{{\nwixident{BLINK{\_}ROW}}{BLINK:unROW}}}\nwendcode{}\nwbegindocs{135}\nwdocspar
 
 \subsection{draw\_blink\_alt (\$74CB)}
 
@@ -2319,12 +2301,12 @@ HRCG control string, then loops over all 200 grid positions (from
 bottom-right to top-left), re-printing the same string at each position
 via {\Tt{}PRINT{\textbackslash}{\_}STRING\nwendquote}.
 
-\nwenddocs{}\nwbegincode{138}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{136}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwenddeflinemarkup
 \nwlinkedidentc{MAP_FILL_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}           EQU     $7AC1   ; character used to fill the map grid
 \nwindexdefn{\nwixident{MAP{\_}FILL{\_}CHAR}}{MAP:unFILL:unCHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}\eatline
-\nwidentdefs{\\{{\nwixident{MAP{\_}FILL{\_}CHAR}}{MAP:unFILL:unCHAR}}}\nwendcode{}\nwbegindocs{139}\nwdocspar
+\nwidentdefs{\\{{\nwixident{MAP{\_}FILL{\_}CHAR}}{MAP:unFILL:unCHAR}}}\nwendcode{}\nwbegindocs{137}\nwdocspar
 
-\nwenddocs{}\nwbegincode{140}\sublabel{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}}}\moddef{fill map~{\nwtagstyle{}\subpageref{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{138}\sublabel{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}}}\moddef{fill map~{\nwtagstyle{}\subpageref{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $743B
 \nwlinkedidentc{FILL_MAP}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}:
     SUBROUTINE
@@ -2351,9 +2333,9 @@ via {\Tt{}PRINT{\textbackslash}{\_}STRING\nwendquote}.
     JSR     \nwlinkedidentc{PRINT_STRING}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}            ; re-print the same glyph string
     JMP     .loop
 \nwindexdefn{\nwixident{FILL{\_}MAP}}{FILL:unMAP}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{FILL{\_}MAP}}{FILL:unMAP}}}\nwidentuses{\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}}\\{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}\\{{\nwixident{MAP{\_}FILL{\_}CHAR}}{MAP:unFILL:unCHAR}}\\{{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}}\\{{\nwixident{RENDER{\_}FONT{\_}CHAR}}{RENDER:unFONT:unCHAR}}}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwindexuse{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwindexuse{\nwixident{FONT{\_}ROW}}{FONT:unROW}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwindexuse{\nwixident{MAP{\_}FILL{\_}CHAR}}{MAP:unFILL:unCHAR}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwindexuse{\nwixident{RENDER{\_}FONT{\_}CHAR}}{RENDER:unFONT:unCHAR}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwendcode{}\nwbegindocs{141}\nwdocspar
+\nwidentdefs{\\{{\nwixident{FILL{\_}MAP}}{FILL:unMAP}}}\nwidentuses{\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}}\\{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}\\{{\nwixident{MAP{\_}FILL{\_}CHAR}}{MAP:unFILL:unCHAR}}\\{{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}}\\{{\nwixident{RENDER{\_}FONT{\_}CHAR}}{RENDER:unFONT:unCHAR}}}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwindexuse{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwindexuse{\nwixident{FONT{\_}ROW}}{FONT:unROW}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwindexuse{\nwixident{MAP{\_}FILL{\_}CHAR}}{MAP:unFILL:unCHAR}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwindexuse{\nwixident{RENDER{\_}FONT{\_}CHAR}}{RENDER:unFONT:unCHAR}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}\nwendcode{}\nwbegindocs{139}\nwdocspar
 
-\nwenddocs{}\nwbegincode{142}\sublabel{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}}}\moddef{render font char~{\nwtagstyle{}\subpageref{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{140}\sublabel{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}}}\moddef{render font char~{\nwtagstyle{}\subpageref{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $7489
 \nwlinkedidentc{RENDER_FONT_CHAR}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}:
     SUBROUTINE
@@ -2395,7 +2377,7 @@ via {\Tt{}PRINT{\textbackslash}{\_}STRING\nwendquote}.
     STA     \nwlinkedidentc{PRINT_STRING_ADDR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}+1     ; /
     JMP     \nwlinkedidentc{PRINT_STRING}{PYNWmai0-RHBNV2D53ZNTBAEZE24PUXKEWI000000-2}            ; output the 2×2 character
 \nwindexdefn{\nwixident{RENDER{\_}FONT{\_}CHAR}}{RENDER:unFONT:unCHAR}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{RENDER{\_}FONT{\_}CHAR}}{RENDER:unFONT:unCHAR}}}\nwidentuses{\\{{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}}\\{{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}}\\{{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwendcode{}\nwbegindocs{143}\nwdocspar
+\nwidentdefs{\\{{\nwixident{RENDER{\_}FONT{\_}CHAR}}{RENDER:unFONT:unCHAR}}}\nwidentuses{\\{{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}}\\{{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}}\\{{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING}}{PRINT:unSTRING}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}\nwendcode{}\nwbegindocs{141}\nwdocspar
 
 \subsection{get\_entity\_fontchar (\$0C7E)}
 
@@ -2413,12 +2395,12 @@ Three cases based on the pointer value:
       based on the full byte~1 value
 \end{itemize}
 
-\nwenddocs{}\nwbegincode{144}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{142}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}\nwenddeflinemarkup
 \nwlinkedidentc{DEFAULT_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}            EQU     $7AC2   ; default entity character ($2C)
 \nwindexdefn{\nwixident{DEFAULT{\_}CHAR}}{DEFAULT:unCHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\eatline
-\nwidentdefs{\\{{\nwixident{DEFAULT{\_}CHAR}}{DEFAULT:unCHAR}}}\nwendcode{}\nwbegindocs{145}\nwdocspar
+\nwidentdefs{\\{{\nwixident{DEFAULT{\_}CHAR}}{DEFAULT:unCHAR}}}\nwendcode{}\nwbegindocs{143}\nwdocspar
 
-\nwenddocs{}\nwbegincode{146}\sublabel{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}}}\moddef{get entity fontchar~{\nwtagstyle{}\subpageref{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{144}\sublabel{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}}}\moddef{get entity fontchar~{\nwtagstyle{}\subpageref{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $0C7E
 \nwlinkedidentc{GET_ENTITY_FONTCHAR}{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}:
     SUBROUTINE
@@ -2491,7 +2473,7 @@ Three cases based on the pointer value:
     JSR     \nwlinkedidentc{APPEARANCE_TO_FONTCHAR}{PYNWmai0-ZV3SLJLMHDXQXGXKZHHC4ROVNQ000000-1}
     JMP     .store
 \nwindexdefn{\nwixident{GET{\_}ENTITY{\_}FONTCHAR}}{GET:unENTITY:unFONTCHAR}{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{GET{\_}ENTITY{\_}FONTCHAR}}{GET:unENTITY:unFONTCHAR}}}\nwidentuses{\\{{\nwixident{APPEARANCE{\_}TO{\_}FONTCHAR}}{APPEARANCE:unTO:unFONTCHAR}}\\{{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}}\\{{\nwixident{DEFAULT{\_}CHAR}}{DEFAULT:unCHAR}}}\nwindexuse{\nwixident{APPEARANCE{\_}TO{\_}FONTCHAR}}{APPEARANCE:unTO:unFONTCHAR}{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}\nwindexuse{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}\nwindexuse{\nwixident{DEFAULT{\_}CHAR}}{DEFAULT:unCHAR}{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}\nwendcode{}\nwbegindocs{147}\nwdocspar
+\nwidentdefs{\\{{\nwixident{GET{\_}ENTITY{\_}FONTCHAR}}{GET:unENTITY:unFONTCHAR}}}\nwidentuses{\\{{\nwixident{APPEARANCE{\_}TO{\_}FONTCHAR}}{APPEARANCE:unTO:unFONTCHAR}}\\{{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}}\\{{\nwixident{DEFAULT{\_}CHAR}}{DEFAULT:unCHAR}}}\nwindexuse{\nwixident{APPEARANCE{\_}TO{\_}FONTCHAR}}{APPEARANCE:unTO:unFONTCHAR}{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}\nwindexuse{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}\nwindexuse{\nwixident{DEFAULT{\_}CHAR}}{DEFAULT:unCHAR}{PYNWmai0-KWRR7HOSUHEUTDUYCEFKKXY7QE000000-1}\nwendcode{}\nwbegindocs{145}\nwdocspar
 
 \subsection{find\_entity\_at\_pos (\$0B62)}
 
@@ -2509,7 +2491,7 @@ start of a 3-byte-entry table whose first byte is a position.
 Uses heavy self-modifying code to patch absolute address operands for
 the indexed loads and table walks.
 
-\nwenddocs{}\nwbegincode{148}\sublabel{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}}}\moddef{find entity at pos~{\nwtagstyle{}\subpageref{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{146}\sublabel{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}}}\moddef{find entity at pos~{\nwtagstyle{}\subpageref{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $0B62
 \nwlinkedidentc{FIND_ENTITY_AT_POS}{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}:
     SUBROUTINE
@@ -2594,14 +2576,14 @@ the indexed loads and table walks.
     STA     .load1+2                ; /
     RTS
 \nwindexdefn{\nwixident{FIND{\_}ENTITY{\_}AT{\_}POS}}{FIND:unENTITY:unAT:unPOS}{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{FIND{\_}ENTITY{\_}AT{\_}POS}}{FIND:unENTITY:unAT:unPOS}}}\nwidentuses{\\{{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}}\nwindexuse{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}\nwindexuse{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}\nwendcode{}\nwbegindocs{149}\nwdocspar
+\nwidentdefs{\\{{\nwixident{FIND{\_}ENTITY{\_}AT{\_}POS}}{FIND:unENTITY:unAT:unPOS}}}\nwidentuses{\\{{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}}\nwindexuse{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}\nwindexuse{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}{PYNWmai0-PLJFN4SECKS5ALV334RXDZNCVU000000-1}\nwendcode{}\nwbegindocs{147}\nwdocspar
 
-\nwenddocs{}\nwbegincode{150}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{148}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwenddeflinemarkup
 \nwlinkedidentc{BLINK_ALT_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}          EQU     $7AC3   ; alternate blink character
 \nwindexdefn{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}\eatline
-\nwidentdefs{\\{{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}}}\nwendcode{}\nwbegindocs{151}\nwdocspar
+\nwidentdefs{\\{{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}}}\nwendcode{}\nwbegindocs{149}\nwdocspar
 
-\nwenddocs{}\nwbegincode{152}\sublabel{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}}}\moddef{draw blink alt~{\nwtagstyle{}\subpageref{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{150}\sublabel{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}}}\moddef{draw blink alt~{\nwtagstyle{}\subpageref{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $74CB
 \nwlinkedidentc{DRAW_BLINK_ALT}{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}:
     SUBROUTINE
@@ -2615,7 +2597,7 @@ the indexed loads and table walks.
     STA     \nwlinkedidentc{BLINK_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}              ; restore original char
     RTS
 \nwindexdefn{\nwixident{DRAW{\_}BLINK{\_}ALT}}{DRAW:unBLINK:unALT}{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{DRAW{\_}BLINK{\_}ALT}}{DRAW:unBLINK:unALT}}}\nwidentuses{\\{{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}}\\{{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}}\\{{\nwixident{DRAW{\_}BLINK{\_}CHAR}}{DRAW:unBLINK:unCHAR}}}\nwindexuse{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}\nwindexuse{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}\nwindexuse{\nwixident{DRAW{\_}BLINK{\_}CHAR}}{DRAW:unBLINK:unCHAR}{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}\nwendcode{}\nwbegindocs{153}\nwdocspar
+\nwidentdefs{\\{{\nwixident{DRAW{\_}BLINK{\_}ALT}}{DRAW:unBLINK:unALT}}}\nwidentuses{\\{{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}}\\{{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}}\\{{\nwixident{DRAW{\_}BLINK{\_}CHAR}}{DRAW:unBLINK:unCHAR}}}\nwindexuse{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}\nwindexuse{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}\nwindexuse{\nwixident{DRAW{\_}BLINK{\_}CHAR}}{DRAW:unBLINK:unCHAR}{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}\nwendcode{}\nwbegindocs{151}\nwdocspar
 
 \subsection{draw\_blink\_normal (\$74DD) / draw\_blink\_char (\$74E0)}
 
@@ -2630,7 +2612,7 @@ then falls through into {\Tt{}DRAW{\textbackslash}{\_}BLINK{\textbackslash}{\_}C
 (the disabled sentinel), it returns immediately.  Saves and restores
 {\Tt{}{\textbackslash}{\$}BC/{\textbackslash}{\$}BD\nwendquote} since {\Tt{}PRINT{\textbackslash}{\_}FONTCHAR\nwendquote} uses that pointer.
 
-\nwenddocs{}\nwbegincode{154}\sublabel{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}}}\moddef{draw blink char~{\nwtagstyle{}\subpageref{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{152}\sublabel{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}}}\moddef{draw blink char~{\nwtagstyle{}\subpageref{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $74DD
 \nwlinkedidentc{DRAW_BLINK_NORMAL}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}:
     JSR     \nwlinkedidentc{PRINT_CTRL_N}{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}            ; Ctrl-N → normal video
@@ -2662,7 +2644,7 @@ then falls through into {\Tt{}DRAW{\textbackslash}{\_}BLINK{\textbackslash}{\_}C
     STA     \nwlinkedidentc{PRINT_STRING_ADDR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}
     RTS
 \nwindexdefn{\nwixident{DRAW{\_}BLINK{\_}CHAR}}{DRAW:unBLINK:unCHAR}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexdefn{\nwixident{DRAW{\_}BLINK{\_}NORMAL}}{DRAW:unBLINK:unNORMAL}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{DRAW{\_}BLINK{\_}CHAR}}{DRAW:unBLINK:unCHAR}}\\{{\nwixident{DRAW{\_}BLINK{\_}NORMAL}}{DRAW:unBLINK:unNORMAL}}}\nwidentuses{\\{{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}}\\{{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}}\\{{\nwixident{BLINK{\_}ROW}}{BLINK:unROW}}\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}\\{{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}}\\{{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}}\\{{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}}}\nwindexuse{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{BLINK{\_}ROW}}{BLINK:unROW}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{FONT{\_}ROW}}{FONT:unROW}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwendcode{}\nwbegindocs{155}\nwdocspar
+\nwidentdefs{\\{{\nwixident{DRAW{\_}BLINK{\_}CHAR}}{DRAW:unBLINK:unCHAR}}\\{{\nwixident{DRAW{\_}BLINK{\_}NORMAL}}{DRAW:unBLINK:unNORMAL}}}\nwidentuses{\\{{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}}\\{{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}}\\{{\nwixident{BLINK{\_}ROW}}{BLINK:unROW}}\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}\\{{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}}\\{{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}}\\{{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}}}\nwindexuse{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{BLINK{\_}ROW}}{BLINK:unROW}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{FONT{\_}ROW}}{FONT:unROW}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwindexuse{\nwixident{PRINT{\_}STRING{\_}ADDR}}{PRINT:unSTRING:unADDR}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}\nwendcode{}\nwbegindocs{153}\nwdocspar
 
 \subsection{print\_ctrl\_N (\$7735)}
 
@@ -2671,7 +2653,7 @@ routine via {\Tt{}COUT1\nwendquote}.  {\Tt{}{\textbackslash}{\$}8E\nwendquote} i
 This is distinct from {\Tt{}SET{\textbackslash}{\_}NORMAL{\textbackslash}{\_}VIDEO\nwendquote} at {\Tt{}{\textbackslash}{\$}75F9\nwendquote} which uses
 {\Tt{}COUT\nwendquote} instead.
 
-\nwenddocs{}\nwbegincode{156}\sublabel{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}}}\moddef{print ctrl n~{\nwtagstyle{}\subpageref{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{154}\sublabel{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}}}\moddef{print ctrl n~{\nwtagstyle{}\subpageref{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $7735
 \nwlinkedidentc{PRINT_CTRL_N}{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}:
     SUBROUTINE
@@ -2679,9 +2661,9 @@ This is distinct from {\Tt{}SET{\textbackslash}{\_}NORMAL{\textbackslash}{\_}VID
     LDA     #$8E                    ; Ctrl-N with high bit
     JMP     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}                ; output via COUT1
 \nwindexdefn{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}}}\nwidentuses{\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}\nwendcode{}\nwbegindocs{157}\nwdocspar
+\nwidentdefs{\\{{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}}}\nwidentuses{\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}\nwendcode{}\nwbegindocs{155}\nwdocspar
 
-\nwenddocs{}\nwbegincode{158}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{156}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwenddeflinemarkup
 \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}            EQU     $FDED   ; Apple II ROM COUT1 (character output)
 \nwlinkedidentc{DAT_5a17_pos}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}        EQU     $5A17   ; saved position for room search
 \nwlinkedidentc{PRNG_OUTPUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}         EQU     $5A18   ; PRNG output (state >> 1), used for random tests
@@ -2693,9 +2675,9 @@ This is distinct from {\Tt{}SET{\textbackslash}{\_}NORMAL{\textbackslash}{\_}VID
 \nwlinkedidentc{GROUP_COUNT_DELTA}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
 \nwlinkedidentc{is_at_outer_limits}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}  EQU     $0BFA   ; check if position is at room boundary
 \nwindexdefn{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwindexdefn{\nwixident{GROUP{\_}COUNT{\_}DELTA}}{GROUP:unCOUNT:unDELTA}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwindexdefn{\nwixident{NUM{\_}DIGIT}}{NUM:unDIGIT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwindexdefn{\nwixident{NUM{\_}DIVISOR}}{NUM:unDIVISOR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwindexdefn{\nwixident{NUM{\_}LEADING}}{NUM:unLEADING}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwindexdefn{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwindexdefn{\nwixident{PRNG{\_}STATE}}{PRNG:unSTATE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwindexdefn{\nwixident{PRNG{\_}TEMP}}{PRNG:unTEMP}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwindexdefn{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwindexdefn{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\eatline
-\nwidentdefs{\\{{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}}\\{{\nwixident{GROUP{\_}COUNT{\_}DELTA}}{GROUP:unCOUNT:unDELTA}}\\{{\nwixident{NUM{\_}DIGIT}}{NUM:unDIGIT}}\\{{\nwixident{NUM{\_}DIVISOR}}{NUM:unDIVISOR}}\\{{\nwixident{NUM{\_}LEADING}}{NUM:unLEADING}}\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{PRNG{\_}STATE}}{PRNG:unSTATE}}\\{{\nwixident{PRNG{\_}TEMP}}{PRNG:unTEMP}}\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}\\{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}}\nwendcode{}\nwbegindocs{159}\nwdocspar
+\nwidentdefs{\\{{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}}\\{{\nwixident{GROUP{\_}COUNT{\_}DELTA}}{GROUP:unCOUNT:unDELTA}}\\{{\nwixident{NUM{\_}DIGIT}}{NUM:unDIGIT}}\\{{\nwixident{NUM{\_}DIVISOR}}{NUM:unDIVISOR}}\\{{\nwixident{NUM{\_}LEADING}}{NUM:unLEADING}}\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{PRNG{\_}STATE}}{PRNG:unSTATE}}\\{{\nwixident{PRNG{\_}TEMP}}{PRNG:unTEMP}}\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}\\{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}}\nwendcode{}\nwbegindocs{157}\nwdocspar
 
-\nwenddocs{}\nwbegincode{160}\sublabel{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}}}\moddef{print font char~{\nwtagstyle{}\subpageref{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{158}\sublabel{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}}}\moddef{print font char~{\nwtagstyle{}\subpageref{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $80A4
     HEX     09      ; num chars in this string
     HEX     81      ; ctrl-A (set character set)
@@ -2763,12 +2745,12 @@ PLOT_FONTCHAR:
     STA     $BD
     JMP     \nwlinkedidentc{PRINT_FROM_PTR}{PYNWmai0-XAPVU72S6LIKQGYUGORXPGRLK4000000-1}
 \nwindexdefn{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}\nwindexdefn{\nwixident{PRINT{\_}FONTCHAR{\_}AT{\_}TEXT{\_}POS}}{PRINT:unFONTCHAR:unAT:unTEXT:unPOS}{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}}\\{{\nwixident{PRINT{\_}FONTCHAR{\_}AT{\_}TEXT{\_}POS}}{PRINT:unFONTCHAR:unAT:unTEXT:unPOS}}}\nwidentuses{\\{{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}}\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}}\nwindexuse{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}\nwendcode{}\nwbegindocs{161}\nwdocspar
+\nwidentdefs{\\{{\nwixident{PRINT{\_}FONTCHAR}}{PRINT:unFONTCHAR}}\\{{\nwixident{PRINT{\_}FONTCHAR{\_}AT{\_}TEXT{\_}POS}}{PRINT:unFONTCHAR:unAT:unTEXT:unPOS}}}\nwidentuses{\\{{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}}\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}}\nwindexuse{\nwixident{FONT{\_}POS{\_}TO{\_}TEXT{\_}POS}}{FONT:unPOS:unTO:unTEXT:unPOS}{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}\nwendcode{}\nwbegindocs{159}\nwdocspar
 
 The {\Tt{}PLOT{\_}CHAR\nwendquote} routine prints the character number in {\Tt{}A\nwendquote}, at the text
 coordinate in {\Tt{}X\nwendquote} and {\Tt{}Y\nwendquote}.
 
-\nwenddocs{}\nwbegincode{162}\sublabel{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}}}\moddef{plot char~{\nwtagstyle{}\subpageref{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{160}\sublabel{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}}}\moddef{plot char~{\nwtagstyle{}\subpageref{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $5DB0
 \nwlinkedidentc{PLOT_CHAR}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}:
     SUBROUTINE
@@ -2780,7 +2762,7 @@ coordinate in {\Tt{}X\nwendquote} and {\Tt{}Y\nwendquote}.
     STA     FONT_CHARSET
     JMP     \nwlinkedidentc{PRINT_FONTCHAR_AT_TEXT_POS}{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}
 \nwindexdefn{\nwixident{PLOT{\_}CHAR}}{PLOT:unCHAR}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{PLOT{\_}CHAR}}{PLOT:unCHAR}}}\nwidentuses{\\{{\nwixident{PRINT{\_}FONTCHAR{\_}AT{\_}TEXT{\_}POS}}{PRINT:unFONTCHAR:unAT:unTEXT:unPOS}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{PRINT{\_}FONTCHAR{\_}AT{\_}TEXT{\_}POS}}{PRINT:unFONTCHAR:unAT:unTEXT:unPOS}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwendcode{}\nwbegindocs{163}\nwdocspar
+\nwidentdefs{\\{{\nwixident{PLOT{\_}CHAR}}{PLOT:unCHAR}}}\nwidentuses{\\{{\nwixident{PRINT{\_}FONTCHAR{\_}AT{\_}TEXT{\_}POS}}{PRINT:unFONTCHAR:unAT:unTEXT:unPOS}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{PRINT{\_}FONTCHAR{\_}AT{\_}TEXT{\_}POS}}{PRINT:unFONTCHAR:unAT:unTEXT:unPOS}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}\nwendcode{}\nwbegindocs{161}\nwdocspar
 
 \chapter{Sound}
 
@@ -2812,7 +2794,7 @@ based on an average Apple II cycle time of {\Tt{}0.98\nwendquote} microseconds, 
 that the frequency of the note played will be equal to {\Tt{}510204\ /\ (10X+31)\nwendquote} Hz.
 See \href{https://6502disassembly.com/a2-rom/}{The Oft Misunderstood WAIT} for a derivation of average cycle time.
 
-\nwenddocs{}\nwbegincode{164}\sublabel{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1}}}\moddef{tone~{\nwtagstyle{}\subpageref{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{162}\sublabel{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1}}}\moddef{tone~{\nwtagstyle{}\subpageref{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
 \nwlinkedidentc{tone}{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1}:
     SUBROUTINE
 
@@ -2839,13 +2821,13 @@ See \href{https://6502disassembly.com/a2-rom/}{The Oft Misunderstood WAIT} for a
     BNE      \nwlinkedidentc{tone}{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1}           ; 3 cycles
     RTS
 \nwindexdefn{\nwixident{tone}}{tone}{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{tone}}{tone}}}\nwnotused{tone}\nwendcode{}\nwbegindocs{165}\nwdocspar
+\nwidentdefs{\\{{\nwixident{tone}}{tone}}}\nwnotused{tone}\nwendcode{}\nwbegindocs{163}\nwdocspar
 
 The {\Tt{}high{\_}tone\nwendquote} routine does the same thing, but with shorter delays.
 The frequency of the note played by {\Tt{}high{\_}tone\nwendquote} will be equal to
 {\Tt{}510204\ /\ (5X+12)\nwendquote} Hz.
 
-\nwenddocs{}\nwbegincode{166}\sublabel{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}}}\moddef{high tone~{\nwtagstyle{}\subpageref{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{164}\sublabel{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}}}\moddef{high tone~{\nwtagstyle{}\subpageref{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
 \nwlinkedidentc{high_tone}{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}:
     SUBROUTINE
 
@@ -2866,7 +2848,7 @@ The frequency of the note played by {\Tt{}high{\_}tone\nwendquote} will be equal
     BNE      \nwlinkedidentc{high_tone}{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}      ; 3 cycles
     RTS
 \nwindexdefn{\nwixident{high{\_}tone}}{high:untone}{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{high{\_}tone}}{high:untone}}}\nwnotused{high tone}\nwendcode{}\nwbegindocs{167}\nwdocspar
+\nwidentdefs{\\{{\nwixident{high{\_}tone}}{high:untone}}}\nwnotused{high tone}\nwendcode{}\nwbegindocs{165}\nwdocspar
 
 Based on cycle times, these are the closest values for various notes. At the higher
 frequencies, the values get so low that they differ only by one, which means the
@@ -2941,7 +2923,7 @@ unless we assume that the programmer erred, thinking that the low tones were
 just one octave below the high tones. In that case, we should just use the high
 tone table and subtract one octave for the low tones.
 
-\nwenddocs{}\nwbegincode{168}\sublabel{PYNWmai0-2J5GFOS7BQMCUPTS3GOLUMOYEM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-2J5GFOS7BQMCUPTS3GOLUMOYEM000000-1}}}\moddef{song table~{\nwtagstyle{}\subpageref{PYNWmai0-2J5GFOS7BQMCUPTS3GOLUMOYEM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{166}\sublabel{PYNWmai0-2J5GFOS7BQMCUPTS3GOLUMOYEM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-2J5GFOS7BQMCUPTS3GOLUMOYEM000000-1}}}\moddef{song table~{\nwtagstyle{}\subpageref{PYNWmai0-2J5GFOS7BQMCUPTS3GOLUMOYEM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
 SPLASH_SONG:
     LOW
     TONE 3F, 65     ; G5  @ 655ms
@@ -2967,7 +2949,7 @@ SPLASH_SONG:
     TONE 47, 1B     ; F5  @ 195ms
     TONE 50, 18     ; Eb5 @ 194ms
     TONE 55, 17     ; D6  @ 197ms (\nwlinkedidentc{tone}{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1} inaccurate)
-\nwnotused{song table}\nwidentuses{\\{{\nwixident{tone}}{tone}}}\nwindexuse{\nwixident{tone}}{tone}{PYNWmai0-2J5GFOS7BQMCUPTS3GOLUMOYEM000000-1}\nwendcode{}\nwbegindocs{169}\nwdocspar
+\nwnotused{song table}\nwidentuses{\\{{\nwixident{tone}}{tone}}}\nwindexuse{\nwixident{tone}}{tone}{PYNWmai0-2J5GFOS7BQMCUPTS3GOLUMOYEM000000-1}\nwendcode{}\nwbegindocs{167}\nwdocspar
 
 The {\Tt{}start{\_}sound\nwendquote} routine goes through a sound table, executing each
 instruction until it encounters a {\Tt{}TONE\nwendquote} instruction. It then
@@ -2997,7 +2979,7 @@ until the player presses a key.
 
 The first thing the main program does:
 
-\nwenddocs{}\nwbegincode{170}\sublabel{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}}}\moddef{main entry~{\nwtagstyle{}\subpageref{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{168}\sublabel{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}}}\moddef{main entry~{\nwtagstyle{}\subpageref{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $0800
 \nwlinkedidentc{MAIN_ENTRY}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}:
     SUBROUTINE
@@ -3013,23 +2995,23 @@ The first thing the main program does:
 .skip:
     ; ... continues to game loop ...
 \nwindexdefn{\nwixident{MAIN{\_}ENTRY}}{MAIN:unENTRY}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{MAIN{\_}ENTRY}}{MAIN:unENTRY}}}\nwidentuses{\\{{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}}\\{{\nwixident{GAME{\_}INIT}}{GAME:unINIT}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwindexuse{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwindexuse{\nwixident{GAME{\_}INIT}}{GAME:unINIT}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwindexuse{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwendcode{}\nwbegindocs{171}\nwdocspar
+\nwidentdefs{\\{{\nwixident{MAIN{\_}ENTRY}}{MAIN:unENTRY}}}\nwidentuses{\\{{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}}\\{{\nwixident{GAME{\_}INIT}}{GAME:unINIT}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwindexuse{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwindexuse{\nwixident{GAME{\_}INIT}}{GAME:unINIT}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwindexuse{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}\nwendcode{}\nwbegindocs{169}\nwdocspar
 
-\nwenddocs{}\nwbegincode{172}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{170}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}\nwenddeflinemarkup
 \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}     EQU     $5A01   ; total mobs across all groups (excl. group 0)
 \nwlinkedidentc{LOCATION_FLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}       EQU     $5A55   ; location-change flag
 \nwlinkedidentc{LOCATION_FLAG2}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}      EQU     $5A56   ; secondary location flag
 \nwlinkedidentc{SCENE_NUMBER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}        EQU     $5A99   ; current scene number
 \nwlinkedidentc{ATTRACT_FLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
 \nwindexdefn{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{SCENE{\_}NUMBER}}{SCENE:unNUMBER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\eatline
-\nwidentdefs{\\{{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}}\\{{\nwixident{SCENE{\_}NUMBER}}{SCENE:unNUMBER}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwendcode{}\nwbegindocs{173}\nwdocspar
+\nwidentdefs{\\{{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}}\\{{\nwixident{SCENE{\_}NUMBER}}{SCENE:unNUMBER}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwendcode{}\nwbegindocs{171}\nwdocspar
 
 \subsection{game\_init (\$78C7)}
 
 Sets up the Apple II for the game---reset vector, graphics mode, and
 various subsystem initialization.
 
-\nwenddocs{}\nwbegincode{174}\sublabel{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}}}\moddef{game init~{\nwtagstyle{}\subpageref{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{172}\sublabel{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}}}\moddef{game init~{\nwtagstyle{}\subpageref{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $78C7
 \nwlinkedidentc{GAME_INIT}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}:
     SUBROUTINE
@@ -3053,7 +3035,7 @@ various subsystem initialization.
     JSR     INIT_GAME_STATE
     JSR     \nwlinkedidentc{FILL_MAP}{PYNWmai0-GLAMCDF6RJVWAHNXVLZP2YDB7M000000-1}
     JSR     \nwlinkedidentc{SET_TEXT_WINDOW_BOTTOM}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}
-    JSR     $6B94
+    JSR     \nwlinkedidentc{INIT_STUB2}{PYNWmai0-IFY6XEMQGG4JTQ6TNKPP64CWGA000000-1}
     LDA     #$00                    ; \\
     STA     \nwlinkedidentc{LOCATION_FLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}           ;  | clear state variables
     STA     \nwlinkedidentc{LOCATION_FLAG2}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}          ;  |
@@ -3065,7 +3047,7 @@ various subsystem initialization.
     STA     $5A02                   ; current player = 1
     RTS
 \nwindexdefn{\nwixident{GAME{\_}INIT}}{GAME:unINIT}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{GAME{\_}INIT}}{GAME:unINIT}}}\nwidentuses{\\{{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}}\\{{\nwixident{FILL{\_}MAP}}{FILL:unMAP}}\\{{\nwixident{INIT{\_}DISK{\_}IOB}}{INIT:unDISK:unIOB}}\\{{\nwixident{INIT{\_}HRCG}}{INIT:unHRCG}}\\{{\nwixident{INIT{\_}STUB}}{INIT:unSTUB}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}}\\{{\nwixident{RELOCATE{\_}HIRES{\_}STAGING}}{RELOCATE:unHIRES:unSTAGING}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}BOTTOM}}{SET:unTEXT:unWINDOW:unBOTTOM}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}WRAP}}{SET:unTEXT:unWINDOW:unWRAP}}}\nwindexuse{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{FILL{\_}MAP}}{FILL:unMAP}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{INIT{\_}DISK{\_}IOB}}{INIT:unDISK:unIOB}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{INIT{\_}HRCG}}{INIT:unHRCG}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{INIT{\_}STUB}}{INIT:unSTUB}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{RELOCATE{\_}HIRES{\_}STAGING}}{RELOCATE:unHIRES:unSTAGING}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}BOTTOM}}{SET:unTEXT:unWINDOW:unBOTTOM}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}WRAP}}{SET:unTEXT:unWINDOW:unWRAP}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwendcode{}\nwbegindocs{175}\nwdocspar
+\nwidentdefs{\\{{\nwixident{GAME{\_}INIT}}{GAME:unINIT}}}\nwidentuses{\\{{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}}\\{{\nwixident{FILL{\_}MAP}}{FILL:unMAP}}\\{{\nwixident{INIT{\_}DISK{\_}IOB}}{INIT:unDISK:unIOB}}\\{{\nwixident{INIT{\_}HRCG}}{INIT:unHRCG}}\\{{\nwixident{INIT{\_}STUB}}{INIT:unSTUB}}\\{{\nwixident{INIT{\_}STUB2}}{INIT:unSTUB2}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}}\\{{\nwixident{RELOCATE{\_}HIRES{\_}STAGING}}{RELOCATE:unHIRES:unSTAGING}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}BOTTOM}}{SET:unTEXT:unWINDOW:unBOTTOM}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}WRAP}}{SET:unTEXT:unWINDOW:unWRAP}}}\nwindexuse{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{FILL{\_}MAP}}{FILL:unMAP}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{INIT{\_}DISK{\_}IOB}}{INIT:unDISK:unIOB}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{INIT{\_}HRCG}}{INIT:unHRCG}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{INIT{\_}STUB}}{INIT:unSTUB}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{INIT{\_}STUB2}}{INIT:unSTUB2}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{RELOCATE{\_}HIRES{\_}STAGING}}{RELOCATE:unHIRES:unSTAGING}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}BOTTOM}}{SET:unTEXT:unWINDOW:unBOTTOM}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwindexuse{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}WRAP}}{SET:unTEXT:unWINDOW:unWRAP}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}\nwendcode{}\nwbegindocs{173}\nwdocspar
 
 The soft-switch reads at {\Tt{}{\$}C050\nwendquote}--{\Tt{}{\$}C057\nwendquote} configure the Apple II display:
 {\Tt{}GR\nwendquote}, full-screen (no split text), page 1, hi-res. This puts the display
@@ -3074,7 +3056,7 @@ into HGR mode showing the framebuffer at {\Tt{}{\$}2000\nwendquote}--{\Tt{}{\$}3
 \subsection{attract\_screen (\$09F4)}
 \label{sec:attract_screen}
 
-\nwenddocs{}\nwbegincode{176}\sublabel{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}}}\moddef{attract screen~{\nwtagstyle{}\subpageref{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{174}\sublabel{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}}}\moddef{attract screen~{\nwtagstyle{}\subpageref{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $09F4
 \nwlinkedidentc{ATTRACT_SCREEN}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}:
     SUBROUTINE
@@ -3094,7 +3076,7 @@ into HGR mode showing the framebuffer at {\Tt{}{\$}2000\nwendquote}--{\Tt{}{\$}3
     LDA     #$26                    ; scene number $26 (38 decimal)
     JMP     \nwlinkedidentc{SCENE_LOOP}{PYNWmai0-5E23YPEUUG4SZHWM2ZQ6MSHERE000000-1}              ; tail-call
 \nwindexdefn{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}}}\nwidentuses{\\{{\nwixident{COMPUTE{\_}SCENE{\_}PTR}}{COMPUTE:unSCENE:unPTR}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}}\\{{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}}\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}}\nwindexuse{\nwixident{COMPUTE{\_}SCENE{\_}PTR}}{COMPUTE:unSCENE:unPTR}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwendcode{}\nwbegindocs{177}\nwdocspar
+\nwidentdefs{\\{{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}}}\nwidentuses{\\{{\nwixident{COMPUTE{\_}SCENE{\_}PTR}}{COMPUTE:unSCENE:unPTR}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}}\\{{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}}\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}}\nwindexuse{\nwixident{COMPUTE{\_}SCENE{\_}PTR}}{COMPUTE:unSCENE:unPTR}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwendcode{}\nwbegindocs{175}\nwdocspar
 
 The attract screen starts with scene index 1 (the first story character
 setup) and begins playing scene \$26.
@@ -3127,7 +3109,7 @@ Guards: bails out if {\Tt{}{\textbackslash}{\$}BE\nwendquote} is zero (null poin
 record at~{\Tt{}{\textbackslash}{\$}BC/{\textbackslash}{\$}BD\nwendquote} is~$\ge$~\$15 (inactive/dead character).
 Called exclusively from {\Tt{}REORDER{\textbackslash}{\_}CHAR\nwendquote} (\$0F84).
 
-\nwenddocs{}\nwbegincode{178}\sublabel{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}}}\moddef{adjust char byte8~{\nwtagstyle{}\subpageref{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{176}\sublabel{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}}}\moddef{adjust char byte8~{\nwtagstyle{}\subpageref{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $102F
 \nwlinkedidentc{DECR_GROUP_COUNT}{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}:
     SUBROUTINE
@@ -3156,7 +3138,7 @@ Called exclusively from {\Tt{}REORDER{\textbackslash}{\_}CHAR\nwendquote} (\$0F8
     STA     ($BE),Y                 ; /
     RTS
 \nwindexdefn{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}\nwindexdefn{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}}\\{{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}}}\nwidentuses{\\{{\nwixident{GROUP{\_}COUNT{\_}DELTA}}{GROUP:unCOUNT:unDELTA}}}\nwindexuse{\nwixident{GROUP{\_}COUNT{\_}DELTA}}{GROUP:unCOUNT:unDELTA}{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}\nwendcode{}\nwbegindocs{179}\nwdocspar
+\nwidentdefs{\\{{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}}\\{{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}}}\nwidentuses{\\{{\nwixident{GROUP{\_}COUNT{\_}DELTA}}{GROUP:unCOUNT:unDELTA}}}\nwindexuse{\nwixident{GROUP{\_}COUNT{\_}DELTA}}{GROUP:unCOUNT:unDELTA}{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}\nwendcode{}\nwbegindocs{177}\nwdocspar
 
 \subsection{reorder\_char (\$0F84)}
 
@@ -3184,7 +3166,7 @@ destination group's member count via {\Tt{}INCR{\textbackslash}{\_}GROUP{\textba
 When {\Tt{}{\textbackslash}{\$}5A29\nwendquote} is zero, a random decision (via {\Tt{}STEP{\textbackslash}{\_}PRNG\nwendquote}) determines
 the insertion point instead of the level comparison.
 
-\nwenddocs{}\nwbegincode{180}\sublabel{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}}}\moddef{reorder char~{\nwtagstyle{}\subpageref{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{178}\sublabel{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}}}\moddef{reorder char~{\nwtagstyle{}\subpageref{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $0F84
 \nwlinkedidentc{REORDER_CHAR}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}:
     SUBROUTINE
@@ -3279,7 +3261,7 @@ the insertion point instead of the level comparison.
     BMI     .insert                 ;  | else keep walking
     BPL     .advance2               ; /
 \nwindexdefn{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}}\nwidentuses{\\{{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}}\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}}\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwindexuse{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwendcode{}\nwbegindocs{181}\nwdocspar
+\nwidentdefs{\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}}\nwidentuses{\\{{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}}\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}}\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwindexuse{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwendcode{}\nwbegindocs{179}\nwdocspar
 
 \subsection{get\_char\_record (\$1053)}
 
@@ -3292,7 +3274,7 @@ Note: Ghidra groups this with a separate routine at {\Tt{}{\textbackslash}{\$}10
 JMP from other functions) that handles character elimination/death logic.
 That code is not part of this entry point's normal return path.
 
-\nwenddocs{}\nwbegincode{182}\sublabel{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}}}\moddef{get char record~{\nwtagstyle{}\subpageref{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{180}\sublabel{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}}}\moddef{get char record~{\nwtagstyle{}\subpageref{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $1053
 \nwlinkedidentc{GET_CHAR_RECORD}{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}:
     SUBROUTINE
@@ -3316,7 +3298,7 @@ That code is not part of this entry point's normal return path.
     STA     $BF                     ; /
     BNE     .loop                   ; always taken ($BF >= $40)
 \nwindexdefn{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}}\nwendcode{}\nwbegindocs{183}\nwdocspar
+\nwidentdefs{\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}}\nwendcode{}\nwbegindocs{181}\nwdocspar
 
 \subsection{scene\_setup (\$0A17)}
 
@@ -3331,7 +3313,7 @@ The bounding box bytes are packed map positions decoded by
 is exclusive of the border), then calls {\Tt{}RANDOM{\textbackslash}{\_}IN{\textbackslash}{\_}RANGE\nwendquote} twice to
 pick a random column and row within the bounds.
 
-\nwenddocs{}\nwbegincode{184}\sublabel{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}}}\moddef{scene setup~{\nwtagstyle{}\subpageref{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{182}\sublabel{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}}}\moddef{scene setup~{\nwtagstyle{}\subpageref{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $0A17
 \nwlinkedidentc{SCENE_SETUP}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}:
     SUBROUTINE
@@ -3390,7 +3372,7 @@ pick a random column and row within the bounds.
 .done:
     RTS
 \nwindexdefn{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}}}\nwidentuses{\\{{\nwixident{CLAMP{\_}CHAR{\_}FIELD}}{CLAMP:unCHAR:unFIELD}}\\{{\nwixident{COLROW{\_}TO{\_}POS}}{COLROW:unTO:unPOS}}\\{{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}}\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}\\{{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}}\\{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}}\nwindexuse{\nwixident{CLAMP{\_}CHAR{\_}FIELD}}{CLAMP:unCHAR:unFIELD}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{COLROW{\_}TO{\_}POS}}{COLROW:unTO:unPOS}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwendcode{}\nwbegindocs{185}\nwdocspar
+\nwidentdefs{\\{{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}}}\nwidentuses{\\{{\nwixident{CLAMP{\_}CHAR{\_}FIELD}}{CLAMP:unCHAR:unFIELD}}\\{{\nwixident{COLROW{\_}TO{\_}POS}}{COLROW:unTO:unPOS}}\\{{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}}\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}\\{{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}}\\{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}}\nwindexuse{\nwixident{CLAMP{\_}CHAR{\_}FIELD}}{CLAMP:unCHAR:unFIELD}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{COLROW{\_}TO{\_}POS}}{COLROW:unTO:unPOS}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwendcode{}\nwbegindocs{183}\nwdocspar
 
 \subsection{scene\_loop (\$6C37)}
 \subsection{init\_disk\_iob (\$6C2E)}
@@ -3402,16 +3384,28 @@ pointer to access the IOB fields via indirect-indexed addressing:
 e.g.\ {\Tt{}STA\ ({\textbackslash}{\$}08),Y\nwendquote} with {\Tt{}Y\nwendquote} selecting the field (track, sector,
 command code, buffer address, etc.).  The RWTS entry point is at {\Tt{}{\textbackslash}{\$}B7B5\nwendquote}.
 
-\nwenddocs{}\nwbegincode{186}\sublabel{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-3}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-3}}}\moddef{zero page defines~{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}{\relax}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{184}\sublabel{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-3}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-3}}}\moddef{zero page defines~{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}{\relax}\nwenddeflinemarkup
 \nwlinkedidentc{RWTS_IOB_PTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-3}            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
 \nwindexdefn{\nwixident{RWTS{\_}IOB{\_}PTR}}{RWTS:unIOB:unPTR}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-3}\eatline
-\nwidentdefs{\\{{\nwixident{RWTS{\_}IOB{\_}PTR}}{RWTS:unIOB:unPTR}}}\nwendcode{}\nwbegindocs{187}\nwdocspar
+\nwidentdefs{\\{{\nwixident{RWTS{\_}IOB{\_}PTR}}{RWTS:unIOB:unPTR}}}\nwendcode{}\nwbegindocs{185}\nwdocspar
 
-\nwenddocs{}\nwbegincode{188}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-12}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{186}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-12}\nwenddeflinemarkup
 \nwlinkedidentc{RWTS_IOB}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}                EQU     $B7E8   ; RWTS Input/Output Block (14 bytes)
 \nwlinkedidentc{RWTS_ENTRY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}              EQU     $B7B5   ; RWTS entry point
 \nwindexdefn{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}\nwindexdefn{\nwixident{RWTS{\_}IOB}}{RWTS:unIOB}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}\eatline
-\nwidentdefs{\\{{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}}\\{{\nwixident{RWTS{\_}IOB}}{RWTS:unIOB}}}\nwendcode{}\nwbegindocs{189}\nwdocspar
+\nwidentdefs{\\{{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}}\\{{\nwixident{RWTS{\_}IOB}}{RWTS:unIOB}}}\nwendcode{}\nwbegindocs{187}\nwdocspar
+
+\subsection{init\_stub2 (\$6B94)}
+
+A single {\Tt{}RTS\nwendquote}---another no-op stub called from {\Tt{}GAME{\textbackslash}{\_}INIT\nwendquote}, like
+{\Tt{}INIT{\textbackslash}{\_}STUB\nwendquote} at {\Tt{}{\textbackslash}{\$}7919\nwendquote}.
+
+\nwenddocs{}\nwbegincode{188}\sublabel{PYNWmai0-IFY6XEMQGG4JTQ6TNKPP64CWGA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-IFY6XEMQGG4JTQ6TNKPP64CWGA000000-1}}}\moddef{init stub2~{\nwtagstyle{}\subpageref{PYNWmai0-IFY6XEMQGG4JTQ6TNKPP64CWGA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $6B94
+\nwlinkedidentc{INIT_STUB2}{PYNWmai0-IFY6XEMQGG4JTQ6TNKPP64CWGA000000-1}:
+    RTS
+\nwindexdefn{\nwixident{INIT{\_}STUB2}}{INIT:unSTUB2}{PYNWmai0-IFY6XEMQGG4JTQ6TNKPP64CWGA000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{INIT{\_}STUB2}}{INIT:unSTUB2}}}\nwendcode{}\nwbegindocs{189}\nwdocspar
 
 \nwenddocs{}\nwbegincode{190}\sublabel{PYNWmai0-MFXGDBBCK3Q7RVR5U57NVVC6RI000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-MFXGDBBCK3Q7RVR5U57NVVC6RI000000-1}}}\moddef{init disk iob~{\nwtagstyle{}\subpageref{PYNWmai0-MFXGDBBCK3Q7RVR5U57NVVC6RI000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $6C2E
@@ -6243,6 +6237,7 @@ The following root chunks produce the assembly files when tangled.
 \LA{}plot char~{\nwtagstyle{}\subpageref{PYNWmai0-GKJMRCHOW2FWSNTGL6NTUR7XCE000000-1}}\RA{}
 \LA{}print font char~{\nwtagstyle{}\subpageref{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}}\RA{}
 \LA{}init game state~{\nwtagstyle{}\subpageref{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}}\RA{}
+\LA{}init stub2~{\nwtagstyle{}\subpageref{PYNWmai0-IFY6XEMQGG4JTQ6TNKPP64CWGA000000-1}}\RA{}
 \LA{}init disk iob~{\nwtagstyle{}\subpageref{PYNWmai0-MFXGDBBCK3Q7RVR5U57NVVC6RI000000-1}}\RA{}
 \LA{}scene loop~{\nwtagstyle{}\subpageref{PYNWmai0-5E23YPEUUG4SZHWM2ZQ6MSHERE000000-1}}\RA{}
 \LA{}text renderer~{\nwtagstyle{}\subpageref{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}}\RA{}
@@ -6675,10 +6670,10 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{high tone}{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}{\nwixd{PYNWmai0-UIZGU6YNKDK4XWBDBMWRAWBZIY000000-1}}}%
 \nwixlogsorted{c}{{init disk iob}{PYNWmai0-MFXGDBBCK3Q7RVR5U57NVVC6RI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-MFXGDBBCK3Q7RVR5U57NVVC6RI000000-1}}}%
 \nwixlogsorted{c}{{init game state}{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}}}%
-\nwixlogsorted{c}{{init hcrg}{PYNWmai0-26DEEOCSHWI7S5GYIOPZSCBG2Y000000-1}{\nwixd{PYNWmai0-26DEEOCSHWI7S5GYIOPZSCBG2Y000000-1}}}%
 \nwixlogsorted{c}{{init hrcg}{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}}}%
 \nwixlogsorted{c}{{init mob count}{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-FUVGEE5QFLBSHT5MZWRVT5CDCY000000-1}}}%
 \nwixlogsorted{c}{{init stub}{PYNWmai0-A5IDJFPW4YOQ5EAI2Y4LCAAB5U000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-A5IDJFPW4YOQ5EAI2Y4LCAAB5U000000-1}}}%
+\nwixlogsorted{c}{{init stub2}{PYNWmai0-IFY6XEMQGG4JTQ6TNKPP64CWGA000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-IFY6XEMQGG4JTQ6TNKPP64CWGA000000-1}}}%
 \nwixlogsorted{c}{{load scene data}{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}}}%
 \nwixlogsorted{c}{{main entry}{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-RWM37KK47QPMZDB6ORCTDQOT2Y000000-1}}}%
 \nwixlogsorted{c}{{main.asm}{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}{\nwixd{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}}%
@@ -6807,6 +6802,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{INIT{\_}HRCG}}{INIT:unHRCG}}%
 \nwixlogsorted{i}{{\nwixident{INIT{\_}MOB{\_}COUNT}}{INIT:unMOB:unCOUNT}}%
 \nwixlogsorted{i}{{\nwixident{INIT{\_}STUB}}{INIT:unSTUB}}%
+\nwixlogsorted{i}{{\nwixident{INIT{\_}STUB2}}{INIT:unSTUB2}}%
 \nwixlogsorted{i}{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}%
 \nwixlogsorted{i}{{\nwixident{LOAD{\_}SCENE{\_}DATA}}{LOAD:unSCENE:unDATA}}%
 \nwixlogsorted{i}{{\nwixident{LOCATION{\_}DATA}}{LOCATION:unDATA}}%
