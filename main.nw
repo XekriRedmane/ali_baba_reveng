@@ -5550,9 +5550,10 @@ Each record is 9~bytes:
 \end{tabular}
 \end{center}
 
-The event list at [[event\_ptr]] consists of 3-byte entries: \$FE marks an
-empty slot that can be filled, \$FF marks the end of the list, and any
-other first byte is an active entry.
+The event list at [[event\_ptr]] consists of 3-byte entries (see
+\S\ref{sec:event-format} for the full format).  Byte~0 is a map position
+(\$FE~=~empty slot, \$FF~=~end-of-list); byte~1 encodes the event type
+and status; byte~2 is type-dependent action data.
 
 The map scene~ID (field~5, bits~0--6) is compared with [[LOCATION\_FLAG2]]
 (\$5A56); when it changes, [[FILL\_MAP]] is called to redraw the map.
@@ -6252,10 +6253,58 @@ s_ASTROLOGERS_MAZE:
     APSTR "ASTROLOGER'S MAZE"
 @ %def LOCATION_NAMES
 
-Each location has an event list: variable-length 3-byte entries terminated
-by [[\$FF]], followed by two [[\$FF]] padding bytes.  Entry byte~0 is a
-map position key ([[\$FE]]~=~empty slot, [[\$FF]]~=~end); bytes~1--2
-contain action/parameter data.
+\subsection{Event list format}
+\label{sec:event-format}
+
+Each location has a variable-length event list pointed to by
+[[event\_ptr]] (location record fields~6--7).  Entries are 3~bytes each,
+terminated by [[\$FF]] followed by two [[\$FF]] padding bytes.  Each
+location's first entry is normally an empty slot ([[\$FE]]) reserved for
+runtime use (e.g.\ dropped treasure after combat).
+
+\paragraph{Byte~0: map position.}
+A value 0--199 encodes a grid position (row~$\times$~20~+~col).
+[[\$FE]] marks an empty slot that can be filled at runtime.
+[[\$FF]] marks the end of the list.
+
+\paragraph{Byte~1: event type.}
+The top two bits select the category:
+
+\begin{center}
+\begin{tabular}{lll}
+\textbf{Byte~1 range} & \textbf{Category} & \textbf{Details} \\
+\hline
+\$00--\$3F & Random encounter & Probability check vs.\ character stat; \\
+           &                  & on fail, bit~6 is set $\to$ becomes specific encounter \\
+\$40--\$BF & Specific encounter & bits~5--0 = mob index $\to$ [[ACTIVE\_CHAR]] \\
+\$C0--\$D1 & Dropped treasure & gold = ((\texttt{byte1} $-$ \$C0) $\times$ 256) + \texttt{byte2} \\
+\$D2       & Persistent scene & \texttt{byte2} = scene ID; not cleared after trigger \\
+\$D3       & One-time scene   & \texttt{byte2} = scene ID; slot cleared to \$FE \\
+\$D4       & Scene + item drop & like \$D3 but also spawns 1--4 bonus items \\
+\$D5--\$DA & Map/area event   & indexed from table at \$7EDD \\
+\$DB--\$FD & (unknown)        & \\
+\$FE       & Empty-slot data  & \texttt{byte2} has sub-encoding
+\end{tabular}
+\end{center}
+
+\paragraph{Byte~2: action data} (meaning depends on byte~1).
+For encounters (\$40--\$BF), this is the map position where the mob
+appears.  For treasure (\$C0--\$D1), the gold amount low byte.
+For scene events (\$D2--\$D4), a scene/event~ID.
+
+\paragraph{Key routines.}
+\begin{itemize}
+\item \$0B62 --- searches a position for mobs first, then events;
+      returns [[\$BE/\$BF]] pointing to the found entry.
+\item \$138D --- finds the nearest non-activated event
+      (byte~1~$<$~\$C0) using Manhattan distance; used for AI
+      pathfinding.
+\item \$1260 --- fills empty [[\$FE]] slots with combat loot, or
+      accumulates value in \$C0--\$D0 entries (treasure drops).
+      Entries saturate at byte~1~=~\$D1.
+\item \$1C01 --- encounter handler: dispatches random vs.\ specific
+      encounters based on byte~1~$<$~\$40.
+\end{itemize}
 
 <<Location events>>=
 LOCATION_EVENTS:
