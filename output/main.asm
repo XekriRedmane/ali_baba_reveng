@@ -205,11 +205,14 @@ NUM_DIVISOR         EQU     $5A1C   ; 16-bit divisor for decimal conversion (2 b
 NUM_LEADING         EQU     $5A1E   ; leading-zero suppress flag (0=suppress, 1=print)
 GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
+INPUT_MODE          EQU     $5A00   ; 0 = keyboard, 1 = joystick
 TOTAL_MOB_COUNT     EQU     $5A01   ; total mobs across all groups (excl. group 0)
+CURRENT_PLAYER      EQU     $5A02   ; current player index (1-based)
 LOCATION_FLAG       EQU     $5A55   ; location-change flag
 LOCATION_FLAG2      EQU     $5A56   ; secondary location flag
 SCENE_NUMBER        EQU     $5A99   ; current scene number
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
+WORLD_INIT_DATA         EQU     $62B9   ; world initialization data table
 RWTS_IOB                EQU     $B7E8   ; RWTS Input/Output Block (14 bytes)
 RWTS_ENTRY              EQU     $B7B5   ; RWTS entry point
 SAVED_BC            EQU     $5A9A   ; saved $BC/$BD pointer (2 bytes)
@@ -364,6 +367,38 @@ MAIN_ENTRY:
     JSR     ATTRACT_SCREEN
 .skip:
     ; ... continues to game loop ...
+    ORG     $084E
+SELECT_INPUT_MODE:
+    SUBROUTINE
+
+    LDA     #$38                    ; message $38: input mode prompt
+    JSR     DISPLAY_MESSAGE
+    LDA     $C061                   ; read paddle button 1
+    AND     #$80                    ; isolate bit 7 (pressed state)
+    STA     $BA                     ; save initial button state
+.clear:
+    STA     $C010                   ; clear keyboard strobe
+.poll:
+    LDX     $C000                   ; read keyboard
+    BMI     .key                    ; key pressed → check it
+    LDA     $C061                   ; re-read paddle button
+    EOR     $BA                     ; compare with initial state
+    BMI     .joystick               ; button state changed → joystick
+    BPL     .poll                   ; keep polling
+.key:
+    CPX     #$A0                    ; space bar?
+    BEQ     .keyboard               ; yes → keyboard mode
+    BNE     .clear                  ; other key → ignore, clear strobe
+.keyboard:
+    LDA     #$00
+    STA     INPUT_MODE              ; 0 = keyboard
+    RTS
+.joystick:
+    LDA     #$01
+    STA     INPUT_MODE              ; 1 = joystick
+    JSR     SET_CURSOR_ROW21
+    LDA     #$2F                    ; message $2F: joystick confirmation
+    JMP     DISPLAY_MESSAGE
     ORG     $09F4
 ATTRACT_SCREEN:
     SUBROUTINE
@@ -1644,6 +1679,14 @@ INIT_GAME_STATE:
     STA     $7A4B                   ; /
     RTS
 
+    ORG     $62E5
+INIT_WORLD:
+    SUBROUTINE
+
+    LDX     #>WORLD_INIT_DATA       ; \ X/Y = pointer to init data
+    LDY     #<WORLD_INIT_DATA       ; /
+    JMP     $5F19                   ; initialize world from data table
+
     ORG     $6B94
 INIT_STUB2:
     RTS
@@ -2194,11 +2237,11 @@ GAME_INIT:
     STA     LOCATION_FLAG           ;  | clear state variables
     STA     LOCATION_FLAG2          ;  |
     STA     $F9                     ; /
-    JSR     $084E
-    JSR     $62E5
-    JSR     $0C51
+    JSR     SELECT_INPUT_MODE
+    JSR     INIT_WORLD
+    JSR     INIT_MOB_COUNT
     LDA     #$01
-    STA     $5A02                   ; current player = 1
+    STA     CURRENT_PLAYER
     RTS
     ORG     $795B
 SCRIPT_ENGINE:
