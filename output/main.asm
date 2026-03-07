@@ -213,7 +213,7 @@ SOURCE_CHAR         EQU     $5A28   ; source character for reorder
 REORDER_LINK        EQU     $5A2A   ; temp: saved next-link during reorder
 REORDER_SORT_KEY    EQU     $5A2B   ; temp: byte 11 of node for sorted insert
 LOCATION_FLAG       EQU     $5A55   ; location-change flag
-LOCATION_FLAG2      EQU     $5A56   ; secondary location flag
+LOCATION_FLAG2      EQU     $5A56   ; current map scene ID (from record field 5, bits 0-6)
 SCENE_NUMBER        EQU     $5A99   ; current scene number
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
 WORLD_INIT_DATA         EQU     $62B9   ; world initialization data table
