@@ -192,7 +192,18 @@ BLINK_CHAR      EQU     $5AA4   ; font character number
 BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
 ROM_COUT1            EQU     $FDED   ; Apple II ROM COUT1 (character output)
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
+PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random tests
+PRNG_STATE          EQU     $5A19   ; PRNG full state: val = 69*val + $53 (mod 256)
+PRNG_TEMP           EQU     $5A1A   ; PRNG temporary for multiplication
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
+LOCATION_FLAG       EQU     $5A55   ; location-change flag
+LOCATION_FLAG2      EQU     $5A56   ; secondary location flag
+SCENE_NUMBER        EQU     $5A99   ; current scene number
+ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
+SAVED_BC            EQU     $5A9A   ; saved $BC/$BD pointer (2 bytes)
+SAVED_F8            EQU     $5A9C   ; saved $F8/$F9 pointer (2 bytes)
+SAVED_BE            EQU     $5A9E   ; saved $BE/$BF pointer (2 bytes)
+SAVED_F4            EQU     $5AA0   ; saved $F4/$F5 pointer (2 bytes)
 MSG_TABLE_PTR           EQU     $4005   ; message table base (2 bytes)
 MSG_LINE_COUNT          EQU     $5A57   ; lines printed so far
 DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
@@ -206,6 +217,11 @@ ROM_WAIT                EQU     $FCA8   ; Apple II ROM WAIT routine
 TEXT_RIGHT_MARGIN        EQU     $5A96   ; right margin column for text wrap
 TEXT_LEFT_MARGIN         EQU     $5A97   ; left margin column for text wrap
 TEXT_STREAM_IDX          EQU     TEXT_STREAM_IDX   ; saved Y index into byte stream
+SCRIPT_LOOP_CTR     EQU     $5A8D   ; script loop iteration counter
+SCRIPT_LOOP_ADDR    EQU     $5A8E   ; script loop address (2 bytes)
+SCRIPT_GOSUB_ADDR   EQU     $5A90   ; script gosub return address (2 bytes)
+SCRIPT_PRNG_MASK    EQU     $5A92   ; PRNG mask for action randomization
+SCRIPT_ACTION_VEC   EQU     $5A93   ; action handler vector (2 bytes)
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
     ORG     $0569
 ATTRACT_LOOP:
@@ -339,7 +355,7 @@ ATTRACT_SCREEN:
     STA     $F5                     ; /
     JSR     $0A17                   ; scene_setup
     LDA     #$00
-    STA     $5A55                   ; clear location-change flag
+    STA     LOCATION_FLAG           ; clear location-change flag
     JSR     SET_CURSOR_ROW21
     LDA     #$26                    ; scene number $26 (38 decimal)
     JMP     SCENE_LOOP              ; tail-call
@@ -701,14 +717,14 @@ PLOT_FONTCHAR:
 SCENE_LOOP:
     SUBROUTINE
 
-    STA     $5A99                   ; store scene number
+    STA     SCENE_NUMBER            ; store scene number
     LDA     #$14
     STA     BLINK_COL               ; disable blink cursor
 
     JSR     SAVE_ZP_POINTERS
 
     JSR     STEP_PRNG
-    LDA     $5A18                   ; PRNG output
+    LDA     PRNG_OUTPUT             ; PRNG output
     AND     #$0A                    ; test bits 1 and 3
     BNE     .display                ; if any set, skip disk load
     JSR     LOAD_SCENE_DATA
@@ -728,7 +744,7 @@ SCENE_LOOP:
     JSR     SCRIPT_ENGINE           ; run script #3 ($A300)
     LDA     $5CFF                   ; scene transition flag
     BEQ     .done                   ; zero = no transition
-    STA     $5A99                   ; set new scene number
+    STA     SCENE_NUMBER            ; set new scene number
     JMP     .display                ; continue
 
 .exit:
@@ -740,8 +756,8 @@ SCENE_LOOP:
 .done:
     JSR     SET_TEXT_WINDOW_BOTTOM
     LDA     #$00                    ; \
-    STA     $5A55                   ;  | clear location flags
-    STA     $5A56                   ; /
+    STA     LOCATION_FLAG           ;  | clear location flags
+    STA     LOCATION_FLAG2          ; /
     JSR     $72A7                   ; update display
     JMP     RESTORE_ZP_POINTERS     ; restore and return
     ORG     $6C8E
@@ -863,41 +879,41 @@ SAVE_ZP_POINTERS:
     SUBROUTINE
 
     LDA     $BC
-    STA     $5A9A
+    STA     SAVED_BC
     LDA     $BD
-    STA     $5A9B
+    STA     SAVED_BC+1
     LDA     $F8
-    STA     $5A9C
+    STA     SAVED_F8
     LDA     $F9
-    STA     $5A9D
+    STA     SAVED_F8+1
     LDA     $BE
-    STA     $5A9E
+    STA     SAVED_BE
     LDA     $BF
-    STA     $5A9F
+    STA     SAVED_BE+1
     LDA     $F4
-    STA     $5AA0
+    STA     SAVED_F4
     LDA     $F5
-    STA     $5AA1
+    STA     SAVED_F4+1
     RTS
     ORG     $6D7C
 RESTORE_ZP_POINTERS:
     SUBROUTINE
 
-    LDA     $5A9A
+    LDA     SAVED_BC
     STA     $BC
-    LDA     $5A9B
+    LDA     SAVED_BC+1
     STA     $BD
-    LDA     $5A9C
+    LDA     SAVED_F8
     STA     $F8
-    LDA     $5A9D
+    LDA     SAVED_F8+1
     STA     $F9
-    LDA     $5A9E
+    LDA     SAVED_BE
     STA     $BE
-    LDA     $5A9F
+    LDA     SAVED_BE+1
     STA     $BF
-    LDA     $5AA0
+    LDA     SAVED_F4
     STA     $F4
-    LDA     $5AA1
+    LDA     SAVED_F4+1
     STA     $F5
     RTS
     ORG     $6DA5
@@ -950,9 +966,9 @@ LOAD_SCENE_DATA:
     RTS
 
 .error:
-    LDY     $5A18                   ; on error: fill with PRNG data
+    LDY     PRNG_OUTPUT             ; on error: fill with PRNG data
     JSR     STEP_PRNG
-    LDA     $5A18
+    LDA     PRNG_OUTPUT
     STA     $9AA6,Y
     RTS
     ORG     $7705
@@ -1189,23 +1205,23 @@ SCROLL_STATUS_LINE:
 STEP_PRNG:
     SUBROUTINE
 
-    LDA     $5A19                   ; val
+    LDA     PRNG_STATE              ; val
     ASL     A                       ; val*2
     ASL     A                       ; val*4
-    STA     $5A1A                   ; temp = val*4
+    STA     PRNG_TEMP               ; temp = val*4
     ASL     A                       ; val*8
     ASL     A                       ; val*16
     ASL     A                       ; val*32
     ASL     A                       ; val*64
     CLC
-    ADC     $5A1A                   ; val*64 + val*4 = val*68
+    ADC     PRNG_TEMP               ; val*64 + val*4 = val*68
     CLC
-    ADC     $5A19                   ; val*68 + val = val*69
+    ADC     PRNG_STATE              ; val*68 + val = val*69
     CLC
     ADC     #$53                    ; + $53
-    STA     $5A19                   ; store full result
+    STA     PRNG_STATE              ; store full result
     LSR                             ; val >> 1
-    STA     $5A18                   ; shifted copy (used for random tests)
+    STA     PRNG_OUTPUT             ; shifted copy (used for random tests)
     RTS
     ORG     $78C7
 GAME_INIT:
@@ -1232,8 +1248,8 @@ GAME_INIT:
     JSR     SET_TEXT_WINDOW_BOTTOM
     JSR     $6B94
     LDA     #$00                    ; \
-    STA     $5A55                   ;  | clear state variables
-    STA     $5A56                   ;  |
+    STA     LOCATION_FLAG           ;  | clear state variables
+    STA     LOCATION_FLAG2          ;  |
     STA     $F9                     ; /
     JSR     $084E
     JSR     $62E5
@@ -1247,10 +1263,10 @@ SCRIPT_ENGINE:
 
     STA     $C010                   ; clear keyboard strobe
     LDA     #$00
-    STA     $5AA7                   ; attract_flag = 0
+    STA     ATTRACT_FLAG            ; attract_flag = 0
     CPX     #$06                    ; script index 6 = attract
     BNE     .not_attract
-    INC     $5AA7                   ; attract_flag = 1
+    INC     ATTRACT_FLAG            ; attract_flag = 1
 .not_attract:
 
     CPX     #$02                    ; special setup for index 2
@@ -1274,9 +1290,9 @@ SCRIPT_ENGINE:
     STA     $E5                     ; $E4/$E5 = script start address
 
     LDA     #$00
-    STA     $5A8D                   ; loop counter = 0
+    STA     SCRIPT_LOOP_CTR         ; loop counter = 0
     LDA     #$01
-    STA     $5A92                   ; PRNG mask = 1
+    STA     SCRIPT_PRNG_MASK        ; PRNG mask = 1
 .fetch:
     LDY     #$00
     LDA     ($E4),Y                 ; read script byte
@@ -1302,78 +1318,78 @@ SCRIPT_ENGINE:
     BCS     .cmd_20                 ; set gosub address
 
     ; --- Loop/end-loop (byte < $1F) ---
-    CMP     $5A8D                   ; compare with loop counter
+    CMP     SCRIPT_LOOP_CTR         ; compare with loop counter
     BEQ     .end_loop
     BCC     .end_loop
 
-    INC     $5A8D                   ; counter++
-    LDA     $5A8E                   ; \
+    INC     SCRIPT_LOOP_CTR         ; counter++
+    LDA     SCRIPT_LOOP_ADDR        ; \
     STA     $E4                     ;  | $E4/$E5 = loop address
-    LDA     $5A8F                   ;  |
+    LDA     SCRIPT_LOOP_ADDR+1      ;  |
     STA     $E5                     ; /
     JMP     .fetch
 
 .end_loop:
     LDA     #$00
-    STA     $5A8D                   ; reset loop counter
+    STA     SCRIPT_LOOP_CTR         ; reset loop counter
     JMP     SCRIPT_ADVANCE
 
 .cmd_25:                            ; PRNG mask = $0F
     LDA     #$0F
-    STA     $5A92
+    STA     SCRIPT_PRNG_MASK
     JMP     SCRIPT_ADVANCE
 
 .cmd_26:                            ; PRNG mask = $00
     LDA     #$00
-    STA     $5A92
+    STA     SCRIPT_PRNG_MASK
     JMP     SCRIPT_ADVANCE
 
 .cmd_23:                            ; action vector → $7A7F
-    STOW    $7A7F,$5A93
+    STOW    $7A7F,SCRIPT_ACTION_VEC
     JMP     SCRIPT_ADVANCE
 
 .cmd_24:                            ; action vector → $7A91
-    STOW    $7A91,$5A93
+    STOW    $7A91,SCRIPT_ACTION_VEC
     JMP     SCRIPT_ADVANCE
 
 .cmd_22:                            ; nop (return from script)
     RTS
 
 .cmd_21:                            ; gosub: jump to saved address
-    LDA     $5A90
+    LDA     SCRIPT_GOSUB_ADDR
     STA     $E4
-    LDA     $5A91
+    LDA     SCRIPT_GOSUB_ADDR+1
     STA     $E5
     JMP     .fetch
 
 .cmd_1F:                            ; set loop address = current+1
     JSR     SCRIPT_INC_E4
     LDA     $E4
-    STA     $5A8E
+    STA     SCRIPT_LOOP_ADDR
     LDA     $E5
-    STA     $5A8F
+    STA     SCRIPT_LOOP_ADDR+1
     JMP     .fetch
 
 .cmd_20:                            ; set gosub address = current+1
     JSR     SCRIPT_INC_E4
     LDA     $E4
-    STA     $5A90
+    STA     SCRIPT_GOSUB_ADDR
     LDA     $E5
-    STA     $5A91
+    STA     SCRIPT_GOSUB_ADDR+1
     JMP     .fetch
 
 .action:
     STA     $E2                     ; save action byte
     JSR     STEP_PRNG
-    LDA     $5A18                   ; PRNG output
-    AND     $5A92                   ; apply mask
+    LDA     PRNG_OUTPUT             ; PRNG output
+    AND     SCRIPT_PRNG_MASK        ; apply mask
     EOR     $E2                     ; XOR with action byte
     STA     $E1                     ; modified action
     JSR     SCRIPT_INC_E4           ; advance script pointer
     LDY     #$00
     LDA     ($E4),Y                 ; read parameter byte
     STA     $E2
-    JSR     SCRIPT_ACTION_INDIRECT  ; → JMP ($5A93)
+    JSR     SCRIPT_ACTION_INDIRECT  ; → JMP (SCRIPT_ACTION_VEC)
     JMP     ($F6)                   ; dispatch via action vector
     ORG     $7A77
 SCRIPT_INC_E4:
@@ -1388,13 +1404,13 @@ SCRIPT_INC_E4:
 
     ORG     $7A4C
 SCRIPT_ACTION_INDIRECT:
-    JMP     ($5A93)
+    JMP     (SCRIPT_ACTION_VEC)
     ORG     $7A4F
 SCRIPT_ADVANCE:
     SUBROUTINE
 
     JSR     SCRIPT_INC_E4           ; advance script pointer
-    LDA     $5AA7                   ; attract_flag
+    LDA     ATTRACT_FLAG            ; attract_flag
     BEQ     .continue               ; not attract mode → skip input check
 
     ; Attract mode: check keyboard
