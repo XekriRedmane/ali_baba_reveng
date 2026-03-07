@@ -178,6 +178,7 @@ PRINT_STRING_ADDR       EQU     $BC     ; 2 bytes (same pointer as PRINT_FROM_PT
 DATA_PTR                EQU     $BE     ; data pointer / return value (2 bytes)
 RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
 HRCG_INIT               EQU     $92A8   ; HRCG entry/init routine
+GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
 FONT_COL        EQU     $5A0C
 FONT_ROW        EQU     $5A0D
 FONT_CHARNUM        EQU     $5A0E
@@ -1594,6 +1595,29 @@ PLOT_FONTCHAR:
     LDA     #>s_PRINT_FONT_CHAR
     STA     $BD
     JMP     PRINT_FROM_PTR
+    ORG     $5B00
+INIT_GAME_STATE:
+    SUBROUTINE
+
+    JSR     $5C6D                   ; set up game display / UI
+    LDA     #<GAME_ACTION_HANDLER   ; \ $F6/$F7 = game action handler
+    STA     $F6                     ;  |
+    LDA     #>GAME_ACTION_HANDLER   ;  |
+    STA     $F7                     ; /
+    LDA     #$00
+    STA     $5A00                   ; clear game state flag
+    LDX     #$B1                    ; LDA (zp),Y opcode
+    STX     $80A6                   ; patch character renderer
+    LDX     #$06                    ; script index 6 (opening)
+    JSR     SCRIPT_ENGINE           ; run opening script
+    LDA     #$4C                    ; \ patch $7A49 to JMP $7A4F
+    STA     $7A49                   ;  | (bypass indirect handler
+    LDA     #$4F                    ;  |  after init script completes)
+    STA     $7A4A                   ;  |
+    LDA     #$7A                    ;  |
+    STA     $7A4B                   ; /
+    RTS
+
     ORG     $6C2E
 INIT_DISK_IOB:
     SUBROUTINE
@@ -2131,9 +2155,9 @@ GAME_INIT:
     LDA     $C057                   ; hi-res
     JSR     INIT_DISK_IOB
     JSR     INIT_HRCG
-    JSR     $773A
-    JSR     $7919
-    JSR     $5B00
+    JSR     SET_TEXT_WINDOW_WRAP
+    JSR     INIT_STUB
+    JSR     INIT_GAME_STATE
     JSR     $743B
     JSR     SET_TEXT_WINDOW_BOTTOM
     JSR     $6B94
@@ -2324,6 +2348,9 @@ SCRIPT_ADVANCE:
 .continue:
     LSR     $5A8C                   ; shift timing flag
     JMP     SCRIPT_ENGINE.fetch     ; loop back to interpreter
+    ORG     $7919
+INIT_STUB:
+    RTS
     ORG     $791A
 INIT_HRCG:
     SUBROUTINE

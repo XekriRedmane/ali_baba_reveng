@@ -1985,6 +1985,65 @@ INIT_HRCG:
     JMP     HRCG_INIT               ; enter HRCG initialization
 @ %def INIT_HRCG
 
+\subsection{init\_stub (\$7919)}
+
+A single [[RTS]]---a no-op stub called from [[GAME\_INIT]].  Likely a
+hook point or a disabled feature from development.
+
+<<init stub>>=
+    ORG     $7919
+INIT_STUB:
+    RTS
+@ %def INIT_STUB
+
+\subsection{init\_game\_state (\$5B00)}
+
+Called once from [[GAME\_INIT]] to set up the game display and run the
+opening script.  Steps:
+
+\begin{enumerate}
+\item Calls [[\$5C6D]] to initialize the game display (draws borders,
+  sets text windows).
+\item Sets [[\$F6/\$F7]] to point to the game action handler at [[\$5B2A]],
+  used by the script engine's indirect dispatch at [[\$7A49]].
+\item Clears [[\$5A00]] (game state flag).
+\item Patches [[\$80A6]] to [[\$B1]] ([[LDA (zp),Y]] opcode), restoring
+  the character renderer's indirect load.
+\item Runs the opening script (index~6) via [[SCRIPT\_ENGINE]].
+\item Patches [[\$7A49--\$7A4B]] from [[JMP (\$F6)]] to [[JMP \$7A4F]],
+  disabling the indirect action handler now that init is complete.
+\end{enumerate}
+
+<<init game state>>=
+    ORG     $5B00
+INIT_GAME_STATE:
+    SUBROUTINE
+
+    JSR     $5C6D                   ; set up game display / UI
+    LDA     #<GAME_ACTION_HANDLER   ; \ $F6/$F7 = game action handler
+    STA     $F6                     ;  |
+    LDA     #>GAME_ACTION_HANDLER   ;  |
+    STA     $F7                     ; /
+    LDA     #$00
+    STA     $5A00                   ; clear game state flag
+    LDX     #$B1                    ; LDA (zp),Y opcode
+    STX     $80A6                   ; patch character renderer
+    LDX     #$06                    ; script index 6 (opening)
+    JSR     SCRIPT_ENGINE           ; run opening script
+    LDA     #$4C                    ; \ patch $7A49 to JMP $7A4F
+    STA     $7A49                   ;  | (bypass indirect handler
+    LDA     #$4F                    ;  |  after init script completes)
+    STA     $7A4A                   ;  |
+    LDA     #$7A                    ;  |
+    STA     $7A4B                   ; /
+    RTS
+
+<<defines>>=
+GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
+@ %def GAME_ACTION_HANDLER
+
+@ %def INIT_GAME_STATE
+
 <<zero page defines>>=
 TEXT_COL                EQU     $24     ; Cursor position
 TEXT_ROW                EQU     $25
@@ -2879,9 +2938,9 @@ GAME_INIT:
     LDA     $C057                   ; hi-res
     JSR     INIT_DISK_IOB
     JSR     INIT_HRCG
-    JSR     $773A
-    JSR     $7919
-    JSR     $5B00
+    JSR     SET_TEXT_WINDOW_WRAP
+    JSR     INIT_STUB
+    JSR     INIT_GAME_STATE
     JSR     $743B
     JSR     SET_TEXT_WINDOW_BOTTOM
     JSR     $6B94
@@ -5997,6 +6056,7 @@ The following root chunks produce the assembly files when tangled.
 <<draw blink char>>
 <<plot char>>
 <<print font char>>
+<<init game state>>
 <<init disk iob>>
 <<scene loop>>
 <<text renderer>>
@@ -6022,6 +6082,7 @@ The following root chunks produce the assembly files when tangled.
 <<script engine>>
 <<script helpers>>
 <<script advance>>
+<<init stub>>
 <<init hrcg>>
 <<set text window upper left>>
 <<status border data>>
