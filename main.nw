@@ -1949,6 +1949,42 @@ or from row 21 using [[SET_TEXT_WINDOW_UPPER_LEFT_LOW]]. Using the bottom of the
 screen allows us to use it as a status and input window while the map is displayed
 above.
 
+\subsection{init\_hrcg (\$791A)}
+
+Initializes the Hi-Res Character Generator (HRCG) by patching two
+locations in the HRCG code and then jumping to its entry point at
+[[\$92A8]].  The patches modify the HRCG initialization to work within
+the game's environment:
+
+\begin{itemize}
+\item [[\$94B6]] $\leftarrow$ \texttt{RTS} (\$60): causes HRCG init to
+  return early, skipping the remainder of its setup.
+\item [[\$92D5--\$92D7]] $\leftarrow$ three \texttt{NOP}s (\$EA): patches
+  out a [[JSR \$03EA]] that would reconnect DOS, which the game does not
+  want.
+\end{itemize}
+
+After patching, the routine tail-calls the HRCG init via [[JMP \$92A8]],
+which returns to [[GAME\_INIT]] via the patched RTS.
+
+<<defines>>=
+HRCG_INIT               EQU     $92A8   ; HRCG entry/init routine
+@ %def HRCG_INIT
+
+<<init hrcg>>=
+    ORG     $791A
+INIT_HRCG:
+    SUBROUTINE
+
+    LDA     #$60                    ; RTS opcode
+    STA     $94B6                   ; patch HRCG init to return early
+    LDA     #$EA                    ; NOP opcode
+    STA     $92D5                   ; \ patch out JSR $03EA
+    STA     $92D6                   ;  | (skip DOS reconnect)
+    STA     $92D7                   ; /
+    JMP     HRCG_INIT               ; enter HRCG initialization
+@ %def INIT_HRCG
+
 <<zero page defines>>=
 TEXT_COL                EQU     $24     ; Cursor position
 TEXT_ROW                EQU     $25
@@ -2842,7 +2878,7 @@ GAME_INIT:
     LDA     $C054                   ; page 1
     LDA     $C057                   ; hi-res
     JSR     INIT_DISK_IOB
-    JSR     $791A
+    JSR     INIT_HRCG
     JSR     $773A
     JSR     $7919
     JSR     $5B00
@@ -5986,6 +6022,7 @@ The following root chunks produce the assembly files when tangled.
 <<script engine>>
 <<script helpers>>
 <<script advance>>
+<<init hrcg>>
 <<set text window upper left>>
 <<status border data>>
 <<status bar strings>>

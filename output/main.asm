@@ -177,6 +177,7 @@ DATA_PTR3               EQU     $BA     ; data pointer 3 (2 bytes)
 PRINT_STRING_ADDR       EQU     $BC     ; 2 bytes (same pointer as PRINT_FROM_PTR)
 DATA_PTR                EQU     $BE     ; data pointer / return value (2 bytes)
 RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
+HRCG_INIT               EQU     $92A8   ; HRCG entry/init routine
 FONT_COL        EQU     $5A0C
 FONT_ROW        EQU     $5A0D
 FONT_CHARNUM        EQU     $5A0E
@@ -2129,7 +2130,7 @@ GAME_INIT:
     LDA     $C054                   ; page 1
     LDA     $C057                   ; hi-res
     JSR     INIT_DISK_IOB
-    JSR     $791A
+    JSR     INIT_HRCG
     JSR     $773A
     JSR     $7919
     JSR     $5B00
@@ -2323,6 +2324,17 @@ SCRIPT_ADVANCE:
 .continue:
     LSR     $5A8C                   ; shift timing flag
     JMP     SCRIPT_ENGINE.fetch     ; loop back to interpreter
+    ORG     $791A
+INIT_HRCG:
+    SUBROUTINE
+
+    LDA     #$60                    ; RTS opcode
+    STA     $94B6                   ; patch HRCG init to return early
+    LDA     #$EA                    ; NOP opcode
+    STA     $92D5                   ; \ patch out JSR $03EA
+    STA     $92D6                   ;  | (skip DOS reconnect)
+    STA     $92D7                   ; /
+    JMP     HRCG_INIT               ; enter HRCG initialization
     ORG     $792D
 SET_TEXT_WINDOW_UPPER_LEFT_ALL:
     SUBROUTINE
