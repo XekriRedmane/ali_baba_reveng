@@ -3988,6 +3988,341 @@ NUM_TO_DECIMAL_CONT:
     RTS
 @ %def NUM_TO_DECIMAL NUM_TO_DECIMAL_CONT
 
+\subsection{check\_encounter (\$0E25)}
+
+Checks whether a given character (by char index in~[[A]]) is co-located
+with a mob from an opposing faction.  Calls [[FIND\_ENTITY\_AT\_POS]] to
+resolve the character to a mob pointer, then walks the group chain via
+[[FIND\_MOB\_AT\_SAME\_POS]] looking for another mob at the same map
+position.  Candidate mobs must have byte~6 bits~5--0~$\ge3$ (active mob
+type) and be from a different faction (checked via [[CHECK\_HOSTILE]]).
+
+Result stored in [[\$5A1F]]:
+\begin{itemize}
+\item 0 --- no mob found at same position (or character is not a mob)
+\item 1 --- found co-located mob but same faction (wrapped search)
+\item 2 --- found co-located mob from opposing faction (enemy encounter)
+\end{itemize}
+
+Callers use the result to set or clear bit~2 of byte~\$0F of the
+character's record, which appears to be a ``combat engaged'' flag.
+
+<<defines>>=
+ENCOUNTER_RESULT        EQU     $5A1F   ; 0/1/2 from CHECK_ENCOUNTER
+@ %def ENCOUNTER_RESULT
+
+<<check encounter>>=
+    ORG     $0E25
+CHECK_ENCOUNTER:
+    SUBROUTINE
+
+    JSR     FIND_ENTITY_AT_POS      ; look up char → $BE/$BF
+    LDA     $BF
+    CMP     #$00
+    BEQ     .none                   ; null pointer → return 0
+    CMP     #$80
+    BMI     .none                   ; not a mob (bit 7 clear) → return 0
+    AND     #$7F                    ; clear mob flag
+    STA     $F5                     ; \ $F4/$F5 = mob data pointer
+    LDA     $BE                     ;  |
+    STA     $F4                     ; /
+.search:
+    LDA     $F4                     ; \ $BC/$BD = current mob pointer
+    STA     $BC                     ;  |
+    LDA     $F5                     ;  |
+    STA     $BD                     ; /
+    JSR     FIND_MOB_AT_SAME_POS    ; find next mob at same position
+    CMP     #$01
+    BMI     .none                   ; 0 = no co-located mob → return 0
+    BEQ     .friendly               ; 1 = found (wrapped) → return 1
+    LDY     #$06                    ; result >= 2: found ahead
+    LDA     ($F4),Y                 ; byte 6 of found mob
+    AND     #$3F                    ; bits 5-0
+    CMP     #$03                    ; active mob type?
+    BCC     .search                 ; no → skip, keep searching
+    JSR     CHECK_HOSTILE           ; compare factions
+    CMP     #$00
+    BEQ     .search                 ; same faction → skip
+    LDA     #$02                    ; enemy found → return 2
+    STA     ENCOUNTER_RESULT
+    RTS
+.none:
+    LDA     #$00
+    BEQ     .store
+.friendly:
+    LDA     #$01
+.store:
+    STA     ENCOUNTER_RESULT
+    RTS
+@ %def CHECK_ENCOUNTER
+
+\subsection{find\_mob\_at\_same\_pos (\$0E6C)}
+
+Walks the group chain starting from the current mob ([[\$F4/\$F5]]),
+looking for another mob at the same map position (byte~3 of mob data).
+If the current mob is the last in the chain (byte~2 = 0), the search
+wraps around to the first mob via the group head ([[\$FA/\$FB]]).
+
+Returns in~[[A]]:
+\begin{itemize}
+\item 0 --- no other mob at same position (full circle)
+\item 1 --- found co-located mob (search wrapped past end of chain)
+\item 2 --- found co-located mob ahead in the chain
+\end{itemize}
+
+On success, [[\$F4/\$F5]] is updated to point to the found mob.
+
+<<defines>>=
+COLOCATE_POS            EQU     $5A21   ; saved position for co-location search
+COLOCATE_LINK           EQU     $5A20   ; saved next-link (stop condition)
+COLOCATE_WRAPPED        EQU     $5A22   ; 1 if wrapped, 2 if ahead
+@ %def COLOCATE_POS COLOCATE_LINK COLOCATE_WRAPPED
+
+<<find mob at same pos>>=
+    ORG     $0E6C
+FIND_MOB_AT_SAME_POS:
+    SUBROUTINE
+
+    LDY     #$03
+    LDA     ($F4),Y                 ; byte 3 = position of current mob
+    STA     COLOCATE_POS
+    DEY
+    LDA     ($F4),Y                 ; byte 2 = next link of current mob
+    STA     COLOCATE_LINK
+    STY     COLOCATE_WRAPPED        ; $5A22 = 2 (found ahead)
+.check_link:
+    CMP     #$00
+    BNE     .resolve                ; has next → follow it
+    LDY     #$01
+    STY     COLOCATE_WRAPPED        ; wrapped to start
+    INY                             ; Y = 2
+    LDA     ($FA),Y                 ; byte 2 of group head = first mob
+.resolve:
+    JSR     GET_MOB_DATA            ; A = mob index → $BA/$BB
+    LDY     #$02
+    LDA     ($BA),Y                 ; byte 2 of resolved mob
+    CMP     COLOCATE_LINK           ; same next-link as original?
+    BNE     .not_self
+    LDA     #$00                    ; full circle → not found
+    RTS
+.not_self:
+    INY                             ; Y = 3
+    LDA     ($BA),Y                 ; byte 3 = position
+    CMP     COLOCATE_POS            ; same position as original?
+    BEQ     .found
+    DEY                             ; Y = 2
+    LDA     ($BA),Y                 ; follow next link
+    JMP     .check_link
+.found:
+    LDA     $BA                     ; \ update $F4/$F5 to found mob
+    STA     $F4                     ;  |
+    LDA     $BB                     ;  |
+    STA     $F5                     ; /
+    LDA     COLOCATE_WRAPPED        ; return 1 (wrapped) or 2 (ahead)
+    RTS
+@ %def FIND_MOB_AT_SAME_POS
+
+\subsection{check\_hostile (\$0EB1)}
+
+Determines whether two mobs are hostile to each other by comparing their
+faction classifications.  Reads byte~4 (appearance index) from the mob
+at [[\$F4/\$F5]] and the mob at [[\$BC/\$BD]], converts each via
+[[APPEARANCE\_TO\_FONTCHAR]] to get the font group (quotient of dividing
+by~21), then classifies via [[GET\_HOSTILITY]]: groups 0--2 and~7 are
+``friendly'' (Y=0), groups 3--6 are ``hostile'' (Y=1).
+
+Returns [[A]]=1 if the two mobs are on different sides, [[A]]=0 if same.
+When both are hostile (Y=1), they are still hostile to each other if
+their font-char remainders differ (different hostile sub-factions).
+
+<<defines>>=
+HOSTILE_APP             EQU     $5A23   ; saved appearance for hostility check
+HOSTILE_A               EQU     $5A24   ; saved A from first GET_HOSTILITY
+HOSTILE_Y               EQU     $5A25   ; saved Y from first GET_HOSTILITY
+@ %def HOSTILE_APP HOSTILE_A HOSTILE_Y
+
+<<check hostile>>=
+    ORG     $0EB1
+CHECK_HOSTILE:
+    SUBROUTINE
+
+    LDY     #$04
+    LDA     ($F4),Y                 ; byte 4 of found mob (appearance)
+    STA     HOSTILE_APP
+    LDA     ($BC),Y                 ; byte 4 of original mob (appearance)
+    JSR     APPEARANCE_TO_FONTCHAR  ; → A=remainder, Y=group
+    JSR     GET_HOSTILITY           ; → Y=0 (friendly) or 1 (hostile)
+    STA     HOSTILE_A
+    STY     HOSTILE_Y
+    LDA     HOSTILE_APP             ; appearance of found mob
+    JSR     APPEARANCE_TO_FONTCHAR
+    JSR     GET_HOSTILITY
+    CPY     HOSTILE_Y               ; compare hostilities
+    BNE     .different              ; different sides → hostile
+    CPY     #$00
+    BEQ     .same                   ; both friendly → same side
+    CMP     HOSTILE_A               ; both hostile: compare sub-factions
+    BNE     .different              ; different → hostile to each other
+.same:
+    LDA     #$00
+    RTS
+.different:
+    LDA     #$01
+    RTS
+@ %def CHECK_HOSTILE
+
+\subsection{get\_hostility (\$0EE3)}
+
+Classifies a font group number (in~[[Y]], from [[APPEARANCE\_TO\_FONTCHAR]])
+as friendly or hostile.  Groups 0--2 and~7 are friendly (Y$\leftarrow$0),
+groups 3--6 are hostile (Y$\leftarrow$1).  The value in~[[A]] is preserved.
+
+<<get hostility>>=
+    ORG     $0EE3
+GET_HOSTILITY:
+    SUBROUTINE
+
+    CPY     #$03                    ; factions 0-2 = friendly
+    BCC     .friendly
+    CPY     #$07                    ; faction 7 = friendly
+    BEQ     .friendly
+    LDY     #$01                    ; factions 3-6 = hostile
+    RTS
+.friendly:
+    LDY     #$00
+    RTS
+@ %def GET_HOSTILITY
+
+\subsection{check\_adjacent\_threats (\$0EF1)}
+
+Checks the four cardinal neighbors of a map position for hostile mobs
+and accumulates their combined threat level.  Input: [[A]]~= position
+(0--199), [[\$F8/\$F9]]~= character record pointer,
+[[\$BC/\$BD]]~= character's mob data pointer.
+
+For each adjacent position (left, right, up, down), calls
+[[SUM\_HOSTILE\_AT\_POS]] to find hostile mobs not already in combat and
+sum their strength (byte~5 bits~4--0) into [[\$5A26]].  After checking
+all neighbors, compares the accumulated threat against the character's
+defense value (byte~5 bits~4--1 of the [[\$F8]] record).
+
+Returns [[A]]=1 if defense~$\ge$~threat (safe), [[A]]=0 if overwhelmed.
+The threat total remains in [[\$5A26]] for callers that check it directly.
+
+Boundary checks prevent wrapping: position~0 has no left neighbor,
+position~199 no right, positions~0--19 no up, positions~180--199 no down.
+
+<<defines>>=
+ADJACENT_THREAT         EQU     $5A26   ; accumulated adjacent threat level
+ADJACENT_POS            EQU     $5A27   ; saved position for adjacency check
+@ %def ADJACENT_THREAT ADJACENT_POS
+
+<<check adjacent threats>>=
+    ORG     $0EF1
+CHECK_ADJACENT_THREATS:
+    SUBROUTINE
+
+    STA     ADJACENT_POS            ; save target position
+    LDA     #$00
+    STA     ADJACENT_THREAT         ; clear threat accumulator
+    LDA     $F8                     ; \ $BC/$BD = character record pointer
+    STA     $BC                     ;  |
+    LDA     $F9                     ;  |
+    STA     $BD                     ; /
+    LDA     ADJACENT_POS            ; reload position
+    BEQ     .skip_left              ; position 0 → no left neighbor
+    SEC
+    SBC     #$01                    ; position - 1
+    JSR     SUM_HOSTILE_AT_POS      ; check left
+.skip_left:
+    LDA     ADJACENT_POS
+    CMP     #$C7                    ; position 199?
+    BEQ     .skip_right             ; → no right neighbor
+    CLC
+    ADC     #$01                    ; position + 1
+    JSR     SUM_HOSTILE_AT_POS      ; check right
+.skip_right:
+    LDA     ADJACENT_POS
+    BMI     .do_up                  ; >= 128 → always has up neighbor
+    CMP     #$14                    ; < 20?
+    BMI     .skip_up                ; → no up neighbor
+.do_up:
+    SEC
+    SBC     #$14                    ; position - 20
+    JSR     SUM_HOSTILE_AT_POS      ; check up
+.skip_up:
+    LDA     ADJACENT_POS
+    BPL     .do_down                ; < 128 → always has down neighbor
+    CMP     #$B4                    ; >= 180?
+    BPL     .skip_down              ; → no down neighbor
+.do_down:
+    CLC
+    ADC     #$14                    ; position + 20
+    JSR     SUM_HOSTILE_AT_POS      ; check down
+.skip_down:
+    LDY     #$05
+    LDA     ($F8),Y                 ; byte 5 of character record
+    ROR                             ; \ bits 4-1 → defense value
+    AND     #$0F                    ; /
+    CMP     ADJACENT_THREAT         ; compare with threat total
+    BPL     .safe                   ; defense >= threat → safe
+    LDA     #$00
+    RTS                             ; return 0 = overwhelmed
+.safe:
+    LDA     #$01
+    RTS                             ; return 1 = safe
+@ %def CHECK_ADJACENT_THREATS
+
+\subsection{sum\_hostile\_at\_pos (\$0F49)}
+
+Finds all hostile mobs at a given map position and adds their strength
+to the threat accumulator [[\$5A26]].  Input: [[A]]~= position,
+[[\$BC/\$BD]]~= reference mob for faction comparison.
+
+For each mob found at the position, checks hostility via
+[[CHECK\_HOSTILE]] and skips mobs that are already combat-engaged
+(bit~2 of byte~\$0F set).  Hostile mobs contribute their strength
+(byte~5 bits~4--0) to the running total, clamped at~127.
+
+<<sum hostile at pos>>=
+    ORG     $0F49
+SUM_HOSTILE_AT_POS:
+    SUBROUTINE
+
+    JSR     FIND_ENTITY_AT_POS      ; A = position → $BE/$BF
+    LDA     $BF
+    BEQ     .done                   ; null → nothing here
+    CMP     #$80
+    BMI     .done                   ; not a mob → skip
+    AND     #$7F                    ; clear mob flag
+    STA     $F5                     ; \ $F4/$F5 = mob data pointer
+    LDA     $BE                     ;  |
+    STA     $F4                     ; /
+.check_mob:
+    JSR     CHECK_HOSTILE           ; is this mob hostile to ($BC)?
+    CMP     #$00
+    BEQ     .next                   ; not hostile → skip
+    LDY     #$0F
+    LDA     ($F4),Y                 ; byte $0F of mob
+    AND     #$04                    ; bit 2 = combat engaged flag
+    BNE     .next                   ; already in combat → skip
+    LDY     #$05
+    LDA     ($F4),Y                 ; byte 5 of mob
+    AND     #$1F                    ; bits 4-0 = strength
+    CLC
+    ADC     ADJACENT_THREAT         ; accumulate threat
+    BPL     .store
+    LDA     #$7F                    ; clamp to 127
+.store:
+    STA     ADJACENT_THREAT
+.next:
+    JSR     FIND_MOB_AT_SAME_POS    ; find next mob at same position
+    CMP     #$02
+    BEQ     .check_mob              ; more mobs → check them too
+.done:
+    RTS
+@ %def SUM_HOSTILE_AT_POS
+
 \subsection{compute\_scene\_ptr (\$0C32)}
 
 Computes a pointer into the game data from a 1-based scene index in~A.
@@ -5365,32 +5700,6 @@ LAB_162b:
     JMP      hit_mob?
 @
 
-Personally, I find the Python version of [[get_item_at_pos_in_room]] much easier to
-understand. It is much less verbose and doesn't involve self-modification.
-
-<<py Get item at pos in room>>=
-get_item_at_pos_in_room(pos, room_ptr):
-    # "Args" are A (a position) and TMP_PTR (room data ptr).
-    # "Return value" is DATA_PTR.
-
-    # return 0x8000 | mob data ptr if mob at pos.
-    mob_ptr = room_ptr
-    while mob_ptr[MOB]:
-        mob_ptr = mob_data_ptr(mob_ptr[MOB])
-        if mob_ptr[POS] == pos:
-            return 0x8000 | mob_ptr
-
-    # return map record ptr if object at pos.
-    map_ptr = room_ptr[MAP]
-    while map_ptr[0] != 0xFF:
-        if map_ptr[0] == pos:
-            return map_ptr
-        map_ptr += 3
-
-    # return brick (1) or space (0) otherwise.
-    return is_at_outer_limits()
-@
-
 <<Get item at pos in room>>=
     ORG      $0B62
     ; Takes A (pos) and TMP_PTR (pointer to room data)
@@ -5563,6 +5872,12 @@ The following root chunks produce the assembly files when tangled.
 <<print mob name>>
 <<colrow to pos>>
 <<num to decimal>>
+<<check encounter>>
+<<find mob at same pos>>
+<<check hostile>>
+<<get hostility>>
+<<check adjacent threats>>
+<<sum hostile at pos>>
 <<draw char at pos>>
 <<random in range>>
 <<advance group link>>

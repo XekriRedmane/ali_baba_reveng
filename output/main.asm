@@ -213,6 +213,15 @@ RNG_LIMIT           EQU     $5A11   ; random\_in\_range temporary (limit/shift c
 RNG_MASK            EQU     $5A12   ; random\_in\_range bit mask
 MSG_TABLE_PTR           EQU     $4005   ; message table base (2 bytes)
 MSG_LINE_COUNT          EQU     $5A57   ; lines printed so far
+ENCOUNTER_RESULT        EQU     $5A1F   ; 0/1/2 from CHECK_ENCOUNTER
+COLOCATE_POS            EQU     $5A21   ; saved position for co-location search
+COLOCATE_LINK           EQU     $5A20   ; saved next-link (stop condition)
+COLOCATE_WRAPPED        EQU     $5A22   ; 1 if wrapped, 2 if ahead
+HOSTILE_APP             EQU     $5A23   ; saved appearance for hostility check
+HOSTILE_A               EQU     $5A24   ; saved A from first GET_HOSTILITY
+HOSTILE_Y               EQU     $5A25   ; saved Y from first GET_HOSTILITY
+ADJACENT_THREAT         EQU     $5A26   ; accumulated adjacent threat level
+ADJACENT_POS            EQU     $5A27   ; saved position for adjacency check
 DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
 ANIM_FRAME_CTR          EQU     $7AAF   ; animation frame countdown
 ANIM_INDEX              EQU     $7ABD   ; current animation table index
@@ -1070,6 +1079,218 @@ NUM_TO_DECIMAL_CONT:
     STA     NUM_LEADING             ; /  (first nonzero digit seen)
 .skip:
     INY                             ; advance output index
+    RTS
+    ORG     $0E25
+CHECK_ENCOUNTER:
+    SUBROUTINE
+
+    JSR     FIND_ENTITY_AT_POS      ; look up char → $BE/$BF
+    LDA     $BF
+    CMP     #$00
+    BEQ     .none                   ; null pointer → return 0
+    CMP     #$80
+    BMI     .none                   ; not a mob (bit 7 clear) → return 0
+    AND     #$7F                    ; clear mob flag
+    STA     $F5                     ; \ $F4/$F5 = mob data pointer
+    LDA     $BE                     ;  |
+    STA     $F4                     ; /
+.search:
+    LDA     $F4                     ; \ $BC/$BD = current mob pointer
+    STA     $BC                     ;  |
+    LDA     $F5                     ;  |
+    STA     $BD                     ; /
+    JSR     FIND_MOB_AT_SAME_POS    ; find next mob at same position
+    CMP     #$01
+    BMI     .none                   ; 0 = no co-located mob → return 0
+    BEQ     .friendly               ; 1 = found (wrapped) → return 1
+    LDY     #$06                    ; result >= 2: found ahead
+    LDA     ($F4),Y                 ; byte 6 of found mob
+    AND     #$3F                    ; bits 5-0
+    CMP     #$03                    ; active mob type?
+    BCC     .search                 ; no → skip, keep searching
+    JSR     CHECK_HOSTILE           ; compare factions
+    CMP     #$00
+    BEQ     .search                 ; same faction → skip
+    LDA     #$02                    ; enemy found → return 2
+    STA     ENCOUNTER_RESULT
+    RTS
+.none:
+    LDA     #$00
+    BEQ     .store
+.friendly:
+    LDA     #$01
+.store:
+    STA     ENCOUNTER_RESULT
+    RTS
+    ORG     $0E6C
+FIND_MOB_AT_SAME_POS:
+    SUBROUTINE
+
+    LDY     #$03
+    LDA     ($F4),Y                 ; byte 3 = position of current mob
+    STA     COLOCATE_POS
+    DEY
+    LDA     ($F4),Y                 ; byte 2 = next link of current mob
+    STA     COLOCATE_LINK
+    STY     COLOCATE_WRAPPED        ; $5A22 = 2 (found ahead)
+.check_link:
+    CMP     #$00
+    BNE     .resolve                ; has next → follow it
+    LDY     #$01
+    STY     COLOCATE_WRAPPED        ; wrapped to start
+    INY                             ; Y = 2
+    LDA     ($FA),Y                 ; byte 2 of group head = first mob
+.resolve:
+    JSR     GET_MOB_DATA            ; A = mob index → $BA/$BB
+    LDY     #$02
+    LDA     ($BA),Y                 ; byte 2 of resolved mob
+    CMP     COLOCATE_LINK           ; same next-link as original?
+    BNE     .not_self
+    LDA     #$00                    ; full circle → not found
+    RTS
+.not_self:
+    INY                             ; Y = 3
+    LDA     ($BA),Y                 ; byte 3 = position
+    CMP     COLOCATE_POS            ; same position as original?
+    BEQ     .found
+    DEY                             ; Y = 2
+    LDA     ($BA),Y                 ; follow next link
+    JMP     .check_link
+.found:
+    LDA     $BA                     ; \ update $F4/$F5 to found mob
+    STA     $F4                     ;  |
+    LDA     $BB                     ;  |
+    STA     $F5                     ; /
+    LDA     COLOCATE_WRAPPED        ; return 1 (wrapped) or 2 (ahead)
+    RTS
+    ORG     $0EB1
+CHECK_HOSTILE:
+    SUBROUTINE
+
+    LDY     #$04
+    LDA     ($F4),Y                 ; byte 4 of found mob (appearance)
+    STA     HOSTILE_APP
+    LDA     ($BC),Y                 ; byte 4 of original mob (appearance)
+    JSR     APPEARANCE_TO_FONTCHAR  ; → A=remainder, Y=group
+    JSR     GET_HOSTILITY           ; → Y=0 (friendly) or 1 (hostile)
+    STA     HOSTILE_A
+    STY     HOSTILE_Y
+    LDA     HOSTILE_APP             ; appearance of found mob
+    JSR     APPEARANCE_TO_FONTCHAR
+    JSR     GET_HOSTILITY
+    CPY     HOSTILE_Y               ; compare hostilities
+    BNE     .different              ; different sides → hostile
+    CPY     #$00
+    BEQ     .same                   ; both friendly → same side
+    CMP     HOSTILE_A               ; both hostile: compare sub-factions
+    BNE     .different              ; different → hostile to each other
+.same:
+    LDA     #$00
+    RTS
+.different:
+    LDA     #$01
+    RTS
+    ORG     $0EE3
+GET_HOSTILITY:
+    SUBROUTINE
+
+    CPY     #$03                    ; factions 0-2 = friendly
+    BCC     .friendly
+    CPY     #$07                    ; faction 7 = friendly
+    BEQ     .friendly
+    LDY     #$01                    ; factions 3-6 = hostile
+    RTS
+.friendly:
+    LDY     #$00
+    RTS
+    ORG     $0EF1
+CHECK_ADJACENT_THREATS:
+    SUBROUTINE
+
+    STA     ADJACENT_POS            ; save target position
+    LDA     #$00
+    STA     ADJACENT_THREAT         ; clear threat accumulator
+    LDA     $F8                     ; \ $BC/$BD = character record pointer
+    STA     $BC                     ;  |
+    LDA     $F9                     ;  |
+    STA     $BD                     ; /
+    LDA     ADJACENT_POS            ; reload position
+    BEQ     .skip_left              ; position 0 → no left neighbor
+    SEC
+    SBC     #$01                    ; position - 1
+    JSR     SUM_HOSTILE_AT_POS      ; check left
+.skip_left:
+    LDA     ADJACENT_POS
+    CMP     #$C7                    ; position 199?
+    BEQ     .skip_right             ; → no right neighbor
+    CLC
+    ADC     #$01                    ; position + 1
+    JSR     SUM_HOSTILE_AT_POS      ; check right
+.skip_right:
+    LDA     ADJACENT_POS
+    BMI     .do_up                  ; >= 128 → always has up neighbor
+    CMP     #$14                    ; < 20?
+    BMI     .skip_up                ; → no up neighbor
+.do_up:
+    SEC
+    SBC     #$14                    ; position - 20
+    JSR     SUM_HOSTILE_AT_POS      ; check up
+.skip_up:
+    LDA     ADJACENT_POS
+    BPL     .do_down                ; < 128 → always has down neighbor
+    CMP     #$B4                    ; >= 180?
+    BPL     .skip_down              ; → no down neighbor
+.do_down:
+    CLC
+    ADC     #$14                    ; position + 20
+    JSR     SUM_HOSTILE_AT_POS      ; check down
+.skip_down:
+    LDY     #$05
+    LDA     ($F8),Y                 ; byte 5 of character record
+    ROR                             ; \ bits 4-1 → defense value
+    AND     #$0F                    ; /
+    CMP     ADJACENT_THREAT         ; compare with threat total
+    BPL     .safe                   ; defense >= threat → safe
+    LDA     #$00
+    RTS                             ; return 0 = overwhelmed
+.safe:
+    LDA     #$01
+    RTS                             ; return 1 = safe
+    ORG     $0F49
+SUM_HOSTILE_AT_POS:
+    SUBROUTINE
+
+    JSR     FIND_ENTITY_AT_POS      ; A = position → $BE/$BF
+    LDA     $BF
+    BEQ     .done                   ; null → nothing here
+    CMP     #$80
+    BMI     .done                   ; not a mob → skip
+    AND     #$7F                    ; clear mob flag
+    STA     $F5                     ; \ $F4/$F5 = mob data pointer
+    LDA     $BE                     ;  |
+    STA     $F4                     ; /
+.check_mob:
+    JSR     CHECK_HOSTILE           ; is this mob hostile to ($BC)?
+    CMP     #$00
+    BEQ     .next                   ; not hostile → skip
+    LDY     #$0F
+    LDA     ($F4),Y                 ; byte $0F of mob
+    AND     #$04                    ; bit 2 = combat engaged flag
+    BNE     .next                   ; already in combat → skip
+    LDY     #$05
+    LDA     ($F4),Y                 ; byte 5 of mob
+    AND     #$1F                    ; bits 4-0 = strength
+    CLC
+    ADC     ADJACENT_THREAT         ; accumulate threat
+    BPL     .store
+    LDA     #$7F                    ; clamp to 127
+.store:
+    STA     ADJACENT_THREAT
+.next:
+    JSR     FIND_MOB_AT_SAME_POS    ; find next mob at same position
+    CMP     #$02
+    BEQ     .check_mob              ; more mobs → check them too
+.done:
     RTS
     ORG     $1156
 DRAW_CHAR_AT_POS:
