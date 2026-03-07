@@ -2201,7 +2201,7 @@ then falls through into [[DRAW\_BLINK\_CHAR]].  Called by
 <<draw blink char>>=
     ORG     $74DD
 DRAW_BLINK_NORMAL:
-    JSR     SET_NORMAL_VIDEO        ; Ctrl-N → normal video
+    JSR     PRINT_CTRL_N            ; Ctrl-N → normal video
 
 DRAW_BLINK_CHAR:
     SUBROUTINE
@@ -2231,23 +2231,25 @@ DRAW_BLINK_CHAR:
     RTS
 @ %def DRAW_BLINK_NORMAL DRAW_BLINK_CHAR
 
-\subsection{set\_normal\_video (\$7735)}
+\subsection{print\_ctrl\_N (\$7735)}
 
 Outputs Ctrl-N (normal video mode) to the Apple~II character output
-routine.  [[\$8E]] is [[Ctrl-N]] with the high bit set.
+routine via [[COUT1]].  [[\$8E]] is [[Ctrl-N]] with the high bit set.
+This is distinct from [[SET\_NORMAL\_VIDEO]] at [[\$75F9]] which uses
+[[COUT]] instead.
 
 <<defines>>=
 ROM_COUT1               EQU     $FDED   ; Apple II ROM COUT1 (direct screen output)
 @ %def ROM_COUT1
 
-<<set normal video>>=
+<<print ctrl n>>=
     ORG     $7735
-SET_NORMAL_VIDEO:
+PRINT_CTRL_N:
     SUBROUTINE
 
     LDA     #$8E                    ; Ctrl-N with high bit
     JMP     ROM_COUT1               ; output via COUT1
-@ %def SET_NORMAL_VIDEO
+@ %def PRINT_CTRL_N
 
 <<defines>>=
 ROM_COUT            EQU     $FDF0   ; Apple II ROM character output
@@ -3308,6 +3310,11 @@ Reads a byte stream from the pointer at [[$06/$07]] and renders
 characters on the hi-res screen.  It maintains column/row state and
 supports several control codes.
 
+<<defines>>=
+TEXT_RIGHT_MARGIN        EQU     $5A96   ; right margin column for text wrap
+TEXT_LEFT_MARGIN         EQU     $5A97   ; left margin column for text wrap
+@ %def TEXT_RIGHT_MARGIN TEXT_LEFT_MARGIN
+
 <<text renderer>>=
     ORG     $6C8E
 TEXT_RENDERER:
@@ -3316,10 +3323,10 @@ TEXT_RENDERER:
     LDY     #$00
 .init:
     LDA     #$02
-    STA     $5A97                   ; left margin = 2
+    STA     TEXT_LEFT_MARGIN         ; left margin = 2
     STA     FONT_COL                ; current column = 2
     LDA     #$12
-    STA     $5A96                   ; right margin = $12 (18)
+    STA     TEXT_RIGHT_MARGIN       ; right margin = $12 (18)
     LDA     #$01
     STA     FONT_ROW                ; current row = 1
 
@@ -3345,10 +3352,10 @@ TEXT_RENDERER:
     JSR     PRINT_FONTCHAR          ; draw at current position
     INC     FONT_COL                ; advance column
     LDA     FONT_COL
-    CMP     $5A96                   ; past right margin?
+    CMP     TEXT_RIGHT_MARGIN       ; past right margin?
     BCC     .next                   ; no → continue
     INC     FONT_ROW                ; yes → next row
-    LDA     $5A97                   ;   reset column to left margin
+    LDA     TEXT_LEFT_MARGIN        ;   reset column to left margin
     STA     FONT_COL
 .next:
     LDY     $5A98                   ; restore stream index
@@ -3391,11 +3398,11 @@ TEXT_RENDERER:
     ; --- Reset ($7D): full-screen text mode ---
 .reset:
     LDA     #$00
-    STA     $5A97                   ; left margin = 0
+    STA     TEXT_LEFT_MARGIN         ; left margin = 0
     STA     FONT_COL                ; column = 0
     STA     FONT_ROW                ; row = 0
     LDA     #$14
-    STA     $5A96                   ; right margin = $14 (20)
+    STA     TEXT_RIGHT_MARGIN       ; right margin = $14 (20)
     INY                             ; advance past $7D
     JMP     .fetch
 @ %def TEXT_RENDERER
@@ -4653,7 +4660,7 @@ The following root chunks produce the assembly files when tangled.
 <<draw blink char>>
 <<plot char>>
 <<print font char>>
-<<set normal video>>
+<<print ctrl n>>
 <<scene loop>>
 <<text renderer>>
 <<display status bar>>

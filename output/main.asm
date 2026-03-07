@@ -189,6 +189,8 @@ CHAR_LOWER_RIGHT    EQU     $80AC
 BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
 BLINK_ROW       EQU     $5AA3   ; font row
 BLINK_CHAR      EQU     $5AA4   ; font character number
+BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
+ROM_COUT1               EQU     $FDED   ; Apple II ROM COUT1 (direct screen output)
 ROM_COUT            EQU     $FDF0   ; Apple II ROM character output
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
@@ -202,6 +204,8 @@ ANIM_FRAME_TABLE        EQU     $7AB6   ; per-frame frame counts (indexed)
 WAIT_LOOP_COUNT         EQU     $5A8C   ; inner wait loop counter
 WAIT_DURATION           EQU     $7AAD   ; ROM WAIT duration parameter
 ROM_WAIT                EQU     $FCA8   ; Apple II ROM WAIT routine
+TEXT_RIGHT_MARGIN        EQU     $5A96   ; right margin column for text wrap
+TEXT_LEFT_MARGIN         EQU     $5A97   ; left margin column for text wrap
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
     ORG     $0569
 ATTRACT_LOOP:
@@ -534,7 +538,7 @@ TICK_ANIM_COUNTER:
 
     DEC     ANIM_FRAME_CTR          ; tick frame counter
     BNE     .reload                 ; not zero → just reload wait count
-    JSR     $74CB                   ; counter hit zero → advance frame
+    JSR     DRAW_BLINK_ALT          ; counter hit zero → draw alt char
 .reload:
     LDX     ANIM_INDEX              ; current animation index
     LDA     ANIM_WAIT_TABLE,X       ; look up wait count for this frame
@@ -551,7 +555,7 @@ ANIM_TICK_AND_WAIT:
     RTS                             ; no → return
 
 .advance:
-    JSR     $74DD                   ; update animation display
+    JSR     DRAW_BLINK_NORMAL       ; redraw blink char in normal video
     LDX     ANIM_INDEX              ; reload animation index
     LDA     ANIM_FRAME_TABLE,X      ; look up frame duration
     STA     ANIM_FRAME_CTR          ; reset frame counter
@@ -575,6 +579,48 @@ CALL_ROM_WAIT:
 
     LDA     WAIT_DURATION           ; load duration parameter
     JMP     ROM_WAIT                ; tail-call ROM WAIT
+    ORG     $74CB
+DRAW_BLINK_ALT:
+    SUBROUTINE
+
+    LDA     BLINK_CHAR              ; save current blink char
+    PHA
+    LDA     BLINK_ALT_CHAR          ; load alternate char
+    STA     BLINK_CHAR              ; swap it in
+    JSR     DRAW_BLINK_CHAR         ; draw at blink position
+    PLA
+    STA     BLINK_CHAR              ; restore original char
+    RTS
+    ORG     $74DD
+DRAW_BLINK_NORMAL:
+    JSR     PRINT_CTRL_N            ; Ctrl-N → normal video
+
+DRAW_BLINK_CHAR:
+    SUBROUTINE
+
+    LDA     BLINK_COL               ; load blink column
+    CMP     #$14                    ; >= 20? (disabled sentinel)
+    BCC     .draw
+    RTS                             ; disabled — do nothing
+
+.draw:
+    STA     FONT_COL                ; copy blink state to font vars
+    LDA     BLINK_ROW
+    STA     FONT_ROW
+    LDA     BLINK_CHAR
+    STA     FONT_CHARNUM
+    LDA     #$01
+    STA     FONT_CHARSET            ; charset 1
+    LDA     PRINT_STRING_ADDR       ; save $BC/$BD (used by PRINT_FONTCHAR)
+    PHA
+    LDA     PRINT_STRING_ADDR+1
+    PHA
+    JSR     PRINT_FONTCHAR          ; render the character
+    PLA
+    STA     PRINT_STRING_ADDR+1     ; restore $BC/$BD
+    PLA
+    STA     PRINT_STRING_ADDR
+    RTS
     ORG     $5D7D
 PLOT_CHAR:
     SUBROUTINE
@@ -651,6 +697,12 @@ PLOT_FONTCHAR:
     LDA     #>s_PRINT_FONT_CHAR
     STA     $BD
     JMP     PRINT_FROM_PTR
+    ORG     $7735
+PRINT_CTRL_N:
+    SUBROUTINE
+
+    LDA     #$8E                    ; Ctrl-N with high bit
+    JMP     ROM_COUT1               ; output via COUT1
     ORG     $6C37
 SCENE_LOOP:
     SUBROUTINE
@@ -705,10 +757,10 @@ TEXT_RENDERER:
     LDY     #$00
 .init:
     LDA     #$02
-    STA     $5A97                   ; left margin = 2
+    STA     TEXT_LEFT_MARGIN         ; left margin = 2
     STA     FONT_COL                ; current column = 2
     LDA     #$12
-    STA     $5A96                   ; right margin = $12 (18)
+    STA     TEXT_RIGHT_MARGIN       ; right margin = $12 (18)
     LDA     #$01
     STA     FONT_ROW                ; current row = 1
 
@@ -734,10 +786,10 @@ TEXT_RENDERER:
     JSR     PRINT_FONTCHAR          ; draw at current position
     INC     FONT_COL                ; advance column
     LDA     FONT_COL
-    CMP     $5A96                   ; past right margin?
+    CMP     TEXT_RIGHT_MARGIN       ; past right margin?
     BCC     .next                   ; no → continue
     INC     FONT_ROW                ; yes → next row
-    LDA     $5A97                   ;   reset column to left margin
+    LDA     TEXT_LEFT_MARGIN        ;   reset column to left margin
     STA     FONT_COL
 .next:
     LDY     $5A98                   ; restore stream index
@@ -780,11 +832,11 @@ TEXT_RENDERER:
     ; --- Reset ($7D): full-screen text mode ---
 .reset:
     LDA     #$00
-    STA     $5A97                   ; left margin = 0
+    STA     TEXT_LEFT_MARGIN         ; left margin = 0
     STA     FONT_COL                ; column = 0
     STA     FONT_ROW                ; row = 0
     LDA     #$14
-    STA     $5A96                   ; right margin = $14 (20)
+    STA     TEXT_RIGHT_MARGIN       ; right margin = $14 (20)
     INY                             ; advance past $7D
     JMP     .fetch
     ORG     $6D1F
