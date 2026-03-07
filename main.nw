@@ -2931,7 +2931,7 @@ DISPLAY_MESSAGE:
     BNE     .print_loop             ; more text — keep printing
 
 .pause:
-    JSR     $0D10                   ; delay
+    JSR     DELAY_WITH_ANIMATION    ; delay
     JSR     PRINT_CTRL_AB           ; reset character set
     JMP     .print_loop             ; continue with next line
 @ %def DISPLAY_MESSAGE
@@ -3079,6 +3079,36 @@ APPEARANCE_TO_FONTCHAR:
 .ret:
     RTS
 @ %def APPEARANCE_TO_FONTCHAR
+
+\subsection{delay\_with\_animation (\$0D10)}
+
+Delays for a configurable duration while keeping the status window
+animation running.  Loads an iteration count from [[\$7ABF]] and calls
+[[\$0D30]] (the per-tick animation/wait handler) that many times.
+Each call to [[\$0D30]] ticks an animation counter, runs a timed wait
+via the ROM [[WAIT]] routine, and advances the animation frame when
+the counter expires.
+
+<<defines>>=
+DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
+@ %def DELAY_COUNT
+
+<<delay with animation>>=
+    ORG     $0D10
+DELAY_WITH_ANIMATION:
+    SUBROUTINE
+
+    LDA     DELAY_COUNT             ; load iteration count
+.loop:
+    PHA                             ; save counter
+    JSR     $0D30                   ; tick animation + timed wait
+    PLA                             ; restore counter
+    TAY
+    DEY                             ; decrement
+    TYA
+    BNE     .loop                   ; loop until zero
+    RTS
+@ %def DELAY_WITH_ANIMATION
 
 \section{Text renderer}
 \label{sec:text_renderer}
@@ -4423,6 +4453,7 @@ The following root chunks produce the assembly files when tangled.
 <<get mob data>>
 <<compute scene ptr>>
 <<appearance to fontchar>>
+<<delay with animation>>
 <<plot char>>
 <<print font char>>
 <<scene loop>>

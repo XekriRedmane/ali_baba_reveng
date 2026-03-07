@@ -194,6 +194,7 @@ DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
 MSG_TABLE_PTR           EQU     $4005   ; message table base (2 bytes)
 MSG_LINE_COUNT          EQU     $5A57   ; lines printed so far
+DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
     ORG     $0569
 ATTRACT_LOOP:
@@ -505,6 +506,20 @@ APPEARANCE_TO_FONTCHAR:
     CLC
     ADC      #$20              ; add 32 → next font group (chars 33-36)
 .ret:
+    RTS
+    ORG     $0D10
+DELAY_WITH_ANIMATION:
+    SUBROUTINE
+
+    LDA     DELAY_COUNT             ; load iteration count
+.loop:
+    PHA                             ; save counter
+    JSR     $0D30                   ; tick animation + timed wait
+    PLA                             ; restore counter
+    TAY
+    DEY                             ; decrement
+    TYA
+    BNE     .loop                   ; loop until zero
     RTS
     ORG     $5D7D
 PLOT_CHAR:
@@ -1019,7 +1034,7 @@ DISPLAY_MESSAGE:
     BNE     .print_loop             ; more text — keep printing
 
 .pause:
-    JSR     $0D10                   ; delay
+    JSR     DELAY_WITH_ANIMATION    ; delay
     JSR     PRINT_CTRL_AB           ; reset character set
     JMP     .print_loop             ; continue with next line
     ORG     $774E
