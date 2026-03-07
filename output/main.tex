@@ -1953,29 +1953,29 @@ Ali Baba provides several convenience routines which translate to HRCG control c
     SUBROUTINE
 
     LDA     #$89        ; ctrl-I
-    JMP     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
+    JMP     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
 
     ORG     $773A
 \nwlinkedidentc{SET_TEXT_WINDOW_WRAP}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}:
     SUBROUTINE
 
     LDA     #$8F        ; ctrl-O
-    JSR     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
+    JSR     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
     LDA     #$97        ; ctrl-W
-    JMP     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
+    JMP     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
 
 \nwlinkedidentc{SET_TEXT_WINDOW_SCROLL}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}:
     SUBROUTINE
 
     LDA     #$8F        ; ctrl-O
-    JSR     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
+    JSR     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
     LDA     #$93        ; ctrl-S
-    JMP     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
+    JMP     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
 
 ; \nwlinkedidentc{PRINT_CTRL_AB}{PYNWmai0-UD4UC22WSFS3NXK2ZFCXIN73PU000000-1} (SET_CHARSET_0) follows at $774E, defined in its own chunk
 
 \nwindexdefn{\nwixident{SET{\_}INVERSE{\_}VIDEO}}{SET:unINVERSE:unVIDEO}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwindexdefn{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}SCROLL}}{SET:unTEXT:unWINDOW:unSCROLL}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwindexdefn{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}WRAP}}{SET:unTEXT:unWINDOW:unWRAP}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{SET{\_}INVERSE{\_}VIDEO}}{SET:unINVERSE:unVIDEO}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}SCROLL}}{SET:unTEXT:unWINDOW:unSCROLL}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}WRAP}}{SET:unTEXT:unWINDOW:unWRAP}}}\nwidentuses{\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}\\{{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}}}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwindexuse{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwendcode{}\nwbegindocs{103}\nwdocspar
+\nwidentdefs{\\{{\nwixident{SET{\_}INVERSE{\_}VIDEO}}{SET:unINVERSE:unVIDEO}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}SCROLL}}{SET:unTEXT:unWINDOW:unSCROLL}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}WRAP}}{SET:unTEXT:unWINDOW:unWRAP}}}\nwidentuses{\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-GPDXH5KV66ADU2Z2YB5ZFVWGM4000000-1}\nwendcode{}\nwbegindocs{103}\nwdocspar
 
 \subsection{Printing routines}
 
@@ -2016,8 +2016,8 @@ SET_TEXT_WINDOW_UPPER_LEFT:
     LDA     #0
     STA     \nwlinkedidentc{TEXT_COL}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}
     LDA     #$96        ; ctrl-V (set text window upper left)
-    JMP     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
-\nwidentuses{\\{{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwendcode{}\nwbegindocs{107}\nwdocspar
+    JMP     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
+\nwidentuses{\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-OXIPRPQDVXIXW2PIGG6KVKJHQM000000-1}\nwendcode{}\nwbegindocs{107}\nwdocspar
 
 Since text on the lower part always starts at row 21, and the column number only
 needs 6 bits, we can specify a compressed 8-bit version of the cursor, where the
@@ -2284,16 +2284,16 @@ This is distinct from {\Tt{}SET{\textbackslash}{\_}NORMAL{\textbackslash}{\_}VID
     SUBROUTINE
 
     LDA     #$8E                    ; Ctrl-N with high bit
-    JMP     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}                ; output via COUT1
+    JMP     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}                ; output via COUT1
 \nwindexdefn{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}}}\nwidentuses{\\{{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}}}\nwindexuse{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}\nwendcode{}\nwbegindocs{135}\nwdocspar
+\nwidentdefs{\\{{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}}}\nwidentuses{\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}\nwendcode{}\nwbegindocs{135}\nwdocspar
 
 \nwenddocs{}\nwbegincode{136}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}\nwenddeflinemarkup
-\nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}            EQU     $FDED   ; Apple II ROM COUT1 (character output)
+\nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}            EQU     $FDED   ; Apple II ROM COUT1 (character output)
 \nwlinkedidentc{DAT_5a17_pos}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}        EQU     $5A17   ; saved position for room search
 \nwlinkedidentc{is_at_outer_limits}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}  EQU     $0BFA   ; check if position is at room boundary
-\nwindexdefn{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwindexdefn{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwindexdefn{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\eatline
-\nwidentdefs{\\{{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}}\\{{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}}\\{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}}\nwendcode{}\nwbegindocs{137}\nwdocspar
+\nwindexdefn{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwindexdefn{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwindexdefn{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\eatline
+\nwidentdefs{\\{{\nwixident{DAT{\_}5a17{\_}pos}}{DAT:un5a17:unpos}}\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}\\{{\nwixident{is{\_}at{\_}outer{\_}limits}}{is:unat:unouter:unlimits}}}\nwendcode{}\nwbegindocs{137}\nwdocspar
 
 \nwenddocs{}\nwbegincode{138}\sublabel{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}}}\moddef{print font char~{\nwtagstyle{}\subpageref{PYNWmai0-QXEI7WLLMAMTCDDRNOTIC7PULU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $80A4
@@ -2923,7 +2923,7 @@ CONTINUE'') message in the text window at the bottom of the screen.
     SUBROUTINE
 
     LDA     #$90                    ; ctrl-P with high bit (toggle inverse)
-    JSR     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
+    JSR     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
     \nwlinkedidentc{STOW}{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-1}    \nwlinkedidentc{STATUS_BORDER_DATA}{PYNWmai0-R3POTCM34ETXX727UT3NU4FP2A000000-1},$06  ; $06/$07 → status bar border data
     JSR     \nwlinkedidentc{TEXT_RENDERER}{PYNWmai0-4PQFNHIY4HEZD756HZHHCIBVCA000000-1}           ; draw border box
     JSR     \nwlinkedidentc{PRINT_CTRL_AB}{PYNWmai0-UD4UC22WSFS3NXK2ZFCXIN73PU000000-1}           ; Ctrl-A, '0'
@@ -2944,7 +2944,7 @@ CONTINUE'') message in the text window at the bottom of the screen.
     \nwlinkedidentc{STOW}{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-1}    \nwlinkedidentc{S_PRESS_BUTTON}{PYNWmai0-NF2SMQY52FAUY37ISHEQH2XRMI000000-1},$BC      ; $BC/$BD → "PRESS THE BUTTON..."
     JMP     .set_margin
 \nwindexdefn{\nwixident{DISPLAY{\_}STATUS{\_}BAR}}{DISPLAY:unSTATUS:unBAR}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{DISPLAY{\_}STATUS{\_}BAR}}{DISPLAY:unSTATUS:unBAR}}}\nwidentuses{\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}\\{{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}}\\{{\nwixident{STATUS{\_}BORDER{\_}DATA}}{STATUS:unBORDER:unDATA}}\\{{\nwixident{STOW}}{STOW}}\\{{\nwixident{S{\_}PRESS{\_}BUTTON}}{S:unPRESS:unBUTTON}}\\{{\nwixident{S{\_}PRESS{\_}SPACE}}{S:unPRESS:unSPACE}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}RENDERER}}{TEXT:unRENDERER}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{STATUS{\_}BORDER{\_}DATA}}{STATUS:unBORDER:unDATA}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{STOW}}{STOW}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{S{\_}PRESS{\_}BUTTON}}{S:unPRESS:unBUTTON}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{S{\_}PRESS{\_}SPACE}}{S:unPRESS:unSPACE}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{TEXT{\_}RENDERER}}{TEXT:unRENDERER}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwendcode{}\nwbegindocs{166}\nwdocspar
+\nwidentdefs{\\{{\nwixident{DISPLAY{\_}STATUS{\_}BAR}}{DISPLAY:unSTATUS:unBAR}}}\nwidentuses{\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}\\{{\nwixident{STATUS{\_}BORDER{\_}DATA}}{STATUS:unBORDER:unDATA}}\\{{\nwixident{STOW}}{STOW}}\\{{\nwixident{S{\_}PRESS{\_}BUTTON}}{S:unPRESS:unBUTTON}}\\{{\nwixident{S{\_}PRESS{\_}SPACE}}{S:unPRESS:unSPACE}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}RENDERER}}{TEXT:unRENDERER}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{STATUS{\_}BORDER{\_}DATA}}{STATUS:unBORDER:unDATA}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{STOW}}{STOW}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{S{\_}PRESS{\_}BUTTON}}{S:unPRESS:unBUTTON}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{S{\_}PRESS{\_}SPACE}}{S:unPRESS:unSPACE}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{TEXT{\_}RENDERER}}{TEXT:unRENDERER}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}\nwendcode{}\nwbegindocs{166}\nwdocspar
 
 The border box data at {\Tt{}STATUS{\textbackslash}{\_}BORDER{\textbackslash}{\_}DATA\nwendquote} is drawn via the hi-res
 text renderer.  The prompt text is printed via {\Tt{}PRINT{\textbackslash}{\_}FROM{\textbackslash}{\_}PTR\nwendquote}.
@@ -2969,10 +2969,10 @@ Prints a length-prefixed string from {\Tt{}{\$}BC/{\$}BD\nwendquote} via COUT:
 .next:
     INY
     LDA     ($BC),Y                 ; read next char
-    JSR     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
+    JSR     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
     JMP     .loop
 \nwindexdefn{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-XAPVU72S6LIKQGYUGORXPGRLK4000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}}\nwidentuses{\\{{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}}}\nwindexuse{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}{PYNWmai0-XAPVU72S6LIKQGYUGORXPGRLK4000000-1}\nwendcode{}\nwbegindocs{168}\nwdocspar
+\nwidentdefs{\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}}\nwidentuses{\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-XAPVU72S6LIKQGYUGORXPGRLK4000000-1}\nwendcode{}\nwbegindocs{168}\nwdocspar
 
 \subsection{display\_message (\$761E)}
 
@@ -3093,11 +3093,11 @@ Sends Ctrl-A and {\Tt{}'0'\nwendquote} to COUT (selects character set~0 in the H
     SUBROUTINE
 
     LDA     #$81                    ; Ctrl-A with high bit
-    JSR     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
+    JSR     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
     LDA     #$B0                    ; '0' with high bit
-    JMP     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
+    JMP     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
 \nwindexdefn{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}{PYNWmai0-UD4UC22WSFS3NXK2ZFCXIN73PU000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}}\nwidentuses{\\{{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}}}\nwindexuse{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}{PYNWmai0-UD4UC22WSFS3NXK2ZFCXIN73PU000000-1}\nwendcode{}\nwbegindocs{174}\nwdocspar
+\nwidentdefs{\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}}\nwidentuses{\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-UD4UC22WSFS3NXK2ZFCXIN73PU000000-1}\nwendcode{}\nwbegindocs{174}\nwdocspar
 
 \subsection{set\_cursor\_row21 / set\_text\_window\_bottom}
 \label{sec:set_text_window}
@@ -3124,9 +3124,9 @@ share all code from {\Tt{}{\$}76C4\nwendquote} onward.
     STA     \nwlinkedidentc{TEXT_COL}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}                ; WNDLFT = 0
     JSR     \nwlinkedidentc{PRINT_CTRL_AB}{PYNWmai0-UD4UC22WSFS3NXK2ZFCXIN73PU000000-1}
     LDA     #$86                    ; Ctrl-F with high bit
-    JMP     \nwlinkedidentc{ROM_COUT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
+    JMP     \nwlinkedidentc{ROM_COUT1}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}
 \nwindexdefn{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}\nwindexdefn{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}BOTTOM}}{SET:unTEXT:unWINDOW:unBOTTOM}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}BOTTOM}}{SET:unTEXT:unWINDOW:unBOTTOM}}}\nwidentuses{\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}\\{{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}\nwindexuse{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}\nwendcode{}\nwbegindocs{176}\nwdocspar
+\nwidentdefs{\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}\\{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}BOTTOM}}{SET:unTEXT:unWINDOW:unBOTTOM}}}\nwidentuses{\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}\\{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}\\{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}\\{{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}}}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}\nwindexuse{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}\nwindexuse{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}\nwindexuse{\nwixident{TEXT{\_}ROW}}{TEXT:unROW}{PYNWmai0-UOBA5Y3PKYLQKGPLIBUCA3M2SE000000-1}\nwendcode{}\nwbegindocs{176}\nwdocspar
 
 \subsection{pos\_to\_colrow (\$0C25)}
 
@@ -5282,7 +5282,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{RESIDENT{\_}DISPATCH{\_}TABLE}}{RESIDENT:unDISPATCH:unTABLE}}%
 \nwixlogsorted{i}{{\nwixident{RESTORE{\_}ZP{\_}POINTERS}}{RESTORE:unZP:unPOINTERS}}%
 \nwixlogsorted{i}{{\nwixident{ROLW}}{ROLW}}%
-\nwixlogsorted{i}{{\nwixident{ROM{\_}COUT}}{ROM:unCOUT}}%
+\nwixlogsorted{i}{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}%
 \nwixlogsorted{i}{{\nwixident{ROM{\_}WAIT}}{ROM:unWAIT}}%
 \nwixlogsorted{i}{{\nwixident{RORW}}{RORW}}%
 \nwixlogsorted{i}{{\nwixident{SAVE{\_}ZP{\_}POINTERS}}{SAVE:unZP:unPOINTERS}}%

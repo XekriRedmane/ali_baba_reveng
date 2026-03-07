@@ -190,7 +190,7 @@ BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
 BLINK_ROW       EQU     $5AA3   ; font row
 BLINK_CHAR      EQU     $5AA4   ; font character number
 BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
-ROM_COUT            EQU     $FDED   ; Apple II ROM COUT1 (character output)
+ROM_COUT1            EQU     $FDED   ; Apple II ROM COUT1 (character output)
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
 MSG_TABLE_PTR           EQU     $4005   ; message table base (2 bytes)
@@ -837,7 +837,7 @@ DISPLAY_STATUS_BAR:
     SUBROUTINE
 
     LDA     #$90                    ; ctrl-P with high bit (toggle inverse)
-    JSR     ROM_COUT
+    JSR     ROM_COUT1
     STOW    STATUS_BORDER_DATA,$06  ; $06/$07 → status bar border data
     JSR     TEXT_RENDERER           ; draw border box
     JSR     PRINT_CTRL_AB           ; Ctrl-A, '0'
@@ -993,24 +993,24 @@ SET_INVERSE_VIDEO:
     SUBROUTINE
 
     LDA     #$89        ; ctrl-I
-    JMP     ROM_COUT
+    JMP     ROM_COUT1
 
     ORG     $773A
 SET_TEXT_WINDOW_WRAP:
     SUBROUTINE
 
     LDA     #$8F        ; ctrl-O
-    JSR     ROM_COUT
+    JSR     ROM_COUT1
     LDA     #$97        ; ctrl-W
-    JMP     ROM_COUT
+    JMP     ROM_COUT1
 
 SET_TEXT_WINDOW_SCROLL:
     SUBROUTINE
 
     LDA     #$8F        ; ctrl-O
-    JSR     ROM_COUT
+    JSR     ROM_COUT1
     LDA     #$93        ; ctrl-S
-    JMP     ROM_COUT
+    JMP     ROM_COUT1
 
 ; PRINT_CTRL_AB (SET_CHARSET_0) follows at $774E, defined in its own chunk
 
@@ -1019,7 +1019,7 @@ PRINT_CTRL_N:
     SUBROUTINE
 
     LDA     #$8E                    ; Ctrl-N with high bit
-    JMP     ROM_COUT                ; output via COUT1
+    JMP     ROM_COUT1                ; output via COUT1
     ORG     $7758
 PRINT_STRING_AT_ADDR:
     SUBROUTINE
@@ -1136,9 +1136,9 @@ PRINT_CTRL_AB:
     SUBROUTINE
 
     LDA     #$81                    ; Ctrl-A with high bit
-    JSR     ROM_COUT
+    JSR     ROM_COUT1
     LDA     #$B0                    ; '0' with high bit
-    JMP     ROM_COUT
+    JMP     ROM_COUT1
     ORG     $775C
 PRINT_FROM_PTR:
     SUBROUTINE
@@ -1154,7 +1154,7 @@ PRINT_FROM_PTR:
 .next:
     INY
     LDA     ($BC),Y                 ; read next char
-    JSR     ROM_COUT
+    JSR     ROM_COUT1
     JMP     .loop
     ORG     $76BE
 SET_CURSOR_ROW21:
@@ -1172,7 +1172,7 @@ SET_TEXT_WINDOW_BOTTOM:
     STA     TEXT_COL                ; WNDLFT = 0
     JSR     PRINT_CTRL_AB
     LDA     #$86                    ; Ctrl-F with high bit
-    JMP     ROM_COUT
+    JMP     ROM_COUT1
     ORG     $78A8
 STEP_PRNG:
     SUBROUTINE
@@ -1427,7 +1427,7 @@ SET_TEXT_WINDOW_UPPER_LEFT:
     LDA     #0
     STA     TEXT_COL
     LDA     #$96        ; ctrl-V (set text window upper left)
-    JMP     ROM_COUT
+    JMP     ROM_COUT1
     ORG     $7E2F
 STATUS_BORDER_DATA:
     HEX     7D                      ; $7D: reset to full-screen
