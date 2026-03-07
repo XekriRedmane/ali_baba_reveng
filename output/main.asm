@@ -190,8 +190,7 @@ BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
 BLINK_ROW       EQU     $5AA3   ; font row
 BLINK_CHAR      EQU     $5AA4   ; font character number
 BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
-ROM_COUT1               EQU     $FDED   ; Apple II ROM COUT1 (direct screen output)
-ROM_COUT            EQU     $FDF0   ; Apple II ROM character output
+ROM_COUT            EQU     $FDED   ; Apple II ROM COUT1 (character output)
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
 MSG_TABLE_PTR           EQU     $4005   ; message table base (2 bytes)
@@ -697,12 +696,6 @@ PLOT_FONTCHAR:
     LDA     #>s_PRINT_FONT_CHAR
     STA     $BD
     JMP     PRINT_FROM_PTR
-    ORG     $7735
-PRINT_CTRL_N:
-    SUBROUTINE
-
-    LDA     #$8E                    ; Ctrl-N with high bit
-    JMP     ROM_COUT1               ; output via COUT1
     ORG     $6C37
 SCENE_LOOP:
     SUBROUTINE
@@ -995,19 +988,14 @@ FONT_POS_TO_TEXT_POS:
     ASL
     STA     TEXT_ROW
     RTS
-    ORG     $75F4
+    ORG     $7730
 SET_INVERSE_VIDEO:
     SUBROUTINE
 
     LDA     #$89        ; ctrl-I
     JMP     ROM_COUT
 
-SET_NORMAL_VIDEO:
-    SUBROUTINE
-
-    LDA     #$8E        ; ctrl-N
-    JMP     ROM_COUT
-
+    ORG     $773A
 SET_TEXT_WINDOW_WRAP:
     SUBROUTINE
 
@@ -1024,14 +1012,14 @@ SET_TEXT_WINDOW_SCROLL:
     LDA     #$93        ; ctrl-S
     JMP     ROM_COUT
 
-SET_CHARSET_0:
+; PRINT_CTRL_AB (SET_CHARSET_0) follows at $774E, defined in its own chunk
+
+    ORG     $7735
+PRINT_CTRL_N:
     SUBROUTINE
 
-    LDA     #$81        ; ctrl-A
-    JSR     ROM_COUT
-    LDA     #$B0        ; 0
-    JMP     ROM_COUT
-
+    LDA     #$8E                    ; Ctrl-N with high bit
+    JMP     ROM_COUT                ; output via COUT1
     ORG     $7758
 PRINT_STRING_AT_ADDR:
     SUBROUTINE

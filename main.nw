@@ -1910,19 +1910,14 @@ STD_FONT_DATA:
 Ali Baba provides several convenience routines which translate to HRCG control codes.
 
 <<control routines>>=
-    ORG     $75F4
+    ORG     $7730
 SET_INVERSE_VIDEO:
     SUBROUTINE
 
     LDA     #$89        ; ctrl-I
     JMP     ROM_COUT
 
-SET_NORMAL_VIDEO:
-    SUBROUTINE
-
-    LDA     #$8E        ; ctrl-N
-    JMP     ROM_COUT
-
+    ORG     $773A
 SET_TEXT_WINDOW_WRAP:
     SUBROUTINE
 
@@ -1939,15 +1934,9 @@ SET_TEXT_WINDOW_SCROLL:
     LDA     #$93        ; ctrl-S
     JMP     ROM_COUT
 
-SET_CHARSET_0:
-    SUBROUTINE
+; PRINT_CTRL_AB (SET_CHARSET_0) follows at $774E, defined in its own chunk
 
-    LDA     #$81        ; ctrl-A
-    JSR     ROM_COUT
-    LDA     #$B0        ; 0
-    JMP     ROM_COUT
-
-@ %def SET_INVERSE_VIDEO SET_NORMAL_VIDEO SET_TEXT_WINDOW_WRAP SET_TEXT_WINDOW_SCROLL SET_CHARSET_0
+@ %def SET_INVERSE_VIDEO SET_TEXT_WINDOW_WRAP SET_TEXT_WINDOW_SCROLL
 
 \subsection{Printing routines}
 
@@ -2238,21 +2227,17 @@ routine via [[COUT1]].  [[\$8E]] is [[Ctrl-N]] with the high bit set.
 This is distinct from [[SET\_NORMAL\_VIDEO]] at [[\$75F9]] which uses
 [[COUT]] instead.
 
-<<defines>>=
-ROM_COUT1               EQU     $FDED   ; Apple II ROM COUT1 (direct screen output)
-@ %def ROM_COUT1
-
 <<print ctrl n>>=
     ORG     $7735
 PRINT_CTRL_N:
     SUBROUTINE
 
     LDA     #$8E                    ; Ctrl-N with high bit
-    JMP     ROM_COUT1               ; output via COUT1
+    JMP     ROM_COUT                ; output via COUT1
 @ %def PRINT_CTRL_N
 
 <<defines>>=
-ROM_COUT            EQU     $FDF0   ; Apple II ROM character output
+ROM_COUT            EQU     $FDED   ; Apple II ROM COUT1 (character output)
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
 @ %def ROM_COUT DAT_5a17_pos is_at_outer_limits
@@ -4660,7 +4645,6 @@ The following root chunks produce the assembly files when tangled.
 <<draw blink char>>
 <<plot char>>
 <<print font char>>
-<<print ctrl n>>
 <<scene loop>>
 <<text renderer>>
 <<display status bar>>
@@ -4672,6 +4656,7 @@ The following root chunks produce the assembly files when tangled.
 <<print centered plus col>>
 <<font pos>>
 <<control routines>>
+<<print ctrl n>>
 <<print string>>
 <<set cursor compressed>>
 <<display message>>
