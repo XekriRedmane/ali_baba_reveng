@@ -195,6 +195,13 @@ is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
 MSG_TABLE_PTR           EQU     $4005   ; message table base (2 bytes)
 MSG_LINE_COUNT          EQU     $5A57   ; lines printed so far
 DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
+ANIM_FRAME_CTR          EQU     $7AAF   ; animation frame countdown
+ANIM_INDEX              EQU     $7ABD   ; current animation table index
+ANIM_WAIT_TABLE         EQU     $7AB0   ; per-frame wait counts (indexed)
+ANIM_FRAME_TABLE        EQU     $7AB6   ; per-frame frame counts (indexed)
+WAIT_LOOP_COUNT         EQU     $5A8C   ; inner wait loop counter
+WAIT_DURATION           EQU     $7AAD   ; ROM WAIT duration parameter
+ROM_WAIT                EQU     $FCA8   ; Apple II ROM WAIT routine
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
     ORG     $0569
 ATTRACT_LOOP:
@@ -514,13 +521,60 @@ DELAY_WITH_ANIMATION:
     LDA     DELAY_COUNT             ; load iteration count
 .loop:
     PHA                             ; save counter
-    JSR     $0D30                   ; tick animation + timed wait
+    JSR     ANIM_TICK_AND_WAIT      ; tick animation + timed wait
     PLA                             ; restore counter
     TAY
     DEY                             ; decrement
     TYA
     BNE     .loop                   ; loop until zero
     RTS
+    ORG     $0D1E
+TICK_ANIM_COUNTER:
+    SUBROUTINE
+
+    DEC     ANIM_FRAME_CTR          ; tick frame counter
+    BNE     .reload                 ; not zero → just reload wait count
+    JSR     $74CB                   ; counter hit zero → advance frame
+.reload:
+    LDX     ANIM_INDEX              ; current animation index
+    LDA     ANIM_WAIT_TABLE,X       ; look up wait count for this frame
+    STA     WAIT_LOOP_COUNT         ; store for timed_wait to use
+    RTS
+    ORG     $0D30
+ANIM_TICK_AND_WAIT:
+    SUBROUTINE
+
+    JSR     TICK_ANIM_COUNTER       ; tick counter, reload wait count
+    JSR     TIMED_WAIT              ; burn time
+    LDA     ANIM_FRAME_CTR          ; did frame counter expire?
+    BEQ     .advance                ; yes → advance animation
+    RTS                             ; no → return
+
+.advance:
+    JSR     $74DD                   ; update animation display
+    LDX     ANIM_INDEX              ; reload animation index
+    LDA     ANIM_FRAME_TABLE,X      ; look up frame duration
+    STA     ANIM_FRAME_CTR          ; reset frame counter
+    RTS
+    ORG     $0D49
+TIMED_WAIT:
+    SUBROUTINE
+
+    LDA     WAIT_LOOP_COUNT         ; anything to wait for?
+    BNE     .wait                   ; yes → enter wait loop
+    RTS                             ; no → return immediately
+
+.wait:
+    JSR     CALL_ROM_WAIT           ; delay one unit
+    DEC     WAIT_LOOP_COUNT         ; decrement counter
+    BNE     .wait                   ; loop until zero
+    RTS
+    ORG     $0D58
+CALL_ROM_WAIT:
+    SUBROUTINE
+
+    LDA     WAIT_DURATION           ; load duration parameter
+    JMP     ROM_WAIT                ; tail-call ROM WAIT
     ORG     $5D7D
 PLOT_CHAR:
     SUBROUTINE

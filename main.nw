@@ -3101,7 +3101,7 @@ DELAY_WITH_ANIMATION:
     LDA     DELAY_COUNT             ; load iteration count
 .loop:
     PHA                             ; save counter
-    JSR     $0D30                   ; tick animation + timed wait
+    JSR     ANIM_TICK_AND_WAIT      ; tick animation + timed wait
     PLA                             ; restore counter
     TAY
     DEY                             ; decrement
@@ -3109,6 +3109,106 @@ DELAY_WITH_ANIMATION:
     BNE     .loop                   ; loop until zero
     RTS
 @ %def DELAY_WITH_ANIMATION
+
+\subsection{tick\_anim\_counter (\$0D1E)}
+
+Decrements the animation frame counter at [[\$7AAF]].  When it reaches
+zero, calls [[\$74CB]] to advance the animation frame.  Then reloads
+the wait loop count from the timing table at [[\$7AB0]] (indexed by
+the current animation index at [[\$7ABD]]) into [[\$5A8C]].
+
+<<defines>>=
+ANIM_FRAME_CTR          EQU     $7AAF   ; animation frame countdown
+ANIM_INDEX              EQU     $7ABD   ; current animation table index
+ANIM_WAIT_TABLE         EQU     $7AB0   ; per-frame wait counts (indexed)
+ANIM_FRAME_TABLE        EQU     $7AB6   ; per-frame frame counts (indexed)
+WAIT_LOOP_COUNT         EQU     $5A8C   ; inner wait loop counter
+WAIT_DURATION           EQU     $7AAD   ; ROM WAIT duration parameter
+@ %def ANIM_FRAME_CTR ANIM_INDEX ANIM_WAIT_TABLE ANIM_FRAME_TABLE WAIT_LOOP_COUNT WAIT_DURATION
+
+<<tick anim counter>>=
+    ORG     $0D1E
+TICK_ANIM_COUNTER:
+    SUBROUTINE
+
+    DEC     ANIM_FRAME_CTR          ; tick frame counter
+    BNE     .reload                 ; not zero → just reload wait count
+    JSR     $74CB                   ; counter hit zero → advance frame
+.reload:
+    LDX     ANIM_INDEX              ; current animation index
+    LDA     ANIM_WAIT_TABLE,X       ; look up wait count for this frame
+    STA     WAIT_LOOP_COUNT         ; store for timed_wait to use
+    RTS
+@ %def TICK_ANIM_COUNTER
+
+\subsection{anim\_tick\_and\_wait (\$0D30)}
+
+Combined animation tick and wait.  Calls [[TICK\_ANIM\_COUNTER]] to
+decrement the frame counter and set up the wait count, then calls
+[[TIMED\_WAIT]] to burn time.  If the frame counter has reached zero
+(meaning the animation frame expired), calls [[\$74DD]] to update the
+display and reloads the frame counter from the frame table at
+[[\$7AB6]].
+
+<<anim tick and wait>>=
+    ORG     $0D30
+ANIM_TICK_AND_WAIT:
+    SUBROUTINE
+
+    JSR     TICK_ANIM_COUNTER       ; tick counter, reload wait count
+    JSR     TIMED_WAIT              ; burn time
+    LDA     ANIM_FRAME_CTR          ; did frame counter expire?
+    BEQ     .advance                ; yes → advance animation
+    RTS                             ; no → return
+
+.advance:
+    JSR     $74DD                   ; update animation display
+    LDX     ANIM_INDEX              ; reload animation index
+    LDA     ANIM_FRAME_TABLE,X      ; look up frame duration
+    STA     ANIM_FRAME_CTR          ; reset frame counter
+    RTS
+@ %def ANIM_TICK_AND_WAIT
+
+\subsection{timed\_wait (\$0D49)}
+
+Calls the ROM [[WAIT]] wrapper [[\$0D58]] repeatedly, decrementing
+[[WAIT\_LOOP\_COUNT]] until it reaches zero.  If the count is already
+zero on entry, returns immediately.
+
+<<timed wait>>=
+    ORG     $0D49
+TIMED_WAIT:
+    SUBROUTINE
+
+    LDA     WAIT_LOOP_COUNT         ; anything to wait for?
+    BNE     .wait                   ; yes → enter wait loop
+    RTS                             ; no → return immediately
+
+.wait:
+    JSR     CALL_ROM_WAIT           ; delay one unit
+    DEC     WAIT_LOOP_COUNT         ; decrement counter
+    BNE     .wait                   ; loop until zero
+    RTS
+@ %def TIMED_WAIT
+
+\subsection{call\_rom\_wait (\$0D58)}
+
+Loads the wait duration from [[WAIT\_DURATION]] and jumps to the
+Apple~II ROM [[WAIT]] routine at [[\$FCA8]], which delays for
+approximately $A \times 2.5 + 13.5$ microseconds.
+
+<<defines>>=
+ROM_WAIT                EQU     $FCA8   ; Apple II ROM WAIT routine
+@ %def ROM_WAIT
+
+<<call rom wait>>=
+    ORG     $0D58
+CALL_ROM_WAIT:
+    SUBROUTINE
+
+    LDA     WAIT_DURATION           ; load duration parameter
+    JMP     ROM_WAIT                ; tail-call ROM WAIT
+@ %def CALL_ROM_WAIT
 
 \section{Text renderer}
 \label{sec:text_renderer}
@@ -4454,6 +4554,10 @@ The following root chunks produce the assembly files when tangled.
 <<compute scene ptr>>
 <<appearance to fontchar>>
 <<delay with animation>>
+<<tick anim counter>>
+<<anim tick and wait>>
+<<timed wait>>
+<<call rom wait>>
 <<plot char>>
 <<print font char>>
 <<scene loop>>
