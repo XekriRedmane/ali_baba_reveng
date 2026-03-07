@@ -3001,12 +3001,16 @@ The first thing the main program does:
 \nwlinkedidentc{INPUT_MODE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}          EQU     $5A00   ; 0 = keyboard, 1 = joystick
 \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}     EQU     $5A01   ; total mobs across all groups (excl. group 0)
 \nwlinkedidentc{CURRENT_PLAYER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}      EQU     $5A02   ; current player index (1-based)
+\nwlinkedidentc{ACTIVE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}         EQU     $5A29   ; character index being processed
+\nwlinkedidentc{SOURCE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}         EQU     $5A28   ; source character for reorder
+\nwlinkedidentc{REORDER_LINK}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}        EQU     $5A2A   ; temp: saved next-link during reorder
+\nwlinkedidentc{REORDER_SORT_KEY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}    EQU     $5A2B   ; temp: byte 11 of node for sorted insert
 \nwlinkedidentc{LOCATION_FLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}       EQU     $5A55   ; location-change flag
 \nwlinkedidentc{LOCATION_FLAG2}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}      EQU     $5A56   ; secondary location flag
 \nwlinkedidentc{SCENE_NUMBER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}        EQU     $5A99   ; current scene number
 \nwlinkedidentc{ATTRACT_FLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
-\nwindexdefn{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{CURRENT{\_}PLAYER}}{CURRENT:unPLAYER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{INPUT{\_}MODE}}{INPUT:unMODE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{SCENE{\_}NUMBER}}{SCENE:unNUMBER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\eatline
-\nwidentdefs{\\{{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}}\\{{\nwixident{CURRENT{\_}PLAYER}}{CURRENT:unPLAYER}}\\{{\nwixident{INPUT{\_}MODE}}{INPUT:unMODE}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}}\\{{\nwixident{SCENE{\_}NUMBER}}{SCENE:unNUMBER}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwendcode{}\nwbegindocs{171}\nwdocspar
+\nwindexdefn{\nwixident{ACTIVE{\_}CHAR}}{ACTIVE:unCHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{CURRENT{\_}PLAYER}}{CURRENT:unPLAYER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{INPUT{\_}MODE}}{INPUT:unMODE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{REORDER{\_}LINK}}{REORDER:unLINK}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{REORDER{\_}SORT{\_}KEY}}{REORDER:unSORT:unKEY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{SCENE{\_}NUMBER}}{SCENE:unNUMBER}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{SOURCE{\_}CHAR}}{SOURCE:unCHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwindexdefn{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\eatline
+\nwidentdefs{\\{{\nwixident{ACTIVE{\_}CHAR}}{ACTIVE:unCHAR}}\\{{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}}\\{{\nwixident{CURRENT{\_}PLAYER}}{CURRENT:unPLAYER}}\\{{\nwixident{INPUT{\_}MODE}}{INPUT:unMODE}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{LOCATION{\_}FLAG2}}{LOCATION:unFLAG2}}\\{{\nwixident{REORDER{\_}LINK}}{REORDER:unLINK}}\\{{\nwixident{REORDER{\_}SORT{\_}KEY}}{REORDER:unSORT:unKEY}}\\{{\nwixident{SCENE{\_}NUMBER}}{SCENE:unNUMBER}}\\{{\nwixident{SOURCE{\_}CHAR}}{SOURCE:unCHAR}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwendcode{}\nwbegindocs{171}\nwdocspar
 
 \subsection{select\_input\_mode (\$084E)}
 
@@ -3131,7 +3135,7 @@ into HGR mode showing the framebuffer at {\Tt{}{\$}2000\nwendquote}--{\Tt{}{\$}3
     SUBROUTINE
 
     LDA     #$01
-    STA     $5A29                   ; scene/character index = 1
+    STA     \nwlinkedidentc{ACTIVE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}             ; scene/character index = 1
     STA     $423E                   ; flag
     JSR     \nwlinkedidentc{COMPUTE_SCENE_PTR}{PYNWmai0-AW5VLYKLITE6VBTFNOR2WD6FNQ000000-1}       ; scene 1 pointer → $BA/$BB
     LDA     $BA                     ; \\
@@ -3145,7 +3149,7 @@ into HGR mode showing the framebuffer at {\Tt{}{\$}2000\nwendquote}--{\Tt{}{\$}3
     LDA     #$26                    ; scene number $26 (38 decimal)
     JMP     \nwlinkedidentc{SCENE_LOOP}{PYNWmai0-5E23YPEUUG4SZHWM2ZQ6MSHERE000000-1}              ; tail-call
 \nwindexdefn{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}}}\nwidentuses{\\{{\nwixident{COMPUTE{\_}SCENE{\_}PTR}}{COMPUTE:unSCENE:unPTR}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}}\\{{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}}\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}}\nwindexuse{\nwixident{COMPUTE{\_}SCENE{\_}PTR}}{COMPUTE:unSCENE:unPTR}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwendcode{}\nwbegindocs{181}\nwdocspar
+\nwidentdefs{\\{{\nwixident{ATTRACT{\_}SCREEN}}{ATTRACT:unSCREEN}}}\nwidentuses{\\{{\nwixident{ACTIVE{\_}CHAR}}{ACTIVE:unCHAR}}\\{{\nwixident{COMPUTE{\_}SCENE{\_}PTR}}{COMPUTE:unSCENE:unPTR}}\\{{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}}\\{{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}}\\{{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}}\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}}\nwindexuse{\nwixident{ACTIVE{\_}CHAR}}{ACTIVE:unCHAR}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{COMPUTE{\_}SCENE{\_}PTR}}{COMPUTE:unSCENE:unPTR}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{LOCATION{\_}FLAG}}{LOCATION:unFLAG}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwindexuse{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}{PYNWmai0-J5774R6PCWTLDLXH4MIVVDMLZE000000-1}\nwendcode{}\nwbegindocs{181}\nwdocspar
 
 The attract screen starts with scene index 1 (the first story character
 setup) and begins playing scene \$26.
@@ -3213,26 +3217,26 @@ Called exclusively from {\Tt{}REORDER{\textbackslash}{\_}CHAR\nwendquote} (\$0F8
 
 Performs one step of an insertion-sort on a linked list of characters,
 ordered by byte~11 (level, masked to 5~bits).  It unlinks the character
-at index~{\Tt{}{\textbackslash}{\$}5A28\nwendquote} from the list and re-inserts it in sorted order
-relative to index~{\Tt{}{\textbackslash}{\$}5A29\nwendquote}.
+at index~{\Tt{}SOURCE{\textbackslash}{\_}CHAR\nwendquote} from the list and re-inserts it in sorted order
+relative to index~{\Tt{}ACTIVE{\textbackslash}{\_}CHAR\nwendquote}.
 
 The linked-list ``next'' pointer is byte~2 of each character record.
 {\Tt{}GET{\textbackslash}{\_}MOB{\textbackslash}{\_}DATA\nwendquote} (\$0C32) resolves a byte-2 value into a record pointer
 at {\Tt{}{\textbackslash}{\$}BA/{\textbackslash}{\$}BB\nwendquote}.
 
-Phase~1 (removal): walks the chain from {\Tt{}{\textbackslash}{\$}5A28\nwendquote}'s record, following
+Phase~1 (removal): walks the chain from {\Tt{}SOURCE{\textbackslash}{\_}CHAR\nwendquote}'s record, following
 byte-2 links via {\Tt{}GET{\textbackslash}{\_}MOB{\textbackslash}{\_}DATA\nwendquote} until {\Tt{}{\textbackslash}{\$}BA/{\textbackslash}{\$}BB\nwendquote} equals
 {\Tt{}{\textbackslash}{\$}BC/{\textbackslash}{\$}BD\nwendquote} (found the predecessor).  Then patches the predecessor's
 byte~2 to skip the removed node.  Decrements the source group's
 member count via {\Tt{}DECR{\textbackslash}{\_}GROUP{\textbackslash}{\_}COUNT\nwendquote}.
 
-Phase~2 (insertion): walks the chain from {\Tt{}{\textbackslash}{\$}5A29\nwendquote}'s record, comparing
+Phase~2 (insertion): walks the chain from {\Tt{}ACTIVE{\textbackslash}{\_}CHAR\nwendquote}'s record, comparing
 byte~11 (level) values.  Inserts the removed character before the first
 node with a lower level, or at the end if none found.  Increments the
 destination group's member count via {\Tt{}INCR{\textbackslash}{\_}GROUP{\textbackslash}{\_}COUNT\nwendquote}.  Adjusts the
 {\Tt{}TOTAL{\textbackslash}{\_}MOB{\textbackslash}{\_}COUNT\nwendquote} to track list membership changes.
 
-When {\Tt{}{\textbackslash}{\$}5A29\nwendquote} is zero, a random decision (via {\Tt{}STEP{\textbackslash}{\_}PRNG\nwendquote}) determines
+When {\Tt{}ACTIVE{\textbackslash}{\_}CHAR\nwendquote} is zero, a random decision (via {\Tt{}STEP{\textbackslash}{\_}PRNG\nwendquote}) determines
 the insertion point instead of the level comparison.
 
 \nwenddocs{}\nwbegincode{184}\sublabel{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}}}\moddef{reorder char~{\nwtagstyle{}\subpageref{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
@@ -3240,14 +3244,14 @@ the insertion point instead of the level comparison.
 \nwlinkedidentc{REORDER_CHAR}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}:
     SUBROUTINE
 
-; --- Phase 1: unlink character $5A28 from its current chain ---
-    LDA     $5A28                   ; source character index
+; --- Phase 1: unlink character \nwlinkedidentc{SOURCE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10} from its current chain ---
+    LDA     \nwlinkedidentc{SOURCE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}             ; source character index
     JSR     \nwlinkedidentc{GET_CHAR_RECORD}{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}         ; $BE/$BF = record pointer
     JSR     \nwlinkedidentc{DECR_GROUP_COUNT}{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}        ; source group lost a member
 .walk1:
     LDY     #$02                    ; \\
-    LDA     ($BE),Y                 ;  | $5A2A = byte 2 of current record
-    STA     $5A2A                   ; /  (the "next" link we're removing)
+    LDA     ($BE),Y                 ;  | \nwlinkedidentc{REORDER_LINK}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10} = byte 2 of current record
+    STA     \nwlinkedidentc{REORDER_LINK}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}            ; /  (the "next" link we're removing)
     JSR     \nwlinkedidentc{GET_MOB_DATA}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}            ; $BA/$BB = resolve link; $BC/$BD = mob data
     LDA     $BA                     ; \\
     CMP     $BC                     ;  | compare $BA/$BB with $BC/$BD
@@ -3257,7 +3261,7 @@ the insertion point instead of the level comparison.
     BNE     .advance1
     ; Found predecessor: $BC/$BD points to the node being removed
     LDY     #$02
-    LDA     $5A2A                   ; \\  if removed node's link == $5A03,
+    LDA     \nwlinkedidentc{REORDER_LINK}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}            ; \\  if removed node's link == $5A03,
     CMP     $5A03                   ;  |   update $5A03 to new link
     BNE     .patch1                 ; /
     LDA     ($BC),Y                 ; \\
@@ -3273,13 +3277,13 @@ the insertion point instead of the level comparison.
     STA     $BF                     ; /
     JMP     .walk1
 
-; --- Phase 2: re-insert at correct sorted position in $5A29's chain ---
+; --- Phase 2: re-insert at correct sorted position in \nwlinkedidentc{ACTIVE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}'s chain ---
 .phase2:
     LDY     #$0B                    ; \\
-    LDA     ($BC),Y                 ;  | $5A2B = byte 11 of removed node
+    LDA     ($BC),Y                 ;  | \nwlinkedidentc{REORDER_SORT_KEY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10} = byte 11 of removed node
     AND     #$1F                    ;  |   (level, 5-bit)
-    STA     $5A2B                   ; /
-    LDA     $5A29                   ; destination character index
+    STA     \nwlinkedidentc{REORDER_SORT_KEY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}        ; /
+    LDA     \nwlinkedidentc{ACTIVE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}             ; destination character index
     JSR     \nwlinkedidentc{GET_CHAR_RECORD}{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}         ; $BE/$BF = dest record pointer
     JSR     \nwlinkedidentc{INCR_GROUP_COUNT}{PYNWmai0-54W2OTUWX7KPVKAUABQU6MTVVE000000-1}        ; dest group gained a member
 .walk2:
@@ -3288,18 +3292,18 @@ the insertion point instead of the level comparison.
     CMP     #$00                    ;  | if zero (end of chain) -> insert here
     BEQ     .insert                 ; /
     JSR     \nwlinkedidentc{GET_MOB_DATA}{PYNWmai0-VTKXUQPSOCRIDYWOEIFECHPTSM000000-1}            ; resolve link
-    LDA     $5A29                   ; \\
+    LDA     \nwlinkedidentc{ACTIVE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}             ; \\
     BEQ     .random                 ; /  if dest index = 0, use random decision
     LDY     #$0B                    ; \\
     LDA     ($BA),Y                 ;  | compare candidate's level
     AND     #$1F                    ;  | with removed node's level
-    CMP     $5A2B                   ;  |
+    CMP     \nwlinkedidentc{REORDER_SORT_KEY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}        ;  |
     BPL     .advance2               ; /  if >= , keep walking (insert later)
 .insert:
     LDY     #$02                    ; \\
     LDA     ($BE),Y                 ;  | ($BC)[2] = ($BE)[2]  (link successor)
     STA     ($BC),Y                 ;  |
-    LDA     $5A2A                   ;  | ($BE)[2] = saved link (insert node)
+    LDA     \nwlinkedidentc{REORDER_LINK}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}            ;  | ($BE)[2] = saved link (insert node)
     STA     ($BE),Y                 ; /
     LDY     #$04                    ; \\
     LDA     ($BC),Y                 ;  | if byte 4 of ($BC) >= $15, done
@@ -3308,11 +3312,11 @@ the insertion point instead of the level comparison.
     RTS                             ; /
 .adjust:
     LDA     #$00                    ; \\
-    CMP     $5A29                   ;  | if inserted into index 0's slot,
+    CMP     \nwlinkedidentc{ACTIVE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}             ;  | if inserted into index 0's slot,
     BNE     .chk28                  ;  |   decrement \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}
     DEC     \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}         ; /
 .chk28:
-    CMP     $5A28                   ; \\  if removed from index 0's slot,
+    CMP     \nwlinkedidentc{SOURCE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}             ; \\  if removed from index 0's slot,
     BNE     .done                   ;  |   increment \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}
     INC     \nwlinkedidentc{TOTAL_MOB_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}         ; /
 .done:
@@ -3330,7 +3334,7 @@ the insertion point instead of the level comparison.
     BMI     .insert                 ;  | else keep walking
     BPL     .advance2               ; /
 \nwindexdefn{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}}\nwidentuses{\\{{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}}\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}}\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwindexuse{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwendcode{}\nwbegindocs{185}\nwdocspar
+\nwidentdefs{\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}}\nwidentuses{\\{{\nwixident{ACTIVE{\_}CHAR}}{ACTIVE:unCHAR}}\\{{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}}\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}\\{{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}}\\{{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}}\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{REORDER{\_}LINK}}{REORDER:unLINK}}\\{{\nwixident{REORDER{\_}SORT{\_}KEY}}{REORDER:unSORT:unKEY}}\\{{\nwixident{SOURCE{\_}CHAR}}{SOURCE:unCHAR}}\\{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}\\{{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}}}\nwindexuse{\nwixident{ACTIVE{\_}CHAR}}{ACTIVE:unCHAR}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{GET{\_}MOB{\_}DATA}}{GET:unMOB:unDATA}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{INCR{\_}GROUP{\_}COUNT}}{INCR:unGROUP:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{REORDER{\_}LINK}}{REORDER:unLINK}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{REORDER{\_}SORT{\_}KEY}}{REORDER:unSORT:unKEY}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{SOURCE{\_}CHAR}}{SOURCE:unCHAR}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwindexuse{\nwixident{TOTAL{\_}MOB{\_}COUNT}}{TOTAL:unMOB:unCOUNT}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}\nwendcode{}\nwbegindocs{185}\nwdocspar
 
 \subsection{get\_char\_record (\$1053)}
 
@@ -3372,7 +3376,7 @@ That code is not part of this entry point's normal return path.
 \subsection{scene\_setup (\$0A17)}
 
 Initializes a scene for display.  Loads the character record for index
-{\Tt{}{\textbackslash}{\$}5A29\nwendquote}, reads the character's bounding box from bytes~3--4 of the
+{\Tt{}ACTIVE{\textbackslash}{\_}CHAR\nwendquote}, reads the character's bounding box from bytes~3--4 of the
 record at {\Tt{}{\textbackslash}{\$}BE\nwendquote}, converts to column/row ranges, picks a random
 position within those bounds, sets the font cursor there, and performs
 additional character-record bookkeeping.
@@ -3387,7 +3391,7 @@ pick a random column and row within the bounds.
 \nwlinkedidentc{SCENE_SETUP}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}:
     SUBROUTINE
 
-    LDA     $5A29                   ; character/scene index
+    LDA     \nwlinkedidentc{ACTIVE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}             ; character/scene index
     JSR     \nwlinkedidentc{GET_CHAR_RECORD}{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}         ; index → $BE/$BF = char record
     LDY     #$03
     LDA     ($BE),Y                 ; byte 3: min position (packed)
@@ -3424,7 +3428,7 @@ pick a random column and row within the bounds.
     LDA     $F5                     ;  |
     STA     $BD                     ; /
     LDA     #$00
-    STA     $5A28                   ; clear player index
+    STA     \nwlinkedidentc{SOURCE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}             ; clear source char index
     JSR     \nwlinkedidentc{REORDER_CHAR}{PYNWmai0-TSZHS7O2FMNRYEK2W57DEKVPQE000000-1}            ; reorder character in linked list
     LDY     #$0D
     LDA     #$00                    ; \\
@@ -3433,7 +3437,7 @@ pick a random column and row within the bounds.
     STA     ($F4),Y                 ; /
     JSR     \nwlinkedidentc{CLAMP_CHAR_FIELD}{PYNWmai0-VZAAE44D7YBBIC7MO6FZNDLI6M000000-1}        ; ensure byte 6 >= byte 5 minimum
     LDA     $5A02                   ; current player index
-    CMP     $5A29                   ; compare with scene index
+    CMP     \nwlinkedidentc{ACTIVE_CHAR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}             ; compare with scene index
     BNE     .done                   ; not current player → skip
     LDY     #$03
     LDA     ($F4),Y                 ; load position from record
@@ -3441,7 +3445,7 @@ pick a random column and row within the bounds.
 .done:
     RTS
 \nwindexdefn{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}}}\nwidentuses{\\{{\nwixident{CLAMP{\_}CHAR{\_}FIELD}}{CLAMP:unCHAR:unFIELD}}\\{{\nwixident{COLROW{\_}TO{\_}POS}}{COLROW:unTO:unPOS}}\\{{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}}\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}\\{{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}}\\{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}}\nwindexuse{\nwixident{CLAMP{\_}CHAR{\_}FIELD}}{CLAMP:unCHAR:unFIELD}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{COLROW{\_}TO{\_}POS}}{COLROW:unTO:unPOS}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwendcode{}\nwbegindocs{189}\nwdocspar
+\nwidentdefs{\\{{\nwixident{SCENE{\_}SETUP}}{SCENE:unSETUP}}}\nwidentuses{\\{{\nwixident{ACTIVE{\_}CHAR}}{ACTIVE:unCHAR}}\\{{\nwixident{CLAMP{\_}CHAR{\_}FIELD}}{CLAMP:unCHAR:unFIELD}}\\{{\nwixident{COLROW{\_}TO{\_}POS}}{COLROW:unTO:unPOS}}\\{{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}}\\{{\nwixident{FONT{\_}COL}}{FONT:unCOL}}\\{{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}}\\{{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}}\\{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}\\{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}\\{{\nwixident{SOURCE{\_}CHAR}}{SOURCE:unCHAR}}}\nwindexuse{\nwixident{ACTIVE{\_}CHAR}}{ACTIVE:unCHAR}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{CLAMP{\_}CHAR{\_}FIELD}}{CLAMP:unCHAR:unFIELD}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{COLROW{\_}TO{\_}POS}}{COLROW:unTO:unPOS}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{DRAW{\_}CHAR{\_}AT{\_}POS}}{DRAW:unCHAR:unAT:unPOS}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{FONT{\_}COL}}{FONT:unCOL}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{GET{\_}CHAR{\_}RECORD}}{GET:unCHAR:unRECORD}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{POS{\_}TO{\_}COLROW}}{POS:unTO:unCOLROW}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwindexuse{\nwixident{SOURCE{\_}CHAR}}{SOURCE:unCHAR}{PYNWmai0-EDKCSDZ4YL2YCTUIJVHBQRMHYY000000-1}\nwendcode{}\nwbegindocs{189}\nwdocspar
 
 \subsection{scene\_loop (\$6C37)}
 \subsection{init\_disk\_iob (\$6C2E)}
@@ -6794,6 +6798,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{timed wait}{PYNWmai0-TTL3BS3ZNAOH4GH5O7EQQ2NYYQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-TTL3BS3ZNAOH4GH5O7EQQ2NYYQ000000-1}}}%
 \nwixlogsorted{c}{{tone}{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1}{\nwixd{PYNWmai0-6MB7TIK43W7I5YBJMUI2RMCLGA000000-1}}}%
 \nwixlogsorted{c}{{zero page defines}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}\nwixd{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\nwixd{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-3}}}%
+\nwixlogsorted{i}{{\nwixident{ACTIVE{\_}CHAR}}{ACTIVE:unCHAR}}%
 \nwixlogsorted{i}{{\nwixident{ADDA}}{ADDA}}%
 \nwixlogsorted{i}{{\nwixident{ADDAC}}{ADDAC}}%
 \nwixlogsorted{i}{{\nwixident{ADDB}}{ADDB}}%
@@ -6921,6 +6926,8 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{RELOCATE{\_}HIRES{\_}STAGING}}{RELOCATE:unHIRES:unSTAGING}}%
 \nwixlogsorted{i}{{\nwixident{RENDER{\_}FONT{\_}CHAR}}{RENDER:unFONT:unCHAR}}%
 \nwixlogsorted{i}{{\nwixident{REORDER{\_}CHAR}}{REORDER:unCHAR}}%
+\nwixlogsorted{i}{{\nwixident{REORDER{\_}LINK}}{REORDER:unLINK}}%
+\nwixlogsorted{i}{{\nwixident{REORDER{\_}SORT{\_}KEY}}{REORDER:unSORT:unKEY}}%
 \nwixlogsorted{i}{{\nwixident{RESIDENT{\_}DECODE{\_}DISPATCH}}{RESIDENT:unDECODE:unDISPATCH}}%
 \nwixlogsorted{i}{{\nwixident{RESIDENT{\_}DISPATCH}}{RESIDENT:unDISPATCH}}%
 \nwixlogsorted{i}{{\nwixident{RESIDENT{\_}DISPATCH{\_}TABLE}}{RESIDENT:unDISPATCH:unTABLE}}%
@@ -6960,6 +6967,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}BOTTOM}}{SET:unTEXT:unWINDOW:unBOTTOM}}%
 \nwixlogsorted{i}{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}SCROLL}}{SET:unTEXT:unWINDOW:unSCROLL}}%
 \nwixlogsorted{i}{{\nwixident{SET{\_}TEXT{\_}WINDOW{\_}WRAP}}{SET:unTEXT:unWINDOW:unWRAP}}%
+\nwixlogsorted{i}{{\nwixident{SOURCE{\_}CHAR}}{SOURCE:unCHAR}}%
 \nwixlogsorted{i}{{\nwixident{STATUS{\_}BORDER{\_}DATA}}{STATUS:unBORDER:unDATA}}%
 \nwixlogsorted{i}{{\nwixident{STD{\_}FONT{\_}DATA}}{STD:unFONT:unDATA}}%
 \nwixlogsorted{i}{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}%

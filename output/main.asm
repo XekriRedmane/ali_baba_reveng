@@ -208,6 +208,10 @@ is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
 INPUT_MODE          EQU     $5A00   ; 0 = keyboard, 1 = joystick
 TOTAL_MOB_COUNT     EQU     $5A01   ; total mobs across all groups (excl. group 0)
 CURRENT_PLAYER      EQU     $5A02   ; current player index (1-based)
+ACTIVE_CHAR         EQU     $5A29   ; character index being processed
+SOURCE_CHAR         EQU     $5A28   ; source character for reorder
+REORDER_LINK        EQU     $5A2A   ; temp: saved next-link during reorder
+REORDER_SORT_KEY    EQU     $5A2B   ; temp: byte 11 of node for sorted insert
 LOCATION_FLAG       EQU     $5A55   ; location-change flag
 LOCATION_FLAG2      EQU     $5A56   ; secondary location flag
 SCENE_NUMBER        EQU     $5A99   ; current scene number
@@ -404,7 +408,7 @@ ATTRACT_SCREEN:
     SUBROUTINE
 
     LDA     #$01
-    STA     $5A29                   ; scene/character index = 1
+    STA     ACTIVE_CHAR             ; scene/character index = 1
     STA     $423E                   ; flag
     JSR     COMPUTE_SCENE_PTR       ; scene 1 pointer → $BA/$BB
     LDA     $BA                     ; \
@@ -421,7 +425,7 @@ ATTRACT_SCREEN:
 SCENE_SETUP:
     SUBROUTINE
 
-    LDA     $5A29                   ; character/scene index
+    LDA     ACTIVE_CHAR             ; character/scene index
     JSR     GET_CHAR_RECORD         ; index → $BE/$BF = char record
     LDY     #$03
     LDA     ($BE),Y                 ; byte 3: min position (packed)
@@ -458,7 +462,7 @@ SCENE_SETUP:
     LDA     $F5                     ;  |
     STA     $BD                     ; /
     LDA     #$00
-    STA     $5A28                   ; clear player index
+    STA     SOURCE_CHAR             ; clear source char index
     JSR     REORDER_CHAR            ; reorder character in linked list
     LDY     #$0D
     LDA     #$00                    ; \
@@ -467,7 +471,7 @@ SCENE_SETUP:
     STA     ($F4),Y                 ; /
     JSR     CLAMP_CHAR_FIELD        ; ensure byte 6 >= byte 5 minimum
     LDA     $5A02                   ; current player index
-    CMP     $5A29                   ; compare with scene index
+    CMP     ACTIVE_CHAR             ; compare with scene index
     BNE     .done                   ; not current player → skip
     LDY     #$03
     LDA     ($F4),Y                 ; load position from record
@@ -478,14 +482,14 @@ SCENE_SETUP:
 REORDER_CHAR:
     SUBROUTINE
 
-; --- Phase 1: unlink character $5A28 from its current chain ---
-    LDA     $5A28                   ; source character index
+; --- Phase 1: unlink character SOURCE_CHAR from its current chain ---
+    LDA     SOURCE_CHAR             ; source character index
     JSR     GET_CHAR_RECORD         ; $BE/$BF = record pointer
     JSR     DECR_GROUP_COUNT        ; source group lost a member
 .walk1:
     LDY     #$02                    ; \
-    LDA     ($BE),Y                 ;  | $5A2A = byte 2 of current record
-    STA     $5A2A                   ; /  (the "next" link we're removing)
+    LDA     ($BE),Y                 ;  | REORDER_LINK = byte 2 of current record
+    STA     REORDER_LINK            ; /  (the "next" link we're removing)
     JSR     GET_MOB_DATA            ; $BA/$BB = resolve link; $BC/$BD = mob data
     LDA     $BA                     ; \
     CMP     $BC                     ;  | compare $BA/$BB with $BC/$BD
@@ -495,7 +499,7 @@ REORDER_CHAR:
     BNE     .advance1
     ; Found predecessor: $BC/$BD points to the node being removed
     LDY     #$02
-    LDA     $5A2A                   ; \  if removed node's link == $5A03,
+    LDA     REORDER_LINK            ; \  if removed node's link == $5A03,
     CMP     $5A03                   ;  |   update $5A03 to new link
     BNE     .patch1                 ; /
     LDA     ($BC),Y                 ; \
@@ -511,13 +515,13 @@ REORDER_CHAR:
     STA     $BF                     ; /
     JMP     .walk1
 
-; --- Phase 2: re-insert at correct sorted position in $5A29's chain ---
+; --- Phase 2: re-insert at correct sorted position in ACTIVE_CHAR's chain ---
 .phase2:
     LDY     #$0B                    ; \
-    LDA     ($BC),Y                 ;  | $5A2B = byte 11 of removed node
+    LDA     ($BC),Y                 ;  | REORDER_SORT_KEY = byte 11 of removed node
     AND     #$1F                    ;  |   (level, 5-bit)
-    STA     $5A2B                   ; /
-    LDA     $5A29                   ; destination character index
+    STA     REORDER_SORT_KEY        ; /
+    LDA     ACTIVE_CHAR             ; destination character index
     JSR     GET_CHAR_RECORD         ; $BE/$BF = dest record pointer
     JSR     INCR_GROUP_COUNT        ; dest group gained a member
 .walk2:
@@ -526,18 +530,18 @@ REORDER_CHAR:
     CMP     #$00                    ;  | if zero (end of chain) -> insert here
     BEQ     .insert                 ; /
     JSR     GET_MOB_DATA            ; resolve link
-    LDA     $5A29                   ; \
+    LDA     ACTIVE_CHAR             ; \
     BEQ     .random                 ; /  if dest index = 0, use random decision
     LDY     #$0B                    ; \
     LDA     ($BA),Y                 ;  | compare candidate's level
     AND     #$1F                    ;  | with removed node's level
-    CMP     $5A2B                   ;  |
+    CMP     REORDER_SORT_KEY        ;  |
     BPL     .advance2               ; /  if >= , keep walking (insert later)
 .insert:
     LDY     #$02                    ; \
     LDA     ($BE),Y                 ;  | ($BC)[2] = ($BE)[2]  (link successor)
     STA     ($BC),Y                 ;  |
-    LDA     $5A2A                   ;  | ($BE)[2] = saved link (insert node)
+    LDA     REORDER_LINK            ;  | ($BE)[2] = saved link (insert node)
     STA     ($BE),Y                 ; /
     LDY     #$04                    ; \
     LDA     ($BC),Y                 ;  | if byte 4 of ($BC) >= $15, done
@@ -546,11 +550,11 @@ REORDER_CHAR:
     RTS                             ; /
 .adjust:
     LDA     #$00                    ; \
-    CMP     $5A29                   ;  | if inserted into index 0's slot,
+    CMP     ACTIVE_CHAR             ;  | if inserted into index 0's slot,
     BNE     .chk28                  ;  |   decrement TOTAL_MOB_COUNT
     DEC     TOTAL_MOB_COUNT         ; /
 .chk28:
-    CMP     $5A28                   ; \  if removed from index 0's slot,
+    CMP     SOURCE_CHAR             ; \  if removed from index 0's slot,
     BNE     .done                   ;  |   increment TOTAL_MOB_COUNT
     INC     TOTAL_MOB_COUNT         ; /
 .done:
