@@ -2081,11 +2081,12 @@ from an address stored in [[PRINT_STRING_ADDR]], at the current cursor
 position.
 
 <<zero page defines>>=
+TEXT_STREAM_PTR         EQU     $06     ; text stream pointer for TEXT_RENDERER (2 bytes)
 TMP_PTR                 EQU     $FA     ; temporary pointer (2 bytes)
 DATA_PTR3               EQU     $BA     ; data pointer 3 (2 bytes)
 PRINT_STRING_ADDR       EQU     $BC     ; 2 bytes (same pointer as PRINT_FROM_PTR)
 DATA_PTR                EQU     $BE     ; data pointer / return value (2 bytes)
-@ %def TMP_PTR DATA_PTR3 PRINT_STRING_ADDR DATA_PTR
+@ %def TEXT_STREAM_PTR TMP_PTR DATA_PTR3 PRINT_STRING_ADDR DATA_PTR
 
 <<print string>>=
     ORG     $7758
@@ -3274,6 +3275,8 @@ LOCATION_POS        EQU     $5A55   ; current location position (triggers redraw
 LOCATION_STYLE      EQU     $5A56   ; current map style (from record field 5, bits 0-6)
 EVENT_POS           EQU     $5A5E   ; event position (from MANHATTAN_DISTANCE)
 SCENE_NUMBER        EQU     $5A99   ; current scene number
+SCENE_TEXT_DATA     EQU     $5C00   ; base address of scene text data (loaded by LOAD_SCENE_DATA)
+SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene number)
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
 @ %def INPUT_MODE TOTAL_MOB_COUNT CURRENT_PLAYER CURRENT_ROOM CHAR_SPRITE DAMAGE_AMOUNT ACTIVE_CHAR SOURCE_CHAR REORDER_LINK REORDER_SORT_KEY LOCATION_POS LOCATION_STYLE EVENT_POS SCENE_NUMBER ATTRACT_FLAG
 
@@ -3773,15 +3776,12 @@ SCENE_LOOP:
     BCS     .exit                   ; carry set = user pressed key
 
     JSR     DISPLAY_STATUS_BAR
-    LDA     #<$5C00                 ; \
-    STA     $06                     ;  | $06/$07 = $5C00 (scene text data)
-    LDA     #>$5C00                 ;  |
-    STA     $07                     ; /
+    STOW    SCENE_TEXT_DATA,TEXT_STREAM_PTR ; scene text data → $06/$07
     JSR     TEXT_RENDERER
 
     LDX     #$06                    ; script index 6
     JSR     SCRIPT_ENGINE           ; run script #3 ($A300)
-    LDA     $5CFF                   ; scene transition flag
+    LDA     SCENE_TRANSITION        ; scene transition flag
     BEQ     .done                   ; zero = no transition
     STA     SCENE_NUMBER            ; set new scene number
     JMP     .display                ; continue
@@ -4170,7 +4170,7 @@ DISPLAY_STATUS_BAR:
 
     LDA     #$90                    ; ctrl-P with high bit (toggle inverse)
     JSR     ROM_COUT1
-    STOW    STATUS_BORDER_DATA,$06  ; $06/$07 → status bar border data
+    STOW    STATUS_BORDER_DATA,TEXT_STREAM_PTR ; status bar border data → $06/$07
     JSR     TEXT_RENDERER           ; draw border box
     JSR     PRINT_CTRL_AB           ; Ctrl-A, '0'
     LDA     #$17
@@ -4180,14 +4180,14 @@ DISPLAY_STATUS_BAR:
     BNE     .joystick
 
     ; Keyboard path:
-    STOW    S_PRESS_SPACE,$BC       ; $BC/$BD → "PRESS SPACE BAR..."
+    STOW    S_PRESS_SPACE,$BC       ; "PRESS SPACE BAR..." → $BC/$BD
 .set_margin:
     LDA     #$04
     STA     TEXT_COL                ; WNDLFT = 4
     JMP     PRINT_FROM_PTR         ; print string, return
 
 .joystick:
-    STOW    S_PRESS_BUTTON,$BC      ; $BC/$BD → "PRESS THE BUTTON..."
+    STOW    S_PRESS_BUTTON,$BC      ; "PRESS THE BUTTON..." → $BC/$BD
     JMP     .set_margin
 @ %def DISPLAY_STATUS_BAR
 
@@ -5103,7 +5103,7 @@ TEXT_RENDERER:
 
     ; --- Main byte-reading loop ---
 .fetch:
-    LDA     ($06),Y                 ; read byte from stream
+    LDA     (TEXT_STREAM_PTR),Y     ; read byte from stream
     BMI     .set_pos                ; bit 7 set → position command
     CMP     #$7F
     BNE     .not_end
@@ -5139,7 +5139,7 @@ TEXT_RENDERER:
     AND     #$7F                    ; row = byte & $7F
     STA     FONT_ROW
     INY
-    LDA     ($06),Y                 ; next byte = column
+    LDA     (TEXT_STREAM_PTR),Y     ; next byte = column
     STA     FONT_COL
     INY
     JMP     .fetch
@@ -5151,9 +5151,9 @@ TEXT_RENDERER:
     NOP
     LDX     #$06
     JSR     SCRIPT_ENGINE           ; run attract script
-    PSHW    $06                     ; save $06/$07 (stream pointer)
-    JSR     DISPLAY_STATUS_BAR      ; (clobbers $06/$07)
-    PULW    $06                     ; restore $06/$07
+    PSHW    TEXT_STREAM_PTR         ; save stream pointer
+    JSR     DISPLAY_STATUS_BAR      ; (clobbers TEXT_STREAM_PTR)
+    PULW    TEXT_STREAM_PTR         ; restore stream pointer
     PLA                             ; restore stream index
     TAY
     NOP
