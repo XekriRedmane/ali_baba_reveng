@@ -6843,9 +6843,12 @@ AI_DIRECTION    EQU     $5A6F   ; current direction being evaluated / random ran
 AI_TEST_POS     EQU     $5A70   ; position being tested for direction evaluation
 AI_TARGET_POS   EQU     $5A71   ; AI target position (set by AI_CHOOSE_TARGET)
 MOB_DEFENSE     EQU     $5A79   ; mob defense value (low 4 bits of mob byte 8)
+INPUT_OPTION_COUNT EQU  $5AAA   ; number of input options to draw
 CURRENT_SELECTION EQU   $5AAB   ; current menu selection index
+INPUT_BUFFER    EQU     $5AAC   ; 120-byte input text display buffer
+INPUT_JMP_VEC   EQU     $5F5E   ; indirect jump vector for input callbacks
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
-@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR DIR_SCORES AI_DIRECTION AI_TEST_POS AI_TARGET_POS EVENT_SLOT_BYTE EVENT_SUB_VALUE MOB_DEFENSE COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT CURRENT_SELECTION TURN_ACTIVE
+@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR DIR_SCORES AI_DIRECTION AI_TEST_POS AI_TARGET_POS EVENT_SLOT_BYTE EVENT_SUB_VALUE MOB_DEFENSE INPUT_OPTION_COUNT COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT CURRENT_SELECTION INPUT_BUFFER INPUT_JMP_VEC TURN_ACTIVE
 
 <<game turn loop>>=
     ORG     $19AD
@@ -8921,11 +8924,11 @@ INPUT_LOOP:
 .exit:
     LDY     #$08
     LDA     ($C2),Y
-    STA     $5F5E
+    STA     INPUT_JMP_VEC
     INY
     LDA     ($C2),Y
-    STA     $5F5F
-    JMP     ($5F5E)
+    STA     INPUT_JMP_VEC+1
+    JMP     (INPUT_JMP_VEC)
 @ %def INPUT_LOOP
 
 <<setup input>>=
@@ -8947,16 +8950,16 @@ DRAW_INPUT_OPTIONS:
     SUBROUTINE
     LDY     #$00
     LDA     ($C0),Y
-    STA     $5AAA
+    STA     INPUT_OPTION_COUNT
 .loop:
-    LDA     $5AAA
+    LDA     INPUT_OPTION_COUNT
     JSR     CALC_RECORD_PTR
     LDY     #$00
     LDA     ($C2),Y
     BEQ     .skip
     JSR     COPY_RECORD_DATA
 .skip:
-    DEC     $5AAA
+    DEC     INPUT_OPTION_COUNT
     BNE     .loop
     RTS
 @ %def DRAW_INPUT_OPTIONS
@@ -8967,11 +8970,11 @@ CALL_INPUT_INIT:
     SUBROUTINE
     LDY     #$02
     LDA     ($C0),Y
-    STA     $5F5E
+    STA     INPUT_JMP_VEC
     INY
     LDA     ($C0),Y
-    STA     $5F5F
-    JMP     ($5F5E)
+    STA     INPUT_JMP_VEC+1
+    JMP     (INPUT_JMP_VEC)
 @ %def CALL_INPUT_INIT
 
 <<clear input buffer>>=
@@ -8981,7 +8984,7 @@ CLEAR_INPUT_BUFFER:
     LDY     #$77
     LDA     #$A0
 .loop:
-    STA     $5AAC,Y
+    STA     INPUT_BUFFER,Y
     DEY
     BPL     .loop
     RTS
@@ -8998,7 +9001,7 @@ RENDER_INPUT_BUFFER:
     JSR     PRINT_CTRL_AB
     LDY     #$00
 .loop:
-    LDA     $5AAC,Y
+    LDA     INPUT_BUFFER,Y
     STY     $BA
     JSR     ROM_COUT1
     LDY     $BA
@@ -10397,7 +10400,7 @@ VALIDATE_INPUT:
 <<copy record data>>=
     ORG     $604C
     SUBROUTINE
-; Copies data from pointer at ($C2)+6/7 into $5AAC buffer
+; Copies data from pointer at ($C2)+6/7 into INPUT_BUFFER
 COPY_RECORD_DATA:
     LDY     #$06
     LDA     ($C2),Y
@@ -10417,7 +10420,7 @@ COPY_RECORD_DATA:
     TAX
 .copy_loop:
     LDA     ($BC),Y
-    STA     $5AAC,X
+    STA     INPUT_BUFFER,X
     DEX
     DEY
     BNE     .copy_loop
