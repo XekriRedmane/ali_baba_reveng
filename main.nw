@@ -1895,7 +1895,9 @@ SET_INVERSE_VIDEO:
 
     LDA     #$89        ; ctrl-I
     JMP     ROM_COUT1
+@ %def SET_INVERSE_VIDEO
 
+<<text window routines>>=
     ORG     $773A
 SET_TEXT_WINDOW_WRAP:
     SUBROUTINE
@@ -1915,7 +1917,7 @@ SET_TEXT_WINDOW_SCROLL:
 
 ; PRINT_CTRL_AB (PRINT_CTRL_AB) follows at $774E, defined in its own chunk
 
-@ %def SET_INVERSE_VIDEO SET_TEXT_WINDOW_WRAP SET_TEXT_WINDOW_SCROLL
+@ %def SET_TEXT_WINDOW_WRAP SET_TEXT_WINDOW_SCROLL
 
 \subsection{Printing routines}
 
@@ -2892,9 +2894,11 @@ LOAD_MAP_TILES:
 <<render font char>>=
     ORG     $7489
 RENDER_FONT_CHAR:
+PRINT_FONTCHAR:
     SUBROUTINE
 
     JSR     FONT_POS_TO_TEXT_POS    ; set TEXT_COL/TEXT_ROW from font pos
+PRINT_FONTCHAR_AT_TEXT_POS:
     LDX     #$B1                    ; base charset page
     LDA     FONT_CHARSET
     CMP     #$02
@@ -2930,7 +2934,7 @@ RENDER_FONT_CHAR:
     LDA     #>s_PRINT_FONT_CHAR    ;  |
     STA     PRINT_STRING_ADDR+1     ; /
     JMP     PRINT_STRING            ; output the 2×2 character
-@ %def RENDER_FONT_CHAR
+@ %def RENDER_FONT_CHAR PRINT_FONTCHAR PRINT_FONTCHAR_AT_TEXT_POS
 
 \subsection{get\_entity\_fontchar (\$0C7E)}
 
@@ -3215,7 +3219,7 @@ NUM_LEADING         EQU     $5A1E   ; leading-zero suppress flag (0=suppress, 1=
 GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
 @ %def ROM_COUT1 DAT_5a17_pos PRNG_OUTPUT PRNG_STATE PRNG_TEMP NUM_DIGIT NUM_DIVISOR NUM_LEADING GROUP_COUNT_DELTA
 
-<<print font char>>=
+<<print font char data>>=
     ORG     $80A4
     HEX     09      ; num chars in this string
     HEX     81      ; ctrl-A (set character set)
@@ -3228,61 +3232,7 @@ GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
     HEX     A0      ; CHAR_LOWER_RIGHT (self-modified)
     HEX     84      ; ctrl-D (complete block data)
 
-    ORG     $7489
-PRINT_FONTCHAR:
-    SUBROUTINE
-
-    JSR     FONT_POS_TO_TEXT_POS
-    ; fall through
-
-PRINT_FONTCHAR_AT_TEXT_POS:
-    LDX     #$B1            ; start from char set 1
-    LDA     FONT_CHARSET
-    CMP     #$02
-    BNE     .store_charset
-
-    ; FONT_CHARSET != 2
-    INX
-    INX                     ; start from charset 3 if FONT_CHARSET != 2.
-
-.store_charset:
-    STX     CHAR_CHARSET
-    ; fall through
-
-PLOT_FONTCHAR:
-    LDA     FONT_CHARNUM
-
-    ; Increment the charset by 1 for every multiple above character 24.
-.loop:
-    CMP     #24             ; 24 font chars = 96 normal chars = 1 char set
-    BCC     .print_block
-
-    ; FONT_CHARNUM >= 24
-    INX
-    STX     CHAR_CHARSET
-    SEC
-    SBC     #24
-    JMP     .loop
-
-.print_block:
-    ASL
-    ASL
-    CLC
-    ADC     #$20    ; A = 4*charnum + $20 (skip space)
-    TAY
-    STY     CHAR_UPPER_LEFT
-    INY
-    STY     CHAR_UPPER_RIGHT
-    INY
-    STY     CHAR_LOWER_LEFT
-    INY
-    STY     CHAR_LOWER_RIGHT
-    LDA     #<s_PRINT_FONT_CHAR
-    STA     PRINT_STRING_ADDR
-    LDA     #>s_PRINT_FONT_CHAR
-    STA     PRINT_STRING_ADDR+1
-    JMP     PRINT_FROM_PTR
-@ %def PRINT_FONTCHAR PRINT_FONTCHAR_AT_TEXT_POS
+@ Duplicate code chunk removed — RENDER_FONT_CHAR at $7489 already defines this.
 
 The [[PLOT_CHAR]] routine prints the character number in [[A]], at the text
 coordinate in [[X]] and [[Y]].
@@ -5054,15 +5004,21 @@ DISPLAY_STATUS_BAR:
     BNE     .joystick
 
     ; Keyboard path:
-    STOW    S_PRESS_SPACE,PRINT_STRING_ADDR       ; "PRESS SPACE BAR..." → PRINT_STRING_ADDR/PRINT_STRING_ADDR+1
+    LDA     #<S_PRESS_SPACE
+    STA     PRINT_STRING_ADDR
+    LDA     #>S_PRESS_SPACE
+.store_hi_and_print:
+    STA     PRINT_STRING_ADDR+1
 .set_margin:
     LDA     #$04
     STA     TEXT_COL                ; WNDLFT = 4
     JMP     PRINT_FROM_PTR         ; print string, return
 
 .joystick:
-    STOW    S_PRESS_BUTTON,PRINT_STRING_ADDR      ; "PRESS THE BUTTON..." → PRINT_STRING_ADDR/PRINT_STRING_ADDR+1
-    JMP     .set_margin
+    LDA     #<S_PRESS_BUTTON
+    STA     PRINT_STRING_ADDR
+    LDA     #>S_PRESS_BUTTON
+    JMP     .store_hi_and_print     ; reuse STA PRINT_STRING_ADDR+1 from keyboard path
 @ %def DISPLAY_STATUS_BAR
 
 The border box data at [[STATUS\_BORDER\_DATA]] is drawn via the hi-res
@@ -5957,7 +5913,7 @@ supports several control codes.
 <<defines>>=
 TEXT_RIGHT_MARGIN        EQU     $5A96   ; right margin column for text wrap
 TEXT_LEFT_MARGIN         EQU     $5A97   ; left margin column for text wrap
-TEXT_STREAM_IDX          EQU     TEXT_STREAM_IDX   ; saved Y index into byte stream
+TEXT_STREAM_IDX          EQU     $5A98   ; saved Y index into byte stream
 @ %def TEXT_RIGHT_MARGIN TEXT_LEFT_MARGIN TEXT_STREAM_IDX
 
 <<text renderer>>=
@@ -6075,9 +6031,8 @@ STATUS_BORDER_DATA:
     HEX     7D                      ; $7D: reset to full-screen
     HEX     80 00                   ; row 0, col 0
     HEX     33 3C                   ; top-left corner, left tee
-    HEX     34 34 34 34 34 34 34 34 ; horizontal bar (x17)
+    HEX     34 34 34 34 34 34 34 34 ; horizontal bar (x16)
     HEX     34 34 34 34 34 34 34 34
-    HEX     34
     HEX     3D 35                   ; right tee, top-right corner
     HEX     3A 3F                   ; decorative
     HEX     81 12 3E 36 3A 3F      ; row 1, col 18, right edge
@@ -6091,9 +6046,8 @@ STATUS_BORDER_DATA:
     HEX     89 12 3E 36 3A 3F      ; row 9
     HEX     8A 12 3E 36            ; row 10
     HEX     39 40                   ; bottom-left corner, left tee
-    HEX     38 38 38 38 38 38 38 38 ; horizontal bar (x17)
+    HEX     38 38 38 38 38 38 38 38 ; horizontal bar (x16)
     HEX     38 38 38 38 38 38 38 38
-    HEX     38
     HEX     41 37                   ; right tee, bottom-right corner
     HEX     7F                      ; end of stream
 @ %def STATUS_BORDER_DATA
@@ -6587,6 +6541,12 @@ SCRIPT_ADVANCE:
 
 \subsection{script helpers}
 
+<<script action indirect>>=
+    ORG     $7A4C
+SCRIPT_ACTION_INDIRECT:
+    JMP     (SCRIPT_ACTION_VEC)
+@ %def SCRIPT_ACTION_INDIRECT
+
 <<script helpers>>=
     ORG     $7A77
 SCRIPT_INC_PC:
@@ -6598,11 +6558,7 @@ SCRIPT_INC_PC:
 .carry:
     INC     SCRIPT_PC+1
     RTS
-
-    ORG     $7A4C
-SCRIPT_ACTION_INDIRECT:
-    JMP     (SCRIPT_ACTION_VEC)
-@ %def SCRIPT_INC_PC SCRIPT_ACTION_INDIRECT
+@ %def SCRIPT_INC_PC
 
 \subsection{play\_tone (\$7A7F)}
 
@@ -11242,7 +11198,7 @@ MAP_VALUE_TO_STRING:
 .loop:
     DEX
     BNE     .next
-    JMP     CENTER_PRINT_NAME
+    JMP     PRINT_BOTTOM_CENTERED
 .next:
     SEC
     LDA     (PRINT_STRING_ADDR),Y
@@ -11257,7 +11213,7 @@ MAP_VALUE_TO_STRING:
 <<copy f4 to f6 and set>>=
     ORG     $1432
     SUBROUTINE
-; Copies MOB_PTR/MOB_PTR+1 -> EFFECT_REC/EFFECT_REC+1, then JMP SET_ENTITY_PTR with A
+; Copies MOB_PTR/MOB_PTR+1 -> EFFECT_REC/EFFECT_REC+1, then JMP APPLY_DAMAGE with A
 COPY_F4_TO_F6_AND_SET:
     TAX
     LDA     MOB_PTR
@@ -11265,7 +11221,7 @@ COPY_F4_TO_F6_AND_SET:
     LDA     MOB_PTR+1
     STA     EFFECT_REC+1
     TXA
-    JMP     SET_ENTITY_PTR
+    JMP     APPLY_DAMAGE
 @ %def COPY_F4_TO_F6_AND_SET
 
 <<calc combat strength>>=
@@ -11325,7 +11281,7 @@ CALC_COMBAT_STRENGTH:
     TAY
     LDA     #$81
     STA     (ENTITY_PTR),Y
-    JSR     CLEAR_MSG_AREA
+    JSR     SET_CURSOR_ROW21
     LDA     #$01
     JSR     SCENE_LOOP
     LDA     #$0A
@@ -11351,7 +11307,7 @@ PROCESS_ENTITY_SCRIPT:
     LDA     #$FE
     STA     (MOB_PTR),Y
     LDX     #$0E
-    JSR     RUN_SCRIPT
+    JSR     SCRIPT_ENGINE
     JSR     DISPATCH_ON_MODE
     LDA     $BA
     JMP     DRAW_CHAR_AT_POS
@@ -11473,9 +11429,9 @@ CALC_RECORD_PTR:
 <<setup cursor ext>>=
     ORG     $5FA2
     SUBROUTINE
-; JSR SET_HTAB_VTAB then falls through to SETUP_CURSOR
+; JSR SET_INVERSE_VIDEO then falls through to SETUP_CURSOR
 SETUP_CURSOR_EXT:
-    JSR     SET_HTAB_VTAB
+    JSR     SET_INVERSE_VIDEO
 @ %def SETUP_CURSOR_EXT
 
 <<setup cursor>>=
@@ -11717,10 +11673,10 @@ The following root chunks produce the assembly files when tangled.
 <<process mob groups>>
 <<show idle status>>
 <<start mob turn>>
-<<check mob needs turn>>
 <<setup scene display>>
 <<load char name ptr>>
 <<setup char sprite>>
+<<check mob needs turn>>
 <<attract screen>>
 <<scene setup>>
 <<clamp char field>>
@@ -11839,6 +11795,7 @@ The following root chunks produce the assembly files when tangled.
 <<inc mob counters>>
 <<ai choose target>>
 <<init stub2>>
+<<setup disk read>>
 <<init disk iob>>
 <<scene loop>>
 <<text renderer>>
@@ -11846,13 +11803,12 @@ The following root chunks produce the assembly files when tangled.
 <<save zp pointers>>
 <<restore zp pointers>>
 <<relocate hires staging>>
-<<setup disk read>>
 <<load scene data>>
 <<check scene events>>
 <<scan for hostile>>
+<<process scene groups>>
 <<load char to fa>>
 <<scan and reorder>>
-<<process scene groups>>
 <<modify char stats>>
 <<modify current stats>>
 <<display shop>>
@@ -11878,6 +11834,7 @@ The following root chunks produce the assembly files when tangled.
 <<font pos>>
 <<control routines>>
 <<print ctrl n>>
+<<text window routines>>
 <<print ctrl ab>>
 <<print string>>
 <<print from ptr>>
@@ -11888,13 +11845,14 @@ The following root chunks produce the assembly files when tangled.
 <<init hrcg>>
 <<set text window upper left>>
 <<script engine>>
+<<script action indirect>>
 <<script advance>>
 <<script helpers>>
 <<play tone>>
 <<play noise>>
 <<status border data>>
 <<status bar strings>>
-<<print font char>>
+<<print font char data>>
 <<script pointer table>>
 <<font data>>
 <<std font data>>

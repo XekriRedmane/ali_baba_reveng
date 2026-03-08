@@ -321,7 +321,7 @@ MAP_REDRAW_FLAG         EQU     $7AC4   ; non-zero = full map redraw needed
 ROM_WAIT                EQU     $FCA8   ; Apple II ROM WAIT routine
 TEXT_RIGHT_MARGIN        EQU     $5A96   ; right margin column for text wrap
 TEXT_LEFT_MARGIN         EQU     $5A97   ; left margin column for text wrap
-TEXT_STREAM_IDX          EQU     TEXT_STREAM_IDX   ; saved Y index into byte stream
+TEXT_STREAM_IDX          EQU     $5A98   ; saved Y index into byte stream
 SCRIPT_LOOP_CTR     EQU     $5A8D   ; script loop iteration counter
 SCRIPT_LOOP_ADDR    EQU     $5A8E   ; script loop address (2 bytes)
 SCRIPT_GOSUB_ADDR   EQU     $5A90   ; script gosub return address (2 bytes)
@@ -615,35 +615,6 @@ START_MOB_TURN:
     LDA     CHAR_AI_MODE
     STA     $5AA6                   ; save AI mode (unused in main.bin)
     JMP     GAME_TURN_LOOP
-    ORG     $0958
-CHECK_MOB_NEEDS_TURN:
-    SUBROUTINE
-    ; Check whether a mob group needs a game turn.
-    ; Returns: carry set = needs turn, carry clear = skip.
-    ; Skips if: AI mode is player (0), or record byte 12 low nibble
-    ; is nonzero, or no encounter and no adjacent threats.
-    LDA     CHAR_AI_MODE
-    BEQ     .needs_turn             ; player-controlled always gets a turn
-    LDY     #$0C
-    LDA     (ENTITY_PTR),Y                 ; mob data byte 12
-    AND     #$0F                    ; low nibble
-    BNE     .needs_turn             ; nonzero = pending action → turn
-    LDY     #$03
-    LDA     (ENTITY_PTR),Y                 ; mob data byte 3 = position
-    JSR     CHECK_ENCOUNTER         ; check for encounter at this position
-    LDA     ENCOUNTER_RESULT
-    BNE     .needs_turn             ; encounter found → turn
-    LDY     #$03
-    LDA     (ENTITY_PTR),Y                 ; position again
-    JSR     CHECK_ADJACENT_THREATS
-    LDA     ADJACENT_THREAT
-    BNE     .needs_turn             ; threats nearby → turn
-    JSR     CLEAR_RESTRICTED        ; no action needed → clear restricted flag
-    CLC                             ; carry clear = skip
-    RTS
-.needs_turn:
-    SEC                             ; carry set = needs turn
-    RTS
     ORG     $0901
 SETUP_SCENE_DISPLAY:
     SUBROUTINE
@@ -690,6 +661,35 @@ SETUP_CHAR_SPRITE:
     LDA     #$01
     STA     FONT_CHARSET
     JMP     RENDER_FONT_CHAR
+    ORG     $0958
+CHECK_MOB_NEEDS_TURN:
+    SUBROUTINE
+    ; Check whether a mob group needs a game turn.
+    ; Returns: carry set = needs turn, carry clear = skip.
+    ; Skips if: AI mode is player (0), or record byte 12 low nibble
+    ; is nonzero, or no encounter and no adjacent threats.
+    LDA     CHAR_AI_MODE
+    BEQ     .needs_turn             ; player-controlled always gets a turn
+    LDY     #$0C
+    LDA     (ENTITY_PTR),Y                 ; mob data byte 12
+    AND     #$0F                    ; low nibble
+    BNE     .needs_turn             ; nonzero = pending action → turn
+    LDY     #$03
+    LDA     (ENTITY_PTR),Y                 ; mob data byte 3 = position
+    JSR     CHECK_ENCOUNTER         ; check for encounter at this position
+    LDA     ENCOUNTER_RESULT
+    BNE     .needs_turn             ; encounter found → turn
+    LDY     #$03
+    LDA     (ENTITY_PTR),Y                 ; position again
+    JSR     CHECK_ADJACENT_THREATS
+    LDA     ADJACENT_THREAT
+    BNE     .needs_turn             ; threats nearby → turn
+    JSR     CLEAR_RESTRICTED        ; no action needed → clear restricted flag
+    CLC                             ; carry clear = skip
+    RTS
+.needs_turn:
+    SEC                             ; carry set = needs turn
+    RTS
     ORG     $09F4
 ATTRACT_SCREEN:
     SUBROUTINE
@@ -1825,7 +1825,7 @@ MAP_VALUE_TO_STRING:
 .loop:
     DEX
     BNE     .next
-    JMP     CENTER_PRINT_NAME
+    JMP     PRINT_BOTTOM_CENTERED
 .next:
     SEC
     LDA     (PRINT_STRING_ADDR),Y
@@ -2177,7 +2177,7 @@ APPLY_DAMAGE_TO_CURRENT:
     JMP     APPLY_DAMAGE
     ORG     $1432
     SUBROUTINE
-; Copies MOB_PTR/MOB_PTR+1 -> EFFECT_REC/EFFECT_REC+1, then JMP SET_ENTITY_PTR with A
+; Copies MOB_PTR/MOB_PTR+1 -> EFFECT_REC/EFFECT_REC+1, then JMP APPLY_DAMAGE with A
 COPY_F4_TO_F6_AND_SET:
     TAX
     LDA     MOB_PTR
@@ -2185,7 +2185,7 @@ COPY_F4_TO_F6_AND_SET:
     LDA     MOB_PTR+1
     STA     EFFECT_REC+1
     TXA
-    JMP     SET_ENTITY_PTR
+    JMP     APPLY_DAMAGE
     ORG     $143F
 AUTO_HEAL:
     SUBROUTINE
@@ -2507,7 +2507,7 @@ CALC_COMBAT_STRENGTH:
     TAY
     LDA     #$81
     STA     (ENTITY_PTR),Y
-    JSR     CLEAR_MSG_AREA
+    JSR     SET_CURSOR_ROW21
     LDA     #$01
     JSR     SCENE_LOOP
     LDA     #$0A
@@ -2646,7 +2646,7 @@ PROCESS_ENTITY_SCRIPT:
     LDA     #$FE
     STA     (MOB_PTR),Y
     LDX     #$0E
-    JSR     RUN_SCRIPT
+    JSR     SCRIPT_ENGINE
     JSR     DISPATCH_ON_MODE
     LDA     $BA
     JMP     DRAW_CHAR_AT_POS
@@ -3825,9 +3825,9 @@ CALC_RECORD_PTR:
     RTS
     ORG     $5FA2
     SUBROUTINE
-; JSR SET_HTAB_VTAB then falls through to SETUP_CURSOR
+; JSR SET_INVERSE_VIDEO then falls through to SETUP_CURSOR
 SETUP_CURSOR_EXT:
-    JSR     SET_HTAB_VTAB
+    JSR     SET_INVERSE_VIDEO
     ORG     $5FA5
     SUBROUTINE
 ; Sets up cursor: calls $5FBC, positions, loads ptr from ($C2)+6/7, prints
@@ -4867,6 +4867,21 @@ AI_CHOOSE_TARGET:
     ORG     $6B94
 INIT_STUB2:
     RTS
+    ORG     $6C18
+SETUP_DISK_READ:
+    SUBROUTINE
+
+    LDY     #$0C
+    STA     ($08),Y                 ; ($08)+$0C = track number (A)
+    LDA     #$00
+    LDY     #$03
+    STA     ($08),Y                 ; ($08)+$03 = 0 (sector offset)
+    LDA     $09                     ; \ A/Y = slot parameter block
+    LDY     $08                     ; /
+    JSR     $B7B5                   ; EALDR seek routine
+    LDA     #$00
+    STA     $48                     ; clear disk status
+    RTS
     ORG     $6C2E
 INIT_DISK_IOB:
     SUBROUTINE
@@ -5019,15 +5034,21 @@ DISPLAY_STATUS_BAR:
     BNE     .joystick
 
     ; Keyboard path:
-    STOW    S_PRESS_SPACE,PRINT_STRING_ADDR       ; "PRESS SPACE BAR..." → PRINT_STRING_ADDR/PRINT_STRING_ADDR+1
+    LDA     #<S_PRESS_SPACE
+    STA     PRINT_STRING_ADDR
+    LDA     #>S_PRESS_SPACE
+.store_hi_and_print:
+    STA     PRINT_STRING_ADDR+1
 .set_margin:
     LDA     #$04
     STA     TEXT_COL                ; WNDLFT = 4
     JMP     PRINT_FROM_PTR         ; print string, return
 
 .joystick:
-    STOW    S_PRESS_BUTTON,PRINT_STRING_ADDR      ; "PRESS THE BUTTON..." → PRINT_STRING_ADDR/PRINT_STRING_ADDR+1
-    JMP     .set_margin
+    LDA     #<S_PRESS_BUTTON
+    STA     PRINT_STRING_ADDR
+    LDA     #>S_PRESS_BUTTON
+    JMP     .store_hi_and_print     ; reuse STA PRINT_STRING_ADDR+1 from keyboard path
     ORG     $6D53
 SAVE_ZP_POINTERS:
     SUBROUTINE
@@ -5104,21 +5125,6 @@ RELOCATE_HIRES_STAGING:
     INC     COPY_SRC+1                         ; next source page
     INC     COPY_DEST+1                         ; next dest page
     JMP     .copy
-    ORG     $6C18
-SETUP_DISK_READ:
-    SUBROUTINE
-
-    LDY     #$0C
-    STA     ($08),Y                 ; ($08)+$0C = track number (A)
-    LDA     #$00
-    LDY     #$03
-    STA     ($08),Y                 ; ($08)+$03 = 0 (sector offset)
-    LDA     $09                     ; \ A/Y = slot parameter block
-    LDY     $08                     ; /
-    JSR     $B7B5                   ; EALDR seek routine
-    LDA     #$00
-    STA     $48                     ; clear disk status
-    RTS
     ORG     $6DD8
 LOAD_SCENE_DATA:
     SUBROUTINE
@@ -5226,6 +5232,27 @@ SCAN_FOR_HOSTILE:
     BEQ     .walk                       ; not hostile → continue
     STA     SCENE_HOSTILE_FLAG          ; hostile found
     BNE     .walk                       ; always branches, continue scan
+    ORG     $6E9E
+PROCESS_SCENE_GROUPS:
+    SUBROUTINE
+    ; Process mob groups $3F, $41, $42 with SCAN_AND_REORDER,
+    ; bookended by LOAD_CHAR_TO_FA for save/restore.
+    LDA     #$03
+    STA     SOURCE_CHAR
+    JSR     LOAD_CHAR_TO_FA             ; save player 3's record to $FA/$FB
+    LDA     #$00
+    STA     ACTIVE_CHAR
+    LDA     #$3F
+    STA     SCENE_GROUP_IDX
+    JSR     SCAN_AND_REORDER            ; group $3F
+    INC     SCENE_GROUP_IDX             ; $40 (skip — that's the player's group)
+    INC     SCENE_GROUP_IDX             ; $41
+    JSR     SCAN_AND_REORDER            ; group $41
+    INC     SCENE_GROUP_IDX             ; $42
+    JSR     SCAN_AND_REORDER            ; group $42
+    LDA     CURRENT_PLAYER
+    JSR     LOAD_CHAR_TO_FA             ; restore current player's record
+    RTS
     ORG     $6EC9
 LOAD_CHAR_TO_FA:
     SUBROUTINE
@@ -5251,27 +5278,6 @@ SCAN_AND_REORDER:
     LDA     MOB_PTR+1                         ;  |
     STA     TARGET_REC+1                         ; /
     JMP     REORDER_CHAR
-    ORG     $6E9E
-PROCESS_SCENE_GROUPS:
-    SUBROUTINE
-    ; Process mob groups $3F, $41, $42 with SCAN_AND_REORDER,
-    ; bookended by LOAD_CHAR_TO_FA for save/restore.
-    LDA     #$03
-    STA     SOURCE_CHAR
-    JSR     LOAD_CHAR_TO_FA             ; save player 3's record to $FA/$FB
-    LDA     #$00
-    STA     ACTIVE_CHAR
-    LDA     #$3F
-    STA     SCENE_GROUP_IDX
-    JSR     SCAN_AND_REORDER            ; group $3F
-    INC     SCENE_GROUP_IDX             ; $40 (skip — that's the player's group)
-    INC     SCENE_GROUP_IDX             ; $41
-    JSR     SCAN_AND_REORDER            ; group $41
-    INC     SCENE_GROUP_IDX             ; $42
-    JSR     SCAN_AND_REORDER            ; group $42
-    LDA     CURRENT_PLAYER
-    JSR     LOAD_CHAR_TO_FA             ; restore current player's record
-    RTS
     ORG     $704D
 MODIFY_CHAR_STATS:
     SUBROUTINE
@@ -5751,9 +5757,11 @@ LOAD_MAP_TILES:
     RTS
     ORG     $7489
 RENDER_FONT_CHAR:
+PRINT_FONTCHAR:
     SUBROUTINE
 
     JSR     FONT_POS_TO_TEXT_POS    ; set TEXT_COL/TEXT_ROW from font pos
+PRINT_FONTCHAR_AT_TEXT_POS:
     LDX     #$B1                    ; base charset page
     LDA     FONT_CHARSET
     CMP     #$02
@@ -6061,7 +6069,12 @@ SET_INVERSE_VIDEO:
 
     LDA     #$89        ; ctrl-I
     JMP     ROM_COUT1
+    ORG     $7735
+PRINT_CTRL_N:
+    SUBROUTINE
 
+    LDA     #$8E                    ; Ctrl-N with high bit
+    JMP     ROM_COUT1                ; output via COUT1
     ORG     $773A
 SET_TEXT_WINDOW_WRAP:
     SUBROUTINE
@@ -6081,12 +6094,6 @@ SET_TEXT_WINDOW_SCROLL:
 
 ; PRINT_CTRL_AB (PRINT_CTRL_AB) follows at $774E, defined in its own chunk
 
-    ORG     $7735
-PRINT_CTRL_N:
-    SUBROUTINE
-
-    LDA     #$8E                    ; Ctrl-N with high bit
-    JMP     ROM_COUT1                ; output via COUT1
     ORG     $774E
 PRINT_CTRL_AB:
     SUBROUTINE
@@ -6364,6 +6371,9 @@ SCRIPT_ENGINE_FETCH:
     STA     SOUND_DURATION
     JSR     SCRIPT_ACTION_INDIRECT  ; → JMP (SCRIPT_ACTION_VEC)
     JMP     (DISPATCH_VEC)                   ; dispatch via action vector
+    ORG     $7A4C
+SCRIPT_ACTION_INDIRECT:
+    JMP     (SCRIPT_ACTION_VEC)
     ORG     $7A4F
 SCRIPT_ADVANCE:
     SUBROUTINE
@@ -6403,10 +6413,6 @@ SCRIPT_INC_PC:
 .carry:
     INC     SCRIPT_PC+1
     RTS
-
-    ORG     $7A4C
-SCRIPT_ACTION_INDIRECT:
-    JMP     (SCRIPT_ACTION_VEC)
     ORG     $7A7F
 PLAY_TONE:
     SUBROUTINE
@@ -6450,9 +6456,8 @@ STATUS_BORDER_DATA:
     HEX     7D                      ; $7D: reset to full-screen
     HEX     80 00                   ; row 0, col 0
     HEX     33 3C                   ; top-left corner, left tee
-    HEX     34 34 34 34 34 34 34 34 ; horizontal bar (x17)
+    HEX     34 34 34 34 34 34 34 34 ; horizontal bar (x16)
     HEX     34 34 34 34 34 34 34 34
-    HEX     34
     HEX     3D 35                   ; right tee, top-right corner
     HEX     3A 3F                   ; decorative
     HEX     81 12 3E 36 3A 3F      ; row 1, col 18, right edge
@@ -6466,9 +6471,8 @@ STATUS_BORDER_DATA:
     HEX     89 12 3E 36 3A 3F      ; row 9
     HEX     8A 12 3E 36            ; row 10
     HEX     39 40                   ; bottom-left corner, left tee
-    HEX     38 38 38 38 38 38 38 38 ; horizontal bar (x17)
+    HEX     38 38 38 38 38 38 38 38 ; horizontal bar (x16)
     HEX     38 38 38 38 38 38 38 38
-    HEX     38
     HEX     41 37                   ; right tee, bottom-right corner
     HEX     7F                      ; end of stream
     ORG     $7E97
@@ -6489,60 +6493,6 @@ S_PRESS_BUTTON:
     HEX     A0      ; CHAR_LOWER_RIGHT (self-modified)
     HEX     84      ; ctrl-D (complete block data)
 
-    ORG     $7489
-PRINT_FONTCHAR:
-    SUBROUTINE
-
-    JSR     FONT_POS_TO_TEXT_POS
-    ; fall through
-
-PRINT_FONTCHAR_AT_TEXT_POS:
-    LDX     #$B1            ; start from char set 1
-    LDA     FONT_CHARSET
-    CMP     #$02
-    BNE     .store_charset
-
-    ; FONT_CHARSET != 2
-    INX
-    INX                     ; start from charset 3 if FONT_CHARSET != 2.
-
-.store_charset:
-    STX     CHAR_CHARSET
-    ; fall through
-
-PLOT_FONTCHAR:
-    LDA     FONT_CHARNUM
-
-    ; Increment the charset by 1 for every multiple above character 24.
-.loop:
-    CMP     #24             ; 24 font chars = 96 normal chars = 1 char set
-    BCC     .print_block
-
-    ; FONT_CHARNUM >= 24
-    INX
-    STX     CHAR_CHARSET
-    SEC
-    SBC     #24
-    JMP     .loop
-
-.print_block:
-    ASL
-    ASL
-    CLC
-    ADC     #$20    ; A = 4*charnum + $20 (skip space)
-    TAY
-    STY     CHAR_UPPER_LEFT
-    INY
-    STY     CHAR_UPPER_RIGHT
-    INY
-    STY     CHAR_LOWER_LEFT
-    INY
-    STY     CHAR_LOWER_RIGHT
-    LDA     #<s_PRINT_FONT_CHAR
-    STA     PRINT_STRING_ADDR
-    LDA     #>s_PRINT_FONT_CHAR
-    STA     PRINT_STRING_ADDR+1
-    JMP     PRINT_FROM_PTR
     ORG     $80AE
 SCRIPT_TABLE:
     DC.W    $80C6                   ; script 0
