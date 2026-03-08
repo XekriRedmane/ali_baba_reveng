@@ -173,7 +173,15 @@
 TEXT_COL                EQU     $24     ; Cursor position
 TEXT_ROW                EQU     $25
 TEXT_STREAM_PTR         EQU     $06     ; text stream pointer for TEXT_RENDERER (2 bytes)
+SOUND_FREQ              EQU     $E1     ; sound frequency / script modified action
+SOUND_DURATION          EQU     $E2     ; sound duration / script parameter byte
+NOISE_SHIFT             EQU     $E3     ; noise generator shift register
+SCRIPT_PC               EQU     $E4     ; script instruction pointer (2 bytes, $E4/$E5)
 MOB_PTR                 EQU     $F4     ; mob data pointer (2 bytes, $F4/$F5)
+DISPATCH_VEC            EQU     $F6     ; script action dispatch vector (2 bytes, $F6/$F7)
+EFFECT_REC              EQU     $F6     ; target entity record for damage/stats (2 bytes)
+CHAR_INDEX              EQU     $F6     ; selected character/player index
+FACTION_MASK            EQU     $F7     ; faction match value for FIND_MOB_BY_FACTION
 ENTITY_PTR              EQU     $F8     ; entity record pointer (2 bytes, $F8/$F9)
 CHAR_PTR                EQU     $FA     ; character record pointer (2 bytes, $FA/$FB)
 MOB_DATA_PTR            EQU     $BA     ; mob data record pointer (2 bytes, $BA/$BB)
@@ -1541,7 +1549,7 @@ GET_CHAR_RECORD:
     ORG     $106F
 APPLY_DAMAGE:
     SUBROUTINE
-    ; Apply damage A to char at ($F6).
+    ; Apply damage A to char at (EFFECT_REC).
     ; Subtracts from field 6 (HP). Displays damage message,
     ; runs script. If HP drops to 0: death handling.
     AND     #$1F
@@ -1560,7 +1568,7 @@ APPLY_DAMAGE:
     LDX     #$04
     JSR     SCRIPT_ENGINE       ; run damage script
     LDY     #$06
-    LDA     ($F6),Y             ; field 6 (HP + flags)
+    LDA     (EFFECT_REC),Y             ; field 6 (HP + flags)
     TAX
     AND     #$3F                ; HP only
     SEC
@@ -1571,16 +1579,16 @@ APPLY_DAMAGE:
     TXA
     AND     #$C0                ; preserve high bits
     ORA     DAMAGE_AMOUNT
-    STA     ($F6),Y             ; store updated field 6
+    STA     (EFFECT_REC),Y             ; store updated field 6
     JSR     SET_CURSOR_ROW21
     LDA     DAMAGE_AMOUNT
     CMP     #$03
     BPL     .check8
     LDY     #$0F
-    LDA     ($F6),Y             ; field 15
+    LDA     (EFFECT_REC),Y             ; field 15
     AND     #$F8
     ORA     #$04                ; set restricted flag
-    STA     ($F6),Y
+    STA     (EFFECT_REC),Y
     JSR     PRINT_ENTITY_NAME
     LDA     #$09
     JSR     DISPLAY_MESSAGE     ; "badly hurt" message
@@ -1599,14 +1607,14 @@ APPLY_DAMAGE:
     ; --- character dies ---
 .dead:
     LDY     #$04
-    LDA     ($F6),Y             ; field 4
+    LDA     (EFFECT_REC),Y             ; field 4
     LDX     #$08                ; default script
     CMP     #$15
     BCC     .skip_flag
     LDY     #$0F
-    LDA     ($F6),Y
+    LDA     (EFFECT_REC),Y
     ORA     #$10                ; set death flag
-    STA     ($F6),Y
+    STA     (EFFECT_REC),Y
     LDX     #$0A                ; NPC death script
 .skip_flag:
     TXA
@@ -1632,36 +1640,36 @@ APPLY_DAMAGE:
     STA     ACTIVE_CHAR
     LDA     CURRENT_PLAYER
     STA     SOURCE_CHAR
-    LDA     $F6
+    LDA     EFFECT_REC
     STA     TARGET_REC
-    LDA     $F7
+    LDA     EFFECT_REC+1
     STA     TARGET_REC+1
     JSR     REORDER_CHAR        ; cleanup
     LDY     #$0D
-    LDA     ($F6),Y             ; gold low
+    LDA     (EFFECT_REC),Y             ; gold low
     STA     TARGET_REC
     INY
-    LDA     ($F6),Y             ; gold high
+    LDA     (EFFECT_REC),Y             ; gold high
     STA     TARGET_REC+1
     LDY     #$00
     JSR     MODIFY_CHAR_STATS   ; subtract gold (Y=0 → subtract)
     LDY     #$03
-    LDA     ($F6),Y
+    LDA     (EFFECT_REC),Y
     JSR     UPDATE_EVENT_LIST            ; handle death at position
     LDY     #$03
-    LDA     ($F6),Y
+    LDA     (EFFECT_REC),Y
     JMP     DRAW_CHAR_AT_POS    ; redraw position
     ORG     $1142
 PRINT_ENTITY_NAME:
     SUBROUTINE
-    ; Print entity name: cursor to row 21, load name ptr from ($F6)[0..1],
+    ; Print entity name: cursor to row 21, load name ptr from (EFFECT_REC)[0..1],
     ; print centered at bottom, then reset text window.
     JSR     SET_CURSOR_ROW21
     LDY     #$00
-    LDA     ($F6),Y             ; name pointer low
+    LDA     (EFFECT_REC),Y             ; name pointer low
     STA     PRINT_STRING_ADDR
     INY
-    LDA     ($F6),Y             ; name pointer high
+    LDA     (EFFECT_REC),Y             ; name pointer high
     STA     PRINT_STRING_ADDR+1
     JSR     PRINT_BOTTOM_CENTERED
     JMP     RESET_TEXT_WINDOW
@@ -2139,23 +2147,23 @@ REORDER_CURRENT_CHAR:
     ORG     $1425
 APPLY_DAMAGE_TO_CURRENT:
     SUBROUTINE
-    ; Apply effect: copy ENTITY_PTR/ENTITY_PTR+1 → $F6/$F7, JMP $106F with A
+    ; Apply effect: copy ENTITY_PTR/ENTITY_PTR+1 → EFFECT_REC/EFFECT_REC+1, JMP $106F with A
     TAX
     LDA     ENTITY_PTR
-    STA     $F6
+    STA     EFFECT_REC
     LDA     ENTITY_PTR+1
-    STA     $F7
+    STA     EFFECT_REC+1
     TXA
     JMP     APPLY_DAMAGE
     ORG     $1432
     SUBROUTINE
-; Copies MOB_PTR/MOB_PTR+1 -> $F6/$F7, then JMP SET_ENTITY_PTR with A
+; Copies MOB_PTR/MOB_PTR+1 -> EFFECT_REC/EFFECT_REC+1, then JMP SET_ENTITY_PTR with A
 COPY_F4_TO_F6_AND_SET:
     TAX
     LDA     MOB_PTR
-    STA     $F6
+    STA     EFFECT_REC
     LDA     MOB_PTR+1
-    STA     $F7
+    STA     EFFECT_REC+1
     TXA
     JMP     SET_ENTITY_PTR
     ORG     $143F
@@ -3505,9 +3513,9 @@ SET_TARGET_RESTRICTED:
     RTS
     ORG     $1F0C
     SUBROUTINE
-; Dispatches on $7A7F: if $60 then DELAY_WITH_ANIMATION else ANIM_TICK_AND_WAIT
+; Dispatches on PLAY_TONE: if $60 (RTS) then DELAY_WITH_ANIMATION else ANIM_TICK_AND_WAIT
 DISPATCH_ON_MODE:
-    LDA     $7A7F
+    LDA     PLAY_TONE
     CMP     #$60
     BEQ     .mode_60
     JMP     ANIM_TICK_AND_WAIT
@@ -3518,10 +3526,10 @@ INIT_GAME_STATE:
     SUBROUTINE
 
     JSR     $5C6D                   ; set up game display / UI
-    LDA     #<GAME_ACTION_HANDLER   ; \ $F6/$F7 = game action handler
-    STA     $F6                     ;  |
+    LDA     #<GAME_ACTION_HANDLER   ; \ $F6/DISPATCH_VEC+1 = game action handler
+    STA     DISPATCH_VEC                     ;  |
     LDA     #>GAME_ACTION_HANDLER   ;  |
-    STA     $F7                     ; /
+    STA     DISPATCH_VEC+1                     ; /
     LDA     #$00
     STA     $5A00                   ; clear game state flag
     LDX     #$B1                    ; LDA (zp),Y opcode
@@ -4137,7 +4145,7 @@ EVENT_FACTION_SCENE_CONT:               ; alternate entry from RANDOM_EVENTS bur
     LDY     #$05
     LDA     (CHAR_PTR),Y                     ; char record byte 5
     AND     #$60                        ; bits 6-5 = faction mask
-    STA     $F7                         ; save for FIND_MOB_BY_FACTION
+    STA     FACTION_MASK                         ; save for FIND_MOB_BY_FACTION
     LDA     #$00                        ; \
     STA     CHAR_PTR                         ;  | reset $FA/$FB to $4000 (record base)
     LDA     #$40                        ;  |
@@ -4149,7 +4157,7 @@ EVENT_FACTION_SCENE_CONT:               ; alternate entry from RANDOM_EVENTS bur
 .found:
     LDA     #$00
     STA     SOURCE_CHAR                 ; clear source char
-    LDA     $F6
+    LDA     CHAR_INDEX
     STA     ACTIVE_CHAR                 ; set active char to found index
     JSR     SCENE_SETUP
     JSR     CHECK_LOCATION_MATCH
@@ -4173,13 +4181,13 @@ EVENT_SPAWN_MOB:
     LDY     #$05
     LDA     (CHAR_PTR),Y                     ; char record byte 5
     AND     #$60                        ; faction mask
-    STA     $F7
+    STA     FACTION_MASK
     JSR     FIND_MOB_BY_FACTION
     CMP     #$00
     BNE     .found
     RTS                                 ; no matching mob → skip
 .found:
-    LDA     $F6
+    LDA     CHAR_INDEX
     STA     SOURCE_CHAR
     LDA     #$00
     STA     ACTIVE_CHAR
@@ -4203,9 +4211,9 @@ PICK_RANDOM_MOB:
     BEQ     PICK_RANDOM_MOB             ; zero = retry
     STA     MOB_PTR                         ; remaining count
     LDA     #$01
-    STA     $F6                         ; player index counter
+    STA     CHAR_INDEX                         ; player index counter
 .next_char:
-    LDA     $F6
+    LDA     CHAR_INDEX
     JSR     GET_CHAR_RECORD
     LDY     #$08
     LDA     MOB_PTR                         ; remaining
@@ -4214,7 +4222,7 @@ PICK_RANDOM_MOB:
     STA     MOB_PTR
     BEQ     .found                      ; exact match
     BMI     .found                      ; overshot → this is the one
-    INC     $F6
+    INC     CHAR_INDEX
     BNE     .next_char                  ; always branches
 .found:
 COPY_BE_TO_FA:
@@ -4227,14 +4235,14 @@ COPY_BE_TO_FA:
 PICK_RANDOM_CHAR:
     SUBROUTINE
     ; Pick a random character from players 2..CURRENT_PLAYER-1.
-    ; Result: $FA/$FB points to the selected char record, $F6 = index.
+    ; Result: $FA/$FB points to the selected char record, CHAR_INDEX = index.
     LDA     CURRENT_PLAYER
     SEC
     SBC     #$03                        ; range = CURRENT_PLAYER - 3
     JSR     RANDOM_IN_RANGE             ; random 0..range-1
     CLC
     ADC     #$02                        ; offset to player 2
-    STA     $F6                         ; save selected index
+    STA     CHAR_INDEX                         ; save selected index
     JSR     GET_CHAR_RECORD             ; load record for player A
     JMP     COPY_BE_TO_FA               ; copy DATA_PTR/DATA_PTR+1 → $FA/$FB
     ORG     $66CE
@@ -4264,7 +4272,7 @@ PROCESS_CHAR_EVENTS:
     SEC
     SBC     #$40                        ; normalize to 0-based
     STA     (EVENT_PTR),Y                     ; write back
-    LDA     $F6
+    LDA     CHAR_INDEX
     STA     ACTIVE_CHAR                 ; save triggering player index
     JMP     CHECK_LOCATION_MATCH
 .advance:
@@ -4280,7 +4288,7 @@ PROCESS_CHAR_EVENTS:
 FIND_MOB_BY_FACTION:
     SUBROUTINE
     ; Walk the mob linked list from ($FA) byte 2, looking for a mob
-    ; whose byte $0F has bit 7 set and bits 6-4 match $F7 (faction).
+    ; whose byte $0F has bit 7 set and bits 6-4 match FACTION_MASK (faction).
     ; Returns A=1 if found (with MOB_PTR/MOB_PTR+1 pointing to it), A=0 if not.
     LDY     #$02
     LDA     (CHAR_PTR),Y                     ; char record byte 2 = first link
@@ -4297,7 +4305,7 @@ FIND_MOB_BY_FACTION:
     LDA     (MOB_PTR),Y                     ; mob data byte $0F
     BPL     .next                       ; bit 7 clear → skip
     AND     #$70                        ; bits 6-4
-    CMP     $F7                         ; match faction?
+    CMP     FACTION_MASK                         ; match faction?
     BNE     .next
     LDA     #$01                        ; found → return 1
     RTS
@@ -5061,42 +5069,42 @@ PROCESS_SCENE_GROUPS:
     ORG     $704D
 MODIFY_CHAR_STATS:
     SUBROUTINE
-    ; Add or subtract gold from char record at ($F6).
+    ; Add or subtract gold from char record at (EFFECT_REC).
     ; Y=0: subtract NUM_VALUE/NUM_VALUE+1 from field 13/14
     ; Y≠0: add NUM_VALUE/NUM_VALUE+1 to field 13/14
     ; Then recompute field 12 (level/XP encoding).
     CPY     #$00
     BEQ     .subtract
     LDY     #$0D
-    LDA     ($F6),Y
+    LDA     (EFFECT_REC),Y
     CLC
     ADC     NUM_VALUE
-    STA     ($F6),Y
+    STA     (EFFECT_REC),Y
     INY
-    LDA     ($F6),Y
+    LDA     (EFFECT_REC),Y
     ADC     NUM_VALUE+1
-    STA     ($F6),Y
+    STA     (EFFECT_REC),Y
     JMP     .aftermath
 .subtract:
     LDY     #$0D
     SEC
-    LDA     ($F6),Y
+    LDA     (EFFECT_REC),Y
     SBC     NUM_VALUE
-    STA     ($F6),Y
+    STA     (EFFECT_REC),Y
     INY
-    LDA     ($F6),Y
+    LDA     (EFFECT_REC),Y
     SBC     NUM_VALUE+1
-    STA     ($F6),Y
+    STA     (EFFECT_REC),Y
 .aftermath:
     LDY     #$05
-    LDA     ($F6),Y
+    LDA     (EFFECT_REC),Y
     ROL
     ROL
     ROL
     AND     #$F8
     STA     $5A7E
     LDY     #$0C
-    LDA     ($F6),Y
+    LDA     (EFFECT_REC),Y
     PHA
     AND     #$0F
     TAX
@@ -5128,12 +5136,12 @@ MODIFY_CHAR_STATS:
     BCC     .no_carry
     INC     $BB
 .no_carry:
-    LDA     ($F6),Y
+    LDA     (EFFECT_REC),Y
     CMP     $BB
     BCC     .store_final
     BNE     .next_iter
     DEY
-    LDA     ($F6),Y
+    LDA     (EFFECT_REC),Y
     CMP     $BA
     BCC     .store_final
 .next_iter:
@@ -5147,16 +5155,16 @@ MODIFY_CHAR_STATS:
     TXA
     ORA     STAT_LEVEL_BITS
     LDY     #$0C
-    STA     ($F6),Y
+    STA     (EFFECT_REC),Y
     RTS
     ORG     $70D4
 MODIFY_CURRENT_STATS:
     SUBROUTINE
-    ; Copy ENTITY_PTR/ENTITY_PTR+1 → $F6/$F7, JMP $704D (treasure lookup)
+    ; Copy ENTITY_PTR/ENTITY_PTR+1 → EFFECT_REC/EFFECT_REC+1, JMP $704D (treasure lookup)
     LDA     ENTITY_PTR
-    STA     $F6
+    STA     EFFECT_REC
     LDA     ENTITY_PTR+1
-    STA     $F7
+    STA     EFFECT_REC+1
     JMP     MODIFY_CHAR_STATS
     ORG     $70DF
 DISPLAY_SHOP:
@@ -6007,17 +6015,17 @@ SCRIPT_ENGINE:
 
 .setup_2:
     DEY
-    STY     $80D5
+    STY     $80D5                   ; patch byte in script 1 data
     JMP     .load_ptr
 .setup_4:
     DEY
-    STY     $80E3
+    STY     $80E3                   ; patch byte in script 2 data
 
 .load_ptr:
     LDA     SCRIPT_TABLE,X          ; low byte
-    STA     $E4
+    STA     SCRIPT_PC
     LDA     SCRIPT_TABLE+1,X        ; high byte
-    STA     $E5                     ; $E4/$E5 = script start address
+    STA     SCRIPT_PC+1                     ; SCRIPT_PC/SCRIPT_PC+1 = script start address
 
     LDA     #$00
     STA     SCRIPT_LOOP_CTR         ; loop counter = 0
@@ -6026,7 +6034,7 @@ SCRIPT_ENGINE:
 SCRIPT_ENGINE_FETCH:
 .fetch:
     LDY     #$00
-    LDA     ($E4),Y                 ; read script byte
+    LDA     (SCRIPT_PC),Y                 ; read script byte
     CMP     #$27
     BCC     .control                ; < $27 → control command
     JMP     .action                 ; ≥ $27 → action dispatch
@@ -6037,8 +6045,8 @@ SCRIPT_ENGINE_FETCH:
     BCS     .cmd_26                 ; $26: PRNG mask = $00
 
     CMP     #$23
-    BEQ     .cmd_23                 ; set action vector → $7A7F
-    BCS     .cmd_24                 ; set action vector → $7A91
+    BEQ     .cmd_23                 ; set action vector → PLAY_TONE
+    BCS     .cmd_24                 ; set action vector → PLAY_NOISE
 
     CMP     #$21
     BEQ     .cmd_21                 ; gosub
@@ -6055,9 +6063,9 @@ SCRIPT_ENGINE_FETCH:
 
     INC     SCRIPT_LOOP_CTR         ; counter++
     LDA     SCRIPT_LOOP_ADDR        ; \
-    STA     $E4                     ;  | $E4/$E5 = loop address
+    STA     SCRIPT_PC                     ;  | SCRIPT_PC/SCRIPT_PC+1 = loop address
     LDA     SCRIPT_LOOP_ADDR+1      ;  |
-    STA     $E5                     ; /
+    STA     SCRIPT_PC+1                     ; /
     JMP     .fetch
 
 .end_loop:
@@ -6075,12 +6083,12 @@ SCRIPT_ENGINE_FETCH:
     STA     SCRIPT_PRNG_MASK
     JMP     SCRIPT_ADVANCE
 
-.cmd_23:                            ; action vector → $7A7F
-    STOW    $7A7F,SCRIPT_ACTION_VEC
+.cmd_23:                            ; action vector → PLAY_TONE
+    STOW    PLAY_TONE,SCRIPT_ACTION_VEC
     JMP     SCRIPT_ADVANCE
 
-.cmd_24:                            ; action vector → $7A91
-    STOW    $7A91,SCRIPT_ACTION_VEC
+.cmd_24:                            ; action vector → PLAY_NOISE
+    STOW    PLAY_NOISE,SCRIPT_ACTION_VEC
     JMP     SCRIPT_ADVANCE
 
 .cmd_22:                            ; nop (return from script)
@@ -6088,40 +6096,40 @@ SCRIPT_ENGINE_FETCH:
 
 .cmd_21:                            ; gosub: jump to saved address
     LDA     SCRIPT_GOSUB_ADDR
-    STA     $E4
+    STA     SCRIPT_PC
     LDA     SCRIPT_GOSUB_ADDR+1
-    STA     $E5
+    STA     SCRIPT_PC+1
     JMP     .fetch
 
 .cmd_1F:                            ; set loop address = current+1
     JSR     SCRIPT_INC_E4
-    LDA     $E4
+    LDA     SCRIPT_PC
     STA     SCRIPT_LOOP_ADDR
-    LDA     $E5
+    LDA     SCRIPT_PC+1
     STA     SCRIPT_LOOP_ADDR+1
     JMP     .fetch
 
 .cmd_20:                            ; set gosub address = current+1
     JSR     SCRIPT_INC_E4
-    LDA     $E4
+    LDA     SCRIPT_PC
     STA     SCRIPT_GOSUB_ADDR
-    LDA     $E5
+    LDA     SCRIPT_PC+1
     STA     SCRIPT_GOSUB_ADDR+1
     JMP     .fetch
 
 .action:
-    STA     $E2                     ; save action byte
+    STA     SOUND_DURATION                     ; save action byte
     JSR     STEP_PRNG
     LDA     PRNG_OUTPUT             ; PRNG output
     AND     SCRIPT_PRNG_MASK        ; apply mask
-    EOR     $E2                     ; XOR with action byte
-    STA     $E1                     ; modified action
+    EOR     SOUND_DURATION                     ; XOR with action byte
+    STA     SOUND_FREQ                     ; modified action
     JSR     SCRIPT_INC_E4           ; advance script pointer
     LDY     #$00
-    LDA     ($E4),Y                 ; read parameter byte
-    STA     $E2
+    LDA     (SCRIPT_PC),Y                 ; read parameter byte
+    STA     SOUND_DURATION
     JSR     SCRIPT_ACTION_INDIRECT  ; → JMP (SCRIPT_ACTION_VEC)
-    JMP     ($F6)                   ; dispatch via action vector
+    JMP     (DISPATCH_VEC)                   ; dispatch via action vector
     ORG     $7A4F
 SCRIPT_ADVANCE:
     SUBROUTINE
@@ -6136,7 +6144,7 @@ SCRIPT_ADVANCE:
     RTS                             ; key pressed → exit
 
 .check_joy:
-    LDA     $5A00                   ; joystick flag
+    LDA     INPUT_MODE              ; joystick flag
     BEQ     .continue               ; no joystick → continue script
     LDX     #$00
     LDA     $C061,X                 ; button 0
@@ -6155,16 +6163,54 @@ SCRIPT_ADVANCE:
 SCRIPT_INC_E4:
     SUBROUTINE
 
-    INC     $E4
+    INC     SCRIPT_PC
     BEQ     .carry
     RTS
 .carry:
-    INC     $E5
+    INC     SCRIPT_PC+1
     RTS
 
     ORG     $7A4C
 SCRIPT_ACTION_INDIRECT:
     JMP     (SCRIPT_ACTION_VEC)
+    ORG     $7A7F
+PLAY_TONE:
+    SUBROUTINE
+
+.outer:
+    LDY     #$0A                    ; 10 speaker toggles per cycle
+.toggle:
+    LDA     $C030                   ; toggle speaker
+    DEX
+    BNE     .toggle                 ; inner delay loop
+    LDX     SOUND_FREQ              ; reload pitch counter
+    DEY
+    BNE     .toggle                 ; next toggle
+    DEC     SOUND_DURATION          ; repeat whole cycle
+    BNE     .outer
+    RTS
+    ORG     $7A91
+PLAY_NOISE:
+    SUBROUTINE
+
+.outer:
+    LDY     #$0A                    ; 10 toggles per cycle
+.toggle:
+    LDA     $C030                   ; toggle speaker
+    ROL     NOISE_SHIFT             ; rotate shift register left
+    DEX
+    BNE     .toggle                 ; inner delay loop
+    LDX     SOUND_FREQ              ; reload pitch counter
+    ROL     NOISE_SHIFT             ; \ rotate left then right =
+    ROR     NOISE_SHIFT             ; / feedback from carry bit
+    NOP                             ; \
+    NOP                             ;  | timing padding
+    NOP                             ; /
+    DEY
+    BNE     .toggle                 ; next toggle
+    DEC     SOUND_DURATION          ; repeat whole cycle
+    BNE     .outer
+    RTS
     ORG     $7E2F
 STATUS_BORDER_DATA:
     HEX     7D                      ; $7D: reset to full-screen
