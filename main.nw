@@ -4818,7 +4818,7 @@ TEXT_RENDERER:
     LDY     TEXT_STREAM_IDX                   ; restore stream index
     INY                             ; advance to next byte
     BNE     .fetch                  ; loop (max 256 per page)
-    JMP     $1A31                   ; overflow handler
+    JMP     MOVE_LOOP               ; overflow handler
 
     ; --- Position command ($80-$FE) ---
 .set_pos:
@@ -6908,6 +6908,7 @@ GAME_TURN_LOOP:
     BNE     .move_loop          ; always
 
     ; === MOVEMENT LOOP ===
+MOVE_LOOP:                     ; $1A31 - external entry point
 .move_loop:
     LDA     #$00
     CMP     MOVE_POINTS
@@ -7071,7 +7072,7 @@ GAME_TURN_LOOP:
 
 .empty_slot:
     JMP     HANDLE_EVENT_SLOT            ; $FE: empty slot interaction
-@ %def GAME_TURN_LOOP
+@ %def GAME_TURN_LOOP MOVE_LOOP
 
 <<handle encounter>>=
     ORG     $1C01
@@ -8375,11 +8376,6 @@ LOAD_TARGET_PTR:
     RTS
 @ %def LOAD_TARGET_PTR
 
-<<fun 1a31>>=
-    ORG     $1A31
-FUN_1A31:
-@ %def FUN_1A31
-
 <<end turn>>=
     ORG     $1BA7
 END_TURN:
@@ -8501,7 +8497,7 @@ HANDLE_EVENT_SLOT:
     BNE     .has_threat
     STA     $5A65
 .has_threat:
-    JMP     FUN_1A31
+    JMP     MOVE_LOOP
 .not_active:
     PHA
     LDX     #$0E
@@ -8541,6 +8537,7 @@ HANDLE_EVENT_SLOT:
     AND     #$3F
     ORA     #$40
     STA     ($BE),Y
+EVENT_PRNG_CHECK:              ; $1DDC - external entry point
     JSR     STEP_PRNG
     LDA     $5A18
     CMP     #$14
@@ -8595,13 +8592,8 @@ HANDLE_EVENT_SLOT:
     STA     TURN_START_ROW
     JSR     RESET_TURN_POS
     JSR     ANIM_TICK_AND_WAIT
-    JMP     FUN_1DDC
-@ %def HANDLE_EVENT_SLOT
-
-<<fun 1ddc>>=
-    ORG     $1DDC
-FUN_1DDC:
-@ %def FUN_1DDC
+    JMP     EVENT_PRNG_CHECK
+@ %def HANDLE_EVENT_SLOT EVENT_PRNG_CHECK
 
 <<player attack>>=
     ORG     $1751
@@ -8703,7 +8695,7 @@ PLAYER_ATTACK:
 .show_found:
     LDA     #$12
     JSR     DISPLAY_MESSAGE
-    JMP     FUN_1DDC
+    JMP     EVENT_PRNG_CHECK
 .take_item:
     JSR     PROCESS_ENTITY_SCRIPT
     JSR     SET_CURSOR_ROW21
@@ -8714,7 +8706,7 @@ PLAYER_ATTACK:
     BPL     .show_found
     LDA     #$03
     JSR     SCENE_LOOP
-    JMP     FUN_1DDC
+    JMP     EVENT_PRNG_CHECK
 .blocked:
     JSR     DISPATCH_ON_MODE
     JSR     SET_CURSOR_ROW21
@@ -8853,7 +8845,7 @@ HANDLE_MOB_ENCOUNTER:
     BEQ     .one_threat
     JMP     END_TURN
 .one_threat:
-    JMP     FUN_1A31
+    JMP     MOVE_LOOP
 .hostile:
     JSR     FIRST_GROUP_MEMBER
 .walk_group:
@@ -10589,7 +10581,6 @@ The following root chunks produce the assembly files when tangled.
 <<calc combat strength>>
 <<load target ptr>>
 <<game turn loop>>
-<<fun 1a31>>
 <<commit move>>
 <<end turn>>
 <<set state fight>>
@@ -10601,7 +10592,6 @@ The following root chunks produce the assembly files when tangled.
 <<show locked msg>>
 <<trigger scene event>>
 <<handle event slot>>
-<<fun 1ddc>>
 <<player attack>>
 <<process entity script>>
 <<mob attack>>

@@ -2440,6 +2440,7 @@ GAME_TURN_LOOP:
     BNE     .move_loop          ; always
 
     ; === MOVEMENT LOOP ===
+MOVE_LOOP:                     ; $1A31 - external entry point
 .move_loop:
     LDA     #$00
     CMP     MOVE_POINTS
@@ -2603,8 +2604,6 @@ GAME_TURN_LOOP:
 
 .empty_slot:
     JMP     HANDLE_EVENT_SLOT            ; $FE: empty slot interaction
-    ORG     $1A31
-FUN_1A31:
     ORG     $1B52
 COMMIT_MOVE:
     SUBROUTINE
@@ -2915,7 +2914,7 @@ HANDLE_EVENT_SLOT:
     BNE     .has_threat
     STA     $5A65
 .has_threat:
-    JMP     FUN_1A31
+    JMP     MOVE_LOOP
 .not_active:
     PHA
     LDX     #$0E
@@ -2955,6 +2954,7 @@ HANDLE_EVENT_SLOT:
     AND     #$3F
     ORA     #$40
     STA     ($BE),Y
+EVENT_PRNG_CHECK:              ; $1DDC - external entry point
     JSR     STEP_PRNG
     LDA     $5A18
     CMP     #$14
@@ -3009,9 +3009,7 @@ HANDLE_EVENT_SLOT:
     STA     TURN_START_ROW
     JSR     RESET_TURN_POS
     JSR     ANIM_TICK_AND_WAIT
-    JMP     FUN_1DDC
-    ORG     $1DDC
-FUN_1DDC:
+    JMP     EVENT_PRNG_CHECK
     ORG     $1751
 PLAYER_ATTACK:
     SUBROUTINE
@@ -3111,7 +3109,7 @@ PLAYER_ATTACK:
 .show_found:
     LDA     #$12
     JSR     DISPLAY_MESSAGE
-    JMP     FUN_1DDC
+    JMP     EVENT_PRNG_CHECK
 .take_item:
     JSR     PROCESS_ENTITY_SCRIPT
     JSR     SET_CURSOR_ROW21
@@ -3122,7 +3120,7 @@ PLAYER_ATTACK:
     BPL     .show_found
     LDA     #$03
     JSR     SCENE_LOOP
-    JMP     FUN_1DDC
+    JMP     EVENT_PRNG_CHECK
 .blocked:
     JSR     DISPATCH_ON_MODE
     JSR     SET_CURSOR_ROW21
@@ -3347,7 +3345,7 @@ HANDLE_MOB_ENCOUNTER:
     BEQ     .one_threat
     JMP     END_TURN
 .one_threat:
-    JMP     FUN_1A31
+    JMP     MOVE_LOOP
 .hostile:
     JSR     FIRST_GROUP_MEMBER
 .walk_group:
@@ -4885,7 +4883,7 @@ TEXT_RENDERER:
     LDY     TEXT_STREAM_IDX                   ; restore stream index
     INY                             ; advance to next byte
     BNE     .fetch                  ; loop (max 256 per page)
-    JMP     $1A31                   ; overflow handler
+    JMP     MOVE_LOOP               ; overflow handler
 
     ; --- Position command ($80-$FE) ---
 .set_pos:
