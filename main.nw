@@ -3245,16 +3245,53 @@ MAIN_ENTRY:
     SUBROUTINE
 
     JSR     GAME_INIT
+.restart:
     LDA     #$09                    ; \
     STA     $FA                     ;  | $FA/$FB = $4009 (character record base)
     LDA     #$40                    ;  |
     STA     $FB                     ; /
     LDA     TOTAL_MOB_COUNT         ; zero on first run (no mobs yet)
-    BNE     .skip                   ; nonzero = game in progress
+    BNE     .has_mobs               ; nonzero = game in progress
     JSR     ATTRACT_SCREEN
-.skip:
-    ; ... continues to game loop ...
+.has_mobs:
+    LDA     #$01
+    STA     CURRENT_PLAYER          ; start with player 1
+.char_loop:
+    LDY     #$08
+    LDA     ($FA),Y                 ; char record byte 8 (status/group)
+    BEQ     .next_char              ; zero = inactive, skip
+    JSR     ENTER_LOCATION          ; draw map if location changed
+    LDA     CURRENT_PLAYER
+    CMP     #$01                    ; player 1?
+    BEQ     .run_scene
+    CMP     #$03                    ; player 3?
+    BNE     .process_mobs
+.run_scene:
+    JSR     FUN_6DFA                ; scene event processing (players 1 & 3)
+.process_mobs:
+    JSR     FUN_0884                ; process mobs for this character
+.next_char:
+    INC     CURRENT_PLAYER
+    CLC
+    LDA     #$09                    ; advance to next 9-byte record
+    ADC     $FA
+    STA     $FA
+    BCC     .no_carry
+    INC     $FB
+.no_carry:
+    LDY     #$01
+    LDA     ($FA),Y                 ; byte 1 of next record
+    CMP     #$FF                    ; $FF = end-of-table sentinel
+    BNE     .char_loop              ; more characters → loop
+    JSR     FUN_65A9                ; between-round processing (random events)
+    JMP     .restart                ; restart the game loop
 @ %def MAIN_ENTRY
+
+<<defines>>=
+FUN_6DFA                EQU     $6DFA   ; scene event processing
+FUN_0884                EQU     $0884   ; per-character mob processing
+FUN_65A9                EQU     $65A9   ; between-round random events
+@ %def FUN_6DFA FUN_0884 FUN_65A9
 
 <<defines>>=
 INPUT_MODE          EQU     $5A00   ; 0 = keyboard, 1 = joystick
