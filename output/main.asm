@@ -3687,7 +3687,7 @@ SETUP_CURSOR_EXT:
     SUBROUTINE
 ; Sets up cursor: calls $5FBC, positions, loads ptr from ($C2)+6/7, prints
 SETUP_CURSOR:
-    JSR     FUN_5FBC
+    JSR     SET_CURSOR_POS
     JSR     PRINT_CTRL_AB
     LDY     #$06
     LDA     ($C2),Y
@@ -3698,7 +3698,31 @@ SETUP_CURSOR:
     JSR     PRINT_FROM_PTR
     JMP     PRINT_CTRL_N
     ORG     $5FBC
-FUN_5FBC:
+    SUBROUTINE
+; Maps linear position at ($C2)+1 to VTAB ($25) and HTAB ($24)
+; Positions 0-39 -> row 21, 40-79 -> row 22, 80+ -> row 23
+SET_CURSOR_POS:
+    LDY     #$01
+    LDA     ($C2),Y
+    CMP     #$28
+    BCS     .row2
+    LDY     #$15               ; row 21
+    BNE     .set_pos
+.row2:
+    SEC
+    SBC     #$28
+    CMP     #$28
+    BCS     .row3
+    LDY     #$16               ; row 22
+    BNE     .set_pos
+.row3:
+    LDY     #$17               ; row 23
+    SEC
+    SBC     #$28
+.set_pos:
+    STY     $25
+    STA     $24
+    RTS
     ORG     $5FDD
     SUBROUTINE
 ; Validates input: saves $C2/$C3, loops reading input until valid record found
@@ -3709,7 +3733,7 @@ VALIDATE_INPUT:
     LDA     $C3
     PHA
 .retry:
-    JSR     FUN_600A
+    JSR     READ_INPUT_CHAR
     CMP     #$00
     BEQ     .done
     CMP     $5AAB
@@ -3732,7 +3756,15 @@ VALIDATE_INPUT:
     TYA
     RTS
     ORG     $600A
-FUN_600A:
+    SUBROUTINE
+; Returns character at ($C2) + $5B24 + 1
+READ_INPUT_CHAR:
+    CLC
+    LDA     $5B24
+    ADC     #$01
+    TAY
+    LDA     ($C2),Y
+    RTS
     ORG     $6014
 CALL_INPUT_INIT:
     SUBROUTINE

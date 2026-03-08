@@ -10564,7 +10564,7 @@ simply the total mob count.
     SUBROUTINE
 ; Sets up cursor: calls $5FBC, positions, loads ptr from ($C2)+6/7, prints
 \nwlinkedidentc{SETUP_CURSOR}{PYNWmai0-CBZBIR5OXKOAWODTCFCFIXJC7I000000-1}:
-    JSR     \nwlinkedidentc{FUN_5FBC}{PYNWmai0-7QCXSF524ETVD6C5HMBFTGNSGE000000-1}
+    JSR     \nwlinkedidentc{SET_CURSOR_POS}{PYNWmai0-5LVLMTUS4H3FNMLGJOVUKMZFXY000000-1}
     JSR     \nwlinkedidentc{PRINT_CTRL_AB}{PYNWmai0-UD4UC22WSFS3NXK2ZFCXIN73PU000000-1}
     LDY     #$06
     LDA     ($C2),Y
@@ -10575,7 +10575,7 @@ simply the total mob count.
     JSR     \nwlinkedidentc{PRINT_FROM_PTR}{PYNWmai0-XAPVU72S6LIKQGYUGORXPGRLK4000000-1}
     JMP     \nwlinkedidentc{PRINT_CTRL_N}{PYNWmai0-RGTFW4EP4BOQ3NW4HSWPGFKDAU000000-1}
 \nwindexdefn{\nwixident{SETUP{\_}CURSOR}}{SETUP:unCURSOR}{PYNWmai0-CBZBIR5OXKOAWODTCFCFIXJC7I000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{SETUP{\_}CURSOR}}{SETUP:unCURSOR}}}\nwidentuses{\\{{\nwixident{FUN{\_}5FBC}}{FUN:un5FBC}}\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}\\{{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}}\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}}\nwindexuse{\nwixident{FUN{\_}5FBC}}{FUN:un5FBC}{PYNWmai0-CBZBIR5OXKOAWODTCFCFIXJC7I000000-1}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}{PYNWmai0-CBZBIR5OXKOAWODTCFCFIXJC7I000000-1}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}{PYNWmai0-CBZBIR5OXKOAWODTCFCFIXJC7I000000-1}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-CBZBIR5OXKOAWODTCFCFIXJC7I000000-1}\nwendcode{}\nwbegindocs{501}\nwdocspar
+\nwidentdefs{\\{{\nwixident{SETUP{\_}CURSOR}}{SETUP:unCURSOR}}}\nwidentuses{\\{{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}}\\{{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}}\\{{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}}\\{{\nwixident{SET{\_}CURSOR{\_}POS}}{SET:unCURSOR:unPOS}}}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}AB}}{PRINT:unCTRL:unAB}{PYNWmai0-CBZBIR5OXKOAWODTCFCFIXJC7I000000-1}\nwindexuse{\nwixident{PRINT{\_}CTRL{\_}N}}{PRINT:unCTRL:unN}{PYNWmai0-CBZBIR5OXKOAWODTCFCFIXJC7I000000-1}\nwindexuse{\nwixident{PRINT{\_}FROM{\_}PTR}}{PRINT:unFROM:unPTR}{PYNWmai0-CBZBIR5OXKOAWODTCFCFIXJC7I000000-1}\nwindexuse{\nwixident{SET{\_}CURSOR{\_}POS}}{SET:unCURSOR:unPOS}{PYNWmai0-CBZBIR5OXKOAWODTCFCFIXJC7I000000-1}\nwendcode{}\nwbegindocs{501}\nwdocspar
 
 \nwenddocs{}\nwbegincode{502}\sublabel{PYNWmai0-EZRVGGNNVSNZAPYZLOQ7EISCNI000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-EZRVGGNNVSNZAPYZLOQ7EISCNI000000-1}}}\moddef{validate input~{\nwtagstyle{}\subpageref{PYNWmai0-EZRVGGNNVSNZAPYZLOQ7EISCNI000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $5FDD
@@ -10588,7 +10588,7 @@ simply the total mob count.
     LDA     $C3
     PHA
 .retry:
-    JSR     \nwlinkedidentc{FUN_600A}{PYNWmai0-F5FIDV54SDOQST26VTY3QMUYZM000000-1}
+    JSR     \nwlinkedidentc{READ_INPUT_CHAR}{PYNWmai0-NJKTNAHFCRYCRVDBACZOIBQD24000000-1}
     CMP     #$00
     BEQ     .done
     CMP     $5AAB
@@ -10611,7 +10611,7 @@ simply the total mob count.
     TYA
     RTS
 \nwindexdefn{\nwixident{VALIDATE{\_}INPUT}}{VALIDATE:unINPUT}{PYNWmai0-EZRVGGNNVSNZAPYZLOQ7EISCNI000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{VALIDATE{\_}INPUT}}{VALIDATE:unINPUT}}}\nwidentuses{\\{{\nwixident{CALC{\_}RECORD{\_}PTR}}{CALC:unRECORD:unPTR}}\\{{\nwixident{FUN{\_}600A}}{FUN:un600A}}}\nwindexuse{\nwixident{CALC{\_}RECORD{\_}PTR}}{CALC:unRECORD:unPTR}{PYNWmai0-EZRVGGNNVSNZAPYZLOQ7EISCNI000000-1}\nwindexuse{\nwixident{FUN{\_}600A}}{FUN:un600A}{PYNWmai0-EZRVGGNNVSNZAPYZLOQ7EISCNI000000-1}\nwendcode{}\nwbegindocs{503}\nwdocspar
+\nwidentdefs{\\{{\nwixident{VALIDATE{\_}INPUT}}{VALIDATE:unINPUT}}}\nwidentuses{\\{{\nwixident{CALC{\_}RECORD{\_}PTR}}{CALC:unRECORD:unPTR}}\\{{\nwixident{READ{\_}INPUT{\_}CHAR}}{READ:unINPUT:unCHAR}}}\nwindexuse{\nwixident{CALC{\_}RECORD{\_}PTR}}{CALC:unRECORD:unPTR}{PYNWmai0-EZRVGGNNVSNZAPYZLOQ7EISCNI000000-1}\nwindexuse{\nwixident{READ{\_}INPUT{\_}CHAR}}{READ:unINPUT:unCHAR}{PYNWmai0-EZRVGGNNVSNZAPYZLOQ7EISCNI000000-1}\nwendcode{}\nwbegindocs{503}\nwdocspar
 
 \nwenddocs{}\nwbegincode{504}\sublabel{PYNWmai0-QAFLGM36KP7VDGVEYKRTTGIIV4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-QAFLGM36KP7VDGVEYKRTTGIIV4000000-1}}}\moddef{copy record data~{\nwtagstyle{}\subpageref{PYNWmai0-QAFLGM36KP7VDGVEYKRTTGIIV4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $604C
@@ -10701,17 +10701,49 @@ simply the total mob count.
 \nwindexdefn{\nwixident{GET{\_}ENTITY{\_}THREAT}}{GET:unENTITY:unTHREAT}{PYNWmai0-A45UBXB4GHNPJITGSLH4DQKEGE000000-1}\eatline
 \nwidentdefs{\\{{\nwixident{GET{\_}ENTITY{\_}THREAT}}{GET:unENTITY:unTHREAT}}}\nwendcode{}\nwbegindocs{511}\nwdocspar
 
-\nwenddocs{}\nwbegincode{512}\sublabel{PYNWmai0-7QCXSF524ETVD6C5HMBFTGNSGE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-7QCXSF524ETVD6C5HMBFTGNSGE000000-1}}}\moddef{fun 5fbc~{\nwtagstyle{}\subpageref{PYNWmai0-7QCXSF524ETVD6C5HMBFTGNSGE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{512}\sublabel{PYNWmai0-5LVLMTUS4H3FNMLGJOVUKMZFXY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-5LVLMTUS4H3FNMLGJOVUKMZFXY000000-1}}}\moddef{set cursor pos~{\nwtagstyle{}\subpageref{PYNWmai0-5LVLMTUS4H3FNMLGJOVUKMZFXY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $5FBC
-\nwlinkedidentc{FUN_5FBC}{PYNWmai0-7QCXSF524ETVD6C5HMBFTGNSGE000000-1}:
-\nwindexdefn{\nwixident{FUN{\_}5FBC}}{FUN:un5FBC}{PYNWmai0-7QCXSF524ETVD6C5HMBFTGNSGE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{FUN{\_}5FBC}}{FUN:un5FBC}}}\nwendcode{}\nwbegindocs{513}\nwdocspar
+    SUBROUTINE
+; Maps linear position at ($C2)+1 to VTAB ($25) and HTAB ($24)
+; Positions 0-39 -> row 21, 40-79 -> row 22, 80+ -> row 23
+\nwlinkedidentc{SET_CURSOR_POS}{PYNWmai0-5LVLMTUS4H3FNMLGJOVUKMZFXY000000-1}:
+    LDY     #$01
+    LDA     ($C2),Y
+    CMP     #$28
+    BCS     .row2
+    LDY     #$15               ; row 21
+    BNE     .set_pos
+.row2:
+    SEC
+    SBC     #$28
+    CMP     #$28
+    BCS     .row3
+    LDY     #$16               ; row 22
+    BNE     .set_pos
+.row3:
+    LDY     #$17               ; row 23
+    SEC
+    SBC     #$28
+.set_pos:
+    STY     $25
+    STA     $24
+    RTS
+\nwindexdefn{\nwixident{SET{\_}CURSOR{\_}POS}}{SET:unCURSOR:unPOS}{PYNWmai0-5LVLMTUS4H3FNMLGJOVUKMZFXY000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{SET{\_}CURSOR{\_}POS}}{SET:unCURSOR:unPOS}}}\nwendcode{}\nwbegindocs{513}\nwdocspar
 
-\nwenddocs{}\nwbegincode{514}\sublabel{PYNWmai0-F5FIDV54SDOQST26VTY3QMUYZM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-F5FIDV54SDOQST26VTY3QMUYZM000000-1}}}\moddef{fun 600a~{\nwtagstyle{}\subpageref{PYNWmai0-F5FIDV54SDOQST26VTY3QMUYZM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{514}\sublabel{PYNWmai0-NJKTNAHFCRYCRVDBACZOIBQD24000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-NJKTNAHFCRYCRVDBACZOIBQD24000000-1}}}\moddef{read input char~{\nwtagstyle{}\subpageref{PYNWmai0-NJKTNAHFCRYCRVDBACZOIBQD24000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $600A
-\nwlinkedidentc{FUN_600A}{PYNWmai0-F5FIDV54SDOQST26VTY3QMUYZM000000-1}:
-\nwindexdefn{\nwixident{FUN{\_}600A}}{FUN:un600A}{PYNWmai0-F5FIDV54SDOQST26VTY3QMUYZM000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{FUN{\_}600A}}{FUN:un600A}}}\nwendcode{}\nwbegindocs{515}\nwdocspar
+    SUBROUTINE
+; Returns character at ($C2) + $5B24 + 1
+\nwlinkedidentc{READ_INPUT_CHAR}{PYNWmai0-NJKTNAHFCRYCRVDBACZOIBQD24000000-1}:
+    CLC
+    LDA     $5B24
+    ADC     #$01
+    TAY
+    LDA     ($C2),Y
+    RTS
+\nwindexdefn{\nwixident{READ{\_}INPUT{\_}CHAR}}{READ:unINPUT:unCHAR}{PYNWmai0-NJKTNAHFCRYCRVDBACZOIBQD24000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{READ{\_}INPUT{\_}CHAR}}{READ:unINPUT:unCHAR}}}\nwendcode{}\nwbegindocs{515}\nwdocspar
 \nwenddocs{}\nwbegindocs{516}\chapter{Assembly output}
 
 The following root chunks produce the assembly files when tangled.
@@ -10822,9 +10854,9 @@ The following root chunks produce the assembly files when tangled.
 \LA{}calc record ptr~{\nwtagstyle{}\subpageref{PYNWmai0-7EUG7CO33OEBTT34NP4BWDV3J4000000-1}}\RA{}
 \LA{}setup cursor ext~{\nwtagstyle{}\subpageref{PYNWmai0-C2WVX7U2VKS2SCHIYVX2NGG5SY000000-1}}\RA{}
 \LA{}setup cursor~{\nwtagstyle{}\subpageref{PYNWmai0-CBZBIR5OXKOAWODTCFCFIXJC7I000000-1}}\RA{}
-\LA{}fun 5fbc~{\nwtagstyle{}\subpageref{PYNWmai0-7QCXSF524ETVD6C5HMBFTGNSGE000000-1}}\RA{}
+\LA{}set cursor pos~{\nwtagstyle{}\subpageref{PYNWmai0-5LVLMTUS4H3FNMLGJOVUKMZFXY000000-1}}\RA{}
 \LA{}validate input~{\nwtagstyle{}\subpageref{PYNWmai0-EZRVGGNNVSNZAPYZLOQ7EISCNI000000-1}}\RA{}
-\LA{}fun 600a~{\nwtagstyle{}\subpageref{PYNWmai0-F5FIDV54SDOQST26VTY3QMUYZM000000-1}}\RA{}
+\LA{}read input char~{\nwtagstyle{}\subpageref{PYNWmai0-NJKTNAHFCRYCRVDBACZOIBQD24000000-1}}\RA{}
 \LA{}call input init~{\nwtagstyle{}\subpageref{PYNWmai0-ZBOIPAZHRCP7LCIQEHWBTZDUT4000000-1}}\RA{}
 \LA{}clear input buffer~{\nwtagstyle{}\subpageref{PYNWmai0-JR46VKN75B4RVQQQF4QQ2VNN7M000000-1}}\RA{}
 \LA{}render input buffer~{\nwtagstyle{}\subpageref{PYNWmai0-RSHMOQOCPDKRT4BUTXBS36IJQQ000000-1}}\RA{}
@@ -11310,8 +11342,6 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{fontdata.asm}{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}{\nwixd{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}}}%
 \nwixlogsorted{c}{{fun 1a31}{PYNWmai0-6VUGIS77RYKB3JKBDKRFZEVGOA000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-6VUGIS77RYKB3JKBDKRFZEVGOA000000-1}}}%
 \nwixlogsorted{c}{{fun 1ddc}{PYNWmai0-XGKUU677DKKFSMDO47RZDSMUGY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-XGKUU677DKKFSMDO47RZDSMUGY000000-1}}}%
-\nwixlogsorted{c}{{fun 5fbc}{PYNWmai0-7QCXSF524ETVD6C5HMBFTGNSGE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-7QCXSF524ETVD6C5HMBFTGNSGE000000-1}}}%
-\nwixlogsorted{c}{{fun 600a}{PYNWmai0-F5FIDV54SDOQST26VTY3QMUYZM000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-F5FIDV54SDOQST26VTY3QMUYZM000000-1}}}%
 \nwixlogsorted{c}{{game init}{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-XR5IMSHLGD4AKOBGLQGCQ6POTY000000-1}}}%
 \nwixlogsorted{c}{{game turn loop}{PYNWmai0-5SXQOZOU4UJBYWY65C5UO66FXM000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-5SXQOZOU4UJBYWY65C5UO66FXM000000-1}}}%
 \nwixlogsorted{c}{{get char record}{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-PDZVFDW3WMN7YKZPZWVSWNODJE000000-1}}}%
@@ -11365,6 +11395,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{process entity script}{PYNWmai0-Q3AHCFQFAYHI5ZDCFHGADKUUBU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-Q3AHCFQFAYHI5ZDCFHGADKUUBU000000-1}}}%
 \nwixlogsorted{c}{{pull two ret addrs}{PYNWmai0-ZQ3HACWSYBTTFFJTEM5GLS64PU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-ZQ3HACWSYBTTFFJTEM5GLS64PU000000-1}}}%
 \nwixlogsorted{c}{{random in range}{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}}}%
+\nwixlogsorted{c}{{read input char}{PYNWmai0-NJKTNAHFCRYCRVDBACZOIBQD24000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-NJKTNAHFCRYCRVDBACZOIBQD24000000-1}}}%
 \nwixlogsorted{c}{{relocate hires staging}{PYNWmai0-2NL3TPDIV6BH32KNILRIC2G5ZE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-2NL3TPDIV6BH32KNILRIC2G5ZE000000-1}}}%
 \nwixlogsorted{c}{{render font char}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}}}%
 \nwixlogsorted{c}{{render input buffer}{PYNWmai0-RSHMOQOCPDKRT4BUTXBS36IJQQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-RSHMOQOCPDKRT4BUTXBS36IJQQ000000-1}}}%
@@ -11389,6 +11420,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{set blink target}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}}}%
 \nwixlogsorted{c}{{set char state}{PYNWmai0-PCWKHH6XLP7LWB7NF37UC54L3U000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-PCWKHH6XLP7LWB7NF37UC54L3U000000-1}}}%
 \nwixlogsorted{c}{{set cursor compressed}{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-BKMVQ6YHAC7PH5XKRWHNWGIJPU000000-1}}}%
+\nwixlogsorted{c}{{set cursor pos}{PYNWmai0-5LVLMTUS4H3FNMLGJOVUKMZFXY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-5LVLMTUS4H3FNMLGJOVUKMZFXY000000-1}}}%
 \nwixlogsorted{c}{{set restricted}{PYNWmai0-L4RDKMKKE7XS4LJ76V5LSAHTFI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-L4RDKMKKE7XS4LJ76V5LSAHTFI000000-1}}}%
 \nwixlogsorted{c}{{set state fight}{PYNWmai0-VXXGYZ4VDZ4FHS3E2VXVMVMFFU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-VXXGYZ4VDZ4FHS3E2VXVMVMFFU000000-1}}}%
 \nwixlogsorted{c}{{set target restricted}{PYNWmai0-X6R76MOH2TJMSMNIB74Y4XDL4E000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-X6R76MOH2TJMSMNIB74Y4XDL4E000000-1}}}%
@@ -11522,8 +11554,6 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{FONT{\_}ROW}}{FONT:unROW}}%
 \nwixlogsorted{i}{{\nwixident{FUN{\_}1A31}}{FUN:un1A31}}%
 \nwixlogsorted{i}{{\nwixident{FUN{\_}1DDC}}{FUN:un1DDC}}%
-\nwixlogsorted{i}{{\nwixident{FUN{\_}5FBC}}{FUN:un5FBC}}%
-\nwixlogsorted{i}{{\nwixident{FUN{\_}600A}}{FUN:un600A}}%
 \nwixlogsorted{i}{{\nwixident{GAME{\_}ACTION{\_}HANDLER}}{GAME:unACTION:unHANDLER}}%
 \nwixlogsorted{i}{{\nwixident{GAME{\_}INIT}}{GAME:unINIT}}%
 \nwixlogsorted{i}{{\nwixident{GAME{\_}TURN{\_}LOOP}}{GAME:unTURN:unLOOP}}%
@@ -11611,6 +11641,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{PULL{\_}TWO{\_}RET{\_}ADDRS}}{PULL:unTWO:unRET:unADDRS}}%
 \nwixlogsorted{i}{{\nwixident{PULW}}{PULW}}%
 \nwixlogsorted{i}{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}%
+\nwixlogsorted{i}{{\nwixident{READ{\_}INPUT{\_}CHAR}}{READ:unINPUT:unCHAR}}%
 \nwixlogsorted{i}{{\nwixident{READ{\_}KEYBOARD}}{READ:unKEYBOARD}}%
 \nwixlogsorted{i}{{\nwixident{RELOCATE{\_}HIRES{\_}STAGING}}{RELOCATE:unHIRES:unSTAGING}}%
 \nwixlogsorted{i}{{\nwixident{RENDER{\_}FONT{\_}CHAR}}{RENDER:unFONT:unCHAR}}%
@@ -11664,6 +11695,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{SETUP{\_}TEXT{\_}POS{\_}COL20}}{SETUP:unTEXT:unPOS:unCOL20}}%
 \nwixlogsorted{i}{{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}}%
 \nwixlogsorted{i}{{\nwixident{SET{\_}CHAR{\_}STATE}}{SET:unCHAR:unSTATE}}%
+\nwixlogsorted{i}{{\nwixident{SET{\_}CURSOR{\_}POS}}{SET:unCURSOR:unPOS}}%
 \nwixlogsorted{i}{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}%
 \nwixlogsorted{i}{{\nwixident{SET{\_}INVERSE{\_}VIDEO}}{SET:unINVERSE:unVIDEO}}%
 \nwixlogsorted{i}{{\nwixident{SET{\_}RESTRICTED}}{SET:unRESTRICTED}}%
