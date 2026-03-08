@@ -3266,6 +3266,10 @@ ACTIVE_CHAR         EQU     $5A29   ; character index being processed
 SOURCE_CHAR         EQU     $5A28   ; source character for reorder
 REORDER_LINK        EQU     $5A2A   ; temp: saved next-link during reorder
 REORDER_SORT_KEY    EQU     $5A2B   ; temp: byte 11 of node for sorted insert
+BOUNDS_MIN_COL      EQU     $5A51   ; scene setup: left column boundary
+BOUNDS_MAX_COL      EQU     $5A52   ; scene setup: right column boundary
+BOUNDS_MIN_ROW      EQU     $5A53   ; scene setup: top row boundary
+BOUNDS_MAX_ROW      EQU     $5A54   ; scene setup: bottom row boundary
 LOCATION_POS        EQU     $5A55   ; current location position (triggers redraw when changed)
 LOCATION_STYLE      EQU     $5A56   ; current map style (from record field 5, bits 0-6)
 EVENT_POS           EQU     $5A5E   ; event position (from MANHATTAN_DISTANCE)
@@ -3650,28 +3654,28 @@ SCENE_SETUP:
     LDY     #$03
     LDA     ($BE),Y                 ; byte 3: min position (packed)
     JSR     POS_TO_COLROW           ; → A=min_col, Y=min_row
-    STA     $5A51                   ; min_col
-    STY     $5A53                   ; min_row
+    STA     BOUNDS_MIN_COL          ; min_col
+    STY     BOUNDS_MIN_ROW          ; min_row
     LDY     #$04
     LDA     ($BE),Y                 ; byte 4: max position (packed)
     JSR     POS_TO_COLROW           ; → A=max_col, Y=max_row
-    STA     $5A52                   ; max_col
-    STY     $5A54                   ; max_row
-    INC     $5A51                   ; min_col++ (exclusive border)
-    INC     $5A53                   ; min_row++
+    STA     BOUNDS_MAX_COL          ; max_col
+    STY     BOUNDS_MAX_ROW          ; max_row
+    INC     BOUNDS_MIN_COL          ; min_col++ (exclusive border)
+    INC     BOUNDS_MIN_ROW          ; min_row++
     CLC
-    LDA     $5A52                   ; \
-    SBC     $5A51                   ;  | col_range = max_col - min_col
+    LDA     BOUNDS_MAX_COL          ; \
+    SBC     BOUNDS_MIN_COL          ;  | col_range = max_col - min_col
     JSR     RANDOM_IN_RANGE         ;  | random column offset
     CLC                             ;  |
-    ADC     $5A51                   ;  | col = min_col + offset
+    ADC     BOUNDS_MIN_COL          ;  | col = min_col + offset
     STA     FONT_COL                ; / set font column
     CLC
-    LDA     $5A54                   ; \
-    SBC     $5A53                   ;  | row_range = max_row - min_row
+    LDA     BOUNDS_MAX_ROW          ; \
+    SBC     BOUNDS_MIN_ROW          ;  | row_range = max_row - min_row
     JSR     RANDOM_IN_RANGE         ;  | random row offset
     CLC                             ;  |
-    ADC     $5A53                   ; / row = min_row + offset
+    ADC     BOUNDS_MIN_ROW          ; / row = min_row + offset
     TAY                             ; Y = row
     LDA     FONT_COL                ; A = col
     JSR     COLROW_TO_POS           ; → A = linear position
