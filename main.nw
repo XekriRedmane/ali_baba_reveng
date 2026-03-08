@@ -591,7 +591,7 @@ For example, [[SUBWL #$01FF, $0300, $0400]] subtracts the 16-bit value at memory
 
 \subsection{Comparison macros}
 
-OFten there is a compare instruction ([[CMP, CPX, CPY]]) followed by a branch. These macros combine
+Often there is a compare instruction ([[CMP, CPX, CPY]]) followed by a branch. These macros combine
 the two instructions as a one-liner.
 
 <<Macros>>=
@@ -2154,9 +2154,18 @@ so that the HRCG can locate the font character at the text coordinate (at
 the upper left of the font character).
 
 <<defines>>=
+AI_WAIT_FLAG    EQU     $5A06   ; wait delay for AI moves (0 or $0A)
+VIEW_MAX_COL    EQU     $5A08   ; viewport max column (from location field 4)
+VIEW_MAX_ROW    EQU     $5A09   ; viewport max row
+VIEW_MIN_COL    EQU     $5A0A   ; viewport min column (from location field 3)
+VIEW_MIN_ROW    EQU     $5A0B   ; viewport min row
 FONT_COL        EQU     $5A0C
 FONT_ROW        EQU     $5A0D
-@ %def FONT_COL FONT_ROW
+LOCATION_ID     EQU     $5A17   ; current location/position index
+SET_TEXT_WINDOW EQU     $76C2   ; set text window parameters
+CLEAR_MAP       EQU     $76B0   ; clear/reset the map display
+LOAD_MAP_TILES  EQU     $746C   ; load map tile set for current location style
+@ %def AI_WAIT_FLAG VIEW_MAX_COL VIEW_MAX_ROW VIEW_MIN_COL VIEW_MIN_ROW FONT_COL FONT_ROW LOCATION_ID SET_TEXT_WINDOW CLEAR_MAP LOAD_MAP_TILES
 
 <<font pos>>=
     ORG     $7723
@@ -2240,6 +2249,332 @@ calls [[PRINT\_STRING]] to output it.
 Each charset holds 24~characters (\$18).  Characters beyond~\$18 bump the
 charset index.  The four glyph indices are consecutive starting at
 [[charnum * 4 + \$20]].
+
+\subsection{setup\_scene\_display (\$0901)}
+
+Called when entering a new scene.  Initialises the AI wait delay:
+if [[CHAR\_AI\_MODE]] is non-zero (AI-controlled character), sets
+[[AI\_WAIT\_FLAG]] to~\$0A and calls [[SCRIPT\_ENGINE]] with index~\$10;
+otherwise clears the flag.  Then draws the character, sets
+[[WAIT\_LOOP\_COUNT]] to twice the wait flag (via ROL), and jumps to
+[[DRAW\_SPRITE]].
+
+<<setup scene display>>=
+    ORG     $0901
+SETUP_SCENE_DISPLAY:
+    SUBROUTINE
+
+    LDA     #$00
+    STA     AI_WAIT_FLAG
+    CMP     CHAR_AI_MODE
+    BNE     .not_ai
+    LDA     #$0A
+    STA     AI_WAIT_FLAG
+    LDX     #$10
+    JSR     SCRIPT_ENGINE
+.not_ai:
+    JSR     DRAW_CHAR_AT_POS
+    JSR     SETUP_CHAR_SPRITE
+    LDA     AI_WAIT_FLAG
+    ROL
+    STA     WAIT_LOOP_COUNT
+    JMP     TIMED_WAIT
+@ %def SETUP_SCENE_DISPLAY
+
+\subsection{check\_at\_boundary (\$0BFA)}
+
+Checks whether the current location position lies on the viewport
+boundary.  Converts [[LOCATION\_ID]] to column/row via
+[[POS\_TO\_COLROW]], then compares against all four viewport edges
+([[VIEW\_MIN\_COL]], [[VIEW\_MAX\_COL]], [[VIEW\_MIN\_ROW]],
+[[VIEW\_MAX\_ROW]]).  If any match, sets [[\$BE]]=1 and [[\$BF]]=0
+(``at edge''); otherwise sets both to~0 (``interior'').
+
+<<check at boundary>>=
+    ORG     $0BFA
+CHECK_AT_BOUNDARY:
+    SUBROUTINE
+
+    LDA     LOCATION_ID
+    JSR     POS_TO_COLROW
+    CMP     VIEW_MIN_COL
+    BEQ     .at_edge
+    CMP     VIEW_MAX_COL
+    BEQ     .at_edge
+    TYA
+    CMP     VIEW_MIN_ROW
+    BEQ     .at_edge
+    CMP     VIEW_MAX_ROW
+    BEQ     .at_edge
+    LDA     #$00
+    STA     $BE
+    STA     $BF
+    RTS
+.at_edge:
+    LDA     #$00
+    STA     $BF
+    LDA     #$01
+    STA     $BE
+    RTS
+@ %def CHECK_AT_BOUNDARY
+
+\subsection{enter\_location (\$72A7)}
+
+Called from [[SCENE\_LOOP]] to set up the viewport when the player
+enters a new location.  Compares [[\$FA]] with [[LOCATION\_POS]]; if
+unchanged, returns immediately.  Otherwise stores the new position,
+calls [[GET\_MOB\_DATA]] and [[SET\_TEXT\_WINDOW]] / [[CLEAR\_MAP]],
+computes the event position via [[MANHATTAN\_DISTANCE]], and
+extracts the location style from record field~5.  If the style
+changed, reloads the map tile set.
+
+The routine then reads fields~3 and~4 of the location record (via
+[[\$FA]] indirect) to obtain the viewport bounds (min/max column and
+row).  It iterates a nested loop: for each row, for each column,
+it calls [[DRAW\_MAP\_COL]] to render that cell.  Finally, if bit~7
+of field~5 is clear, it calls [[DRAW\_MAP\_ENTITIES]] to overlay
+entity icons on the map.
+
+<<enter location>>=
+    ORG     $72A7
+ENTER_LOCATION:
+    SUBROUTINE
+
+    LDA     $FA
+    CMP     LOCATION_POS
+    BNE     .changed
+    RTS
+.changed:
+    STA     LOCATION_POS
+    JSR     GET_MOB_DATA
+    JSR     SET_TEXT_WINDOW
+    JSR     CLEAR_MAP
+    LDA     #$15
+    STA     $F8
+    LDA     #$5A
+    STA     $F9
+    JSR     MANHATTAN_DISTANCE
+    STA     EVENT_POS
+    LDY     #$05
+    LDA     ($FA),Y
+    AND     #$7F
+    CMP     LOCATION_STYLE
+    BEQ     .same_style
+    STA     LOCATION_STYLE
+    JSR     LOAD_MAP_TILES
+    JSR     FILL_MAP
+.same_style:
+    LDY     #$03
+    LDA     ($FA),Y
+    JSR     POS_TO_COLROW
+    STY     VIEW_MIN_ROW
+    STY     FONT_ROW
+    STA     VIEW_MIN_COL
+    LDY     #$04
+    LDA     ($FA),Y
+    JSR     POS_TO_COLROW
+    STY     VIEW_MAX_ROW
+    STA     VIEW_MAX_COL
+.row_loop:
+    LDA     VIEW_MIN_COL
+    STA     FONT_COL
+.col_loop:
+    JSR     DRAW_MAP_COL
+    INC     FONT_COL
+    LDA     VIEW_MAX_COL
+    CMP     FONT_COL
+    BPL     .col_loop
+    INC     FONT_ROW
+    LDA     VIEW_MAX_ROW
+    CMP     FONT_ROW
+    BPL     .row_loop
+    LDY     #$05
+    LDA     ($FA),Y
+    BMI     .skip_entities
+    JSR     DRAW_MAP_ENTITIES
+.skip_entities:
+    RTS
+@ %def ENTER_LOCATION
+
+\subsection{draw\_map\_col (\$7323)}
+
+Draws a single map cell at the current [[FONT\_COL]]/[[FONT\_ROW]].
+Computes the linear position inline (col + row$\times$20) rather than
+calling [[COLROW\_TO\_POS]], then calls [[FIND\_ENTITY\_AT\_POS]],
+[[GET\_MAP\_CHAR]], and [[RENDER\_FONT\_CHAR]] to draw the tile.
+
+<<draw map col>>=
+    ORG     $7323
+DRAW_MAP_COL:
+    SUBROUTINE
+
+    LDA     FONT_COL
+    CLC
+    LDY     FONT_ROW
+.mult_loop:
+    DEY
+    BMI     .mult_done
+    ADC     #$14                    ; +20 per row
+    BCC     .mult_loop
+.mult_done:
+    JSR     FIND_ENTITY_AT_POS
+    JSR     GET_ENTITY_FONTCHAR
+    JSR     RENDER_FONT_CHAR
+    RTS
+@ %def DRAW_MAP_COL
+
+\subsection{draw\_map\_entities (\$733B)}
+
+Draws entity icons on the map.  Three modes:
+
+\begin{enumerate}
+\item If [[MAP\_REDRAW\_FLAG]] is set, skip straight to drawing mobs.
+\item If [[LOCATION\_STYLE]] bits 5--6 are set, scroll the map and
+      set the redraw flag.
+\item Otherwise, scan the full grid cell by cell: for each cell that
+      contains a non-\$FE entity in the drawable range, draw its icon
+      via [[DRAW\_MAP\_ICON\_B]].
+\end{enumerate}
+
+After the grid scan (or redraw), iterates the mob group via
+[[FIRST\_GROUP\_MEMBER]]/[[NEXT\_GROUP\_MEMBER]], drawing each mob's
+icon using [[DRAW\_BLINK\_CHAR]] (or [[RENDER\_FONT\_CHAR]] if the
+mob has no blink animation).
+
+<<draw map entities>>=
+    ORG     $733B
+DRAW_MAP_ENTITIES:
+    SUBROUTINE
+
+    LDY     #$05
+    LDA     ($FA),Y
+    ORA     #$80
+    STA     ($FA),Y                 ; mark entities drawn (set bit 7)
+    LDA     MAP_REDRAW_FLAG
+    BEQ     .no_redraw
+    JMP     .draw_mobs
+.no_redraw:
+    LDA     LOCATION_STYLE
+    AND     #$60                    ; check style bits 5-6
+    BEQ     .scan_grid
+    JSR     SET_CURSOR_ROW21
+    LDA     #$0F
+    JSR     DISPLAY_MESSAGE
+    LDA     #$FF
+    STA     MAP_REDRAW_FLAG
+    BNE     .draw_mobs              ; always taken
+.scan_grid:
+    LDA     VIEW_MIN_COL
+    STA     FONT_COL
+    LDA     VIEW_MIN_ROW
+    STA     FONT_ROW
+    LDY     #$02
+    LDA     ($FA),Y
+    PHA                             ; save record byte 2
+    LDA     #$00
+    STA     ($FA),Y                 ; clear it during scan
+.cell_check:
+    LDA     FONT_COL
+    LDY     FONT_ROW
+    JSR     COLROW_TO_POS
+    JSR     FIND_ENTITY_AT_POS
+    LDA     $BF
+    BEQ     .next_col               ; no entity here
+    JSR     GET_ENTITY_FONTCHAR
+    LDY     #$01
+    LDA     ($BE),Y
+    CMP     #$FE
+    BEQ     .next_col               ; $FE = skip
+    CMP     #$80
+    BCC     .draw_it                ; $00-$7F = draw
+    CMP     #$C0
+    BCC     .next_col               ; $80-$BF = skip
+.draw_it:                           ; $C0-$FF = draw
+    JSR     SET_CURSOR_ROW21
+    JSR     CLASSIFY_ENTITY_TYPE
+    JSR     $7705
+    JSR     DRAW_MAP_ICON_B
+.next_col:
+    INC     FONT_COL
+    LDA     VIEW_MAX_COL
+    CMP     FONT_COL
+    BPL     .cell_check             ; inner: next column
+    LDA     VIEW_MIN_COL
+    STA     FONT_COL
+    INC     FONT_ROW
+    LDA     VIEW_MAX_ROW
+    CMP     FONT_ROW
+    BPL     .cell_check             ; outer: next row
+    LDY     #$02
+    PLA
+    STA     ($FA),Y                 ; restore record byte 2
+    BNE     .draw_mobs
+    RTS
+.draw_mobs:
+    JSR     FIRST_GROUP_MEMBER
+.mob_loop:
+    LDY     #$03
+    LDA     ($F4),Y
+    JSR     POS_TO_COLROW
+    STY     FONT_ROW
+    STA     FONT_COL
+    LDA     #$01
+    STA     FONT_CHARSET            ; custom font
+    LDY     #$04
+    LDA     ($F4),Y
+    JSR     GET_ENTITY_FONTCHAR
+    STA     FONT_CHARNUM
+    CPY     #$00
+    BEQ     .mob_blink
+    LDY     #$0C
+    LDA     ($F4),Y
+    AND     #$0F
+    BEQ     .mob_anim
+.mob_blink:
+    JSR     SET_CURSOR_ROW21
+    JSR     DRAW_BLINK_CHAR
+    JSR     DRAW_MAP_ICON_B
+    JMP     .mob_done
+.mob_anim:
+    JSR     RENDER_FONT_CHAR
+.mob_done:
+    JSR     NEXT_GROUP_MEMBER
+    LDA     $F5
+    BNE     .mob_loop
+    RTS
+@ %def DRAW_MAP_ENTITIES
+
+\subsection{draw\_map\_icon\_b (\$740B)}
+
+After drawing a map entity, this routine copies the current font
+position ([[FONT\_COL]]/[[FONT\_ROW]]/[[FONT\_CHARNUM]]) into the
+blink cursor variables ([[BLINK\_COL]]/[[BLINK\_ROW]]/[[BLINK\_CHAR]]),
+then calls [[TIMED\_WAIT]] with the delay from [[BLINK\_DELAY]].
+Finishes by resetting [[BLINK\_COL]] to~\$14 (disabled).
+
+<<draw map icon b>>=
+    ORG     $740B
+DRAW_MAP_ICON_B:
+    SUBROUTINE
+
+    JSR     SCROLL_STATUS_LINE
+    JSR     RENDER_FONT_CHAR
+    LDA     FONT_COL
+    STA     BLINK_COL
+    LDA     FONT_ROW
+    STA     BLINK_ROW
+    LDA     FONT_CHARNUM
+    STA     BLINK_CHAR
+    JSR     $74CB
+    LDA     BLINK_DELAY
+    STA     WAIT_LOOP_COUNT
+    JSR     TIMED_WAIT
+    JSR     $74DD
+    JSR     ANIM_TICK_AND_WAIT
+    LDA     #$14
+    STA     BLINK_COL               ; disable blink cursor
+    RTS
+@ %def DRAW_MAP_ICON_B
 
 \subsection{fill\_map (\$743B)}
 
@@ -2462,7 +2797,7 @@ FIND_ENTITY_AT_POS:
     LDY     $0B86                   ; (self-modified: read position from table)
     CPY     #$FF
     BNE     .check_player
-    JMP     is_at_outer_limits      ; $FF = end of table
+    JMP     CHECK_AT_BOUNDARY      ; $FF = end of table
 .check_player:
     CPY     DAT_5a17_pos            ; matches target?
     BEQ     .found_player
@@ -2612,8 +2947,7 @@ NUM_DIGIT           EQU     $5A1B   ; current digit accumulator (ASCII $B0-$B9)
 NUM_DIVISOR         EQU     $5A1C   ; 16-bit divisor for decimal conversion (2 bytes)
 NUM_LEADING         EQU     $5A1E   ; leading-zero suppress flag (0=suppress, 1=print)
 GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
-is_at_outer_limits  EQU     $0BFA   ; check if position is at room boundary
-@ %def ROM_COUT1 DAT_5a17_pos PRNG_OUTPUT PRNG_STATE PRNG_TEMP NUM_DIGIT NUM_DIVISOR NUM_LEADING GROUP_COUNT_DELTA is_at_outer_limits
+@ %def ROM_COUT1 DAT_5a17_pos PRNG_OUTPUT PRNG_STATE PRNG_TEMP NUM_DIGIT NUM_DIVISOR NUM_LEADING GROUP_COUNT_DELTA
 
 <<print font char>>=
     ORG     $80A4
@@ -2935,16 +3269,18 @@ INPUT_MODE          EQU     $5A00   ; 0 = keyboard, 1 = joystick
 TOTAL_MOB_COUNT     EQU     $5A01   ; total mobs across all groups (excl. group 0)
 CURRENT_PLAYER      EQU     $5A02   ; current player index (1-based)
 CURRENT_ROOM        EQU     $5A03   ; current room/location being processed
+CHAR_SPRITE         EQU     $5A04   ; character's font char number for display
 DAMAGE_AMOUNT       EQU     $5A10   ; damage to apply / new HP after subtraction
 ACTIVE_CHAR         EQU     $5A29   ; character index being processed
 SOURCE_CHAR         EQU     $5A28   ; source character for reorder
 REORDER_LINK        EQU     $5A2A   ; temp: saved next-link during reorder
 REORDER_SORT_KEY    EQU     $5A2B   ; temp: byte 11 of node for sorted insert
-LOCATION_FLAG       EQU     $5A55   ; location-change flag
-LOCATION_FLAG2      EQU     $5A56   ; current map scene ID (from record field 5, bits 0-6)
+LOCATION_POS        EQU     $5A55   ; current location position (triggers redraw when changed)
+LOCATION_STYLE      EQU     $5A56   ; current map style (from record field 5, bits 0-6)
+EVENT_POS           EQU     $5A5E   ; event position (from MANHATTAN_DISTANCE)
 SCENE_NUMBER        EQU     $5A99   ; current scene number
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
-@ %def INPUT_MODE TOTAL_MOB_COUNT CURRENT_PLAYER CURRENT_ROOM DAMAGE_AMOUNT ACTIVE_CHAR SOURCE_CHAR REORDER_LINK REORDER_SORT_KEY LOCATION_FLAG LOCATION_FLAG2 SCENE_NUMBER ATTRACT_FLAG
+@ %def INPUT_MODE TOTAL_MOB_COUNT CURRENT_PLAYER CURRENT_ROOM CHAR_SPRITE DAMAGE_AMOUNT ACTIVE_CHAR SOURCE_CHAR REORDER_LINK REORDER_SORT_KEY LOCATION_POS LOCATION_STYLE EVENT_POS SCENE_NUMBER ATTRACT_FLAG
 
 \subsection{select\_input\_mode (\$084E)}
 
@@ -3042,8 +3378,8 @@ GAME_INIT:
     JSR     SET_TEXT_WINDOW_BOTTOM
     JSR     INIT_STUB2
     LDA     #$00                    ; \
-    STA     LOCATION_FLAG           ;  | clear state variables
-    STA     LOCATION_FLAG2          ;  |
+    STA     LOCATION_POS           ;  | clear state variables
+    STA     LOCATION_STYLE          ;  |
     STA     $F9                     ; /
     JSR     SELECT_INPUT_MODE
     JSR     INIT_WORLD
@@ -3075,7 +3411,7 @@ ATTRACT_SCREEN:
     STA     $F5                     ; /
     JSR     SCENE_SETUP
     LDA     #$00
-    STA     LOCATION_FLAG           ; clear location-change flag
+    STA     LOCATION_POS           ; clear location-change flag
     JSR     SET_CURSOR_ROW21
     LDA     #$26                    ; scene number $26 (38 decimal)
     JMP     SCENE_LOOP              ; tail-call
@@ -3458,15 +3794,15 @@ SCENE_LOOP:
 .exit:
     JSR     SET_TEXT_WINDOW_BOTTOM
     LDA     #$1B
-    JSR     $761E                   ; sound/mode off
+    JSR     DISPLAY_MESSAGE         ; display message (mode off)
                                     ; fall through to .done
 
 .done:
     JSR     SET_TEXT_WINDOW_BOTTOM
     LDA     #$00                    ; \
-    STA     LOCATION_FLAG           ;  | clear location flags
-    STA     LOCATION_FLAG2          ; /
-    JSR     $72A7                   ; update display
+    STA     LOCATION_POS           ;  | clear location flags
+    STA     LOCATION_STYLE          ; /
+    JSR     ENTER_LOCATION          ; redraw map if location changed
     JMP     RESTORE_ZP_POINTERS     ; restore and return
 @ %def SCENE_LOOP
 
@@ -3614,13 +3950,13 @@ STEP_PRNG:
     SUBROUTINE
 
     LDA     PRNG_STATE              ; val
-    ASL     A                       ; val*2
-    ASL     A                       ; val*4
+    ASL                       ; val*2
+    ASL                       ; val*4
     STA     PRNG_TEMP               ; temp = val*4
-    ASL     A                       ; val*8
-    ASL     A                       ; val*16
-    ASL     A                       ; val*32
-    ASL     A                       ; val*64
+    ASL                       ; val*8
+    ASL                       ; val*16
+    ASL                       ; val*32
+    ASL                       ; val*64
     CLC
     ADC     PRNG_TEMP               ; val*64 + val*4 = val*68
     CLC
@@ -3711,7 +4047,7 @@ RANDOM_IN_RANGE:
     DEY                             ; \
     BMI     .shifted                ;  | shift limit left by (shift count)
     CLC                             ;  | positions so it aligns with the
-    ROL     A                       ;  | mask bits
+    ROL                       ;  | mask bits
     BNE     .shift_loop             ; /
 .shifted:
     LDY     RNG_LIMIT               ; Y = shift count
@@ -3731,7 +4067,7 @@ RANDOM_IN_RANGE:
     RTS                             ;  | to recover the final value
 .shift_right:
     CLC                             ;  |
-    ROR     A                       ;  |
+    ROR                       ;  |
     BCC     .accept                 ; / (always taken: masked bit is 0)
 @ %def RANDOM_IN_RANGE
 
@@ -4037,28 +4373,6 @@ SET_TEXT_WINDOW_BOTTOM:
     LDA     #$86                    ; Ctrl-F with high bit
     JMP     ROM_COUT1
 @ %def SET_CURSOR_ROW21 SET_TEXT_WINDOW_BOTTOM
-
-\subsection{scroll\_status\_line (\SCROLL_STATUS_LINE)}
-
-Scrolls the status window (rows 21--23) up by one line.  Sets scroll
-mode, defines the text window as the status area (upper-left at
-row~21), positions the cursor at row~23, outputs [[Ctrl-C]] to scroll
-up, resets the window to full screen, and restores wrap mode.
-
-<<scroll status line>>=
-    ORG     SCROLL_STATUS_LINE
-SCROLL_STATUS_LINE:
-    SUBROUTINE
-
-    JSR     SET_TEXT_WINDOW_SCROLL   ; enable scroll mode
-    JSR     SET_TEXT_WINDOW_UPPER_LEFT_LOW ; window top = row 21
-    LDA     #$17
-    STA     TEXT_ROW                 ; cursor to row 23
-    LDA     #$83                    ; Ctrl-C with high bit (scroll up)
-    JSR     ROM_COUT1
-    JSR     SET_TEXT_WINDOW_UPPER_LEFT_ALL ; reset window to (0,0)
-    JMP     SET_TEXT_WINDOW_WRAP     ; restore wrap mode and return
-@ %def SCROLL_STATUS_LINE
 
 \subsection{pos\_to\_colrow (\$0C25)}
 
@@ -4568,30 +4882,31 @@ where [[$4000/$4001]] holds the base address of the scene table.
 <<compute scene ptr>>=
     ORG     $0C32
 COMPUTE_SCENE_PTR:
+GET_MOB_DATA:
     SUBROUTINE
 
     CLC
     ADC     #$FF                    ; A = index - 1
-    ROL     A                       ; \
-    ROL     A                       ;  | rotate left 4 times
-    ROL     A                       ;  | = multiply by 16 (with carry)
-    ROL     A                       ; /
+    ROL                       ; \
+    ROL                       ;  | rotate left 4 times
+    ROL                       ;  | = multiply by 16 (with carry)
+    ROL                       ; /
     TAY                             ; save intermediate
-    ROL     A                       ; one more rotate
+    ROL                       ; one more rotate
     AND     #$0F                    ; high nybble → page offset
     CLC
     ADC     $4001                   ; add base page
-    STA     $BB                     ; high byte
+    STA     DATA_PTR3+1             ; high byte
     TYA
     AND     #$F0                    ; low nybble → byte offset
     CLC
     ADC     $4000                   ; add base offset
-    STA     $BA                     ; low byte
+    STA     DATA_PTR3               ; low byte
     BCC     .done
-    INC     $BB                     ; carry
+    INC     DATA_PTR3+1             ; carry
 .done:
     RTS
-@ %def COMPUTE_SCENE_PTR
+@ %def COMPUTE_SCENE_PTR GET_MOB_DATA
 
 \subsection{appearance\_to\_fontchar (\$0CF7)}
 
@@ -4675,7 +4990,9 @@ ANIM_WAIT_TABLE         EQU     $7AB0   ; per-frame wait counts (indexed)
 ANIM_FRAME_TABLE        EQU     $7AB6   ; per-frame frame counts (indexed)
 WAIT_LOOP_COUNT         EQU     $5A8C   ; inner wait loop counter
 WAIT_DURATION           EQU     $7AAD   ; ROM WAIT duration parameter
-@ %def ANIM_FRAME_CTR ANIM_INDEX ANIM_WAIT_TABLE ANIM_FRAME_TABLE WAIT_LOOP_COUNT WAIT_DURATION
+BLINK_DELAY             EQU     $7AAC   ; delay value loaded into WAIT_LOOP_COUNT by DRAW_MAP_ICON_B
+MAP_REDRAW_FLAG         EQU     $7AC4   ; non-zero = full map redraw needed
+@ %def ANIM_FRAME_CTR ANIM_INDEX ANIM_WAIT_TABLE ANIM_FRAME_TABLE WAIT_LOOP_COUNT WAIT_DURATION BLINK_DELAY MAP_REDRAW_FLAG
 
 <<tick anim counter>>=
     ORG     $0D1E
@@ -5003,6 +5320,7 @@ RESIDENT_DISPATCH:
     STA     $53                     ; /
 
     LDY     #$04                    ; skip 4 bytes
+RESIDENT_DISPATCH_FETCH:
 .fetch:
     LDA     ($52),Y                 ; read opcode
     INY
@@ -5129,7 +5447,7 @@ RESIDENT_DECODE_DISPATCH:
     LDA     $55                     ;  |
     STA     $53                     ; /
     LDY     #$00
-    JMP     RESIDENT_DISPATCH.fetch ; fetch from new location
+    JMP     RESIDENT_DISPATCH_FETCH ; fetch from new location
 @ %def RESIDENT_DECODE_DISPATCH
 
 \section{Script/event engine (\$795B)}
@@ -5217,6 +5535,7 @@ After setup, the interpreter initializes its loop counter and PRNG mask:
     STA     SCRIPT_LOOP_CTR         ; loop counter = 0
     LDA     #$01
     STA     SCRIPT_PRNG_MASK        ; PRNG mask = 1
+SCRIPT_ENGINE_FETCH:
 .fetch:
     LDY     #$00
     LDA     ($E4),Y                 ; read script byte
@@ -5379,7 +5698,7 @@ SCRIPT_ADVANCE:
 
 .continue:
     LSR     WAIT_LOOP_COUNT                   ; shift timing flag
-    JMP     SCRIPT_ENGINE.fetch     ; loop back to interpreter
+    JMP     SCRIPT_ENGINE_FETCH     ; loop back to interpreter
 @ %def SCRIPT_ADVANCE
 
 \subsection{script helpers}
@@ -7135,7 +7454,7 @@ HANDLE_ENCOUNTER:
 .specific:
     LDY     #$00
     LDA     ($BE),Y             ; event byte 0 = position
-    STA     $5A5E
+    STA     EVENT_POS
     LDA     #$01
     JSR     SET_CHAR_STATE            ; set state 1
     LDY     #$01
@@ -7511,7 +7830,7 @@ AI_CHOOSE_TARGET:
     LDA     AI_TARGET_COL
     CMP     #$3C
     BNE     .found3
-    LDA     $5A5E               ; no hostile found → use default
+    LDA     EVENT_POS               ; no hostile found → use default
     STA     AI_TARGET_POS
 .found3:
     JMP     .done
@@ -7555,7 +7874,7 @@ AI_CHOOSE_TARGET:
     STA     AI_TARGET_POS               ; strongest mob's position
     JMP     .done
 .no_target5:
-    LDA     $5A5E               ; no hostile → use default
+    LDA     EVENT_POS               ; no hostile → use default
     STA     AI_TARGET_POS
     JMP     .done
 
@@ -7738,12 +8057,12 @@ COMMIT_MOVE:
     JSR     COLROW_TO_POS
     LDY     #$03
     STA     ($F8),Y             ; update char packed position
-    LDA     $5A04
-    STA     FONT_CHARNUM               ; FONT_CHARNUM
+    LDA     CHAR_SPRITE
+    STA     FONT_CHARNUM
     STA     BLINK_CHAR
     LDA     #$01
     STA     FONT_CHARSET
-    JSR     DRAW_SPRITE            ; draw sprite
+    JSR     RENDER_FONT_CHAR       ; draw sprite
     LDX     #$16
     STX     $5AA9
     ; falls through to RESET_TURN_POS
@@ -7846,17 +8165,18 @@ MODIFY_CURRENT_STATS:
 <<reset text window>>=
     ORG     $769B
 RESET_TEXT_WINDOW:
+SCROLL_STATUS_LINE:
     SUBROUTINE
     ; Text display: init HRCG, set window bottom, output char $83, reset
     JSR     SET_TEXT_WINDOW_SCROLL
     JSR     SET_TEXT_WINDOW_UPPER_LEFT_LOW
     LDA     #$17
-    STA     $25                 ; WNDBTM = 23
+    STA     TEXT_ROW             ; cursor to row 23
     LDA     #$83
-    JSR     $FDED               ; ROM COUT
+    JSR     ROM_COUT1
     JSR     SET_TEXT_WINDOW_UPPER_LEFT_ALL
     JMP     SET_TEXT_WINDOW_WRAP
-@ %def RESET_TEXT_WINDOW
+@ %def RESET_TEXT_WINDOW SCROLL_STATUS_LINE
 
 <<apply damage>>=
     ORG     $106F
@@ -8097,12 +8417,12 @@ SETUP_CHAR_SPRITE:
     STA     BLINK_COL
     STY     BLINK_ROW
     TAX
-    LDA     $5A04
+    LDA     CHAR_SPRITE
     STA     FONT_CHARNUM
     STA     BLINK_CHAR
     LDA     #$01
     STA     FONT_CHARSET
-    JMP     DRAW_SPRITE
+    JMP     RENDER_FONT_CHAR
 @ %def SETUP_CHAR_SPRITE
 
 <<check can leave>>=
@@ -8665,7 +8985,7 @@ PLAYER_ATTACK:
     STY     FONT_ROW
     STA     FONT_COL
     JSR     GET_ENTITY_FONTCHAR
-    JSR     DRAW_SPRITE
+    JSR     RENDER_FONT_CHAR
     LDX     #$0C
     JSR     SCRIPT_ENGINE
     JSR     SET_CURSOR_ROW21
@@ -9324,7 +9644,7 @@ DISPLAY_SHOP:
     INY
     INY
     INY
-    LDA     $5A56
+    LDA     LOCATION_STYLE
     ROL
     ROL
     ROL
@@ -9417,50 +9737,6 @@ ADD_PRICE_COMPONENT:
 .done:
     RTS
 @ %def ADD_PRICE_COMPONENT
-
-<<draw sprite>>=
-    ORG     $7489
-DRAW_SPRITE:
-    SUBROUTINE
-    ; Draw sprite: set up HRCG parameters from font char number
-    ; and direction, then call PRINT_STRING.
-    JSR     FONT_POS_TO_TEXT_POS
-    LDX     #$B1
-    LDA     FONT_CHARSET
-    CMP     #$02
-    BNE     .not2
-    INX
-    INX
-.not2:
-    STX     $80A6
-    LDA     FONT_CHARNUM
-.check_range:
-    CMP     #$18
-    BCC     .in_range
-    INX
-    STX     $80A6
-    SEC
-    SBC     #$18
-    JMP     .check_range
-.in_range:
-    ASL
-    ASL
-    CLC
-    ADC     #$20
-    TAY
-    STY     $80A8
-    INY
-    STY     $80A9
-    INY
-    STY     $80AB
-    INY
-    STY     $80AC
-    LDA     #$A4
-    STA     $BC
-    LDA     #$80
-    STA     $BD
-    JMP     PRINT_STRING
-@ %def DRAW_SPRITE
 
 <<check combat eligibility>>=
     ORG     $750C
@@ -9644,7 +9920,7 @@ SET_BLINK_TARGET:
     STA     $BE                     ;  | copy pointer $F4 → $BE
     LDA     $F5                     ;  |
     STA     $BF                     ; /
-    JSR     $0C7E                   ; look up player's font char
+    JSR     GET_ENTITY_FONTCHAR     ; look up player's font char
     LDA     FONT_CHARNUM
     STA     BLINK_CHAR
     RTS
@@ -9759,11 +10035,11 @@ LAB_162b:
     ; add Thing[STR]/2 & 0x0F - Mob[STR]/2 & 0x0F
     LDY      #$05
     LDA      (THING_PTR?),Y
-    ROR      A
+    ROR
     AND      #$0F
     STA      DAT_5a77
     LDA      (MOB_PTR?),Y
-    ROR      A
+    ROR
     AND      #$0F
     SEC
     SBC      DAT_5a77
@@ -9846,7 +10122,7 @@ get_item_at_pos_in_room:
 
     LDY      .load2+1
     BNE.Y    #$FF, .not_ff          ; (load2) != 0xFF?
-    JMP      is_at_outer_limits     ; else goto is_at_outer_limits
+    JMP      CHECK_AT_BOUNDARY     ; else goto CHECK_AT_BOUNDARY
 
 .not_ff:
     BEQ.Y    DAT_5a17_pos, .return_load2  ; (load2) == DAT_5a17_pos?
@@ -9895,56 +10171,12 @@ get_item_at_pos_in_room:
     RTS
 
 mob_dataptr_to_load4:
-    SUBROUTINE
-    ; load4 <- mob data for A
+    ; load4 <- mob data for A (no SUBROUTINE — shares scope for .load4)
 
     JSR      GET_MOB_DATA
     STOW     DATA_PTR3, .load4
     RTS
 @
-
-\subsection{get\_mob\_data (\$0C32)}
-
-Converts a 1-based mob index in [[A]] to a pointer to its 16-byte data
-record, stored in [[DATA\_PTR3]] ([[\$BA/\$BB]]).  The mob data table
-starts at the address stored in [[\$4000/\$4001]] (within the decrypted
-game data region), with each record being 16 bytes.  The formula is:
-
-\begin{center}
-[[DATA\_PTR3]] = [[\$4000/\$4001]] + (A $-$ 1) $\times$ 16
-\end{center}
-
-The multiplication by 16 is done by rotating the decremented index
-left by 4 bits through carry, then splitting the result into high and
-low byte contributions.
-
-<<get mob data>>=
-    ORG     $0C32
-GET_MOB_DATA:
-    SUBROUTINE
-
-    CLC
-    ADC     #$FF                    ; A = index - 1, C = 1
-    ROL                             ; \
-    ROL                             ;  | rotate {C, A} left 4 bits
-    ROL                             ;  | = (index-1) * 16 with bits split
-    ROL                             ; /
-    TAY                             ; save rotated value
-    ROL                             ; one more rotate
-    AND     #$0F                    ; high byte contribution = (index-1) >> 4
-    CLC
-    ADC     $4001                   ; add base page
-    STA     DATA_PTR3+1
-    TYA
-    AND     #$F0                    ; low byte contribution = ((index-1) & $0F) << 4
-    CLC
-    ADC     $4000                   ; add base offset
-    STA     DATA_PTR3
-    BCC     .done
-    INC     DATA_PTR3+1             ; carry to high byte
-.done:
-    RTS
-@ %def GET_MOB_DATA
 
 \subsection{init\_mob\_count (\$0C51)}
 
@@ -10592,25 +10824,24 @@ The following root chunks produce the assembly files when tangled.
 <<pull two ret addrs>>
 <<main entry>>
 <<select input mode>>
+<<setup scene display>>
+<<load char name ptr>>
+<<setup char sprite>>
 <<attract screen>>
 <<scene setup>>
-<<reorder char>>
-<<adjust char byte8>>
-<<get char record>>
-<<Get item at pos in room>>
+<<clamp char field>>
+<<find entity at pos>>
+<<check at boundary>>
 <<pos to colrow>>
-<<get mob data>>
 <<compute scene ptr>>
 <<init mob count>>
+<<get entity fontchar>>
 <<appearance to fontchar>>
 <<delay with animation>>
 <<tick anim counter>>
 <<anim tick and wait>>
 <<timed wait>>
 <<call rom wait>>
-<<clamp char field>>
-<<find entity at pos>>
-<<get entity fontchar>>
 <<print mob name>>
 <<colrow to pos>>
 <<num to decimal>>
@@ -10620,17 +10851,18 @@ The following root chunks produce the assembly files when tangled.
 <<get hostility>>
 <<check adjacent threats>>
 <<sum hostile at pos>>
-<<draw char at pos>>
-<<load char name ptr>>
-<<setup char sprite>>
+<<reorder char>>
+<<adjust char byte8>>
+<<get char record>>
 <<apply damage>>
 <<print entity name>>
+<<draw char at pos>>
 <<classify entity type>>
 <<map value to string>>
+<<check can leave>>
+<<update event list>>
 <<pick random member>>
 <<advance group link>>
-<<update event list>>
-<<check can leave>>
 <<random in range>>
 <<find nearest event>>
 <<manhattan distance>>
@@ -10647,6 +10879,11 @@ The following root chunks produce the assembly files when tangled.
 <<add willingness>>
 <<set blink target>>
 <<calc combat strength>>
+<<player attack>>
+<<process entity script>>
+<<mob attack>>
+<<select combat target>>
+<<get entity threat>>
 <<load target ptr>>
 <<game turn loop>>
 <<commit move>>
@@ -10660,22 +10897,11 @@ The following root chunks produce the assembly files when tangled.
 <<show locked msg>>
 <<trigger scene event>>
 <<handle event slot>>
-<<player attack>>
-<<process entity script>>
-<<mob attack>>
-<<select combat target>>
-<<get entity threat>>
 <<handle mob encounter>>
 <<set target restricted>>
 <<dispatch on mode>>
-<<fill map>>
-<<render font char>>
-<<draw blink alt>>
-<<draw blink char>>
-<<plot char>>
-<<print font char>>
 <<init game state>>
-<<init world>>
+<<plot char>>
 <<input loop>>
 <<setup input>>
 <<draw input options>>
@@ -10693,6 +10919,7 @@ The following root chunks produce the assembly files when tangled.
 <<teardown input>>
 <<get input table ptr>>
 <<configure input>>
+<<init world>>
 <<start game input>>
 <<check threats here>>
 <<pickup treasure>>
@@ -10703,15 +10930,6 @@ The following root chunks produce the assembly files when tangled.
 <<evaluate direction>>
 <<inc mob counters>>
 <<ai choose target>>
-<<modify char stats>>
-<<modify current stats>>
-<<display shop>>
-<<advance shop ptr>>
-<<add price component>>
-<<draw sprite>>
-<<check combat eligibility>>
-<<setup text pos>>
-<<reset text window>>
 <<init stub2>>
 <<init disk iob>>
 <<scene loop>>
@@ -10721,31 +10939,47 @@ The following root chunks produce the assembly files when tangled.
 <<restore zp pointers>>
 <<relocate hires staging>>
 <<load scene data>>
+<<modify char stats>>
+<<modify current stats>>
+<<display shop>>
+<<advance shop ptr>>
+<<add price component>>
+<<enter location>>
+<<draw map col>>
+<<draw map entities>>
+<<draw map icon b>>
+<<fill map>>
+<<render font char>>
+<<draw blink alt>>
+<<draw blink char>>
+<<check combat eligibility>>
+<<display message>>
+<<reset text window>>
+<<set text window bottom>>
+<<setup text pos>>
 <<print bottom centered>>
 <<print centered plus col>>
 <<font pos>>
 <<control routines>>
 <<print ctrl n>>
-<<print string>>
-<<set cursor compressed>>
-<<display message>>
 <<print ctrl ab>>
+<<print string>>
 <<print from ptr>>
-<<set text window bottom>>
-<<scroll status line>>
+<<set cursor compressed>>
 <<step prng>>
 <<game init>>
-<<script engine>>
-<<script helpers>>
-<<script advance>>
 <<init stub>>
 <<init hrcg>>
 <<set text window upper left>>
+<<script engine>>
+<<script advance>>
+<<script helpers>>
 <<status border data>>
 <<status bar strings>>
+<<print font char>>
+<<script pointer table>>
 <<font data>>
 <<std font data>>
-<<script pointer table>>
 @
 
 <<fontdata.asm>>=

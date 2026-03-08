@@ -53,11 +53,12 @@ handlers), add `SUBROUTINE` before each routine that has local labels.
 ## 4. dasm accumulator addressing: use bare mnemonic, not `ASL A`
 
 dasm does NOT accept `ASL A` or `LSR A` or `ROL A` or `ROR A`. It treats `A`
-as a symbol. Use bare `ASL`, `LSR`, `ROL`, `ROR` for accumulator mode.
+as a symbol, adding it to the unresolved symbol list. Use bare `ASL`, `LSR`,
+`ROL`, `ROR` for accumulator mode.
 
-The noweb tangler in main.nw uses `ASL     A` in the source — the tangler
-strips trailing operands for these mnemonics. But in standalone test files
-assembled directly by dasm, use the bare form.
+**Rule:** Never write `A` as an operand for shift/rotate instructions in
+main.nw or test files. The tangler does NOT strip it — use bare mnemonics
+everywhere.
 
 ## 5. Verify assembled output against the original binary
 
@@ -220,6 +221,13 @@ EOF
 The single quotes around `'EOF'` prevent ALL shell interpolation inside the
 heredoc. This works reliably regardless of Python string content.
 
+**Caveat:** Heredocs prevent *shell* interpolation, but Python still interprets
+backslashes in its own string literals. `'\'` inside Python is an escaped quote,
+causing `SyntaxError: unterminated string literal`. Use `'\\'` (double backslash)
+or `r'\'` won't work either (raw strings can't end in odd backslashes). Best fix:
+use `'\\\\'` or restructure to avoid trailing backslash in a single-quoted string.
+Example: `stripped.startswith('\\')` not `stripped.startswith('\')`.
+
 **Exception:** Very simple one-liners with no `$` can use `python3 -c '...'`
 (single-quoted argument). But heredocs are safer as a default.
 
@@ -352,6 +360,53 @@ itself: `COMBAT_WILLINGNESS EQU $5A76` becomes
 - Fix the EQU definitions afterward, or
 - Add the EQU definitions AFTER doing the replace (so `$XXXX` is gone
   from the code before the EQU line exists)
+
+## 20. Verify every JSR/JMP target against the binary, not just the first instruction
+
+When disassembling a function, don't just verify the ORG address — verify
+every JSR and JMP operand byte-for-byte. Label names inherited from Ghidra
+or a previous session can be wrong.
+
+**Example:** DRAW_MAP_ICON_B had `JSR GET_MOB_DATA` but the binary showed
+`JSR $0D30` (ANIM_TICK_AND_WAIT). Same function also had `JSR DRAW_SPRITE`
+but the binary had `JSR $0D49` (TIMED_WAIT). Both errors survived because
+the function was verified at the ORG level but individual call targets
+were never checked.
+
+**Rule:** After writing a new chunk, dump the raw bytes for the entire
+address range and confirm every 3-byte JSR/JMP instruction matches its
+label. A quick check: for each `JSR LABEL` or `JMP LABEL`, look up the
+label's address and compare it to the two operand bytes in the binary.
+
+## 21. Before creating a new chunk, search for existing chunks at the same ORG
+
+Duplicate chunks at the same address cause either Origin Reverse errors
+(two ORG directives for the same address) or silent overwrites where
+dasm uses whichever comes last.
+
+**Example:** GET_MOB_DATA and COMPUTE_SCENE_PTR were both at $0C32 with
+identical code but different label names. DRAW_SPRITE and RENDER_FONT_CHAR
+were both at $7489. SCROLL_STATUS_LINE and RESET_TEXT_WINDOW were both at
+$769B.
+
+**Rule:** Before creating a chunk for address $XXXX, grep main.nw for
+`ORG.*XXXX`. If a chunk already exists, add an alias label to it instead
+of creating a new chunk. Same function can have multiple entry-point
+labels (just stack them before the SUBROUTINE directive).
+
+## 22. An ORG using a symbol name instead of a hex literal is a bug
+
+Every ORG directive should use a hex literal (`ORG $XXXX`). If you see
+`ORG SYMBOL_NAME`, the symbol is either undefined (causing unresolved
+errors) or defined elsewhere (creating a fragile dependency).
+
+**Example:** `ORG SCROLL_STATUS_LINE` used a symbol that was never defined
+as an EQU — the chunk couldn't assemble and the symbol showed up as
+unresolved. The real address was $769B, already covered by another chunk.
+
+**Rule:** Always write `ORG $XXXX` with a hex literal. If you don't know
+the address, find it in the binary first — never use a symbol as a
+placeholder.
 
 ## Verification checklist
 
