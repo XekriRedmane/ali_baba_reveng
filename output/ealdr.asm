@@ -1,4 +1,175 @@
     PROCESSOR 6502
+    MACRO STOW
+        LDA      #<{1}
+        STA      {2}
+        LDA      #>{1}
+        STA      {2}+1
+    ENDM
+    MACRO STOW2
+        LDA      #>{1}
+        STA      {2}+1
+        LDA      #<{1}
+        STA      {2}
+    ENDM
+    MACRO MOVB
+        LDA    {1}
+        STA    {2}
+    ENDM
+    MACRO STOB
+        LDA    {1}
+        STA    {2}
+    ENDM
+    MACRO MOVW
+        LDA    {1}
+        STA    {2}
+        LDA    {1}+1
+        STA    {2}+1
+    ENDM
+    MACRO PSHW
+        LDA    {1}
+        PHA
+        LDA    {1}+1
+        PHA
+    ENDM
+    MACRO PULB
+        PLA
+        STA    {1}
+    ENDM
+    MACRO PULW
+        PLA
+        STA    {1}+1
+        PLA
+        STA    {1}
+    ENDM
+    MACRO INCW
+        INC    {1}
+        BNE    .continue
+        INC    {1}+1
+.continue
+    ENDM
+    MACRO ADDA
+        CLC
+        ADC    {1}
+        STA    {1}
+        BCC    .continue
+        INC    {1}+1
+.continue
+    ENDM
+    MACRO ADDAC
+        ADC    {1}
+        STA    {1}
+        BCC    .continue
+        INC    {1}+1
+.continue
+    ENDM
+    MACRO ADDB
+        LDA    {1}
+        CLC
+        ADC    {2}
+        STA    {1}
+        BCC    .continue
+        INC    {1}+1
+.continue
+    ENDM
+    MACRO ADDB2
+        CLC
+        LDA    {1}
+        ADC    {2}
+        STA    {1}
+        BCC    .continue
+        INC    {1}+1
+.continue
+    ENDM
+    MACRO ADDW
+        CLC
+        LDA    {1}
+        ADC    {2}
+        STA    {3}
+        LDA    {1}+1
+        ADC    {2}+1
+        STA    {3}+1
+    ENDM
+    MACRO ADDWC
+        LDA    {1}
+        ADC    {2}
+        STA    {3}
+        LDA    {1}+1
+        ADC    {2}+1
+        STA    {3}+1
+    ENDM
+    MACRO SUBB
+        LDA    {1}
+        SEC
+        SBC    {2}
+        STA    {1}
+        BCS    .continue
+        DEC    {1}+1
+.continue
+    ENDM
+    MACRO SUBB2
+        SEC
+        LDA    {1}
+        SBC    {2}
+        STA    {1}
+        BCS    .continue
+        DEC    {1}+1
+.continue
+    ENDM
+    MACRO SUBW
+        SEC
+        LDA    {1}
+        SBC    {2}
+        STA    {3}
+        LDA    {1}+1
+        SBC    {2}+1
+        STA    {3}+1
+    ENDM
+    MACRO SUBWL
+        SEC
+        LDA    <{1}
+        SBC    {2}
+        STA    {3}
+        LDA    >{1}
+        SBC    {2}+1
+        STA    {3}+1
+    ENDM
+    MACRO ROLW
+        ROL    {1}
+        ROL    {1}+1
+    ENDM
+    MACRO RORW
+        ROR    {1}+1
+        ROR    {1}
+    ENDM
+    MACRO BAEQ
+        CMP     {1}
+        BEQ     {2}
+    ENDM
+
+    MACRO BANE
+        CMP     {1}
+        BNE     {2}
+    ENDM
+
+    MACRO BXEQ
+        CPX     {1}
+        BEQ     {2}
+    ENDM
+
+    MACRO BXNE
+        CPX     {1}
+        BNE     {2}
+    ENDM
+
+    MACRO BYEQ
+        CPY     {1}
+        BEQ     {2}
+    ENDM
+
+    MACRO BYNE
+        CPY     {1}
+        BNE     {2}
+    ENDM
 ealdr_ptr           EQU     $46     ; VM instruction pointer (2 bytes)
 EALDR_psuedoacc     EQU     $48     ; VM accumulator
 ealdr_src           EQU     $4C     ; VM source pointer (2 bytes)
@@ -276,20 +447,14 @@ ealdr_op_call:
     BCC      .nc
     INC      ealdr_ptr+1
 .nc:
-    LDA      ealdr_ptr         ; push return addr (lo first, hi second)
-    PHA
-    LDA      ealdr_ptr+1
-    PHA
+    PSHW     ealdr_ptr         ; push return addr (lo first, hi second)
     LDY      #$00
     JMP      ealdr_vm_goto     ; goto path (IP = target)
 
 ; --- Opcode 09: RET ---
 ; Return from VM subroutine.  Handler at $AB12.
 ealdr_op_ret:
-    PLA                        ; pop return addr (hi first, lo second)
-    STA      ealdr_ptr+1
-    PLA
-    STA      ealdr_ptr
+    PULW     ealdr_ptr         ; pop return addr (hi first, lo second)
     LDY      #$00
     JMP      ealdr_vm_dispatch
 
