@@ -634,7 +634,7 @@ the two instructions as a one-liner.
 Ali Baba uses Pascal-formatted strings. This means that string data has one length byte, then that number
 of character bytes after. In addition, the strings are in "Apple ASCII", where the high bit of each
 character is set. Rather than just adding raw hex bytes to the assembly listing, I've opted to write
-a small Python program which does a pass over the assembly source to find [[APSTR]] directives with strings
+this postprocessor into the weave program. It does a pass over the assembly source to find [[APSTR]] directives with strings
 and convert them to raw [[HEX]] data.
 
 \chapter{The boot process}
