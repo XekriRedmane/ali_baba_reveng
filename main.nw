@@ -2082,11 +2082,11 @@ position.
 
 <<zero page defines>>=
 TEXT_STREAM_PTR         EQU     $06     ; text stream pointer for TEXT_RENDERER (2 bytes)
-TMP_PTR                 EQU     $FA     ; temporary pointer (2 bytes)
+CHAR_PTR                EQU     $FA     ; character record pointer (2 bytes, $FA/$FB)
 DATA_PTR3               EQU     $BA     ; data pointer 3 (2 bytes)
 PRINT_STRING_ADDR       EQU     $BC     ; 2 bytes (same pointer as PRINT_FROM_PTR)
 DATA_PTR                EQU     $BE     ; data pointer / return value (2 bytes)
-@ %def TEXT_STREAM_PTR TMP_PTR DATA_PTR3 PRINT_STRING_ADDR DATA_PTR
+@ %def TEXT_STREAM_PTR CHAR_PTR DATA_PTR3 PRINT_STRING_ADDR DATA_PTR
 
 <<print string>>=
     ORG     $7758
@@ -2338,7 +2338,7 @@ entity icons on the map.
 ENTER_LOCATION:
     SUBROUTINE
 
-    LDA     $FA
+    LDA     CHAR_PTR
     CMP     LOCATION_POS
     BNE     .changed
     RTS
@@ -2354,7 +2354,7 @@ ENTER_LOCATION:
     JSR     MANHATTAN_DISTANCE
     STA     EVENT_POS
     LDY     #$05
-    LDA     ($FA),Y
+    LDA     (CHAR_PTR),Y
     AND     #$7F
     CMP     LOCATION_STYLE
     BEQ     .same_style
@@ -2363,13 +2363,13 @@ ENTER_LOCATION:
     JSR     FILL_MAP
 .same_style:
     LDY     #$03
-    LDA     ($FA),Y
+    LDA     (CHAR_PTR),Y
     JSR     POS_TO_COLROW
     STY     VIEW_MIN_ROW
     STY     FONT_ROW
     STA     VIEW_MIN_COL
     LDY     #$04
-    LDA     ($FA),Y
+    LDA     (CHAR_PTR),Y
     JSR     POS_TO_COLROW
     STY     VIEW_MAX_ROW
     STA     VIEW_MAX_COL
@@ -2387,7 +2387,7 @@ ENTER_LOCATION:
     CMP     FONT_ROW
     BPL     .row_loop
     LDY     #$05
-    LDA     ($FA),Y
+    LDA     (CHAR_PTR),Y
     BMI     .skip_entities
     JSR     DRAW_MAP_ENTITIES
 .skip_entities:
@@ -2445,9 +2445,9 @@ DRAW_MAP_ENTITIES:
     SUBROUTINE
 
     LDY     #$05
-    LDA     ($FA),Y
+    LDA     (CHAR_PTR),Y
     ORA     #$80
-    STA     ($FA),Y                 ; mark entities drawn (set bit 7)
+    STA     (CHAR_PTR),Y                 ; mark entities drawn (set bit 7)
     LDA     MAP_REDRAW_FLAG
     BEQ     .no_redraw
     JMP     .draw_mobs
@@ -2467,10 +2467,10 @@ DRAW_MAP_ENTITIES:
     LDA     VIEW_MIN_ROW
     STA     FONT_ROW
     LDY     #$02
-    LDA     ($FA),Y
+    LDA     (CHAR_PTR),Y
     PHA                             ; save record byte 2
     LDA     #$00
-    STA     ($FA),Y                 ; clear it during scan
+    STA     (CHAR_PTR),Y                 ; clear it during scan
 .cell_check:
     LDA     FONT_COL
     LDY     FONT_ROW
@@ -2505,7 +2505,7 @@ DRAW_MAP_ENTITIES:
     BPL     .cell_check             ; outer: next row
     LDY     #$02
     PLA
-    STA     ($FA),Y                 ; restore record byte 2
+    STA     (CHAR_PTR),Y                 ; restore record byte 2
     BNE     .draw_mobs
     RTS
 .draw_mobs:
@@ -2774,10 +2774,10 @@ FIND_ENTITY_AT_POS:
     SUBROUTINE
 
     STA     DAT_5a17_pos            ; save target position
-    LDA     $FB                     ; \ patch base address into
+    LDA     CHAR_PTR+1                     ; \ patch base address into
     STA     .load3+2                ;  | player search (high byte)
     STA     .load2+2                ;  | mob search (high byte)
-    LDA     $FA                     ;  |
+    LDA     CHAR_PTR                     ;  |
     STA     .load3+1                ;  | player search (low byte)
     STA     .load2+1                ; / mob search (low byte)
     JMP     .mob_search
@@ -3247,9 +3247,9 @@ MAIN_ENTRY:
     JSR     GAME_INIT
 .restart:
     LDA     #$09                    ; \
-    STA     $FA                     ;  | $FA/$FB = $4009 (character record base)
+    STA     CHAR_PTR                     ;  | $FA/$FB = $4009 (character record base)
     LDA     #$40                    ;  |
-    STA     $FB                     ; /
+    STA     CHAR_PTR+1                     ; /
     LDA     TOTAL_MOB_COUNT         ; zero on first run (no mobs yet)
     BNE     .has_mobs               ; nonzero = game in progress
     JSR     ATTRACT_SCREEN
@@ -3258,7 +3258,7 @@ MAIN_ENTRY:
     STA     CURRENT_PLAYER          ; start with player 1
 .char_loop:
     LDY     #$08
-    LDA     ($FA),Y                 ; char record byte 8 (status/group)
+    LDA     (CHAR_PTR),Y                 ; char record byte 8 (status/group)
     BEQ     .next_char              ; zero = inactive, skip
     JSR     ENTER_LOCATION          ; draw map if location changed
     LDA     CURRENT_PLAYER
@@ -3274,13 +3274,13 @@ MAIN_ENTRY:
     INC     CURRENT_PLAYER
     CLC
     LDA     #$09                    ; advance to next 9-byte record
-    ADC     $FA
-    STA     $FA
+    ADC     CHAR_PTR
+    STA     CHAR_PTR
     BCC     .no_carry
-    INC     $FB
+    INC     CHAR_PTR+1
 .no_carry:
     LDY     #$01
-    LDA     ($FA),Y                 ; byte 1 of next record
+    LDA     (CHAR_PTR),Y                 ; byte 1 of next record
     CMP     #$FF                    ; $FF = end-of-table sentinel
     BNE     .char_loop              ; more characters → loop
     JSR     RANDOM_EVENTS           ; between-round random event dispatch
@@ -3295,7 +3295,7 @@ PROCESS_MOB_GROUPS:
     ; For each group: inactive (type < 3) → display message + auto-heal;
     ; active (type >= 3) → set up scene and enter GAME_TURN_LOOP.
     LDY     #$02
-    LDA     ($FA),Y                 ; char record byte 2 = first group link
+    LDA     (CHAR_PTR),Y                 ; char record byte 2 = first group link
     STA     CURRENT_ROOM            ; save as current link
     JSR     CLEAR_MAP
     JSR     STEP_PRNG
@@ -3478,19 +3478,19 @@ EVENT_FACTION_SCENE:
     ; in the mob list; if found, run SCENE_SETUP for that mob.
     JSR     PICK_RANDOM_MOB
 EVENT_FACTION_SCENE_CONT:               ; alternate entry from RANDOM_EVENTS burst
-    LDA     $FA
+    LDA     CHAR_PTR
     CMP     #$09                        ; $FA still at base ($4009)?
     BNE     .has_char
     RTS                                 ; no character selected → skip
 .has_char:
     LDY     #$05
-    LDA     ($FA),Y                     ; char record byte 5
+    LDA     (CHAR_PTR),Y                     ; char record byte 5
     AND     #$60                        ; bits 6-5 = faction mask
     STA     $F7                         ; save for FIND_MOB_BY_FACTION
     LDA     #$00                        ; \
-    STA     $FA                         ;  | reset $FA/$FB to $4000 (record base)
+    STA     CHAR_PTR                         ;  | reset $FA/$FB to $4000 (record base)
     LDA     #$40                        ;  |
-    STA     $FB                         ; /
+    STA     CHAR_PTR+1                         ; /
     JSR     FIND_MOB_BY_FACTION         ; search mob list for matching faction
     CMP     #$00
     BNE     .found
@@ -3514,16 +3514,16 @@ EVENT_SPAWN_MOB:
     ; a matching mob and reorder it into the group.
     JSR     PICK_RANDOM_CHAR
     LDY     #$08
-    LDA     ($FA),Y                     ; char record byte 8
+    LDA     (CHAR_PTR),Y                     ; char record byte 8
     BEQ     .inactive                   ; zero = slot available
     JSR     PICK_RANDOM_CHAR            ; try once more
     LDY     #$08
-    LDA     ($FA),Y
+    LDA     (CHAR_PTR),Y
     BEQ     .inactive
     RTS                                 ; both active → give up
 .inactive:
     LDY     #$05
-    LDA     ($FA),Y                     ; char record byte 5
+    LDA     (CHAR_PTR),Y                     ; char record byte 5
     AND     #$60                        ; faction mask
     STA     $F7
     JSR     FIND_MOB_BY_FACTION
@@ -3574,9 +3574,9 @@ PICK_RANDOM_MOB:
 .found:
 COPY_BE_TO_FA:
     LDA     $BE                         ; \
-    STA     $FA                         ;  | $FA/$FB = $BE/$BF (selected record)
+    STA     CHAR_PTR                         ;  | $FA/$FB = $BE/$BF (selected record)
     LDA     $BF                         ;  |
-    STA     $FB                         ; /
+    STA     CHAR_PTR+1                         ; /
     RTS
 @ %def PICK_RANDOM_MOB COPY_BE_TO_FA
 
@@ -3605,10 +3605,10 @@ PROCESS_CHAR_EVENTS:
     ; For entries with byte 1 in range $40-$7F, subtract $40 from the
     ; value and trigger the event via CHECK_LOCATION_MATCH.
     LDY     #$06
-    LDA     ($FA),Y                     ; char record byte 6 = event list low
+    LDA     (CHAR_PTR),Y                     ; char record byte 6 = event list low
     STA     $BE
     INY
-    LDA     ($FA),Y                     ; byte 7 = event list high
+    LDA     (CHAR_PTR),Y                     ; byte 7 = event list high
     STA     $BF
 .scan:
     LDY     #$00
@@ -3647,7 +3647,7 @@ FIND_MOB_BY_FACTION:
     ; whose byte $0F has bit 7 set and bits 6-4 match $F7 (faction).
     ; Returns A=1 if found (with $F4/$F5 pointing to it), A=0 if not.
     LDY     #$02
-    LDA     ($FA),Y                     ; char record byte 2 = first link
+    LDA     (CHAR_PTR),Y                     ; char record byte 2 = first link
 .check_link:
     BNE     .resolve
     RTS                                 ; zero link → return A=0
@@ -3766,9 +3766,9 @@ SCAN_FOR_HOSTILE:
     STA     $F4                         ;  | $F4/$F5 = mob data pointer
     LDA     $BB                         ;  |
     STA     $F5                         ; /
-    LDA     $FA                         ; \
+    LDA     CHAR_PTR                         ; \
     STA     $BA                         ;  | save $FA/$FB into $BA/$BB
-    LDA     $FB                         ;  |
+    LDA     CHAR_PTR+1                         ;  |
     STA     $BB                         ; /
 .walk:
     LDY     #$02
@@ -3799,9 +3799,9 @@ LOAD_CHAR_TO_FA:
     ; Wrapper: GET_CHAR_RECORD then copy $BE/$BF → $FA/$FB.
     JSR     GET_CHAR_RECORD
     LDA     $BE
-    STA     $FA
+    STA     CHAR_PTR
     LDA     $BF
-    STA     $FB
+    STA     CHAR_PTR+1
     RTS
 @ %def LOAD_CHAR_TO_FA
 
@@ -4689,7 +4689,7 @@ FIRST_GROUP_MEMBER:
     SUBROUTINE
 
     LDY     #$02                    ; \
-    LDA     ($FA),Y                 ;  | check byte 2 of group head ($FA)
+    LDA     (CHAR_PTR),Y                 ;  | check byte 2 of group head ($FA)
     BNE     .resolve                ; /  if nonzero, follow it
 NEXT_GROUP_MEMBER:
     LDY     #$02                    ; \
@@ -5240,7 +5240,7 @@ FIND_MOB_AT_SAME_POS:
     LDY     #$01
     STY     COLOCATE_WRAPPED        ; wrapped to start
     INY                             ; Y = 2
-    LDA     ($FA),Y                 ; byte 2 of group head = first mob
+    LDA     (CHAR_PTR),Y                 ; byte 2 of group head = first mob
 .resolve:
     JSR     GET_MOB_DATA            ; A = mob index → $BA/$BB
     LDY     #$02
@@ -8354,10 +8354,10 @@ AI_CHOOSE_TARGET:
     ORA     $BA                 ; merge high bits from source
     STA     ($F8),Y
     LDY     #$08
-    LDA     ($FA),Y             ; group field 8
+    LDA     (CHAR_PTR),Y             ; group field 8
     CLC
     ADC     #$01                ; increment party size
-    STA     ($FA),Y
+    STA     (CHAR_PTR),Y
     INC     $5A01               ; increment global party count
     RTS
 
@@ -8478,7 +8478,7 @@ PICK_RANDOM_MEMBER:
     ; Uses ($FA)[8] as group size, calls RANDOM_IN_RANGE to pick Nth
 .loop:
     LDY     #$08
-    LDA     ($FA),Y             ; group size
+    LDA     (CHAR_PTR),Y             ; group size
     BEQ     .zero               ; empty group
     JSR     RANDOM_IN_RANGE     ; random(size)
     CMP     #$00
@@ -8513,10 +8513,10 @@ FIND_NEAREST_EVENT:
     LDA     #$7F                ; initial min distance
     STA     NEAREST_DIST
     LDY     #$06
-    LDA     ($FA),Y             ; event list pointer low
+    LDA     (CHAR_PTR),Y             ; event list pointer low
     STA     $BE
     INY
-    LDA     ($FA),Y             ; event list pointer high
+    LDA     (CHAR_PTR),Y             ; event list pointer high
     STA     $BF
     JMP     .check_end
 .eval:
@@ -8914,10 +8914,10 @@ UPDATE_EVENT_LIST:
     RTS
 .has_value:
     LDY     #$06
-    LDA     ($FA),Y             ; event list pointer low
+    LDA     (CHAR_PTR),Y             ; event list pointer low
     STA     $BE
     INY
-    LDA     ($FA),Y             ; event list pointer high
+    LDA     (CHAR_PTR),Y             ; event list pointer high
     STA     $BF
 .scan:
     LDY     #$00
@@ -10691,26 +10691,26 @@ INIT_MOB_COUNT:
     LDA     #$00                    ; \
     STA     TOTAL_MOB_COUNT         ; / clear total
     LDA     #$09                    ; \ $FA/$FB = $4009 (record 1)
-    STA     $FA                     ;  |
+    STA     CHAR_PTR                     ;  |
     LDA     #$40                    ;  |
-    STA     $FB                     ; /
+    STA     CHAR_PTR+1                     ; /
 .loop:
     LDY     #$01
-    LDA     ($FA),Y                 ; byte 1 of record
+    LDA     (CHAR_PTR),Y                 ; byte 1 of record
     CMP     #$FF                    ; $FF = end sentinel
     BNE     .count
     RTS
 .count:
     LDY     #$08
-    LDA     ($FA),Y                 ; byte 8 = group member count
+    LDA     (CHAR_PTR),Y                 ; byte 8 = group member count
     CLC
     ADC     TOTAL_MOB_COUNT         ; accumulate
     STA     TOTAL_MOB_COUNT
     LDA     #$09                    ; \ advance $FA by 9 (next record)
-    ADC     $FA                     ;  |
-    STA     $FA                     ;  |
+    ADC     CHAR_PTR                     ;  |
+    STA     CHAR_PTR                     ;  |
     BCC     .loop                   ;  |
-    INC     $FB                     ;  |
+    INC     CHAR_PTR+1                     ;  |
     BCS     .loop                   ; / always taken
 @ %def INIT_MOB_COUNT
 
