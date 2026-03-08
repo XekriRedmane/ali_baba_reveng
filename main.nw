@@ -8206,7 +8206,7 @@ ENTER_COMBAT_STATE:
     JSR     CHECK_ENCOUNTER
     JSR     CLEAR_RESTRICTED
     LDA     #$02
-    CMP     $5A1F
+    CMP     ENCOUNTER_RESULT
     BNE     .skip
     JSR     SET_RESTRICTED
 .skip:
@@ -8385,11 +8385,11 @@ LOAD_TARGET_PTR:
     ORG     $1BA7
 END_TURN:
     SUBROUTINE
-    ; End turn: clear $5B27, check encounter, compare level vs $5A66
+    ; End turn: clear TURN_ACTIVE, check encounter, compare level vs STEPS_TAKEN
     LDA     #$00
-    STA     $5B27
+    STA     TURN_ACTIVE
     JSR     CHECK_AND_RESTRICT
-    LDA     $5A66
+    LDA     STEPS_TAKEN
     BNE     .check_level
     JMP     TURN_DISPATCH
 .check_level:
@@ -8397,7 +8397,7 @@ END_TURN:
     LDA     ($F8),Y
     ROR
     AND     #$07
-    CMP     $5A66
+    CMP     STEPS_TAKEN
     BMI     .too_low
     JMP     TURN_DISPATCH
 .too_low:
@@ -8422,7 +8422,7 @@ CHECK_AND_RESTRICT:
     LDA     ($F8),Y
     JSR     CHECK_ENCOUNTER
     JSR     CLEAR_RESTRICTED
-    LDA     $5A1F
+    LDA     ENCOUNTER_RESULT
     CMP     #$02
     BNE     .done
     JSR     SET_RESTRICTED
@@ -8842,7 +8842,7 @@ HANDLE_MOB_ENCOUNTER:
     LDY     #$03
     LDA     ($F8),Y
     JSR     CHECK_ENCOUNTER
-    LDA     $5A1F
+    LDA     ENCOUNTER_RESULT
     CMP     #$02
     BPL     .hostile
     JSR     CHECK_THREATS_HERE
@@ -9024,7 +9024,7 @@ GET_INPUT_TABLE_PTR:
 CONFIGURE_INPUT:
     SUBROUTINE
     ; Configure input handler: set up self-modifying addresses
-    ; from $5B25/$5B26/$5A65/$5B27.
+    ; from $5B25/$5B26/$5A65/TURN_ACTIVE.
     JSR     CHECK_COMBAT_ELIGIBILITY
     LDA     $5B26
     STA     $60B3
@@ -9039,7 +9039,7 @@ CONFIGURE_INPUT:
     STA     $607E
     LDA     $5A65
     STA     $6081
-    LDA     $5B27
+    LDA     TURN_ACTIVE
     BEQ     .clear
     RTS
 .clear:
@@ -9455,9 +9455,9 @@ CHECK_COMBAT_ELIGIBILITY:
     LDA     ($F8),Y
     ROR
     AND     #$07
-    CMP     $5A66
+    CMP     STEPS_TAKEN
     BMI     .under_level
-    LDA     $5A66
+    LDA     STEPS_TAKEN
     BNE     .done
     LDY     #$05
     LDA     ($F8),Y
@@ -9476,7 +9476,7 @@ CHECK_COMBAT_ELIGIBILITY:
     LDY     #$03
     LDA     ($F8),Y
     JSR     CHECK_ENCOUNTER
-    LDA     $5A1F
+    LDA     ENCOUNTER_RESULT
     CMP     #$02
     BEQ     .done
     LDA     #$01
@@ -10251,13 +10251,13 @@ SELECT_COMBAT_TARGET:
     RTS
 .path_low:
     LDA     #$00
-    CMP     $5A66
+    CMP     STEPS_TAKEN
     BNE     .ret_2
     LDY     #$03
     LDA     ($F8),Y
     JSR     CHECK_ENCOUNTER
     LDA     #$02
-    CMP     $5A1F
+    CMP     ENCOUNTER_RESULT
     BEQ     .ret_2
     JSR     CHECK_THREATS_HERE
     CMP     #$01
