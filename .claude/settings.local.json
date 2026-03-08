@@ -41,7 +41,24 @@
       "Bash(grep)",
       "mcp__ghidra-server__search_functions_enhanced",
       "mcp__ghidra-server__list_functions_enhanced",
-      "Bash(cd \"C:/Users/rober/Projects/ali_baba_re\" && python weave.py 2>&1)"
+      "Bash(cd \"C:/Users/rober/Projects/ali_baba_re\" && python weave.py 2>&1)",
+      "mcp__ghidra-server__get_xrefs_to",
+      "Bash(C:/Dasm/dasm.exe \"C:/Users/rober/Projects/ali_baba_re/output/main.asm\" -f3 -o/dev/null)",
+      "Bash(C:/Dasm/dasm.exe \"C:/Users/rober/Projects/ali_baba_re/output/ealdr.asm\" -f3 -o/dev/null)",
+      "Bash(python weave.py)",
+      "Bash(C:/Dasm/dasm.exe output/main.asm -f3 -o/dev/null)",
+      "Bash(C:/Dasm/dasm.exe main.asm -f3 -o/dev/null)",
+      "Bash(cd \"C:/Users/rober/Projects/ali_baba_re/output\" && C:/Dasm/dasm.exe ealdr.asm -f3 -o/dev/null 2>&)",
+      "Bash(C:/Dasm/dasm.exe ealdr.asm -f3 -o/dev/null)",
+      "Bash(dasm:*)",
+      "Bash(python:*)",
+      "Bash(git:*)",
+      "mcp__ghidra-server__create_label",
+      "mcp__ghidra-server__get_assembly_context",
+      "mcp__ghidra-server__rename_or_label",
+      "Bash(sort -t'$' -k2)",
+      "Bash(sed:*)",
+      "Bash(sort:*)"
     ]
   }
 }
