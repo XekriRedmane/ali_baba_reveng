@@ -6947,7 +6947,7 @@ MOVE_LOOP:                     ; $1A31 - external entry point
     ; --- player input ---
 .player_input:
     JSR     CONFIGURE_INPUT            ; set up input UI
-    LDA     $6081               ; check if input available
+    LDA     GAME_INPUT_TABLE+4  ; check if movement enabled
     BNE     .have_input
     JMP     TEARDOWN_INPUT            ; no input → exit
 .have_input:
@@ -9036,27 +9036,27 @@ GET_INPUT_TABLE_PTR:
     ORG     $60D2
 CONFIGURE_INPUT:
     SUBROUTINE
-    ; Configure input handler: set up self-modifying addresses
+    ; Configure input handler: patch game input table enable flags
     ; from UNDER_LEVEL/SAFE_TO_REST/MOVE_POINTS/TURN_ACTIVE.
     JSR     CHECK_COMBAT_ELIGIBILITY
     LDA     SAFE_TO_REST
-    STA     $60B3
+    STA     GAME_INPUT_TABLE+54  ; rec6 byte 0 (rest option)
     LDA     UNDER_LEVEL
-    STA     $609F
+    STA     GAME_INPUT_TABLE+34  ; rec4 byte 0 (flee option)
     EOR     #$01
-    STA     $608B
-    STA     $6095
+    STA     GAME_INPUT_TABLE+14  ; rec2 byte 0 (combat option)
+    STA     GAME_INPUT_TABLE+24  ; rec3 byte 0 (combat option)
     EOR     #$01
     CLC
     ADC     #$03
-    STA     $607E
+    STA     GAME_INPUT_TABLE+1   ; max movement range
     LDA     MOVE_POINTS
-    STA     $6081
+    STA     GAME_INPUT_TABLE+4   ; rec1 byte 0 (movement)
     LDA     TURN_ACTIVE
     BEQ     .clear
     RTS
 .clear:
-    STA     $6081
+    STA     GAME_INPUT_TABLE+4   ; rec1 byte 0 (movement)
     RTS
 @ %def CONFIGURE_INPUT
 
@@ -10429,6 +10429,51 @@ COPY_RECORD_DATA:
     RTS
 @ %def COPY_RECORD_DATA
 
+<<game input table>>=
+    ORG     $607D
+; Game input option table (7 records x 10 bytes + 4-byte header).
+; Record format: [enable, col_offset, key, ?, ?, ?, str_ptr_lo, str_ptr_hi, ?, ?]
+; Byte 0 of records 1-6 is patched by CONFIGURE_INPUT based on combat state.
+; Header: option count, max_range (patched), init_ptr lo/hi
+GAME_INPUT_TABLE:
+.header:
+    HEX 07              ; 7 options
+.max_range = *
+    HEX 03              ; max movement range (patched: UNDER_LEVEL*3+3)
+    HEX D260            ; init function pointer ($60D2 = CONFIGURE_INPUT)
+.rec1:                  ; record 1 ($6081) - movement
+.rec1_enable = *
+    HEX 01              ; enable (patched: MOVE_POINTS or 0)
+    HEX 07040207
+    HEX 05537D311A
+.rec2:                  ; record 2 ($608B) - combat option
+.rec2_enable = *
+    HEX 01              ; enable (patched: ~UNDER_LEVEL)
+    HEX 2F0103
+    HEX 05063E7D0761
+.rec3:                  ; record 3 ($6095) - combat option
+.rec3_enable = *
+    HEX 01              ; enable (patched: ~UNDER_LEVEL)
+    HEX 570204
+    HEX 0604787BB714
+.rec4:                  ; record 4 ($609F) - flee option
+.rec4_enable = *
+    HEX 01              ; enable (patched: UNDER_LEVEL)
+    HEX 570301
+    HEX 03077F7BC61B
+.rec5:                  ; record 5 ($60A9)
+    HEX 01140706
+    HEX 0102457D8C61
+.rec6:                  ; record 6 ($60B3) - rest option
+.rec6_enable = *
+    HEX 01              ; enable (patched: SAFE_TO_REST)
+    HEX 3C0507
+    HEX 0203737B3F14
+.rec7:                  ; record 7 ($60BD)
+    HEX 01640605
+    HEX 0401667B0161
+@ %def GAME_INPUT_TABLE
+
 <<inc mob counters>>=
     ORG     $689F
     SUBROUTINE
@@ -10639,6 +10684,7 @@ The following root chunks produce the assembly files when tangled.
 <<clear input buffer>>
 <<render input buffer>>
 <<copy record data>>
+<<game input table>>
 <<teardown input>>
 <<get input table ptr>>
 <<configure input>>
