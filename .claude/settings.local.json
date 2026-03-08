@@ -58,7 +58,8 @@
       "mcp__ghidra-server__rename_or_label",
       "Bash(sort -t'$' -k2)",
       "Bash(sed:*)",
-      "Bash(sort:*)"
+      "Bash(sort:*)",
+      "mcp__ghidra-server__delete_label"
     ]
   }
 }

@@ -3267,9 +3267,9 @@ MAIN_ENTRY:
     CMP     #$03                    ; player 3?
     BNE     .process_mobs
 .run_scene:
-    JSR     FUN_6DFA                ; scene event processing (players 1 & 3)
+    JSR     CHECK_SCENE_EVENTS      ; scene event dispatch (players 1 & 3)
 .process_mobs:
-    JSR     FUN_0884                ; process mobs for this character
+    JSR     PROCESS_MOB_GROUPS      ; walk mob list, run turns
 .next_char:
     INC     CURRENT_PLAYER
     CLC
@@ -3283,30 +3283,288 @@ MAIN_ENTRY:
     LDA     ($FA),Y                 ; byte 1 of next record
     CMP     #$FF                    ; $FF = end-of-table sentinel
     BNE     .char_loop              ; more characters → loop
-    JSR     FUN_65A9                ; between-round processing (random events)
+    JSR     RANDOM_EVENTS           ; between-round random event dispatch
     JMP     .restart                ; restart the game loop
 @ %def MAIN_ENTRY
 
-<<fun 0884>>=
-; STUB — not yet disassembled
+<<process mob groups>>=
     ORG     $0884
-FUN_0884:
+PROCESS_MOB_GROUPS:
     SUBROUTINE
-@ %def FUN_0884
+    ; Walk the mob linked list for the current character.
+    ; For each group: inactive (type < 3) → display message + auto-heal;
+    ; active (type >= 3) → set up scene and enter GAME_TURN_LOOP.
+    LDY     #$02
+    LDA     ($FA),Y                 ; char record byte 2 = first group link
+    STA     CURRENT_ROOM            ; save as current link
+    JSR     CLEAR_MAP
+    JSR     STEP_PRNG
+    LDA     PRNG_OUTPUT
+    AND     #$17                    ; 1-in-24 chance (bits 0-2,4)
+    BNE     .walk_list
+    JSR     $A508                   ; periodic disk checkpoint (resident)
+.walk_list:
+    LDA     CURRENT_ROOM            ; current link in chain
+    BNE     .has_mob
+    RTS                             ; zero = end of list
+.has_mob:
+    JSR     GET_MOB_DATA            ; resolve link → $BA/$BB
+    LDA     $BA                     ; \
+    STA     $F8                     ;  | $F8/$F9 = mob data pointer
+    LDA     $BB                     ;  |
+    STA     $F9                     ; /
+    LDY     #$02
+    LDA     ($F8),Y                 ; mob data byte 2 = next link
+    STA     CURRENT_ROOM            ; save for next iteration
+    LDY     #$06
+    LDA     ($F8),Y                 ; mob data byte 6
+    AND     #$3F                    ; bits 5-0 = mob type
+    CMP     #$03                    ; type >= 3?
+    BPL     .active_mob
+    JSR     SHOW_IDLE_STATUS        ; inactive: print name + message
+    JSR     AUTO_HEAL               ; heal party members
+    JMP     .walk_list
+.active_mob:
+    JSR     START_MOB_TURN          ; active: set up sprite, enter turn loop
+    LDA     #$14
+    STA     BLINK_COL               ; reset blink column to 20
+    JMP     .walk_list
+@ %def PROCESS_MOB_GROUPS
 
-<<fun 65a9>>=
-; STUB — not yet disassembled
+<<show idle status>>=
+    ORG     $08D1
+SHOW_IDLE_STATUS:
+    SUBROUTINE
+    ; Display a status message for an inactive mob group.
+    JSR     SCROLL_STATUS_LINE
+    JSR     PRINT_MOB_NAME
+    JSR     SCROLL_STATUS_LINE
+    LDA     #$20                    ; message $20: idle status text
+    JMP     DISPLAY_MESSAGE
+@ %def SHOW_IDLE_STATUS
+
+<<start mob turn>>=
+    ORG     $08DF
+START_MOB_TURN:
+    SUBROUTINE
+    ; Set up the character sprite and enter the game turn loop
+    ; for an active mob group (type >= 3).
+    LDY     #$04
+    LDA     ($F8),Y                 ; mob data byte 4 = appearance
+    JSR     APPEARANCE_TO_FONTCHAR
+    STA     CHAR_SPRITE             ; save font character
+    STY     CHAR_AI_MODE            ; Y = font group → AI behavior mode
+    JSR     CHECK_MOB_NEEDS_TURN    ; carry set = needs a turn
+    BCS     .enter_turn
+    RTS                             ; carry clear = skip this mob
+.enter_turn:
+    JSR     SET_CURSOR_ROW21
+    JSR     SETUP_SCENE_DISPLAY
+    LDA     CHAR_AI_MODE
+    STA     $5AA6                   ; save AI mode (unused in main.bin)
+    JMP     GAME_TURN_LOOP
+@ %def START_MOB_TURN
+
+<<check mob needs turn>>=
+    ORG     $0958
+CHECK_MOB_NEEDS_TURN:
+    SUBROUTINE
+    ; Check whether a mob group needs a game turn.
+    ; Returns: carry set = needs turn, carry clear = skip.
+    ; Skips if: AI mode is player (0), or record byte 12 low nibble
+    ; is nonzero, or no encounter and no adjacent threats.
+    LDA     CHAR_AI_MODE
+    BEQ     .needs_turn             ; player-controlled always gets a turn
+    LDY     #$0C
+    LDA     ($F8),Y                 ; mob data byte 12
+    AND     #$0F                    ; low nibble
+    BNE     .needs_turn             ; nonzero = pending action → turn
+    LDY     #$03
+    LDA     ($F8),Y                 ; mob data byte 3 = position
+    JSR     CHECK_ENCOUNTER         ; check for encounter at this position
+    LDA     ENCOUNTER_RESULT
+    BNE     .needs_turn             ; encounter found → turn
+    LDY     #$03
+    LDA     ($F8),Y                 ; position again
+    JSR     CHECK_ADJACENT_THREATS
+    LDA     ADJACENT_THREAT
+    BNE     .needs_turn             ; threats nearby → turn
+    JSR     CLEAR_RESTRICTED        ; no action needed → clear restricted flag
+    CLC                             ; carry clear = skip
+    RTS
+.needs_turn:
+    SEC                             ; carry set = needs turn
+    RTS
+@ %def CHECK_MOB_NEEDS_TURN
+
+<<random events>>=
     ORG     $65A9
-FUN_65A9:
+RANDOM_EVENTS:
     SUBROUTINE
-@ %def FUN_65A9
+    ; Between-round random event dispatcher.  Each step rolls PRNG and
+    ; compares against the event threshold at $4239 (~7% chance).
+    ; Cascading: the deeper it goes, the more events fire at once.
+    JSR     STEP_PRNG
+    LDA     PRNG_OUTPUT
+    CMP     EVENT_THRESHOLD
+    BPL     .ev2
+    JSR     FUN_660D                ; event type 1
+.ev2:
+    JSR     STEP_PRNG
+    LDA     PRNG_OUTPUT
+    CMP     EVENT_THRESHOLD
+    BPL     .ev3
+    JSR     FUN_6613                ; event type 2
+.ev3:
+    JSR     STEP_PRNG
+    LDA     PRNG_OUTPUT
+    CMP     EVENT_THRESHOLD
+    BPL     .ev4
+    JSR     FUN_6619                ; event type 3
+.ev4:
+    JSR     STEP_PRNG
+    LDA     PRNG_OUTPUT
+    CMP     EVENT_THRESHOLD
+    BPL     .ev5
+    JSR     FUN_664E                ; event type 4a
+.ev5:
+    JSR     STEP_PRNG
+    LDA     PRNG_OUTPUT
+    CMP     EVENT_THRESHOLD
+    BPL     .ev6
+    JSR     FUN_664E                ; event type 4b
+.ev6:
+    JSR     STEP_PRNG
+    LDA     PRNG_OUTPUT
+    CMP     EVENT_THRESHOLD
+    BMI     .burst
+    RTS                             ; no more events this round
+.burst:
+    JSR     FUN_664E                ; event burst: 4 + special + tail
+    JSR     FUN_664E
+    JSR     FUN_664E
+    JSR     FUN_664E
+    JSR     FUN_66BA
+    JMP     FUN_6619_CONT          ; tail into FUN_6619 second half
+@ %def RANDOM_EVENTS
 
-<<fun 6dfa>>=
+<<defines>>=
+EVENT_THRESHOLD         EQU     $4239   ; random event probability threshold (~7%)
+@ %def EVENT_THRESHOLD
+
+<<fun 660d>>=
 ; STUB — not yet disassembled
-    ORG     $6DFA
-FUN_6DFA:
+    ORG     $660D
+FUN_660D:
     SUBROUTINE
-@ %def FUN_6DFA
+@ %def FUN_660D
+
+<<fun 6613>>=
+; STUB — not yet disassembled
+    ORG     $6613
+FUN_6613:
+    SUBROUTINE
+@ %def FUN_6613
+
+<<fun 6619>>=
+; STUB — not yet disassembled
+    ORG     $6619
+FUN_6619:
+    SUBROUTINE
+@ %def FUN_6619
+
+<<defines>>=
+FUN_6619_CONT           EQU     $661C   ; alternate entry into FUN_6619 (from RANDOM_EVENTS burst)
+@ %def FUN_6619_CONT
+
+<<fun 664e>>=
+; STUB — not yet disassembled
+    ORG     $664E
+FUN_664E:
+    SUBROUTINE
+@ %def FUN_664E
+
+<<fun 66ba>>=
+; STUB — not yet disassembled
+    ORG     $66BA
+FUN_66BA:
+    SUBROUTINE
+@ %def FUN_66BA
+
+<<check scene events>>=
+    ORG     $6DFA
+CHECK_SCENE_EVENTS:
+    SUBROUTINE
+    ; Scene event dispatcher for players 1 & 3.  Checks encounter
+    ; state and dispatches to SCENE_LOOP with mode 4-8 based on
+    ; game state flags.  Called from MAIN_ENTRY's character loop.
+    LDA     #$00
+    CMP     SCENE_HOSTILE_DONE      ; already processed hostiles?
+    BNE     .done                   ; yes → skip
+    LDA     #$40
+    STA     SCENE_GROUP_IDX         ; start scanning from group $40
+    JSR     FUN_6E5A                ; scan for hostile encounter
+    LDA     #$01
+    CMP     SCENE_FOUND_FLAG        ; found a matching group?
+    BNE     .done                   ; no → skip
+    CMP     CURRENT_PLAYER          ; is this player 1?
+    BNE     .other_player
+    CMP     SCENE_HOSTILE_FLAG      ; hostile encounter found?
+    BNE     .hostile
+    CMP     SCENE_P1_DONE           ; player 1 already processed?
+    BEQ     .done                   ; yes → skip
+    STA     SCENE_P1_DONE           ; mark as done
+    LDA     #$04
+    JMP     SCENE_LOOP              ; mode 4: player 1 non-hostile scene
+.done:
+    RTS
+.other_player:
+    CMP     SCENE_P3_DONE           ; player 3 already processed?
+    BEQ     .done                   ; yes → skip
+    STA     SCENE_P3_DONE           ; mark as done
+    JSR     SET_CURSOR_ROW21
+    LDA     #$05
+    JMP     SCENE_LOOP              ; mode 5: other player scene
+.hostile:
+    STA     SCENE_HOSTILE_DONE      ; mark hostile as processed
+    LDA     #$06
+    JSR     SCENE_LOOP              ; mode 6: hostile encounter intro
+    JSR     FUN_6E9E                ; process mob groups
+    LDA     SCENE_EVENT_RESULT
+    BNE     .done                   ; nonzero = event handled, stop
+    LDA     #$07
+    JSR     SCENE_LOOP              ; mode 7: post-encounter
+    LDA     SCENE_COMBAT_FLAG
+    BEQ     .done                   ; no combat → done
+    JSR     SCROLL_STATUS_LINE
+    LDA     #$08
+    JMP     SCENE_LOOP              ; mode 8: combat resolution
+@ %def CHECK_SCENE_EVENTS
+
+<<defines>>=
+SCENE_FOUND_FLAG        EQU     $5A89   ; scan result: 1 = matching group found
+SCENE_HOSTILE_FLAG      EQU     $5A8A   ; scan result: nonzero = hostile encountered
+SCENE_GROUP_IDX         EQU     $5A8B   ; current group index for scanning
+SCENE_COMBAT_FLAG       EQU     $423A   ; nonzero = combat pending
+SCENE_P3_DONE           EQU     $423B   ; nonzero = player 3 scene processed
+SCENE_P1_DONE           EQU     $423C   ; nonzero = player 1 scene processed
+SCENE_HOSTILE_DONE      EQU     $423D   ; nonzero = hostile encounter processed
+SCENE_EVENT_RESULT      EQU     $423E   ; nonzero = event fully handled
+@ %def SCENE_FOUND_FLAG SCENE_HOSTILE_FLAG SCENE_GROUP_IDX SCENE_COMBAT_FLAG SCENE_P3_DONE SCENE_P1_DONE SCENE_HOSTILE_DONE SCENE_EVENT_RESULT
+
+<<fun 6e5a>>=
+; STUB — not yet disassembled
+    ORG     $6E5A
+FUN_6E5A:
+    SUBROUTINE
+@ %def FUN_6E5A
+
+<<fun 6e9e>>=
+; STUB — not yet disassembled
+    ORG     $6E9E
+FUN_6E9E:
+    SUBROUTINE
+@ %def FUN_6E9E
 
 <<defines>>=
 INPUT_MODE          EQU     $5A00   ; 0 = keyboard, 1 = joystick
@@ -3462,7 +3720,7 @@ ATTRACT_SCREEN:
 
     LDA     #$01
     STA     ACTIVE_CHAR             ; scene/character index = 1
-    STA     $423E                   ; flag
+    STA     SCENE_EVENT_RESULT      ; mark event as handled
     JSR     COMPUTE_SCENE_PTR       ; scene 1 pointer → $BA/$BB
     LDA     $BA                     ; \
     STA     $F4                     ;  | $F4/$F5 = $BA/$BB (save pointer)
@@ -9121,7 +9379,7 @@ MOB_ATTACK:
     CMP     #$15
     BCS     .npc
     LDA     #$00
-    STA     $423A
+    STA     SCENE_COMBAT_FLAG
 .npc:
     JSR     DISPATCH_ON_MODE
     LDY     #$08
@@ -10772,7 +11030,10 @@ The following root chunks produce the assembly files when tangled.
 <<pull two ret addrs>>
 <<main entry>>
 <<select input mode>>
-<<fun 0884>>
+<<process mob groups>>
+<<show idle status>>
+<<start mob turn>>
+<<check mob needs turn>>
 <<setup scene display>>
 <<load char name ptr>>
 <<setup char sprite>>
@@ -10875,7 +11136,12 @@ The following root chunks produce the assembly files when tangled.
 <<inc field5 counter>>
 <<clear status slots>>
 <<clear and display>>
-<<fun 65a9>>
+<<random events>>
+<<fun 660d>>
+<<fun 6613>>
+<<fun 6619>>
+<<fun 664e>>
+<<fun 66ba>>
 <<npc move ai>>
 <<evaluate direction>>
 <<inc mob counters>>
@@ -10889,7 +11155,9 @@ The following root chunks produce the assembly files when tangled.
 <<restore zp pointers>>
 <<relocate hires staging>>
 <<load scene data>>
-<<fun 6dfa>>
+<<check scene events>>
+<<fun 6e5a>>
+<<fun 6e9e>>
 <<modify char stats>>
 <<modify current stats>>
 <<display shop>>
