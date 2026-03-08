@@ -11654,6 +11654,30 @@ READ_INPUT_CHAR:
     LDA     ($C2),Y
     RTS
 @ %def READ_INPUT_CHAR
+@ \chapter{High Resolution Character Generator}
+
+The Hi-Res Character Generator (HRCG) is a third-party library from the
+Applesoft Toolkit.  It is relocated during [[game\_init]] from the hi-res
+page staging area [[$2000--$32FF]] to its runtime address range
+[[$9600--$A8FF]].  The HRCG code proper occupies [[$9600--$97A4]]; the
+standard font data follows at [[$97A5--$9AA4]]; and the remaining space
+through [[$A8FF]] is available to the toolkit.
+
+The HRCG initialization entry point is [[$92A8]] (called via
+[[INIT\_HRCG]] at [[$791A]]).  Six functions reside at
+[[$92A8--$95FA]]: [[HRCG\_INIT]] plus five support routines.
+
+@ \chapter{Disk I/O Routines}
+
+The disk I/O routines occupy [[$B300--$BFFF]] at runtime.  Like the HRCG
+code, they are not loaded directly to their final addresses by the
+EALDR\@.  Instead, the EALDR loads them into the hi-res page area
+[[$3300--$3FFF]] (tracks~[[\$0F]] and [[\$10]]).  During [[game\_init]],
+the routine at [[$6DA5]] copies [[$3300--$3FFF]] to [[$B300--$BFFF]].
+
+These routines handle all disk access for the main game, including
+scene loading and save/restore operations.
+
 @ \chapter{Assembly output}
 
 The following root chunks produce the assembly files when tangled.
