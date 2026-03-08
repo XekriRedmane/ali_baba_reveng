@@ -6836,8 +6836,9 @@ COMBAT_STRENGTH EQU     $5A78   ; result of CALC_COMBAT_STRENGTH
 TARGET_PTR_LO   EQU     $5A86   ; selected combat target pointer (low byte)
 TARGET_PTR_HI   EQU     $5A87   ; selected combat target pointer (high byte)
 BEST_THREAT     EQU     $5A88   ; best threat level during target selection
+EVENT_SLOT_BYTE EQU     $5A59   ; saved byte 2 of event slot (type+value)
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
-@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT TURN_ACTIVE
+@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR EVENT_SLOT_BYTE COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT TURN_ACTIVE
 
 <<game turn loop>>=
     ORG     $19AD
@@ -7093,17 +7094,17 @@ HANDLE_ENCOUNTER:
     BPL     .specific           ; type >= $40 → specific encounter
     LDA     #$14
     JSR     RANDOM_IN_RANGE     ; random(20)
-    STA     $5A18
+    STA     PRNG_OUTPUT
     LDY     #$05
     LDA     ($F8),Y             ; char field 5
     AND     #$1F                ; low 5 bits = avoidance stat
-    CMP     $5A18
+    CMP     PRNG_OUTPUT
     BMI     .roll_type          ; stat < random → encounter happens
     JMP     .avoided            ; stat >= random → avoid encounter
 .roll_type:
     JSR     STEP_PRNG
     LDA     #$74
-    CMP     $5A18
+    CMP     PRNG_OUTPUT
     BPL     .normal             ; $74 >= random → normal encounter
     JMP     .special            ; rare: special encounter
 .normal:
@@ -7125,7 +7126,7 @@ HANDLE_ENCOUNTER:
     AND     #$3F                ; low 6 bits = encounter ID
     BNE     .have_id
     JSR     STEP_PRNG           ; ID 0 → derive from PRNG
-    LDA     $5A18
+    LDA     PRNG_OUTPUT
     ROR
     ROR
     AND     #$1C
@@ -8091,10 +8092,10 @@ SETUP_CHAR_SPRITE:
     ORG     $1231
 CHECK_CAN_LEAVE:
     SUBROUTINE
-    ; Check hostility threshold: if $5A18 >= $40, show message $1C
+    ; Check hostility threshold: if PRNG_OUTPUT >= $40, show message $1C
     ; and return 1; else show message $1D and return 0.
     JSR     STEP_PRNG
-    LDA     $5A18
+    LDA     PRNG_OUTPUT
     CMP     #$40
     BPL     .pass
     JMP     .fail
@@ -8121,7 +8122,7 @@ CHECK_CAN_LEAVE:
 AUTO_HEAL:
     SUBROUTINE
     ; Auto-heal: if HP < $28, randomly attempt healing via $1482.
-    ; Loops while $5A18 >= $50 (still injured). Shows message $21
+    ; Loops while PRNG_OUTPUT >= $50 (still injured). Shows message $21
     ; if player heals for the first time.
     LDY     #$06
     LDA     ($F8),Y
@@ -8141,7 +8142,7 @@ AUTO_HEAL:
 .heal_loop:
     JSR     INCREMENT_HP
     JSR     STEP_PRNG
-    LDA     $5A18
+    LDA     PRNG_OUTPUT
     CMP     #$50
     BPL     .heal_loop
     LDY     #$04
@@ -8478,7 +8479,7 @@ HANDLE_EVENT_SLOT:
     JSR     SET_CHAR_STATE
     LDY     #$02
     LDA     ($BE),Y
-    STA     $5A59
+    STA     EVENT_SLOT_BYTE
     AND     #$C0
     CMP     #$C0
     BNE     .not_active
@@ -8500,7 +8501,7 @@ HANDLE_EVENT_SLOT:
     JSR     CHECK_THREATS_HERE
     CMP     #$00
     BNE     .has_threat
-    STA     $5A65
+    STA     MOVE_POINTS
 .has_threat:
     JMP     MOVE_LOOP
 .not_active:
@@ -8510,7 +8511,7 @@ HANDLE_EVENT_SLOT:
     PLA
     CMP     #$00
     BNE     .has_type
-    LDA     $5A59
+    LDA     EVENT_SLOT_BYTE
     AND     #$1F
     CMP     #$1B
     BMI     .small_val
@@ -8528,23 +8529,23 @@ HANDLE_EVENT_SLOT:
     BEQ     .type40
     LDA     #$19
     JSR     RANDOM_IN_RANGE
-    STA     $5A18
+    STA     PRNG_OUTPUT
     LDY     #$05
     LDA     ($F8),Y
     AND     #$1F
-    CMP     $5A18
+    CMP     PRNG_OUTPUT
     BPL     .type40
     JSR     SET_CURSOR_ROW21
     LDA     #$10
     JSR     DISPLAY_MESSAGE
     LDY     #$02
-    LDA     $5A59
+    LDA     EVENT_SLOT_BYTE
     AND     #$3F
     ORA     #$40
     STA     ($BE),Y
 EVENT_PRNG_CHECK:              ; $1DDC - external entry point
     JSR     STEP_PRNG
-    LDA     $5A18
+    LDA     PRNG_OUTPUT
     CMP     #$14
     BMI     .trap_damage
     RTS
@@ -8556,14 +8557,14 @@ EVENT_PRNG_CHECK:              ; $1DDC - external entry point
     JSR     PRINT_MOB_NAME
     JSR     DELAY_WITH_ANIMATION
     JSR     STEP_PRNG
-    LDA     $5A18
+    LDA     PRNG_OUTPUT
     ROL
     ROL
     LDA     #$01
     ADC     #$00
     JMP     APPLY_DAMAGE_TO_CURRENT
 .type40:
-    LDA     $5A59
+    LDA     EVENT_SLOT_BYTE
     AND     #$1F
     STA     $5A5A
     CMP     #$1B
@@ -8580,7 +8581,7 @@ EVENT_PRNG_CHECK:              ; $1DDC - external entry point
     CMP     #$1F
     BMI     .clear_slot
     DEC     $5A5A
-    LDA     $5A59
+    LDA     EVENT_SLOT_BYTE
     AND     #$E0
     ORA     $5A5A
     LDY     #$02
@@ -8825,7 +8826,7 @@ HANDLE_MOB_ENCOUNTER:
     TAX
     JSR     STEP_PRNG
     TXA
-    CMP     $5A18
+    CMP     PRNG_OUTPUT
     BPL     .no_flee
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
@@ -9024,7 +9025,7 @@ GET_INPUT_TABLE_PTR:
 CONFIGURE_INPUT:
     SUBROUTINE
     ; Configure input handler: set up self-modifying addresses
-    ; from $5B25/$5B26/$5A65/TURN_ACTIVE.
+    ; from $5B25/$5B26/MOVE_POINTS/TURN_ACTIVE.
     JSR     CHECK_COMBAT_ELIGIBILITY
     LDA     $5B26
     STA     $60B3
@@ -9037,7 +9038,7 @@ CONFIGURE_INPUT:
     CLC
     ADC     #$03
     STA     $607E
-    LDA     $5A65
+    LDA     MOVE_POINTS
     STA     $6081
     LDA     TURN_ACTIVE
     BEQ     .clear
