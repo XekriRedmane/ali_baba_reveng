@@ -1051,20 +1051,14 @@ ealdr_op_call:
     BCC      .nc
     INC      ealdr_ptr+1
 .nc:
-    LDA      ealdr_ptr         ; push return addr (lo first, hi second)
-    PHA
-    LDA      ealdr_ptr+1
-    PHA
+    PSHW     ealdr_ptr         ; push return addr (lo first, hi second)
     LDY      #$00
     JMP      ealdr_vm_goto     ; goto path (IP = target)
 
 ; --- Opcode 09: RET ---
 ; Return from VM subroutine.  Handler at $AB12.
 ealdr_op_ret:
-    PLA                        ; pop return addr (hi first, lo second)
-    STA      ealdr_ptr+1
-    PLA
-    STA      ealdr_ptr
+    PULW     ealdr_ptr         ; pop return addr (hi first, lo second)
     LDY      #$00
     JMP      ealdr_vm_dispatch
 
@@ -11177,6 +11171,7 @@ ealdr_top           EQU     $AC61   ; funny-increment high counter
 
 <<ealdr.asm>>=
     PROCESSOR 6502
+<<Macros>>
 <<ealdr defines>>
 <<EALDR entry>>
 <<EALDR copy subroutine>>
