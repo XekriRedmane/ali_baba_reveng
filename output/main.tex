@@ -6392,7 +6392,7 @@ and execution jumps back to the saved loop address.
     JMP     .fetch
 
 .cmd_1F:                            ; set loop address = current+1
-    JSR     \nwlinkedidentc{SCRIPT_INC_E4}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}
+    JSR     \nwlinkedidentc{SCRIPT_INC_PC}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}
     LDA     \nwlinkedidentc{SCRIPT_PC}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}
     STA     \nwlinkedidentc{SCRIPT_LOOP_ADDR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}
     LDA     \nwlinkedidentc{SCRIPT_PC}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}+1
@@ -6400,13 +6400,13 @@ and execution jumps back to the saved loop address.
     JMP     .fetch
 
 .cmd_20:                            ; set gosub address = current+1
-    JSR     \nwlinkedidentc{SCRIPT_INC_E4}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}
+    JSR     \nwlinkedidentc{SCRIPT_INC_PC}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}
     LDA     \nwlinkedidentc{SCRIPT_PC}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}
     STA     \nwlinkedidentc{SCRIPT_GOSUB_ADDR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}
     LDA     \nwlinkedidentc{SCRIPT_PC}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}+1
     STA     \nwlinkedidentc{SCRIPT_GOSUB_ADDR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}+1
     JMP     .fetch
-\nwidentuses{\\{{\nwixident{PLAY{\_}NOISE}}{PLAY:unNOISE}}\\{{\nwixident{PLAY{\_}TONE}}{PLAY:unTONE}}\\{{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}}\\{{\nwixident{SCRIPT{\_}ADVANCE}}{SCRIPT:unADVANCE}}\\{{\nwixident{SCRIPT{\_}GOSUB{\_}ADDR}}{SCRIPT:unGOSUB:unADDR}}\\{{\nwixident{SCRIPT{\_}INC{\_}E4}}{SCRIPT:unINC:unE4}}\\{{\nwixident{SCRIPT{\_}LOOP{\_}ADDR}}{SCRIPT:unLOOP:unADDR}}\\{{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}}\\{{\nwixident{SCRIPT{\_}PRNG{\_}MASK}}{SCRIPT:unPRNG:unMASK}}\\{{\nwixident{STOW}}{STOW}}}\nwindexuse{\nwixident{PLAY{\_}NOISE}}{PLAY:unNOISE}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{PLAY{\_}TONE}}{PLAY:unTONE}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}ADVANCE}}{SCRIPT:unADVANCE}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}GOSUB{\_}ADDR}}{SCRIPT:unGOSUB:unADDR}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}INC{\_}E4}}{SCRIPT:unINC:unE4}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}LOOP{\_}ADDR}}{SCRIPT:unLOOP:unADDR}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}PRNG{\_}MASK}}{SCRIPT:unPRNG:unMASK}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{STOW}}{STOW}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwendcode{}\nwbegindocs{374}\nwdocspar
+\nwidentuses{\\{{\nwixident{PLAY{\_}NOISE}}{PLAY:unNOISE}}\\{{\nwixident{PLAY{\_}TONE}}{PLAY:unTONE}}\\{{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}}\\{{\nwixident{SCRIPT{\_}ADVANCE}}{SCRIPT:unADVANCE}}\\{{\nwixident{SCRIPT{\_}GOSUB{\_}ADDR}}{SCRIPT:unGOSUB:unADDR}}\\{{\nwixident{SCRIPT{\_}INC{\_}PC}}{SCRIPT:unINC:unPC}}\\{{\nwixident{SCRIPT{\_}LOOP{\_}ADDR}}{SCRIPT:unLOOP:unADDR}}\\{{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}}\\{{\nwixident{SCRIPT{\_}PRNG{\_}MASK}}{SCRIPT:unPRNG:unMASK}}\\{{\nwixident{STOW}}{STOW}}}\nwindexuse{\nwixident{PLAY{\_}NOISE}}{PLAY:unNOISE}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{PLAY{\_}TONE}}{PLAY:unTONE}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}ADVANCE}}{SCRIPT:unADVANCE}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}GOSUB{\_}ADDR}}{SCRIPT:unGOSUB:unADDR}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}INC{\_}PC}}{SCRIPT:unINC:unPC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}LOOP{\_}ADDR}}{SCRIPT:unLOOP:unADDR}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{SCRIPT{\_}PRNG{\_}MASK}}{SCRIPT:unPRNG:unMASK}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwindexuse{\nwixident{STOW}}{STOW}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwendcode{}\nwbegindocs{374}\nwdocspar
 
 \subsubsection{Action dispatch ($\geq$ \$27)}
 
@@ -6423,14 +6423,14 @@ at {\Tt{}{\textbackslash}DISPATCH{\_}VEC\nwendquote} is set by the handlers at {
     AND     \nwlinkedidentc{SCRIPT_PRNG_MASK}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}        ; apply mask
     EOR     \nwlinkedidentc{SOUND_DURATION}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}                     ; XOR with action byte
     STA     \nwlinkedidentc{SOUND_FREQ}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}                     ; modified action
-    JSR     \nwlinkedidentc{SCRIPT_INC_E4}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}           ; advance script pointer
+    JSR     \nwlinkedidentc{SCRIPT_INC_PC}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}           ; advance script pointer
     LDY     #$00
     LDA     (\nwlinkedidentc{SCRIPT_PC}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}),Y                 ; read parameter byte
     STA     \nwlinkedidentc{SOUND_DURATION}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}
     JSR     \nwlinkedidentc{SCRIPT_ACTION_INDIRECT}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}  ; → JMP (\nwlinkedidentc{SCRIPT_ACTION_VEC}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26})
     JMP     (\nwlinkedidentc{DISPATCH_VEC}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2})                   ; dispatch via action vector
 \nwindexdefn{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\eatline
-\nwidentdefs{\\{{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}}}\nwidentuses{\\{{\nwixident{DISPATCH{\_}VEC}}{DISPATCH:unVEC}}\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{SCRIPT{\_}ACTION{\_}INDIRECT}}{SCRIPT:unACTION:unINDIRECT}}\\{{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}}\\{{\nwixident{SCRIPT{\_}INC{\_}E4}}{SCRIPT:unINC:unE4}}\\{{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}}\\{{\nwixident{SCRIPT{\_}PRNG{\_}MASK}}{SCRIPT:unPRNG:unMASK}}\\{{\nwixident{SOUND{\_}DURATION}}{SOUND:unDURATION}}\\{{\nwixident{SOUND{\_}FREQ}}{SOUND:unFREQ}}\\{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}}\nwindexuse{\nwixident{DISPATCH{\_}VEC}}{DISPATCH:unVEC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SCRIPT{\_}ACTION{\_}INDIRECT}}{SCRIPT:unACTION:unINDIRECT}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SCRIPT{\_}INC{\_}E4}}{SCRIPT:unINC:unE4}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SCRIPT{\_}PRNG{\_}MASK}}{SCRIPT:unPRNG:unMASK}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SOUND{\_}DURATION}}{SOUND:unDURATION}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SOUND{\_}FREQ}}{SOUND:unFREQ}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwendcode{}\nwbegindocs{376}\nwdocspar
+\nwidentdefs{\\{{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}}}\nwidentuses{\\{{\nwixident{DISPATCH{\_}VEC}}{DISPATCH:unVEC}}\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{SCRIPT{\_}ACTION{\_}INDIRECT}}{SCRIPT:unACTION:unINDIRECT}}\\{{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}}\\{{\nwixident{SCRIPT{\_}INC{\_}PC}}{SCRIPT:unINC:unPC}}\\{{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}}\\{{\nwixident{SCRIPT{\_}PRNG{\_}MASK}}{SCRIPT:unPRNG:unMASK}}\\{{\nwixident{SOUND{\_}DURATION}}{SOUND:unDURATION}}\\{{\nwixident{SOUND{\_}FREQ}}{SOUND:unFREQ}}\\{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}}\nwindexuse{\nwixident{DISPATCH{\_}VEC}}{DISPATCH:unVEC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SCRIPT{\_}ACTION{\_}INDIRECT}}{SCRIPT:unACTION:unINDIRECT}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SCRIPT{\_}INC{\_}PC}}{SCRIPT:unINC:unPC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SCRIPT{\_}PRNG{\_}MASK}}{SCRIPT:unPRNG:unMASK}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SOUND{\_}DURATION}}{SOUND:unDURATION}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{SOUND{\_}FREQ}}{SOUND:unFREQ}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwindexuse{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}\nwendcode{}\nwbegindocs{376}\nwdocspar
 
 \subsection{advance (\$7A4F)}
 
@@ -6447,7 +6447,7 @@ which exits the entire {\Tt{}SCRIPT{\textbackslash}{\_}ENGINE\nwendquote} call.
 \nwlinkedidentc{SCRIPT_ADVANCE}{PYNWmai0-V3JA2NOBVSV23YOIWF45X5ET3A000000-1}:
     SUBROUTINE
 
-    JSR     \nwlinkedidentc{SCRIPT_INC_E4}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}           ; advance script pointer
+    JSR     \nwlinkedidentc{SCRIPT_INC_PC}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}           ; advance script pointer
     LDA     \nwlinkedidentc{ATTRACT_FLAG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-12}            ; attract_flag
     BEQ     .continue               ; not attract mode → skip input check
 
@@ -6473,13 +6473,13 @@ which exits the entire {\Tt{}SCRIPT{\textbackslash}{\_}ENGINE\nwendquote} call.
     LSR     \nwlinkedidentc{WAIT_LOOP_COUNT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-23}                   ; shift timing flag
     JMP     SCRIPT_ENGINE_FETCH     ; loop back to interpreter
 \nwindexdefn{\nwixident{SCRIPT{\_}ADVANCE}}{SCRIPT:unADVANCE}{PYNWmai0-V3JA2NOBVSV23YOIWF45X5ET3A000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{SCRIPT{\_}ADVANCE}}{SCRIPT:unADVANCE}}}\nwidentuses{\\{{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}}\\{{\nwixident{INPUT{\_}MODE}}{INPUT:unMODE}}\\{{\nwixident{SCRIPT{\_}INC{\_}E4}}{SCRIPT:unINC:unE4}}\\{{\nwixident{WAIT{\_}LOOP{\_}COUNT}}{WAIT:unLOOP:unCOUNT}}}\nwindexuse{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}{PYNWmai0-V3JA2NOBVSV23YOIWF45X5ET3A000000-1}\nwindexuse{\nwixident{INPUT{\_}MODE}}{INPUT:unMODE}{PYNWmai0-V3JA2NOBVSV23YOIWF45X5ET3A000000-1}\nwindexuse{\nwixident{SCRIPT{\_}INC{\_}E4}}{SCRIPT:unINC:unE4}{PYNWmai0-V3JA2NOBVSV23YOIWF45X5ET3A000000-1}\nwindexuse{\nwixident{WAIT{\_}LOOP{\_}COUNT}}{WAIT:unLOOP:unCOUNT}{PYNWmai0-V3JA2NOBVSV23YOIWF45X5ET3A000000-1}\nwendcode{}\nwbegindocs{378}\nwdocspar
+\nwidentdefs{\\{{\nwixident{SCRIPT{\_}ADVANCE}}{SCRIPT:unADVANCE}}}\nwidentuses{\\{{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}}\\{{\nwixident{INPUT{\_}MODE}}{INPUT:unMODE}}\\{{\nwixident{SCRIPT{\_}INC{\_}PC}}{SCRIPT:unINC:unPC}}\\{{\nwixident{WAIT{\_}LOOP{\_}COUNT}}{WAIT:unLOOP:unCOUNT}}}\nwindexuse{\nwixident{ATTRACT{\_}FLAG}}{ATTRACT:unFLAG}{PYNWmai0-V3JA2NOBVSV23YOIWF45X5ET3A000000-1}\nwindexuse{\nwixident{INPUT{\_}MODE}}{INPUT:unMODE}{PYNWmai0-V3JA2NOBVSV23YOIWF45X5ET3A000000-1}\nwindexuse{\nwixident{SCRIPT{\_}INC{\_}PC}}{SCRIPT:unINC:unPC}{PYNWmai0-V3JA2NOBVSV23YOIWF45X5ET3A000000-1}\nwindexuse{\nwixident{WAIT{\_}LOOP{\_}COUNT}}{WAIT:unLOOP:unCOUNT}{PYNWmai0-V3JA2NOBVSV23YOIWF45X5ET3A000000-1}\nwendcode{}\nwbegindocs{378}\nwdocspar
 
 \subsection{script helpers}
 
 \nwenddocs{}\nwbegincode{379}\sublabel{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}}}\moddef{script helpers~{\nwtagstyle{}\subpageref{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $7A77
-\nwlinkedidentc{SCRIPT_INC_E4}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}:
+\nwlinkedidentc{SCRIPT_INC_PC}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}:
     SUBROUTINE
 
     INC     \nwlinkedidentc{SCRIPT_PC}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}
@@ -6492,8 +6492,8 @@ which exits the entire {\Tt{}SCRIPT{\textbackslash}{\_}ENGINE\nwendquote} call.
     ORG     $7A4C
 \nwlinkedidentc{SCRIPT_ACTION_INDIRECT}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}:
     JMP     (\nwlinkedidentc{SCRIPT_ACTION_VEC}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26})
-\nwindexdefn{\nwixident{SCRIPT{\_}ACTION{\_}INDIRECT}}{SCRIPT:unACTION:unINDIRECT}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}\nwindexdefn{\nwixident{SCRIPT{\_}INC{\_}E4}}{SCRIPT:unINC:unE4}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{SCRIPT{\_}ACTION{\_}INDIRECT}}{SCRIPT:unACTION:unINDIRECT}}\\{{\nwixident{SCRIPT{\_}INC{\_}E4}}{SCRIPT:unINC:unE4}}}\nwidentuses{\\{{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}}\\{{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}}}\nwindexuse{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}\nwindexuse{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}\nwendcode{}\nwbegindocs{380}\nwdocspar
+\nwindexdefn{\nwixident{SCRIPT{\_}ACTION{\_}INDIRECT}}{SCRIPT:unACTION:unINDIRECT}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}\nwindexdefn{\nwixident{SCRIPT{\_}INC{\_}PC}}{SCRIPT:unINC:unPC}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{SCRIPT{\_}ACTION{\_}INDIRECT}}{SCRIPT:unACTION:unINDIRECT}}\\{{\nwixident{SCRIPT{\_}INC{\_}PC}}{SCRIPT:unINC:unPC}}}\nwidentuses{\\{{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}}\\{{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}}}\nwindexuse{\nwixident{SCRIPT{\_}ACTION{\_}VEC}}{SCRIPT:unACTION:unVEC}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}\nwindexuse{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}\nwendcode{}\nwbegindocs{380}\nwdocspar
 
 \subsection{play\_tone (\$7A7F)}
 
@@ -12691,7 +12691,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{SCRIPT{\_}ADVANCE}}{SCRIPT:unADVANCE}}%
 \nwixlogsorted{i}{{\nwixident{SCRIPT{\_}ENGINE}}{SCRIPT:unENGINE}}%
 \nwixlogsorted{i}{{\nwixident{SCRIPT{\_}GOSUB{\_}ADDR}}{SCRIPT:unGOSUB:unADDR}}%
-\nwixlogsorted{i}{{\nwixident{SCRIPT{\_}INC{\_}E4}}{SCRIPT:unINC:unE4}}%
+\nwixlogsorted{i}{{\nwixident{SCRIPT{\_}INC{\_}PC}}{SCRIPT:unINC:unPC}}%
 \nwixlogsorted{i}{{\nwixident{SCRIPT{\_}LOOP{\_}ADDR}}{SCRIPT:unLOOP:unADDR}}%
 \nwixlogsorted{i}{{\nwixident{SCRIPT{\_}LOOP{\_}CTR}}{SCRIPT:unLOOP:unCTR}}%
 \nwixlogsorted{i}{{\nwixident{SCRIPT{\_}PC}}{SCRIPT:unPC}}%

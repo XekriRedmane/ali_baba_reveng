@@ -6102,7 +6102,7 @@ SCRIPT_ENGINE_FETCH:
     JMP     .fetch
 
 .cmd_1F:                            ; set loop address = current+1
-    JSR     SCRIPT_INC_E4
+    JSR     SCRIPT_INC_PC
     LDA     SCRIPT_PC
     STA     SCRIPT_LOOP_ADDR
     LDA     SCRIPT_PC+1
@@ -6110,7 +6110,7 @@ SCRIPT_ENGINE_FETCH:
     JMP     .fetch
 
 .cmd_20:                            ; set gosub address = current+1
-    JSR     SCRIPT_INC_E4
+    JSR     SCRIPT_INC_PC
     LDA     SCRIPT_PC
     STA     SCRIPT_GOSUB_ADDR
     LDA     SCRIPT_PC+1
@@ -6124,7 +6124,7 @@ SCRIPT_ENGINE_FETCH:
     AND     SCRIPT_PRNG_MASK        ; apply mask
     EOR     SOUND_DURATION                     ; XOR with action byte
     STA     SOUND_FREQ                     ; modified action
-    JSR     SCRIPT_INC_E4           ; advance script pointer
+    JSR     SCRIPT_INC_PC           ; advance script pointer
     LDY     #$00
     LDA     (SCRIPT_PC),Y                 ; read parameter byte
     STA     SOUND_DURATION
@@ -6134,7 +6134,7 @@ SCRIPT_ENGINE_FETCH:
 SCRIPT_ADVANCE:
     SUBROUTINE
 
-    JSR     SCRIPT_INC_E4           ; advance script pointer
+    JSR     SCRIPT_INC_PC           ; advance script pointer
     LDA     ATTRACT_FLAG            ; attract_flag
     BEQ     .continue               ; not attract mode → skip input check
 
@@ -6160,7 +6160,7 @@ SCRIPT_ADVANCE:
     LSR     WAIT_LOOP_COUNT                   ; shift timing flag
     JMP     SCRIPT_ENGINE_FETCH     ; loop back to interpreter
     ORG     $7A77
-SCRIPT_INC_E4:
+SCRIPT_INC_PC:
     SUBROUTINE
 
     INC     SCRIPT_PC

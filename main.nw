@@ -6230,7 +6230,7 @@ and execution jumps back to the saved loop address.
     JMP     .fetch
 
 .cmd_1F:                            ; set loop address = current+1
-    JSR     SCRIPT_INC_E4
+    JSR     SCRIPT_INC_PC
     LDA     SCRIPT_PC
     STA     SCRIPT_LOOP_ADDR
     LDA     SCRIPT_PC+1
@@ -6238,7 +6238,7 @@ and execution jumps back to the saved loop address.
     JMP     .fetch
 
 .cmd_20:                            ; set gosub address = current+1
-    JSR     SCRIPT_INC_E4
+    JSR     SCRIPT_INC_PC
     LDA     SCRIPT_PC
     STA     SCRIPT_GOSUB_ADDR
     LDA     SCRIPT_PC+1
@@ -6261,7 +6261,7 @@ at [[\DISPATCH_VEC]] is set by the handlers at [[SCRIPT\_ACTION\_VEC]].
     AND     SCRIPT_PRNG_MASK        ; apply mask
     EOR     SOUND_DURATION                     ; XOR with action byte
     STA     SOUND_FREQ                     ; modified action
-    JSR     SCRIPT_INC_E4           ; advance script pointer
+    JSR     SCRIPT_INC_PC           ; advance script pointer
     LDY     #$00
     LDA     (SCRIPT_PC),Y                 ; read parameter byte
     STA     SOUND_DURATION
@@ -6284,7 +6284,7 @@ which exits the entire [[SCRIPT\_ENGINE]] call.
 SCRIPT_ADVANCE:
     SUBROUTINE
 
-    JSR     SCRIPT_INC_E4           ; advance script pointer
+    JSR     SCRIPT_INC_PC           ; advance script pointer
     LDA     ATTRACT_FLAG            ; attract_flag
     BEQ     .continue               ; not attract mode → skip input check
 
@@ -6315,7 +6315,7 @@ SCRIPT_ADVANCE:
 
 <<script helpers>>=
     ORG     $7A77
-SCRIPT_INC_E4:
+SCRIPT_INC_PC:
     SUBROUTINE
 
     INC     SCRIPT_PC
@@ -6328,7 +6328,7 @@ SCRIPT_INC_E4:
     ORG     $7A4C
 SCRIPT_ACTION_INDIRECT:
     JMP     (SCRIPT_ACTION_VEC)
-@ %def SCRIPT_INC_E4 SCRIPT_ACTION_INDIRECT
+@ %def SCRIPT_INC_PC SCRIPT_ACTION_INDIRECT
 
 \subsection{play\_tone (\$7A7F)}
 
