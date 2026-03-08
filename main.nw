@@ -6389,7 +6389,34 @@ PLAY_NOISE:
     RTS
 @ %def PLAY_NOISE
 
-\section{Scene data loading (\$6DD8)}
+\section{Disk I/O helpers}
+
+\subsection{setup\_disk\_read (\$6C18)}
+
+Prepares disk I/O parameters for the EALDR disk routines.  Stores
+the track number (A) at offset~\$0C of the parameter block at~(\$08),
+clears the sector offset at~(\$08)+3, then calls the EALDR seek
+routine at~\$B7B5 with the slot address from~\$08/\$09.
+
+<<setup disk read>>=
+    ORG     $6C18
+SETUP_DISK_READ:
+    SUBROUTINE
+
+    LDY     #$0C
+    STA     ($08),Y                 ; ($08)+$0C = track number (A)
+    LDA     #$00
+    LDY     #$03
+    STA     ($08),Y                 ; ($08)+$03 = 0 (sector offset)
+    LDA     $09                     ; \ A/Y = slot parameter block
+    LDY     $08                     ; /
+    JSR     $B7B5                   ; EALDR seek routine
+    LDA     #$00
+    STA     $48                     ; clear disk status
+    RTS
+@ %def SETUP_DISK_READ
+
+\subsection{load\_scene\_data (\$6DD8)}
 
 Loads scene-specific data from disk into the [[\$5C00]] region.  The disk
 read calls [[\$B300]], which is part of the EALDR disk I/O code still
@@ -6406,7 +6433,7 @@ LOAD_SCENE_DATA:
     LDY     #$04                    ;  | ($08)+4 = 5 (track configuration)
     STA     ($08),Y                 ; /
     LDA     #$00
-    JSR     $6C18                   ; prepare disk parameters
+    JSR     SETUP_DISK_READ         ; prepare disk parameters
     CLC
     JSR     $B300                   ; EALDR disk read routine
     BCS     .error
@@ -11519,6 +11546,7 @@ The following root chunks produce the assembly files when tangled.
 <<save zp pointers>>
 <<restore zp pointers>>
 <<relocate hires staging>>
+<<setup disk read>>
 <<load scene data>>
 <<check scene events>>
 <<scan for hostile>>

@@ -4913,6 +4913,21 @@ RELOCATE_HIRES_STAGING:
     INC     COPY_SRC+1                         ; next source page
     INC     COPY_DEST+1                         ; next dest page
     JMP     .copy
+    ORG     $6C18
+SETUP_DISK_READ:
+    SUBROUTINE
+
+    LDY     #$0C
+    STA     ($08),Y                 ; ($08)+$0C = track number (A)
+    LDA     #$00
+    LDY     #$03
+    STA     ($08),Y                 ; ($08)+$03 = 0 (sector offset)
+    LDA     $09                     ; \ A/Y = slot parameter block
+    LDY     $08                     ; /
+    JSR     $B7B5                   ; EALDR seek routine
+    LDA     #$00
+    STA     $48                     ; clear disk status
+    RTS
     ORG     $6DD8
 LOAD_SCENE_DATA:
     SUBROUTINE
@@ -4922,7 +4937,7 @@ LOAD_SCENE_DATA:
     LDY     #$04                    ;  | ($08)+4 = 5 (track configuration)
     STA     ($08),Y                 ; /
     LDA     #$00
-    JSR     $6C18                   ; prepare disk parameters
+    JSR     SETUP_DISK_READ         ; prepare disk parameters
     CLC
     JSR     $B300                   ; EALDR disk read routine
     BCS     .error
