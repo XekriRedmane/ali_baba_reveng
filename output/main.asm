@@ -261,6 +261,8 @@ CURRENT_ROW     EQU     $5A64   ; current row during turn
 MOVE_POINTS     EQU     $5A65   ; movement points remaining
 STEPS_TAKEN     EQU     $5A66   ; steps taken this turn
 INPUT_DIR       EQU     $5A67   ; direction/command from input (1-9)
+COMBAT_WILLINGNESS EQU  COMBAT_WILLINGNESS   ; accumulated willingness-to-fight score
+COMBAT_STRENGTH EQU     COMBAT_STRENGTH   ; result of CALC_COMBAT_STRENGTH
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
     ORG     $0569
@@ -2122,21 +2124,21 @@ START_COMBAT:
 RESOLVE_ATTACK:
     SUBROUTINE
     ; Combat willingness calculation and attack resolution.
-    ; Computes willingness score in $5A76 based on char/target stats,
+    ; Computes willingness score in COMBAT_WILLINGNESS based on char/target stats,
     ; then rolls random to determine if attack occurs.
     JSR     SET_BLINK_TARGET
     LDA     $5A74
     CMP     #$01
     BNE     .not_player
     LDA     #$1C
-    STA     $5A76
+    STA     COMBAT_WILLINGNESS
     JMP     .clamp_done
 .not_player:
     LDY     #$0B
     LDA     ($F8),Y
     TAX
     AND     #$1F
-    STA     $5A76
+    STA     COMBAT_WILLINGNESS
     TXA
     AND     #$20
     BEQ     .no_bit5
@@ -2209,20 +2211,20 @@ RESOLVE_ATTACK:
     SBC     $5A77
     JSR     ADD_WILLINGNESS
 .diff_pos:
-    LDA     $5A76
+    LDA     COMBAT_WILLINGNESS
     BPL     .not_neg
     LDA     #$00
-    STA     $5A76
+    STA     COMBAT_WILLINGNESS
     JMP     .clamp_done
 .not_neg:
     CMP     #$1F
     BMI     .clamp_done
     LDA     #$1E
-    STA     $5A76
+    STA     COMBAT_WILLINGNESS
 .clamp_done:
     LDA     #$1F
     JSR     RANDOM_IN_RANGE
-    CMP     $5A76
+    CMP     COMBAT_WILLINGNESS
     BMI     .attack
     BEQ     .attack
     JSR     SET_CURSOR_ROW21
@@ -2251,8 +2253,8 @@ RESOLVE_ATTACK:
 ADD_WILLINGNESS:
     SUBROUTINE
     CLC
-    ADC     $5A76
-    STA     $5A76
+    ADC     COMBAT_WILLINGNESS
+    STA     COMBAT_WILLINGNESS
     RTS
     ORG     $16A3
 SET_BLINK_TARGET:
@@ -2310,12 +2312,12 @@ CALC_COMBAT_STRENGTH:
     AND     #$0F
     TAX
     JSR     RANDOM_IN_RANGE
-    STA     $5A78
+    STA     COMBAT_STRENGTH
     TXA
     JSR     RANDOM_IN_RANGE
     SEC
-    ADC     $5A78
-    STA     $5A78
+    ADC     COMBAT_STRENGTH
+    STA     COMBAT_STRENGTH
     LDA     $5A05
     BEQ     .check_5a74
 .exit_pla:                     ; $1712 - reused by backward BNE from $1717
@@ -2350,12 +2352,12 @@ CALC_COMBAT_STRENGTH:
     LDA     #$0A
     JSR     RANDOM_IN_RANGE
     SEC
-    ADC     $5A78
+    ADC     COMBAT_STRENGTH
     CMP     #$1F
     BCC     .cap_ok
     LDA     #$1F
 .cap_ok:
-    STA     $5A78
+    STA     COMBAT_STRENGTH
     RTS
     ORG     $199D
 LOAD_TARGET_PTR:
@@ -3017,7 +3019,7 @@ PLAYER_ATTACK:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
-    LDA     $5A78
+    LDA     COMBAT_STRENGTH
     JSR     MAP_VALUE_TO_STRING
     JSR     RESET_TEXT_WINDOW
     LDA     $F4
@@ -3026,7 +3028,7 @@ PLAYER_ATTACK:
     STA     $BF
     JSR     CLASSIFY_ENTITY_TYPE
     JSR     PRINT_BOTTOM_CENTERED
-    LDY     $5A78
+    LDY     COMBAT_STRENGTH
     LDX     #$02
     JSR     SCRIPT_ENGINE
     LDY     #$01
@@ -3043,7 +3045,7 @@ PLAYER_ATTACK:
 .roll_hit:
     LDA     #$0D
     JSR     RANDOM_IN_RANGE
-    CMP     $5A78
+    CMP     COMBAT_STRENGTH
     BCS     .immune
     JSR     DISPATCH_ON_MODE
     LDY     #$01
@@ -3080,13 +3082,13 @@ PLAYER_ATTACK:
 .check_type:
     CMP     #$00
     BEQ     .immune
-    LDA     $5A78
+    LDA     COMBAT_STRENGTH
     CMP     #$0A
     BPL     .strong_enough
     TXA
     CMP     #$80
     BPL     .blocked
-    LDA     $5A78
+    LDA     COMBAT_STRENGTH
     CMP     #$04
     BMI     .blocked
 .strong_enough:
@@ -3147,11 +3149,11 @@ MOB_ATTACK:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
-    LDA     $5A78
+    LDA     COMBAT_STRENGTH
     JSR     MAP_VALUE_TO_STRING
     JSR     RESET_TEXT_WINDOW
     JSR     PRINT_MEMBER_NAME
-    LDY     $5A78
+    LDY     COMBAT_STRENGTH
     LDX     #$02
     JSR     SCRIPT_ENGINE
     LDY     #$04
@@ -3168,7 +3170,7 @@ MOB_ATTACK:
     AND     #$0F
     CMP     #$00
     BNE     .has_strength
-    LDA     $5A78
+    LDA     COMBAT_STRENGTH
     JMP     COPY_F4_TO_F6_AND_SET
 .has_strength:
     JSR     RESET_TEXT_WINDOW
@@ -3180,7 +3182,7 @@ MOB_ATTACK:
     LDA     $5A79
     AND     #$0F
     STA     $5A79
-    LDA     $5A78
+    LDA     COMBAT_STRENGTH
     SEC
     SBC     $5A79
     BEQ     .weak_hit
@@ -3199,10 +3201,10 @@ MOB_ATTACK:
     LDA     #$34
     JMP     DISPLAY_MESSAGE
 .partial:
-    STA     $5A78
+    STA     COMBAT_STRENGTH
     TXA
     JSR     DISPLAY_MESSAGE
-    LDA     $5A78
+    LDA     COMBAT_STRENGTH
     JMP     COPY_F4_TO_F6_AND_SET
     ORG     $18E4
     SUBROUTINE
