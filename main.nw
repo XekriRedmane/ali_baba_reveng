@@ -3272,13 +3272,22 @@ BOUNDS_MAX_COL      EQU     $5A52   ; scene setup: right column boundary
 BOUNDS_MIN_ROW      EQU     $5A53   ; scene setup: top row boundary
 BOUNDS_MAX_ROW      EQU     $5A54   ; scene setup: bottom row boundary
 LOCATION_POS        EQU     $5A55   ; current location position (triggers redraw when changed)
+NEAREST_DIST        EQU     $5A14   ; find nearest event: current minimum distance
+HEAL_NOTIFIED       EQU     $5A16   ; auto heal: nonzero = already printed heal message
 LOCATION_STYLE      EQU     $5A56   ; current map style (from record field 5, bits 0-6)
+TRAP_TYPE           EQU     $5A58   ; treasure trap: random trap type (0-3)
+AI_PREV_DIR         EQU     $5A5D   ; NPC AI: previous move direction (bias avoidance)
+EVENT_DEST_POS      EQU     $5A5F   ; event handler: destination position
 EVENT_POS           EQU     $5A5E   ; event position (from MANHATTAN_DISTANCE)
+SHOP_ITEM_MASK      EQU     $5A80   ; shop: bitmask for current item ($80 rotating right)
+SHOP_PRICE          EQU     $5A81   ; shop: accumulated price low byte
+SHOP_PRICE_HI       EQU     $5A82   ; shop: accumulated price high byte
 SCENE_NUMBER        EQU     $5A99   ; current scene number
+TURN_SCRIPT_GUARD   EQU     $5AA9   ; turn reset: guards one-shot script execution
 SCENE_TEXT_DATA     EQU     $5C00   ; base address of scene text data (loaded by LOAD_SCENE_DATA)
 SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene number)
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
-@ %def INPUT_MODE TOTAL_MOB_COUNT CURRENT_PLAYER CURRENT_ROOM CHAR_SPRITE DAMAGE_AMOUNT ACTIVE_CHAR SOURCE_CHAR REORDER_LINK REORDER_SORT_KEY LOCATION_POS LOCATION_STYLE EVENT_POS SCENE_NUMBER ATTRACT_FLAG
+@ %def INPUT_MODE TOTAL_MOB_COUNT CURRENT_PLAYER CURRENT_ROOM CHAR_SPRITE DAMAGE_AMOUNT ACTIVE_CHAR SOURCE_CHAR REORDER_LINK REORDER_SORT_KEY LOCATION_POS LOCATION_STYLE NEAREST_DIST HEAL_NOTIFIED TRAP_TYPE AI_PREV_DIR EVENT_DEST_POS EVENT_POS SHOP_ITEM_MASK SHOP_PRICE SHOP_PRICE_HI SCENE_NUMBER TURN_SCRIPT_GUARD ATTRACT_FLAG
 
 \subsection{select\_input\_mode (\$084E)}
 
@@ -7466,21 +7475,21 @@ HANDLE_ENCOUNTER:
 .no_clear:
     LDY     #$02
     LDA     ($BE),Y             ; event byte 2 = destination pos
-    STA     $5A5F
+    STA     EVENT_DEST_POS
     JSR     COMMIT_MOVE            ; commit move
     LDA     $7ABE
     STA     WAIT_LOOP_COUNT
     JSR     REORDER_CURRENT_CHAR
     JSR     TIMED_WAIT
     LDY     #$03
-    LDA     $5A5F
+    LDA     EVENT_DEST_POS
     STA     ($F8),Y             ; update char packed position
     LDA     ACTIVE_CHAR
     CMP     CURRENT_PLAYER               ; compare encounter ID with current scene
     BEQ     .same_scene
     JMP     RESET_TURN_POS            ; different → reset position
 .same_scene:
-    LDA     $5A5F
+    LDA     EVENT_DEST_POS
     JSR     POS_TO_COLROW
     STA     CURRENT_COL
     STY     CURRENT_ROW
@@ -7628,7 +7637,7 @@ PICKUP_TREASURE:
     LDA     #$06
     JSR     RANDOM_IN_RANGE     ; random(6)
     AND     #$03                ; trap type 0-3
-    STA     $5A58
+    STA     TRAP_TYPE
     LDY     #$04
     LDA     ($F8),Y             ; char field 4
     BMI     .apply_trap
@@ -7637,10 +7646,10 @@ PICKUP_TREASURE:
     JSR     SET_CURSOR_ROW21
     LDA     #$36
     CLC
-    ADC     $5A58               ; scene $36 + trap type
+    ADC     TRAP_TYPE               ; scene $36 + trap type
     JSR     SCENE_LOOP          ; show trap scene
 .apply_trap:
-    LDA     $5A58
+    LDA     TRAP_TYPE
     CMP     #$01
     BMI     .trap0              ; trap 0: lose 1-5 HP
     BEQ     .trap1              ; trap 1: lose 2-9 HP
@@ -7720,7 +7729,7 @@ AI_CHOOSE_TARGET:
 
     ; --- dispatch by AI mode ---
     LDA     #$00
-    STA     $5A5D
+    STA     AI_PREV_DIR
     LDA     CHAR_AI_MODE
     CMP     #$02
     BPL     .mode_ge2
@@ -7911,7 +7920,7 @@ FIND_NEAREST_EVENT:
     ; Find nearest non-activated event (byte 1 < $C0) by Manhattan distance
     ; Returns position in A ($5A13)
     LDA     #$7F                ; initial min distance
-    STA     $5A14
+    STA     NEAREST_DIST
     LDY     #$06
     LDA     ($FA),Y             ; event list pointer low
     STA     $BE
@@ -7928,9 +7937,9 @@ FIND_NEAREST_EVENT:
     LDA     ($BE),Y             ; event byte 0 = position
     STA     $5A15
     JSR     MANHATTAN_DISTANCE            ; Manhattan distance
-    CMP     $5A14
+    CMP     NEAREST_DIST
     BPL     .advance            ; not closer
-    STA     $5A14               ; new minimum
+    STA     NEAREST_DIST               ; new minimum
     LDA     $5A15
     STA     $5A13               ; record position
 .advance:
@@ -8047,7 +8056,7 @@ COMMIT_MOVE:
     STA     FONT_CHARSET
     JSR     RENDER_FONT_CHAR       ; draw sprite
     LDX     #$16
-    STX     $5AA9
+    STX     TURN_SCRIPT_GUARD
     ; falls through to RESET_TURN_POS
 RESET_TURN_POS:
     ; Reset to turn start: convert start col/row to packed pos,
@@ -8060,12 +8069,12 @@ RESET_TURN_POS:
     STA     TURN_START_COL
     LDA     CURRENT_ROW
     STA     TURN_START_ROW
-    LDX     $5AA9
+    LDX     TURN_SCRIPT_GUARD
     CPX     #$16
     BEQ     .run_script
     RTS
 .run_script:
-    DEC     $5AA9
+    DEC     TURN_SCRIPT_GUARD
     JMP     SCRIPT_ENGINE
 @ %def COMMIT_MOVE RESET_TURN_POS
 
@@ -8458,7 +8467,7 @@ AUTO_HEAL:
     RTS
 .start_heal:
     LDA     #$00
-    STA     $5A16
+    STA     HEAL_NOTIFIED
 .heal_loop:
     JSR     INCREMENT_HP
     JSR     STEP_PRNG
@@ -8472,7 +8481,7 @@ AUTO_HEAL:
 .done:
     RTS
 .player:
-    LDA     $5A16
+    LDA     HEAL_NOTIFIED
     BNE     .done
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
@@ -8499,7 +8508,7 @@ INCREMENT_HP:
     JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
     LDA     #$22
-    STA     $5A16
+    STA     HEAL_NOTIFIED
     JMP     DISPLAY_MESSAGE
 @ %def INCREMENT_HP
 
@@ -9418,7 +9427,7 @@ NPC_MOVE_AI:
     LDA     #$13
     STA     DIR_SCORES
 .no_target:
-    LDX     $5A5D
+    LDX     AI_PREV_DIR
     BEQ     .no_prev
     INC     DIR_SCORES,X
     INC     DIR_SCORES,X
@@ -9490,7 +9499,7 @@ NPC_MOVE_AI:
 .ge3:
     EOR     #$07
 .store_dir:
-    STA     $5A5D
+    STA     AI_PREV_DIR
     LDA     $BB
     RTS
 @ %def NPC_MOVE_AI
@@ -9610,18 +9619,18 @@ DISPLAY_SHOP:
     JSR     SETUP_CHAR_SPRITE
 .item_start:
     LDA     #$80
-    STA     $5A80
+    STA     SHOP_ITEM_MASK
     LDA     #$00
     STA     SHOP_ITEM_OFFSET
 .item_loop:
     LDA     $5A83
-    AND     $5A80
+    AND     SHOP_ITEM_MASK
     BNE     .show_item
     JMP     .next_item
 .show_item:
     LDA     #$00
-    STA     $5A81
-    STA     $5A82
+    STA     SHOP_PRICE
+    STA     SHOP_PRICE_HI
     LDY     SHOP_ITEM_OFFSET
     INY
     INY
@@ -9650,9 +9659,9 @@ DISPLAY_SHOP:
     STA     $7D0F,X
     DEX
     BPL     .clear2
-    LDA     $5A81
+    LDA     SHOP_PRICE
     STA     $BC
-    LDA     $5A82
+    LDA     SHOP_PRICE_HI
     STA     $BD
     LDA     #$04
     STA     $BA
@@ -9681,12 +9690,12 @@ DISPLAY_SHOP:
     JMP     START_GAME_INPUT
 .next_item:
     CLC
-    LDA     $5A80
+    LDA     SHOP_ITEM_MASK
     ROR
     BCC     .more_items
     JMP     .item_start
 .more_items:
-    STA     $5A80
+    STA     SHOP_ITEM_MASK
     LDA     SHOP_ITEM_OFFSET
     ADC     #$05
     STA     SHOP_ITEM_OFFSET
@@ -9713,10 +9722,10 @@ ADD_PRICE_COMPONENT:
     SUBROUTINE
     CLC
     LDA     ($E6),Y
-    ADC     $5A81
-    STA     $5A81
+    ADC     SHOP_PRICE
+    STA     SHOP_PRICE
     BCC     .done
-    INC     $5A82
+    INC     SHOP_PRICE_HI
 .done:
     RTS
 @ %def ADD_PRICE_COMPONENT
