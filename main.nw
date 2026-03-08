@@ -1998,7 +1998,7 @@ opening script.  Steps:
 INIT_GAME_STATE:
     SUBROUTINE
 
-    JSR     $5C6D                   ; set up game display / UI
+    JSR     INIT_GAME_DISPLAY       ; set up game display / UI
     LDA     #<GAME_ACTION_HANDLER   ; \ $F6/DISPATCH_VEC+1 = game action handler
     STA     DISPATCH_VEC                     ;  |
     LDA     #>GAME_ACTION_HANDLER   ;  |
@@ -2023,6 +2023,228 @@ READ_KEYBOARD                EQU     $A44C   ; resident: read keyboard input
 @ %def GAME_ACTION_HANDLER READ_KEYBOARD
 
 @ %def INIT_GAME_STATE
+
+\subsection{init\_game\_display (\$5C6D)}
+
+Draws the complete game UI: renders the background text stream,
+places 2$\times$2 border characters, draws border label text at
+hardcoded positions, plots decorative corner icons, and finally
+prints the copyright notice and ``press space bar'' prompt.
+
+<<defines>>=
+UI_TEXT_STREAM          EQU     $5E55   ; text stream data for game UI background
+BORDER_POS_HORIZ       EQU     $5E7B   ; 6 col/row pairs for horizontal border labels
+BORDER_POS_VERT_L      EQU     $5E87   ; 10 col/row pairs for vertical border labels (left)
+BORDER_POS_VERT_R      EQU     $5E9B   ; 10 col/row pairs for vertical border labels (right)
+BORDER_STR_HORIZ       EQU     $5EAF   ; horizontal border pattern string
+BORDER_STR_VERT_L      EQU     $5EC1   ; vertical border pattern string (left)
+BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
+s_COPYRIGHT            EQU     $5EC7   ; "COPYRIGHT 1982 STUART SMITH"
+s_PRESS_SPACE          EQU     $5EE3   ; "PRESS SPACE BAR TO CONTINUE"
+s_DECOR_ROW1           EQU     $5EFF   ; decorative right-side row 1
+s_DECOR_ROW2           EQU     $5F07   ; decorative right-side row 2
+s_DECOR_ROW3           EQU     $5F10   ; decorative right-side row 3
+BORDER_LOOP_CTR        EQU     $5DC3   ; loop counter for border label drawing
+@ %def UI_TEXT_STREAM BORDER_POS_HORIZ BORDER_POS_VERT_L BORDER_POS_VERT_R BORDER_STR_HORIZ BORDER_STR_VERT_L BORDER_STR_VERT_R s_COPYRIGHT s_PRESS_SPACE s_DECOR_ROW1 s_DECOR_ROW2 s_DECOR_ROW3 BORDER_LOOP_CTR
+
+<<init game display>>=
+    ORG     $5C6D
+INIT_GAME_DISPLAY:
+    SUBROUTINE
+
+    LDA     #$90                    ; HRCG control: clear hi-res screen
+    JSR     ROM_COUT1
+    stow    UI_TEXT_STREAM,TEXT_STREAM_PTR ; point text stream at UI data
+    JSR     TEXT_RENDERER           ; render game UI background
+
+    ; Draw three 2x2 border characters across top (charset 2, row 3)
+    LDA     #$01                    ; char 1
+    LDX     #$10                    ; col 16
+    JSR     DRAW_BORDER_CHAR
+    LDA     #$0E                    ; char 14
+    LDX     #$12                    ; col 18
+    JSR     DRAW_BORDER_CHAR
+    LDA     #$04                    ; char 4
+    LDX     #$14                    ; col 20
+    JSR     DRAW_BORDER_CHAR
+
+    JSR     DRAW_BORDER_LABELS      ; draw border text labels
+    JSR     DRAW_BORDER_ICONS       ; draw corner decorations
+
+    JSR     PRINT_CTRL_AB           ; reset HRCG block mode
+
+    ; Print copyright at row 21, col 0
+    LDA     #$15
+    STA     TEXT_ROW
+    LDA     #$00
+    STA     TEXT_COL
+    LDX     #<s_COPYRIGHT
+    LDY     #>s_COPYRIGHT
+    JSR     PRINT_STRING_AT_ADDR
+
+    ; Print "PRESS SPACE BAR TO CONTINUE" at row 23, col 0
+    LDA     #$17
+    STA     TEXT_ROW
+    LDA     #$00
+    STA     TEXT_COL
+    LDX     #<s_PRESS_SPACE
+    LDY     #>s_PRESS_SPACE
+    JSR     PRINT_STRING_AT_ADDR
+
+    ; Switch to HRCG charset 5 for decorative chars
+    LDA     #$81                    ; ctrl-A (select charset)
+    JSR     ROM_COUT1
+    LDA     #$B5                    ; '5' = charset 5
+    JSR     ROM_COUT1
+
+    ; Print decorative strings at col 30, rows 21-23
+    LDA     #$15
+    STA     TEXT_ROW
+    LDA     #$1E
+    STA     TEXT_COL
+    LDX     #<s_DECOR_ROW1
+    LDY     #>s_DECOR_ROW1
+    JSR     PRINT_STRING_AT_ADDR
+
+    INC     TEXT_ROW
+    LDA     #$1E
+    STA     TEXT_COL
+    LDX     #<s_DECOR_ROW2
+    LDY     #>s_DECOR_ROW2
+    JSR     PRINT_STRING_AT_ADDR
+
+    INC     TEXT_ROW
+    LDA     #$1E
+    STA     TEXT_COL
+    LDX     #<s_DECOR_ROW3
+    LDY     #>s_DECOR_ROW3
+    JMP     PRINT_STRING_AT_ADDR
+@ %def INIT_GAME_DISPLAY
+
+\subsection{draw\_border\_char (\$5CEC)}
+
+Helper for [[INIT\_GAME\_DISPLAY]].  Draws a 2$\times$2 font character
+from charset~2 at column~[[X]], row~3.  The character number is in~[[A]].
+
+<<draw border char>>=
+    ORG     $5CEC
+DRAW_BORDER_CHAR:
+
+    STX     TEXT_COL
+    STA     FONT_CHARNUM
+    LDY     #$03
+    STY     TEXT_ROW
+    LDA     #$02
+    STA     FONT_CHARSET
+    JMP     PRINT_FONTCHAR_AT_TEXT_POS
+@ %def DRAW_BORDER_CHAR
+
+\subsection{draw\_border\_labels (\$5CFD)}
+
+Draws text labels around the game border.  Three loops iterate over
+tables of (column, row) pairs, printing a border pattern string at
+each position.  Selects HRCG charset~2 before drawing.
+
+<<draw border labels>>=
+    ORG     $5CFD
+DRAW_BORDER_LABELS:
+    SUBROUTINE
+
+    ; Select HRCG charset 2
+    LDA     #$81                    ; ctrl-A
+    JSR     ROM_COUT1
+    LDA     #$B2                    ; '2' = charset 2
+    JSR     ROM_COUT1
+
+    ; Loop 1: horizontal borders (6 positions from BORDER_POS_HORIZ)
+    LDX     #$0A                    ; index 10 (5 pairs, counting down by 2)
+    STX     BORDER_LOOP_CTR
+    stow    BORDER_STR_HORIZ,PRINT_STRING_ADDR
+.loop1:
+    LDA     BORDER_POS_HORIZ,X
+    STA     TEXT_COL
+    INX
+    LDA     BORDER_POS_HORIZ,X
+    STA     TEXT_ROW
+    JSR     PRINT_STRING
+    DEC     BORDER_LOOP_CTR
+    DEC     BORDER_LOOP_CTR
+    LDX     BORDER_LOOP_CTR
+    BPL     .loop1
+
+    ; Loop 2: vertical borders left (10 positions from BORDER_POS_VERT_L)
+    LDX     #$12                    ; index 18 (9 pairs, counting down by 2)
+    STX     BORDER_LOOP_CTR
+    stow    BORDER_STR_VERT_L,PRINT_STRING_ADDR
+.loop2:
+    LDA     BORDER_POS_VERT_L,X
+    STA     TEXT_COL
+    INX
+    LDA     BORDER_POS_VERT_L,X
+    STA     TEXT_ROW
+    JSR     PRINT_STRING
+    DEC     BORDER_LOOP_CTR
+    DEC     BORDER_LOOP_CTR
+    LDX     BORDER_LOOP_CTR
+    BPL     .loop2
+
+    ; Loop 3: vertical borders right (10 positions from BORDER_POS_VERT_R)
+    LDX     #$12
+    STX     BORDER_LOOP_CTR
+    stow    BORDER_STR_VERT_R,PRINT_STRING_ADDR
+.loop3:
+    LDA     BORDER_POS_VERT_R,X
+    STA     TEXT_COL
+    INX
+    LDA     BORDER_POS_VERT_R,X
+    STA     TEXT_ROW
+    JSR     PRINT_STRING
+    DEC     BORDER_LOOP_CTR
+    DEC     BORDER_LOOP_CTR
+    LDX     BORDER_LOOP_CTR
+    BPL     .loop3
+    RTS
+@ %def DRAW_BORDER_LABELS
+
+\subsection{draw\_border\_icons (\$5D7A)}
+
+Plots six decorative 2$\times$2 font characters at fixed positions
+around the game border using [[PLOT\_CHAR]].
+
+<<draw border icons>>=
+    ORG     $5D7A
+DRAW_BORDER_ICONS:
+
+    LDA     #$02                    ; char 2 at col 4, row 11
+    LDX     #$04
+    LDY     #$0B
+    JSR     PLOT_CHAR
+
+    LDA     #$01                    ; char 1 at col 4, row 16
+    LDX     #$04
+    LDY     #$10
+    JSR     PLOT_CHAR
+
+    LDA     #$03                    ; char 3 at col 34, row 16
+    LDX     #$22
+    LDY     #$10
+    JSR     PLOT_CHAR
+
+    LDA     #$04                    ; char 4 at col 34, row 11
+    LDX     #$22
+    LDY     #$0B
+    JSR     PLOT_CHAR
+
+    LDA     #$1C                    ; char 28 at col 16, row 16
+    LDX     #$10
+    LDY     #$10
+    JSR     PLOT_CHAR
+
+    LDA     #$1C                    ; char 28 at col 22, row 11
+    LDX     #$16
+    LDY     #$0B
+    JMP     PLOT_CHAR
+@ %def DRAW_BORDER_ICONS
 
 <<zero page defines>>=
 TEXT_COL                EQU     $24     ; Cursor position
@@ -2182,9 +2404,7 @@ FONT_COL        EQU     $5A0C
 FONT_ROW        EQU     $5A0D
 LOCATION_ID     EQU     $5A17   ; current location/position index
 SET_TEXT_WINDOW EQU     $76C2   ; set text window parameters
-CLEAR_MAP       EQU     $76B0   ; clear/reset the map display
-LOAD_MAP_TILES  EQU     $746C   ; load map tile set for current location style
-@ %def AI_WAIT_FLAG VIEW_MAX_COL VIEW_MAX_ROW VIEW_MIN_COL VIEW_MIN_ROW FONT_COL FONT_ROW LOCATION_ID SET_TEXT_WINDOW CLEAR_MAP LOAD_MAP_TILES
+@ %def AI_WAIT_FLAG VIEW_MAX_COL VIEW_MAX_ROW VIEW_MIN_COL VIEW_MIN_ROW FONT_COL FONT_ROW LOCATION_ID SET_TEXT_WINDOW
 
 <<font pos>>=
     ORG     $7723
@@ -2635,6 +2855,39 @@ FILL_MAP:
     JSR     PRINT_STRING            ; re-print the same glyph string
     JMP     .loop
 @ %def FILL_MAP
+
+\subsection{load\_map\_tiles (\$746C)}
+
+Selects the tile set for the current location style.  Bits 6--5 of
+[[LOCATION\_STYLE]] index into three 4-entry tables to set
+[[DEFAULT\_CHAR]], [[MAP\_FILL\_CHAR]], and [[BLINK\_ALT\_CHAR]].
+
+<<defines>>=
+TILE_DEFAULT_TAB        EQU     $7AD0   ; 4-byte table: default char per style
+TILE_FILL_TAB           EQU     $7AD4   ; 4-byte table: fill char per style
+TILE_BLINK_TAB          EQU     $7AD8   ; 4-byte table: blink alt char per style
+@ %def TILE_DEFAULT_TAB TILE_FILL_TAB TILE_BLINK_TAB
+
+<<load map tiles>>=
+    ORG     $746C
+LOAD_MAP_TILES:
+    SUBROUTINE
+
+    LDA     LOCATION_STYLE          ; location style byte
+    ROL                             ; \ rotate bits 7-6 down to bits 1-0
+    ROL                             ;  | (4 ROLs through carry)
+    ROL                             ;  |
+    ROL                             ; /
+    AND     #$03                    ; mask to 2-bit style index
+    TAX
+    LDA     TILE_BLINK_TAB,X
+    STA     BLINK_ALT_CHAR
+    LDA     TILE_FILL_TAB,X
+    STA     MAP_FILL_CHAR
+    LDA     TILE_DEFAULT_TAB,X
+    STA     DEFAULT_CHAR
+    RTS
+@ %def LOAD_MAP_TILES
 
 <<render font char>>=
     ORG     $7489
@@ -5865,6 +6118,16 @@ interpreter, separate from the EALDR VM, that runs during gameplay and
 the attract screen.  It uses the same XOR encryption scheme as the EALDR
 VM (low byte XOR [[\$03]], high byte XOR [[\$D9]]).
 
+\subsection{stub\_entry (\$0500)}
+
+The reset vector points here.  Simply jumps to [[ATTRACT\_LOOP]].
+
+<<stub entry>>=
+    ORG     $0500
+STUB_ENTRY:
+    JMP     ATTRACT_LOOP
+@ %def STUB_ENTRY
+
 \subsection{attract\_loop (\$0569)}
 
 The entry point for the resident interpreter.  Each iteration swaps
@@ -5970,6 +6233,17 @@ PULL_TWO_RET_ADDRS:
 .done:
     JMP     ($54)                   ; jump back to .resume
 @ %def PULL_TWO_RET_ADDRS
+
+\subsection{decode\_dispatch\_relay (\$07DF)}
+
+A 3-byte relay in the handler page.  Jumps to
+[[RESIDENT\_DECODE\_DISPATCH]] at [[\$0700]].
+
+<<decode dispatch relay>>=
+    ORG     $07DF
+DECODE_DISPATCH_RELAY:
+    JMP     RESIDENT_DECODE_DISPATCH
+@ %def DECODE_DISPATCH_RELAY
 
 \subsection{Dispatch table (\$06D3)}
 
@@ -8868,6 +9142,26 @@ SCROLL_STATUS_LINE:
     JMP     SET_TEXT_WINDOW_WRAP
 @ %def RESET_TEXT_WINDOW SCROLL_STATUS_LINE
 
+\subsection{clear\_map (\$76B0)}
+
+Loads the first two bytes of the record at [[\$FA/\$FB]] (CHAR\_PTR)
+into [[PRINT\_STRING\_ADDR]] and tail-calls [[SETUP\_TEXT\_POS]].
+Used before map redraw to set the text window from the current
+character's record.
+
+<<clear map>>=
+    ORG     $76B0
+CLEAR_MAP:
+
+    LDY     #$00
+    LDA     (CHAR_PTR),Y            ; record byte 0 → PRINT_STRING_ADDR low
+    STA     PRINT_STRING_ADDR
+    INY
+    LDA     (CHAR_PTR),Y            ; record byte 1 → PRINT_STRING_ADDR high
+    STA     PRINT_STRING_ADDR+1
+    JMP     SETUP_TEXT_POS
+@ %def CLEAR_MAP
+
 <<apply damage>>=
     ORG     $106F
 APPLY_DAMAGE:
@@ -11409,6 +11703,7 @@ The following root chunks produce the assembly files when tangled.
 <<Macros>>
 <<zero page defines>>
 <<defines>>
+<<stub entry>>
 <<attract loop>>
 <<resident dispatch>>
 <<resident dispatch table>>
@@ -11416,6 +11711,7 @@ The following root chunks produce the assembly files when tangled.
 <<resident decode dispatch>>
 <<decode encrypted addr>>
 <<pull two ret addrs>>
+<<decode dispatch relay>>
 <<main entry>>
 <<select input mode>>
 <<process mob groups>>
@@ -11499,6 +11795,10 @@ The following root chunks produce the assembly files when tangled.
 <<set target restricted>>
 <<dispatch on mode>>
 <<init game state>>
+<<init game display>>
+<<draw border char>>
+<<draw border labels>>
+<<draw border icons>>
 <<plot char>>
 <<input loop>>
 <<setup input>>
@@ -11563,12 +11863,14 @@ The following root chunks produce the assembly files when tangled.
 <<draw map entities>>
 <<draw map icon b>>
 <<fill map>>
+<<load map tiles>>
 <<render font char>>
 <<draw blink alt>>
 <<draw blink char>>
 <<check combat eligibility>>
 <<display message>>
 <<reset text window>>
+<<clear map>>
 <<set text window bottom>>
 <<setup text pos>>
 <<print bottom centered>>

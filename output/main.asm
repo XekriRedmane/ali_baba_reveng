@@ -202,6 +202,19 @@ RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
 HRCG_INIT               EQU     $92A8   ; HRCG entry/init routine
 GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
 READ_KEYBOARD                EQU     $A44C   ; resident: read keyboard input
+UI_TEXT_STREAM          EQU     $5E55   ; text stream data for game UI background
+BORDER_POS_HORIZ       EQU     $5E7B   ; 6 col/row pairs for horizontal border labels
+BORDER_POS_VERT_L      EQU     $5E87   ; 10 col/row pairs for vertical border labels (left)
+BORDER_POS_VERT_R      EQU     $5E9B   ; 10 col/row pairs for vertical border labels (right)
+BORDER_STR_HORIZ       EQU     $5EAF   ; horizontal border pattern string
+BORDER_STR_VERT_L      EQU     $5EC1   ; vertical border pattern string (left)
+BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
+s_COPYRIGHT            EQU     $5EC7   ; "COPYRIGHT 1982 STUART SMITH"
+s_PRESS_SPACE          EQU     $5EE3   ; "PRESS SPACE BAR TO CONTINUE"
+s_DECOR_ROW1           EQU     $5EFF   ; decorative right-side row 1
+s_DECOR_ROW2           EQU     $5F07   ; decorative right-side row 2
+s_DECOR_ROW3           EQU     $5F10   ; decorative right-side row 3
+BORDER_LOOP_CTR        EQU     $5DC3   ; loop counter for border label drawing
 AI_WAIT_FLAG    EQU     $5A06   ; wait delay for AI moves (0 or $0A)
 VIEW_MAX_COL    EQU     $5A08   ; viewport max column (from location field 4)
 VIEW_MAX_ROW    EQU     $5A09   ; viewport max row
@@ -211,8 +224,6 @@ FONT_COL        EQU     $5A0C
 FONT_ROW        EQU     $5A0D
 LOCATION_ID     EQU     $5A17   ; current location/position index
 SET_TEXT_WINDOW EQU     $76C2   ; set text window parameters
-CLEAR_MAP       EQU     $76B0   ; clear/reset the map display
-LOAD_MAP_TILES  EQU     $746C   ; load map tile set for current location style
 FONT_CHARNUM        EQU     $5A0E
 FONT_CHARSET        EQU     $5A0F
 s_PRINT_FONT_CHAR   EQU     $80A4   ; 10 bytes
@@ -225,6 +236,9 @@ BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
 BLINK_ROW       EQU     $5AA3   ; font row
 BLINK_CHAR      EQU     $5AA4   ; font character number
 MAP_FILL_CHAR           EQU     $7AC1   ; character used to fill the map grid
+TILE_DEFAULT_TAB        EQU     $7AD0   ; 4-byte table: default char per style
+TILE_FILL_TAB           EQU     $7AD4   ; 4-byte table: fill char per style
+TILE_BLINK_TAB          EQU     $7AD8   ; 4-byte table: blink alt char per style
 DEFAULT_CHAR            EQU     $7AC2   ; default entity character ($2C)
 BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
 ROM_COUT1            EQU     $FDED   ; Apple II ROM COUT1 (character output)
@@ -344,6 +358,9 @@ UNDER_LEVEL     EQU     $5B25   ; 1 if char level < steps taken
 SAFE_TO_REST    EQU     $5B26   ; 1 if no adjacent threats or encounters
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
+    ORG     $0500
+STUB_ENTRY:
+    JMP     ATTRACT_LOOP
     ORG     $0569
 ATTRACT_LOOP:
     SUBROUTINE
@@ -449,6 +466,9 @@ PULL_TWO_RET_ADDRS:
     INC     $55                     ; carry
 .done:
     JMP     ($54)                   ; jump back to .resume
+    ORG     $07DF
+DECODE_DISPATCH_RELAY:
+    JMP     RESIDENT_DECODE_DISPATCH
     ORG     $0800
 MAIN_ENTRY:
     SUBROUTINE
@@ -3525,7 +3545,7 @@ DISPATCH_ON_MODE:
 INIT_GAME_STATE:
     SUBROUTINE
 
-    JSR     $5C6D                   ; set up game display / UI
+    JSR     INIT_GAME_DISPLAY       ; set up game display / UI
     LDA     #<GAME_ACTION_HANDLER   ; \ $F6/DISPATCH_VEC+1 = game action handler
     STA     DISPATCH_VEC                     ;  |
     LDA     #>GAME_ACTION_HANDLER   ;  |
@@ -3544,6 +3564,177 @@ INIT_GAME_STATE:
     STA     $7A4B                   ; /
     RTS
 
+    ORG     $5C6D
+INIT_GAME_DISPLAY:
+    SUBROUTINE
+
+    LDA     #$90                    ; HRCG control: clear hi-res screen
+    JSR     ROM_COUT1
+    stow    UI_TEXT_STREAM,TEXT_STREAM_PTR ; point text stream at UI data
+    JSR     TEXT_RENDERER           ; render game UI background
+
+    ; Draw three 2x2 border characters across top (charset 2, row 3)
+    LDA     #$01                    ; char 1
+    LDX     #$10                    ; col 16
+    JSR     DRAW_BORDER_CHAR
+    LDA     #$0E                    ; char 14
+    LDX     #$12                    ; col 18
+    JSR     DRAW_BORDER_CHAR
+    LDA     #$04                    ; char 4
+    LDX     #$14                    ; col 20
+    JSR     DRAW_BORDER_CHAR
+
+    JSR     DRAW_BORDER_LABELS      ; draw border text labels
+    JSR     DRAW_BORDER_ICONS       ; draw corner decorations
+
+    JSR     PRINT_CTRL_AB           ; reset HRCG block mode
+
+    ; Print copyright at row 21, col 0
+    LDA     #$15
+    STA     TEXT_ROW
+    LDA     #$00
+    STA     TEXT_COL
+    LDX     #<s_COPYRIGHT
+    LDY     #>s_COPYRIGHT
+    JSR     PRINT_STRING_AT_ADDR
+
+    ; Print "PRESS SPACE BAR TO CONTINUE" at row 23, col 0
+    LDA     #$17
+    STA     TEXT_ROW
+    LDA     #$00
+    STA     TEXT_COL
+    LDX     #<s_PRESS_SPACE
+    LDY     #>s_PRESS_SPACE
+    JSR     PRINT_STRING_AT_ADDR
+
+    ; Switch to HRCG charset 5 for decorative chars
+    LDA     #$81                    ; ctrl-A (select charset)
+    JSR     ROM_COUT1
+    LDA     #$B5                    ; '5' = charset 5
+    JSR     ROM_COUT1
+
+    ; Print decorative strings at col 30, rows 21-23
+    LDA     #$15
+    STA     TEXT_ROW
+    LDA     #$1E
+    STA     TEXT_COL
+    LDX     #<s_DECOR_ROW1
+    LDY     #>s_DECOR_ROW1
+    JSR     PRINT_STRING_AT_ADDR
+
+    INC     TEXT_ROW
+    LDA     #$1E
+    STA     TEXT_COL
+    LDX     #<s_DECOR_ROW2
+    LDY     #>s_DECOR_ROW2
+    JSR     PRINT_STRING_AT_ADDR
+
+    INC     TEXT_ROW
+    LDA     #$1E
+    STA     TEXT_COL
+    LDX     #<s_DECOR_ROW3
+    LDY     #>s_DECOR_ROW3
+    JMP     PRINT_STRING_AT_ADDR
+    ORG     $5CEC
+DRAW_BORDER_CHAR:
+
+    STX     TEXT_COL
+    STA     FONT_CHARNUM
+    LDY     #$03
+    STY     TEXT_ROW
+    LDA     #$02
+    STA     FONT_CHARSET
+    JMP     PRINT_FONTCHAR_AT_TEXT_POS
+    ORG     $5CFD
+DRAW_BORDER_LABELS:
+    SUBROUTINE
+
+    ; Select HRCG charset 2
+    LDA     #$81                    ; ctrl-A
+    JSR     ROM_COUT1
+    LDA     #$B2                    ; '2' = charset 2
+    JSR     ROM_COUT1
+
+    ; Loop 1: horizontal borders (6 positions from BORDER_POS_HORIZ)
+    LDX     #$0A                    ; index 10 (5 pairs, counting down by 2)
+    STX     BORDER_LOOP_CTR
+    stow    BORDER_STR_HORIZ,PRINT_STRING_ADDR
+.loop1:
+    LDA     BORDER_POS_HORIZ,X
+    STA     TEXT_COL
+    INX
+    LDA     BORDER_POS_HORIZ,X
+    STA     TEXT_ROW
+    JSR     PRINT_STRING
+    DEC     BORDER_LOOP_CTR
+    DEC     BORDER_LOOP_CTR
+    LDX     BORDER_LOOP_CTR
+    BPL     .loop1
+
+    ; Loop 2: vertical borders left (10 positions from BORDER_POS_VERT_L)
+    LDX     #$12                    ; index 18 (9 pairs, counting down by 2)
+    STX     BORDER_LOOP_CTR
+    stow    BORDER_STR_VERT_L,PRINT_STRING_ADDR
+.loop2:
+    LDA     BORDER_POS_VERT_L,X
+    STA     TEXT_COL
+    INX
+    LDA     BORDER_POS_VERT_L,X
+    STA     TEXT_ROW
+    JSR     PRINT_STRING
+    DEC     BORDER_LOOP_CTR
+    DEC     BORDER_LOOP_CTR
+    LDX     BORDER_LOOP_CTR
+    BPL     .loop2
+
+    ; Loop 3: vertical borders right (10 positions from BORDER_POS_VERT_R)
+    LDX     #$12
+    STX     BORDER_LOOP_CTR
+    stow    BORDER_STR_VERT_R,PRINT_STRING_ADDR
+.loop3:
+    LDA     BORDER_POS_VERT_R,X
+    STA     TEXT_COL
+    INX
+    LDA     BORDER_POS_VERT_R,X
+    STA     TEXT_ROW
+    JSR     PRINT_STRING
+    DEC     BORDER_LOOP_CTR
+    DEC     BORDER_LOOP_CTR
+    LDX     BORDER_LOOP_CTR
+    BPL     .loop3
+    RTS
+    ORG     $5D7A
+DRAW_BORDER_ICONS:
+
+    LDA     #$02                    ; char 2 at col 4, row 11
+    LDX     #$04
+    LDY     #$0B
+    JSR     PLOT_CHAR
+
+    LDA     #$01                    ; char 1 at col 4, row 16
+    LDX     #$04
+    LDY     #$10
+    JSR     PLOT_CHAR
+
+    LDA     #$03                    ; char 3 at col 34, row 16
+    LDX     #$22
+    LDY     #$10
+    JSR     PLOT_CHAR
+
+    LDA     #$04                    ; char 4 at col 34, row 11
+    LDX     #$22
+    LDY     #$0B
+    JSR     PLOT_CHAR
+
+    LDA     #$1C                    ; char 28 at col 16, row 16
+    LDX     #$10
+    LDY     #$10
+    JSR     PLOT_CHAR
+
+    LDA     #$1C                    ; char 28 at col 22, row 11
+    LDX     #$16
+    LDY     #$0B
+    JMP     PLOT_CHAR
     ORG     $5DB0
 PLOT_CHAR:
     SUBROUTINE
@@ -5540,6 +5731,24 @@ FILL_MAP:
     JSR     FONT_POS_TO_TEXT_POS    ; set text cursor to font position
     JSR     PRINT_STRING            ; re-print the same glyph string
     JMP     .loop
+    ORG     $746C
+LOAD_MAP_TILES:
+    SUBROUTINE
+
+    LDA     LOCATION_STYLE          ; location style byte
+    ROL                             ; \ rotate bits 7-6 down to bits 1-0
+    ROL                             ;  | (4 ROLs through carry)
+    ROL                             ;  |
+    ROL                             ; /
+    AND     #$03                    ; mask to 2-bit style index
+    TAX
+    LDA     TILE_BLINK_TAB,X
+    STA     BLINK_ALT_CHAR
+    LDA     TILE_FILL_TAB,X
+    STA     MAP_FILL_CHAR
+    LDA     TILE_DEFAULT_TAB,X
+    STA     DEFAULT_CHAR
+    RTS
     ORG     $7489
 RENDER_FONT_CHAR:
     SUBROUTINE
@@ -5754,6 +5963,16 @@ SCROLL_STATUS_LINE:
     JSR     ROM_COUT1
     JSR     SET_TEXT_WINDOW_UPPER_LEFT_ALL
     JMP     SET_TEXT_WINDOW_WRAP
+    ORG     $76B0
+CLEAR_MAP:
+
+    LDY     #$00
+    LDA     (CHAR_PTR),Y            ; record byte 0 → PRINT_STRING_ADDR low
+    STA     PRINT_STRING_ADDR
+    INY
+    LDA     (CHAR_PTR),Y            ; record byte 1 → PRINT_STRING_ADDR high
+    STA     PRINT_STRING_ADDR+1
+    JMP     SETUP_TEXT_POS
     ORG     $76BE
 SET_CURSOR_ROW21:
     SUBROUTINE
