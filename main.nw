@@ -7544,7 +7544,7 @@ AI_CHOOSE_TARGET:
     RTS
 @ %def AI_CHOOSE_TARGET
 
-<<fun 12d0>>=
+<<pick random member>>=
     ORG     $12D0
 PICK_RANDOM_MEMBER:
     SUBROUTINE
@@ -7578,7 +7578,7 @@ PICK_RANDOM_MEMBER:
 @ %def PICK_RANDOM_MEMBER
 
 
-<<fun 138d>>=
+<<find nearest event>>=
     ORG     $138D
 FIND_NEAREST_EVENT:
     SUBROUTINE
@@ -7625,7 +7625,7 @@ FIND_NEAREST_EVENT:
     RTS
 @ %def FIND_NEAREST_EVENT
 
-<<fun 13db>>=
+<<manhattan distance>>=
     ORG     $13DB
 MANHATTAN_DISTANCE:
     SUBROUTINE
@@ -7657,7 +7657,7 @@ MANHATTAN_DISTANCE:
     RTS
 @ %def MANHATTAN_DISTANCE
 
-<<fun 1406>>=
+<<print member name>>=
     ORG     $1406
 PRINT_MEMBER_NAME:
     SUBROUTINE
@@ -7671,7 +7671,7 @@ PRINT_MEMBER_NAME:
     JMP     PRINT_BOTTOM_CENTERED
 @ %def PRINT_MEMBER_NAME
 
-<<fun 1414>>=
+<<reorder current char>>=
     ORG     $1414
 REORDER_CURRENT_CHAR:
     SUBROUTINE
@@ -7685,7 +7685,7 @@ REORDER_CURRENT_CHAR:
     JMP     REORDER_CHAR
 @ %def REORDER_CURRENT_CHAR
 
-<<fun 1425>>=
+<<apply damage to current>>=
     ORG     $1425
 APPLY_DAMAGE_TO_CURRENT:
     SUBROUTINE
@@ -7699,7 +7699,7 @@ APPLY_DAMAGE_TO_CURRENT:
     JMP     APPLY_DAMAGE
 @ %def APPLY_DAMAGE_TO_CURRENT
 
-<<fun 1b52>>=
+<<commit move>>=
     ORG     $1B52
 COMMIT_MOVE:
     SUBROUTINE
@@ -7743,7 +7743,7 @@ RESET_TURN_POS:
     JMP     SCRIPT_ENGINE
 @ %def COMMIT_MOVE RESET_TURN_POS
 
-<<fun 1be0>>=
+<<set char state>>=
     ORG     $1BE0
 SET_CHAR_STATE:
     SUBROUTINE
@@ -7757,7 +7757,7 @@ SET_CHAR_STATE:
     RTS
 @ %def SET_CHAR_STATE
 
-<<fun 657b>>=
+<<inc field5 counter>>=
     ORG     $657B
 INC_FIELD5_COUNTER:
     SUBROUTINE
@@ -7782,7 +7782,7 @@ INC_FIELD_COUNTER:
     RTS
 @ %def INC_FIELD5_COUNTER INC_FIELD_COUNTER
 
-<<fun 6593>>=
+<<clear status slots>>=
     ORG     $6593
 CLEAR_STATUS_SLOTS:
     SUBROUTINE
@@ -7797,7 +7797,7 @@ CLEAR_STATUS_SLOTS:
     RTS
 @ %def CLEAR_STATUS_SLOTS
 
-<<fun 65a1>>=
+<<clear and display>>=
     ORG     $65A1
 CLEAR_AND_DISPLAY:
     SUBROUTINE
@@ -7807,7 +7807,7 @@ CLEAR_AND_DISPLAY:
     JMP     DISPLAY_MESSAGE_LOOP
 @ %def CLEAR_AND_DISPLAY
 
-<<fun 70d4>>=
+<<modify current stats>>=
     ORG     $70D4
 MODIFY_CURRENT_STATS:
     SUBROUTINE
@@ -7819,7 +7819,7 @@ MODIFY_CURRENT_STATS:
     JMP     MODIFY_CHAR_STATS
 @ %def MODIFY_CURRENT_STATS
 
-<<fun 769b>>=
+<<reset text window>>=
     ORG     $769B
 RESET_TEXT_WINDOW:
     SUBROUTINE
@@ -7834,7 +7834,7 @@ RESET_TEXT_WINDOW:
     JMP     SET_TEXT_WINDOW_WRAP
 @ %def RESET_TEXT_WINDOW
 
-<<fun 106f>>=
+<<apply damage>>=
     ORG     $106F
 APPLY_DAMAGE:
     SUBROUTINE
@@ -7950,7 +7950,7 @@ APPLY_DAMAGE:
     JMP     DRAW_CHAR_AT_POS    ; redraw position
 @ %def APPLY_DAMAGE
 
-<<fun 1142>>=
+<<print entity name>>=
     ORG     $1142
 PRINT_ENTITY_NAME:
     SUBROUTINE
@@ -7967,7 +7967,7 @@ PRINT_ENTITY_NAME:
     JMP     RESET_TEXT_WINDOW
 @ %def PRINT_ENTITY_NAME
 
-<<fun 1260>>=
+<<update event list>>=
     ORG     $1260
 UPDATE_EVENT_LIST:
     SUBROUTINE
@@ -8048,7 +8048,7 @@ UPDATE_EVENT_LIST:
     JMP     .scan
 @ %def UPDATE_EVENT_LIST
 
-<<fun 0925>>=
+<<load char name ptr>>=
     ORG     $0925
 LOAD_CHAR_NAME_PTR:
     SUBROUTINE
@@ -8061,7 +8061,7 @@ LOAD_CHAR_NAME_PTR:
     JMP     SETUP_TEXT_POS_COL20
 @ %def LOAD_CHAR_NAME_PTR
 
-<<fun 0933>>=
+<<setup char sprite>>=
     ORG     $0933
 SETUP_CHAR_SPRITE:
     SUBROUTINE
@@ -8081,7 +8081,7 @@ SETUP_CHAR_SPRITE:
     JMP     DRAW_SPRITE
 @ %def SETUP_CHAR_SPRITE
 
-<<fun 1231>>=
+<<check can leave>>=
     ORG     $1231
 CHECK_CAN_LEAVE:
     SUBROUTINE
@@ -8110,7 +8110,7 @@ CHECK_CAN_LEAVE:
     RTS
 @ %def CHECK_CAN_LEAVE
 
-<<fun 143f>>=
+<<auto heal>>=
     ORG     $143F
 AUTO_HEAL:
     SUBROUTINE
@@ -8154,7 +8154,7 @@ AUTO_HEAL:
     JMP     DISPLAY_MESSAGE
 @ %def AUTO_HEAL
 
-<<fun 1482>>=
+<<increment hp>>=
     ORG     $1482
 INCREMENT_HP:
     SUBROUTINE
@@ -8176,7 +8176,7 @@ INCREMENT_HP:
     JMP     DISPLAY_MESSAGE
 @ %def INCREMENT_HP
 
-<<fun 14a3>>=
+<<turn dispatch>>=
     ORG     $14A3
 TURN_DISPATCH:
     SUBROUTINE
@@ -8191,7 +8191,7 @@ TURN_DISPATCH:
     JMP     TEARDOWN_INPUT
 @ %def TURN_DISPATCH
 
-<<fun 14b7>>=
+<<enter combat state>>=
     ORG     $14B7
 ENTER_COMBAT_STATE:
     SUBROUTINE
@@ -8209,7 +8209,7 @@ ENTER_COMBAT_STATE:
     RTS
 @ %def ENTER_COMBAT_STATE
 
-<<fun 14cd>>=
+<<start combat>>=
     ORG     $14CD
 START_COMBAT:
     SUBROUTINE
@@ -8220,7 +8220,7 @@ START_COMBAT:
     JMP     RESOLVE_ATTACK
 @ %def START_COMBAT
 
-<<fun 15ab>>=
+<<resolve attack>>=
     ORG     $15AB
 RESOLVE_ATTACK:
     SUBROUTINE
@@ -8352,7 +8352,7 @@ RESOLVE_ATTACK:
     JMP     MOB_ATTACK
 @ %def RESOLVE_ATTACK
 
-<<fun 169b>>=
+<<add willingness>>=
     ORG     $169B
 ADD_WILLINGNESS:
     SUBROUTINE
@@ -8362,7 +8362,7 @@ ADD_WILLINGNESS:
     RTS
 @ %def ADD_WILLINGNESS
 
-<<fun 199d>>=
+<<load target ptr>>=
     ORG     $199D
 LOAD_TARGET_PTR:
     SUBROUTINE
@@ -8380,7 +8380,7 @@ LOAD_TARGET_PTR:
 FUN_1A31:
 @ %def FUN_1A31
 
-<<fun 1ba7>>=
+<<end turn>>=
     ORG     $1BA7
 END_TURN:
     SUBROUTINE
@@ -8402,7 +8402,7 @@ END_TURN:
 .too_low:
 @ %def END_TURN
 
-<<fun 1bc6>>=
+<<set state fight>>=
     ORG     $1BC6
 SET_STATE_FIGHT:
     SUBROUTINE
@@ -8411,7 +8411,7 @@ SET_STATE_FIGHT:
     JMP     SET_CHAR_STATE
 @ %def SET_STATE_FIGHT
 
-<<fun 1bcb>>=
+<<check and restrict>>=
     ORG     $1BCB
 CHECK_AND_RESTRICT:
     SUBROUTINE
@@ -8429,7 +8429,7 @@ CHECK_AND_RESTRICT:
     RTS
 @ %def CHECK_AND_RESTRICT
 
-<<fun 1bef>>=
+<<clear restricted>>=
     ORG     $1BEF
 CLEAR_RESTRICTED:
     SUBROUTINE
@@ -8441,7 +8441,7 @@ CLEAR_RESTRICTED:
     RTS
 @ %def CLEAR_RESTRICTED
 
-<<fun 1bf8>>=
+<<set restricted>>=
     ORG     $1BF8
 SET_RESTRICTED:
     SUBROUTINE
@@ -8453,7 +8453,7 @@ SET_RESTRICTED:
     RTS
 @ %def SET_RESTRICTED
 
-<<fun 1cf1>>=
+<<show locked msg>>=
     ORG     $1CF1
 SHOW_LOCKED_MSG:
     SUBROUTINE
@@ -8467,7 +8467,7 @@ SHOW_LOCKED_MSG:
     JMP     SET_CHAR_STATE
 @ %def SHOW_LOCKED_MSG
 
-<<fun 1d4d>>=
+<<handle event slot>>=
     ORG     $1D4D
 HANDLE_EVENT_SLOT:
     SUBROUTINE
@@ -8603,7 +8603,7 @@ HANDLE_EVENT_SLOT:
 FUN_1DDC:
 @ %def FUN_1DDC
 
-<<fun 1751>>=
+<<player attack>>=
     ORG     $1751
 PLAYER_ATTACK:
     SUBROUTINE
@@ -8722,7 +8722,7 @@ PLAYER_ATTACK:
     JMP     DISPLAY_MESSAGE
 @ %def PLAYER_ATTACK
 
-<<fun 1860>>=
+<<mob attack>>=
     ORG     $1860
 MOB_ATTACK:
     SUBROUTINE
@@ -8789,7 +8789,7 @@ MOB_ATTACK:
     JMP     COPY_F4_TO_F6_AND_SET
 @ %def MOB_ATTACK
 
-<<fun 1e5a>>=
+<<handle mob encounter>>=
     ORG     $1E5A
 HANDLE_MOB_ENCOUNTER:
     SUBROUTINE
@@ -8876,7 +8876,7 @@ HANDLE_MOB_ENCOUNTER:
     JMP     END_TURN
 @ %def HANDLE_MOB_ENCOUNTER
 
-<<fun 1f03>>=
+<<set target restricted>>=
     ORG     $1F03
 SET_TARGET_RESTRICTED:
     SUBROUTINE
@@ -8887,7 +8887,7 @@ SET_TARGET_RESTRICTED:
     RTS
 @ %def SET_TARGET_RESTRICTED
 
-<<fun 5f19>>=
+<<input loop>>=
     ORG     $5F19
 INPUT_LOOP:
     SUBROUTINE
@@ -8923,7 +8923,7 @@ INPUT_LOOP:
     JMP     ($5F5E)
 @ %def INPUT_LOOP
 
-<<fun 5f60>>=
+<<setup input>>=
     ORG     $5F60
 SETUP_INPUT:
     SUBROUTINE
@@ -8936,7 +8936,7 @@ SETUP_INPUT:
     JMP     RENDER_INPUT_BUFFER
 @ %def SETUP_INPUT
 
-<<fun 5f70>>=
+<<draw input options>>=
     ORG     $5F70
 DRAW_INPUT_OPTIONS:
     SUBROUTINE
@@ -8956,7 +8956,7 @@ DRAW_INPUT_OPTIONS:
     RTS
 @ %def DRAW_INPUT_OPTIONS
 
-<<fun 6014>>=
+<<call input init>>=
     ORG     $6014
 CALL_INPUT_INIT:
     SUBROUTINE
@@ -8969,7 +8969,7 @@ CALL_INPUT_INIT:
     JMP     ($5F5E)
 @ %def CALL_INPUT_INIT
 
-<<fun 6024>>=
+<<clear input buffer>>=
     ORG     $6024
 CLEAR_INPUT_BUFFER:
     SUBROUTINE
@@ -8982,7 +8982,7 @@ CLEAR_INPUT_BUFFER:
     RTS
 @ %def CLEAR_INPUT_BUFFER
 
-<<fun 602f>>=
+<<render input buffer>>=
     ORG     $602F
 RENDER_INPUT_BUFFER:
     SUBROUTINE
@@ -9003,7 +9003,7 @@ RENDER_INPUT_BUFFER:
     RTS
 @ %def RENDER_INPUT_BUFFER
 
-<<fun 60c7>>=
+<<teardown input>>=
     ORG     $60C7
 TEARDOWN_INPUT:
     SUBROUTINE
@@ -9012,7 +9012,7 @@ TEARDOWN_INPUT:
     JMP     INPUT_LOOP
 @ %def TEARDOWN_INPUT
 
-<<fun 60cd>>=
+<<get input table ptr>>=
     ORG     $60CD
 GET_INPUT_TABLE_PTR:
     SUBROUTINE
@@ -9022,7 +9022,7 @@ GET_INPUT_TABLE_PTR:
     RTS
 @ %def GET_INPUT_TABLE_PTR
 
-<<fun 60d2>>=
+<<configure input>>=
     ORG     $60D2
 CONFIGURE_INPUT:
     SUBROUTINE
@@ -9050,7 +9050,7 @@ CONFIGURE_INPUT:
     RTS
 @ %def CONFIGURE_INPUT
 
-<<fun 6458>>=
+<<start game input>>=
     ORG     $6458
 START_GAME_INPUT:
     SUBROUTINE
@@ -9059,7 +9059,7 @@ START_GAME_INPUT:
     JMP     INPUT_LOOP
 @ %def START_GAME_INPUT
 
-<<fun 645f>>=
+<<check threats here>>=
     ORG     $645F
 CHECK_THREATS_HERE:
     SUBROUTINE
@@ -9070,7 +9070,7 @@ CHECK_THREATS_HERE:
     JMP     CHECK_ADJACENT_THREATS
 @ %def CHECK_THREATS_HERE
 
-<<fun 6742>>=
+<<npc move ai>>=
     ORG     $6742
 NPC_MOVE_AI:
     SUBROUTINE
@@ -9177,7 +9177,7 @@ NPC_MOVE_AI:
     RTS
 @ %def NPC_MOVE_AI
 
-<<fun 6815>>=
+<<evaluate direction>>=
     ORG     $6815
 EVALUATE_DIRECTION:
     SUBROUTINE
@@ -9256,7 +9256,7 @@ EVALUATE_DIRECTION:
 ; falls through to INC_MOB_COUNTERS
 @ %def EVALUATE_DIRECTION
 
-<<fun 70df>>=
+<<display shop>>=
     ORG     $70DF
 DISPLAY_SHOP:
     SUBROUTINE
@@ -9375,7 +9375,7 @@ DISPLAY_SHOP:
     JMP     .item_loop
 @ %def DISPLAY_SHOP
 
-<<fun 71f0>>=
+<<advance shop ptr>>=
     ORG     $71F0
 ADVANCE_SHOP_PTR:
     SUBROUTINE
@@ -9389,7 +9389,7 @@ ADVANCE_SHOP_PTR:
     RTS
 @ %def ADVANCE_SHOP_PTR
 
-<<fun 71fc>>=
+<<add price component>>=
     ORG     $71FC
 ADD_PRICE_COMPONENT:
     SUBROUTINE
@@ -9403,7 +9403,7 @@ ADD_PRICE_COMPONENT:
     RTS
 @ %def ADD_PRICE_COMPONENT
 
-<<fun 7489>>=
+<<draw sprite>>=
     ORG     $7489
 DRAW_SPRITE:
     SUBROUTINE
@@ -9447,7 +9447,7 @@ DRAW_SPRITE:
     JMP     PRINT_STRING
 @ %def DRAW_SPRITE
 
-<<fun 750c>>=
+<<check combat eligibility>>=
     ORG     $750C
 CHECK_COMBAT_ELIGIBILITY:
     SUBROUTINE
@@ -9492,7 +9492,7 @@ CHECK_COMBAT_ELIGIBILITY:
     RTS
 @ %def CHECK_COMBAT_ELIGIBILITY
 
-<<fun 704d>>=
+<<modify char stats>>=
     ORG     $704D
 MODIFY_CHAR_STATS:
     SUBROUTINE
@@ -9976,7 +9976,7 @@ INIT_MOB_COUNT:
 
 @ \section{Stub labels for undisassembled functions}
 
-<<fun 116b>>=
+<<classify entity type>>=
     ORG     $116B
     SUBROUTINE
 ; Sets $BC/$BD to handler address based on entity type at ($BE)
@@ -10073,7 +10073,7 @@ CLASSIFY_ENTITY_TYPE:
     JMP     .type_C3
 @ %def CLASSIFY_ENTITY_TYPE
 
-<<fun 11fc>>=
+<<map value to string>>=
     ORG     $11FC
     SUBROUTINE
 ; Maps A to string table index, walks linked list from $803A
@@ -10113,7 +10113,7 @@ MAP_VALUE_TO_STRING:
     BNE     .loop
 @ %def MAP_VALUE_TO_STRING
 
-<<fun 1432>>=
+<<copy f4 to f6 and set>>=
     ORG     $1432
     SUBROUTINE
 ; Copies $F4/$F5 -> $F6/$F7, then JMP SET_ENTITY_PTR with A
@@ -10127,7 +10127,7 @@ COPY_F4_TO_F6_AND_SET:
     JMP     SET_ENTITY_PTR
 @ %def COPY_F4_TO_F6_AND_SET
 
-<<fun 16e0>>=
+<<calc combat strength>>=
     ORG     $16E0
     SUBROUTINE
 ; Calculates combat strength using RANDOM_IN_RANGE
@@ -10199,7 +10199,7 @@ CALC_COMBAT_STRENGTH:
     RTS
 @ %def CALC_COMBAT_STRENGTH
 
-<<fun 1849>>=
+<<process entity script>>=
     ORG     $1849
     SUBROUTINE
 ; Saves entity char, marks as $FE, runs script $0E, dispatches, restores
@@ -10216,7 +10216,7 @@ PROCESS_ENTITY_SCRIPT:
     JMP     DRAW_CHAR_AT_POS
 @ %def PROCESS_ENTITY_SCRIPT
 
-<<fun 18e4>>=
+<<select combat target>>=
     ORG     $18E4
     SUBROUTINE
 ; Selects combat target based on $5A05 (3 paths: <3, 3-4, >=5)
@@ -10295,7 +10295,7 @@ SELECT_COMBAT_TARGET:
     RTS
 @ %def SELECT_COMBAT_TARGET
 
-<<fun 1f0c>>=
+<<dispatch on mode>>=
     ORG     $1F0C
     SUBROUTINE
 ; Dispatches on $7A7F: if $60 then DELAY_WITH_ANIMATION else ANIM_TICK_AND_WAIT
@@ -10308,7 +10308,7 @@ DISPATCH_ON_MODE:
     JMP     DELAY_WITH_ANIMATION
 @ %def DISPATCH_ON_MODE
 
-<<fun 5f8c>>=
+<<calc record ptr>>=
     ORG     $5F8C
     SUBROUTINE
 ; $C2/$C3 = $C0/$C1 + A*10 - 6
@@ -10329,7 +10329,7 @@ CALC_RECORD_PTR:
     RTS
 @ %def CALC_RECORD_PTR
 
-<<fun 5fa2>>=
+<<setup cursor ext>>=
     ORG     $5FA2
     SUBROUTINE
 ; JSR SET_HTAB_VTAB then falls through to SETUP_CURSOR
@@ -10337,7 +10337,7 @@ SETUP_CURSOR_EXT:
     JSR     SET_HTAB_VTAB
 @ %def SETUP_CURSOR_EXT
 
-<<fun 5fa5>>=
+<<setup cursor>>=
     ORG     $5FA5
     SUBROUTINE
 ; Sets up cursor: calls $5FBC, positions, loads ptr from ($C2)+6/7, prints
@@ -10354,7 +10354,7 @@ SETUP_CURSOR:
     JMP     PRINT_CTRL_N
 @ %def SETUP_CURSOR
 
-<<fun 5fdd>>=
+<<validate input>>=
     ORG     $5FDD
     SUBROUTINE
 ; Validates input: saves $C2/$C3, loops reading input until valid record found
@@ -10389,7 +10389,7 @@ VALIDATE_INPUT:
     RTS
 @ %def VALIDATE_INPUT
 
-<<fun 604c>>=
+<<copy record data>>=
     ORG     $604C
     SUBROUTINE
 ; Copies data from pointer at ($C2)+6/7 into $5AAC buffer
@@ -10419,7 +10419,7 @@ COPY_RECORD_DATA:
     RTS
 @ %def COPY_RECORD_DATA
 
-<<fun 689f>>=
+<<inc mob counters>>=
     ORG     $689F
     SUBROUTINE
 ; Increments mob counters; Y = count-1 on entry
@@ -10433,7 +10433,7 @@ INC_MOB_COUNTERS:
     BPL     INC_MOB_COUNTERS
 @ %def INC_MOB_COUNTERS
 
-<<fun 76d8>>=
+<<setup text pos>>=
     ORG     $76D2
     SUBROUTINE
 ; Two entry points: $76D2 (col 0) and $76D8 (col 20)
@@ -10468,7 +10468,7 @@ SETUP_TEXT_POS_COL20:          ; $76D8 - original SETUP_TEXT_POS_COL20 entry
 @ %def SETUP_TEXT_POS SETUP_TEXT_POS_COL20
 
 
-<<fun 1979>>=
+<<get entity threat>>=
     ORG     $1979
 GET_ENTITY_THREAT:
 @ %def GET_ENTITY_THREAT
@@ -10529,53 +10529,55 @@ The following root chunks produce the assembly files when tangled.
 <<check adjacent threats>>
 <<sum hostile at pos>>
 <<draw char at pos>>
-<<fun 0925>>
-<<fun 0933>>
-<<fun 106f>>
-<<fun 1142>>
-<<fun 116b>>
-<<fun 11fc>>
-<<fun 12d0>>
+<<load char name ptr>>
+<<setup char sprite>>
+<<apply damage>>
+<<print entity name>>
+<<classify entity type>>
+<<map value to string>>
+<<pick random member>>
 <<advance group link>>
-<<fun 1260>>
-<<fun 1231>>
+<<update event list>>
+<<check can leave>>
 <<random in range>>
-<<fun 138d>>
-<<fun 13db>>
-<<fun 1406>>
-<<fun 1414>>
-<<fun 1425>>
-<<fun 1432>>
-<<fun 143f>>
-<<fun 1482>>
-<<fun 14a3>>
-<<fun 14b7>>
-<<fun 14cd>>
-<<fun 15ab>>
-<<fun 169b>>
-<<fun 16e0>>
-<<fun 199d>>
+<<find nearest event>>
+<<manhattan distance>>
+<<print member name>>
+<<reorder current char>>
+<<apply damage to current>>
+<<copy f4 to f6 and set>>
+<<auto heal>>
+<<increment hp>>
+<<turn dispatch>>
+<<enter combat state>>
+<<start combat>>
+<<resolve attack>>
+<<add willingness>>
+<<set blink target>>
+<<calc combat strength>>
+<<load target ptr>>
 <<game turn loop>>
 <<fun 1a31>>
-<<fun 1b52>>
-<<fun 1ba7>>
-<<fun 1bc6>>
-<<fun 1bcb>>
-<<fun 1be0>>
-<<fun 1bef>>
-<<fun 1bf8>>
+<<commit move>>
+<<end turn>>
+<<set state fight>>
+<<check and restrict>>
+<<set char state>>
+<<clear restricted>>
+<<set restricted>>
 <<handle encounter>>
-<<fun 1cf1>>
+<<show locked msg>>
 <<trigger scene event>>
-<<fun 1d4d>>
+<<handle event slot>>
 <<fun 1ddc>>
-<<fun 1751>>
-<<fun 1849>>
-<<fun 1860>>
-<<fun 18e4>>
-<<fun 1e5a>>
-<<fun 1f03>>
-<<fun 1f0c>>
+<<player attack>>
+<<process entity script>>
+<<mob attack>>
+<<select combat target>>
+<<get entity threat>>
+<<handle mob encounter>>
+<<set target restricted>>
+<<dispatch on mode>>
 <<fill map>>
 <<render font char>>
 <<draw blink alt>>
@@ -10584,40 +10586,41 @@ The following root chunks produce the assembly files when tangled.
 <<print font char>>
 <<init game state>>
 <<init world>>
-<<fun 5f19>>
-<<fun 5f60>>
-<<fun 5f70>>
-<<fun 5f8c>>
-<<fun 5fa2>>
-<<fun 5fa5>>
+<<input loop>>
+<<setup input>>
+<<draw input options>>
+<<calc record ptr>>
+<<setup cursor ext>>
+<<setup cursor>>
 <<fun 5fbc>>
-<<fun 5fdd>>
-<<fun 6014>>
-<<fun 6024>>
-<<fun 602f>>
-<<fun 604c>>
-<<fun 60c7>>
-<<fun 60cd>>
-<<fun 60d2>>
-<<fun 6458>>
-<<fun 645f>>
+<<validate input>>
+<<fun 600a>>
+<<call input init>>
+<<clear input buffer>>
+<<render input buffer>>
+<<copy record data>>
+<<teardown input>>
+<<get input table ptr>>
+<<configure input>>
+<<start game input>>
+<<check threats here>>
 <<pickup treasure>>
-<<fun 657b>>
-<<fun 6593>>
-<<fun 65a1>>
-<<fun 6742>>
-<<fun 6815>>
-<<fun 689f>>
+<<inc field5 counter>>
+<<clear status slots>>
+<<clear and display>>
+<<npc move ai>>
+<<evaluate direction>>
+<<inc mob counters>>
 <<ai choose target>>
-<<fun 704d>>
-<<fun 70d4>>
-<<fun 70df>>
-<<fun 71f0>>
-<<fun 71fc>>
-<<fun 7489>>
-<<fun 750c>>
-<<fun 76d8>>
-<<fun 769b>>
+<<modify char stats>>
+<<modify current stats>>
+<<display shop>>
+<<advance shop ptr>>
+<<add price component>>
+<<draw sprite>>
+<<check combat eligibility>>
+<<setup text pos>>
+<<reset text window>>
 <<init stub2>>
 <<init disk iob>>
 <<scene loop>>

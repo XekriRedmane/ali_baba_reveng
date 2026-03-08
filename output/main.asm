@@ -2254,6 +2254,40 @@ ADD_WILLINGNESS:
     ADC     $5A76
     STA     $5A76
     RTS
+    ORG     $16A3
+SET_BLINK_TARGET:
+    SUBROUTINE
+
+    LDA     IS_PLAYER_TURN
+    CMP     #$01
+    BEQ     .player
+
+    ; --- mob path: convert packed position to col/row ---
+    LDY     #$03
+    LDA     ($F4),Y                 ; mob data[3] = packed position
+    JSR     POS_TO_COLROW           ; A=col, Y=row
+    STA     BLINK_COL
+    STY     BLINK_ROW
+    LDY     #$04
+    LDA     ($F4),Y                 ; mob data[4] = appearance
+    JSR     APPEARANCE_TO_FONTCHAR  ; appearance → font char number
+    STA     BLINK_CHAR
+    RTS
+
+    ; --- player path: col/row already separate ---
+.player:
+    LDA     CURRENT_COL             ; player font column
+    STA     BLINK_COL
+    LDA     CURRENT_ROW             ; player font row
+    STA     BLINK_ROW
+    LDA     $F4                     ; \
+    STA     $BE                     ;  | copy pointer $F4 → $BE
+    LDA     $F5                     ;  |
+    STA     $BF                     ; /
+    JSR     $0C7E                   ; look up player's font char
+    LDA     FONT_CHARNUM
+    STA     BLINK_CHAR
+    RTS
     ORG     $16E0
     SUBROUTINE
 ; Calculates combat strength using RANDOM_IN_RANGE
@@ -3248,6 +3282,8 @@ SELECT_COMBAT_TARGET:
     BEQ     .path_low
     LDA     #$01
     RTS
+    ORG     $1979
+GET_ENTITY_THREAT:
     ORG     $1E5A
 HANDLE_MOB_ENCOUNTER:
     SUBROUTINE
@@ -3695,6 +3731,8 @@ VALIDATE_INPUT:
     STA     $C2
     TYA
     RTS
+    ORG     $600A
+FUN_600A:
     ORG     $6014
 CALL_INPUT_INIT:
     SUBROUTINE
