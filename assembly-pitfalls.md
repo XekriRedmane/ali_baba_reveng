@@ -341,6 +341,18 @@ Placing `.loop_high` at the CMP (after the JSR) makes the branch offset
 place the loop label BEFORE the JSR. Same applies to JMP-based retry
 loops (VALIDATE_INPUT had `JMP .retry` needing to re-call `JSR FUN_600A`).
 
+## 19. Global replace of $XXXX clobbers EQU definitions
+
+`replace_all` of `$5A76` → `COMBAT_WILLINGNESS` also hits the EQU line
+itself: `COMBAT_WILLINGNESS EQU $5A76` becomes
+`COMBAT_WILLINGNESS EQU COMBAT_WILLINGNESS` (circular).
+
+**Rule:** When replacing raw hex addresses with EQU names, either:
+- Skip lines containing `EQU` and `%def`, or
+- Fix the EQU definitions afterward, or
+- Add the EQU definitions AFTER doing the replace (so `$XXXX` is gone
+  from the code before the EQU line exists)
+
 ## Verification checklist
 
 After writing any new assembly chunk:

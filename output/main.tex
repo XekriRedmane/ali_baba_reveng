@@ -6975,11 +6975,14 @@ If something occupies the destination cell, the result from
 \nwlinkedidentc{MOVE_POINTS}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}     EQU     $5A65   ; movement points remaining
 \nwlinkedidentc{STEPS_TAKEN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}     EQU     $5A66   ; steps taken this turn
 \nwlinkedidentc{INPUT_DIR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}       EQU     $5A67   ; direction/command from input (1-9)
-\nwlinkedidentc{COMBAT_WILLINGNESS}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25} EQU  \nwlinkedidentc{COMBAT_WILLINGNESS}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}   ; accumulated willingness-to-fight score
-\nwlinkedidentc{COMBAT_STRENGTH}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25} EQU     \nwlinkedidentc{COMBAT_STRENGTH}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}   ; result of \nwlinkedidentc{CALC_COMBAT_STRENGTH}{PYNWmai0-4F7RGWPVP5L7UVBAJJPFGT7N7Y000000-1}
+\nwlinkedidentc{COMBAT_WILLINGNESS}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25} EQU  $5A76   ; accumulated willingness-to-fight score
+\nwlinkedidentc{COMBAT_STRENGTH}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25} EQU     $5A78   ; result of \nwlinkedidentc{CALC_COMBAT_STRENGTH}{PYNWmai0-4F7RGWPVP5L7UVBAJJPFGT7N7Y000000-1}
+\nwlinkedidentc{TARGET_PTR_LO}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}   EQU     $5A86   ; selected combat target pointer (low byte)
+\nwlinkedidentc{TARGET_PTR_HI}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}   EQU     $5A87   ; selected combat target pointer (high byte)
+\nwlinkedidentc{BEST_THREAT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}     EQU     $5A88   ; best threat level during target selection
 \nwlinkedidentc{TURN_ACTIVE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}     EQU     $5B27   ; 1 while turn is in progress
-\nwindexdefn{\nwixident{CHAR{\_}AI{\_}MODE}}{CHAR:unAI:unMODE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{COMBAT{\_}STRENGTH}}{COMBAT:unSTRENGTH}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{COMBAT{\_}WILLINGNESS}}{COMBAT:unWILLINGNESS}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{CURRENT{\_}COL}}{CURRENT:unCOL}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{CURRENT{\_}ROW}}{CURRENT:unROW}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{INPUT{\_}DIR}}{INPUT:unDIR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{MOVE{\_}POINTS}}{MOVE:unPOINTS}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{STEPS{\_}TAKEN}}{STEPS:unTAKEN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{TURN{\_}ACTIVE}}{TURN:unACTIVE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{TURN{\_}START{\_}COL}}{TURN:unSTART:unCOL}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{TURN{\_}START{\_}ROW}}{TURN:unSTART:unROW}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\eatline
-\nwidentdefs{\\{{\nwixident{CHAR{\_}AI{\_}MODE}}{CHAR:unAI:unMODE}}\\{{\nwixident{COMBAT{\_}STRENGTH}}{COMBAT:unSTRENGTH}}\\{{\nwixident{COMBAT{\_}WILLINGNESS}}{COMBAT:unWILLINGNESS}}\\{{\nwixident{CURRENT{\_}COL}}{CURRENT:unCOL}}\\{{\nwixident{CURRENT{\_}ROW}}{CURRENT:unROW}}\\{{\nwixident{INPUT{\_}DIR}}{INPUT:unDIR}}\\{{\nwixident{MOVE{\_}POINTS}}{MOVE:unPOINTS}}\\{{\nwixident{STEPS{\_}TAKEN}}{STEPS:unTAKEN}}\\{{\nwixident{TURN{\_}ACTIVE}}{TURN:unACTIVE}}\\{{\nwixident{TURN{\_}START{\_}COL}}{TURN:unSTART:unCOL}}\\{{\nwixident{TURN{\_}START{\_}ROW}}{TURN:unSTART:unROW}}}\nwidentuses{\\{{\nwixident{CALC{\_}COMBAT{\_}STRENGTH}}{CALC:unCOMBAT:unSTRENGTH}}}\nwindexuse{\nwixident{CALC{\_}COMBAT{\_}STRENGTH}}{CALC:unCOMBAT:unSTRENGTH}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwendcode{}\nwbegindocs{340}\nwdocspar
+\nwindexdefn{\nwixident{BEST{\_}THREAT}}{BEST:unTHREAT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{CHAR{\_}AI{\_}MODE}}{CHAR:unAI:unMODE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{COMBAT{\_}STRENGTH}}{COMBAT:unSTRENGTH}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{COMBAT{\_}WILLINGNESS}}{COMBAT:unWILLINGNESS}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{CURRENT{\_}COL}}{CURRENT:unCOL}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{CURRENT{\_}ROW}}{CURRENT:unROW}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{INPUT{\_}DIR}}{INPUT:unDIR}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{MOVE{\_}POINTS}}{MOVE:unPOINTS}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{STEPS{\_}TAKEN}}{STEPS:unTAKEN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{TARGET{\_}PTR{\_}HI}}{TARGET:unPTR:unHI}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{TARGET{\_}PTR{\_}LO}}{TARGET:unPTR:unLO}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{TURN{\_}ACTIVE}}{TURN:unACTIVE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{TURN{\_}START{\_}COL}}{TURN:unSTART:unCOL}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwindexdefn{\nwixident{TURN{\_}START{\_}ROW}}{TURN:unSTART:unROW}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\eatline
+\nwidentdefs{\\{{\nwixident{BEST{\_}THREAT}}{BEST:unTHREAT}}\\{{\nwixident{CHAR{\_}AI{\_}MODE}}{CHAR:unAI:unMODE}}\\{{\nwixident{COMBAT{\_}STRENGTH}}{COMBAT:unSTRENGTH}}\\{{\nwixident{COMBAT{\_}WILLINGNESS}}{COMBAT:unWILLINGNESS}}\\{{\nwixident{CURRENT{\_}COL}}{CURRENT:unCOL}}\\{{\nwixident{CURRENT{\_}ROW}}{CURRENT:unROW}}\\{{\nwixident{INPUT{\_}DIR}}{INPUT:unDIR}}\\{{\nwixident{MOVE{\_}POINTS}}{MOVE:unPOINTS}}\\{{\nwixident{STEPS{\_}TAKEN}}{STEPS:unTAKEN}}\\{{\nwixident{TARGET{\_}PTR{\_}HI}}{TARGET:unPTR:unHI}}\\{{\nwixident{TARGET{\_}PTR{\_}LO}}{TARGET:unPTR:unLO}}\\{{\nwixident{TURN{\_}ACTIVE}}{TURN:unACTIVE}}\\{{\nwixident{TURN{\_}START{\_}COL}}{TURN:unSTART:unCOL}}\\{{\nwixident{TURN{\_}START{\_}ROW}}{TURN:unSTART:unROW}}}\nwidentuses{\\{{\nwixident{CALC{\_}COMBAT{\_}STRENGTH}}{CALC:unCOMBAT:unSTRENGTH}}}\nwindexuse{\nwixident{CALC{\_}COMBAT{\_}STRENGTH}}{CALC:unCOMBAT:unSTRENGTH}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwendcode{}\nwbegindocs{340}\nwdocspar
 
 \nwenddocs{}\nwbegincode{341}\sublabel{PYNWmai0-5SXQOZOU4UJBYWY65C5UO66FXM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-5SXQOZOU4UJBYWY65C5UO66FXM000000-1}}}\moddef{game turn loop~{\nwtagstyle{}\subpageref{PYNWmai0-5SXQOZOU4UJBYWY65C5UO66FXM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $19AD
@@ -8405,7 +8408,7 @@ If something occupies the destination cell, the result from
     ; Computes willingness score in \nwlinkedidentc{COMBAT_WILLINGNESS}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25} based on char/target stats,
     ; then rolls random to determine if attack occurs.
     JSR     \nwlinkedidentc{SET_BLINK_TARGET}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}
-    LDA     $5A74
+    LDA     \nwlinkedidentc{IS_PLAYER_TURN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}
     CMP     #$01
     BNE     .not_player
     LDA     #$1C
@@ -8515,20 +8518,20 @@ If something occupies the destination cell, the result from
     JSR     \nwlinkedidentc{PRINT_BOTTOM_CENTERED}{PYNWmai0-7N4O63INZLB3AXK5ETC5T7GMII000000-1}
     JSR     \nwlinkedidentc{RESET_TEXT_WINDOW}{PYNWmai0-XSKCO3EXCSH7NSCHZBYJYA6KSA000000-1}
     LDA     #$01
-    CMP     $5A74
+    CMP     \nwlinkedidentc{IS_PLAYER_TURN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}
     BEQ     .is_player
     JSR     \nwlinkedidentc{PRINT_MEMBER_NAME}{PYNWmai0-5HT5O3J4MAUXACC3LBXLGKOCGA000000-1}
 .is_player:
     JSR     \nwlinkedidentc{DELAY_WITH_ANIMATION}{PYNWmai0-GR34WPZFUFAWF4EEF55HS6PMUU000000-1}
     RTS
 .attack:
-    LDA     $5A74
+    LDA     \nwlinkedidentc{IS_PLAYER_TURN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}
     BEQ     .mob_attack
     JMP     \nwlinkedidentc{PLAYER_ATTACK}{PYNWmai0-KCI6OHVG6G5YDI3BXT725RQZWE000000-1}
 .mob_attack:
     JMP     \nwlinkedidentc{MOB_ATTACK}{PYNWmai0-7EICTP7W6LBWLQVWCXMBL5ALWE000000-1}
 \nwindexdefn{\nwixident{RESOLVE{\_}ATTACK}}{RESOLVE:unATTACK}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{RESOLVE{\_}ATTACK}}{RESOLVE:unATTACK}}}\nwidentuses{\\{{\nwixident{ADD{\_}WILLINGNESS}}{ADD:unWILLINGNESS}}\\{{\nwixident{COMBAT{\_}WILLINGNESS}}{COMBAT:unWILLINGNESS}}\\{{\nwixident{DELAY{\_}WITH{\_}ANIMATION}}{DELAY:unWITH:unANIMATION}}\\{{\nwixident{MOB{\_}ATTACK}}{MOB:unATTACK}}\\{{\nwixident{PLAYER{\_}ATTACK}}{PLAYER:unATTACK}}\\{{\nwixident{PRINT{\_}BOTTOM{\_}CENTERED}}{PRINT:unBOTTOM:unCENTERED}}\\{{\nwixident{PRINT{\_}MEMBER{\_}NAME}}{PRINT:unMEMBER:unNAME}}\\{{\nwixident{PRINT{\_}MOB{\_}NAME}}{PRINT:unMOB:unNAME}}\\{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}\\{{\nwixident{RESET{\_}TEXT{\_}WINDOW}}{RESET:unTEXT:unWINDOW}}\\{{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}}\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}}\nwindexuse{\nwixident{ADD{\_}WILLINGNESS}}{ADD:unWILLINGNESS}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{COMBAT{\_}WILLINGNESS}}{COMBAT:unWILLINGNESS}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{DELAY{\_}WITH{\_}ANIMATION}}{DELAY:unWITH:unANIMATION}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{MOB{\_}ATTACK}}{MOB:unATTACK}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{PLAYER{\_}ATTACK}}{PLAYER:unATTACK}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{PRINT{\_}BOTTOM{\_}CENTERED}}{PRINT:unBOTTOM:unCENTERED}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{PRINT{\_}MEMBER{\_}NAME}}{PRINT:unMEMBER:unNAME}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{PRINT{\_}MOB{\_}NAME}}{PRINT:unMOB:unNAME}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{RESET{\_}TEXT{\_}WINDOW}}{RESET:unTEXT:unWINDOW}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwendcode{}\nwbegindocs{400}\nwdocspar
+\nwidentdefs{\\{{\nwixident{RESOLVE{\_}ATTACK}}{RESOLVE:unATTACK}}}\nwidentuses{\\{{\nwixident{ADD{\_}WILLINGNESS}}{ADD:unWILLINGNESS}}\\{{\nwixident{COMBAT{\_}WILLINGNESS}}{COMBAT:unWILLINGNESS}}\\{{\nwixident{DELAY{\_}WITH{\_}ANIMATION}}{DELAY:unWITH:unANIMATION}}\\{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}\\{{\nwixident{MOB{\_}ATTACK}}{MOB:unATTACK}}\\{{\nwixident{PLAYER{\_}ATTACK}}{PLAYER:unATTACK}}\\{{\nwixident{PRINT{\_}BOTTOM{\_}CENTERED}}{PRINT:unBOTTOM:unCENTERED}}\\{{\nwixident{PRINT{\_}MEMBER{\_}NAME}}{PRINT:unMEMBER:unNAME}}\\{{\nwixident{PRINT{\_}MOB{\_}NAME}}{PRINT:unMOB:unNAME}}\\{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}\\{{\nwixident{RESET{\_}TEXT{\_}WINDOW}}{RESET:unTEXT:unWINDOW}}\\{{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}}\\{{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}}}\nwindexuse{\nwixident{ADD{\_}WILLINGNESS}}{ADD:unWILLINGNESS}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{COMBAT{\_}WILLINGNESS}}{COMBAT:unWILLINGNESS}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{DELAY{\_}WITH{\_}ANIMATION}}{DELAY:unWITH:unANIMATION}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{MOB{\_}ATTACK}}{MOB:unATTACK}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{PLAYER{\_}ATTACK}}{PLAYER:unATTACK}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{PRINT{\_}BOTTOM{\_}CENTERED}}{PRINT:unBOTTOM:unCENTERED}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{PRINT{\_}MEMBER{\_}NAME}}{PRINT:unMEMBER:unNAME}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{PRINT{\_}MOB{\_}NAME}}{PRINT:unMOB:unNAME}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{RESET{\_}TEXT{\_}WINDOW}}{RESET:unTEXT:unWINDOW}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{SET{\_}BLINK{\_}TARGET}}{SET:unBLINK:unTARGET}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwindexuse{\nwixident{SET{\_}CURSOR{\_}ROW21}}{SET:unCURSOR:unROW21}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}\nwendcode{}\nwbegindocs{400}\nwdocspar
 
 \nwenddocs{}\nwbegincode{401}\sublabel{PYNWmai0-F2RBQZVGPDGPEQK2JKDZOJNL5Y000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-F2RBQZVGPDGPEQK2JKDZOJNL5Y000000-1}}}\moddef{add willingness~{\nwtagstyle{}\subpageref{PYNWmai0-F2RBQZVGPDGPEQK2JKDZOJNL5Y000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $169B
@@ -8545,15 +8548,15 @@ If something occupies the destination cell, the result from
     ORG     $199D
 \nwlinkedidentc{LOAD_TARGET_PTR}{PYNWmai0-TMW7BNSHSB7S5CA2EWFUHI57Y4000000-1}:
     SUBROUTINE
-    LDA     $5A86
+    LDA     \nwlinkedidentc{TARGET_PTR_LO}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     STA     $F4
-    LDA     $5A87
+    LDA     \nwlinkedidentc{TARGET_PTR_HI}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     STA     $F5
     LDA     #$00
-    STA     $5A74
+    STA     \nwlinkedidentc{IS_PLAYER_TURN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}
     RTS
 \nwindexdefn{\nwixident{LOAD{\_}TARGET{\_}PTR}}{LOAD:unTARGET:unPTR}{PYNWmai0-TMW7BNSHSB7S5CA2EWFUHI57Y4000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{LOAD{\_}TARGET{\_}PTR}}{LOAD:unTARGET:unPTR}}}\nwendcode{}\nwbegindocs{404}\nwdocspar
+\nwidentdefs{\\{{\nwixident{LOAD{\_}TARGET{\_}PTR}}{LOAD:unTARGET:unPTR}}}\nwidentuses{\\{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}\\{{\nwixident{TARGET{\_}PTR{\_}HI}}{TARGET:unPTR:unHI}}\\{{\nwixident{TARGET{\_}PTR{\_}LO}}{TARGET:unPTR:unLO}}}\nwindexuse{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}{PYNWmai0-TMW7BNSHSB7S5CA2EWFUHI57Y4000000-1}\nwindexuse{\nwixident{TARGET{\_}PTR{\_}HI}}{TARGET:unPTR:unHI}{PYNWmai0-TMW7BNSHSB7S5CA2EWFUHI57Y4000000-1}\nwindexuse{\nwixident{TARGET{\_}PTR{\_}LO}}{TARGET:unPTR:unLO}{PYNWmai0-TMW7BNSHSB7S5CA2EWFUHI57Y4000000-1}\nwendcode{}\nwbegindocs{404}\nwdocspar
 
 \nwenddocs{}\nwbegincode{405}\sublabel{PYNWmai0-YK37CBMYWN72MINVDJFMB7UPQ4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-YK37CBMYWN72MINVDJFMB7UPQ4000000-1}}}\moddef{end turn~{\nwtagstyle{}\subpageref{PYNWmai0-YK37CBMYWN72MINVDJFMB7UPQ4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $1BA7
@@ -10340,7 +10343,7 @@ simply the total mob count.
     SUBROUTINE
 ; Calculates combat strength using \nwlinkedidentc{RANDOM_IN_RANGE}{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}
 \nwlinkedidentc{CALC_COMBAT_STRENGTH}{PYNWmai0-4F7RGWPVP5L7UVBAJJPFGT7N7Y000000-1}:
-    LDA     $5A74
+    LDA     \nwlinkedidentc{IS_PLAYER_TURN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}
     CMP     #$01
     BEQ     .use_y7
     LDY     #$03
@@ -10370,7 +10373,7 @@ simply the total mob count.
     PLA
     RTS
 .check_5a74:
-    LDA     $5A74
+    LDA     \nwlinkedidentc{IS_PLAYER_TURN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}
     BNE     .exit_pla
     PLA
     TAY
@@ -10406,7 +10409,7 @@ simply the total mob count.
     STA     \nwlinkedidentc{COMBAT_STRENGTH}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     RTS
 \nwindexdefn{\nwixident{CALC{\_}COMBAT{\_}STRENGTH}}{CALC:unCOMBAT:unSTRENGTH}{PYNWmai0-4F7RGWPVP5L7UVBAJJPFGT7N7Y000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{CALC{\_}COMBAT{\_}STRENGTH}}{CALC:unCOMBAT:unSTRENGTH}}}\nwidentuses{\\{{\nwixident{COMBAT{\_}STRENGTH}}{COMBAT:unSTRENGTH}}\\{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}\\{{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}}}\nwindexuse{\nwixident{COMBAT{\_}STRENGTH}}{COMBAT:unSTRENGTH}{PYNWmai0-4F7RGWPVP5L7UVBAJJPFGT7N7Y000000-1}\nwindexuse{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}{PYNWmai0-4F7RGWPVP5L7UVBAJJPFGT7N7Y000000-1}\nwindexuse{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}{PYNWmai0-4F7RGWPVP5L7UVBAJJPFGT7N7Y000000-1}\nwendcode{}\nwbegindocs{485}\nwdocspar
+\nwidentdefs{\\{{\nwixident{CALC{\_}COMBAT{\_}STRENGTH}}{CALC:unCOMBAT:unSTRENGTH}}}\nwidentuses{\\{{\nwixident{COMBAT{\_}STRENGTH}}{COMBAT:unSTRENGTH}}\\{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}\\{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}\\{{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}}}\nwindexuse{\nwixident{COMBAT{\_}STRENGTH}}{COMBAT:unSTRENGTH}{PYNWmai0-4F7RGWPVP5L7UVBAJJPFGT7N7Y000000-1}\nwindexuse{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}{PYNWmai0-4F7RGWPVP5L7UVBAJJPFGT7N7Y000000-1}\nwindexuse{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}{PYNWmai0-4F7RGWPVP5L7UVBAJJPFGT7N7Y000000-1}\nwindexuse{\nwixident{SCENE{\_}LOOP}}{SCENE:unLOOP}{PYNWmai0-4F7RGWPVP5L7UVBAJJPFGT7N7Y000000-1}\nwendcode{}\nwbegindocs{485}\nwdocspar
 
 \nwenddocs{}\nwbegincode{486}\sublabel{PYNWmai0-Q3AHCFQFAYHI5ZDCFHGADKUUBU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-Q3AHCFQFAYHI5ZDCFHGADKUUBU000000-1}}}\moddef{process entity script~{\nwtagstyle{}\subpageref{PYNWmai0-Q3AHCFQFAYHI5ZDCFHGADKUUBU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $1849
@@ -10438,7 +10441,7 @@ simply the total mob count.
     BMI     .path_mid
     JSR     \nwlinkedidentc{FIRST_GROUP_MEMBER}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}
     LDA     #$00
-    STA     $5A88
+    STA     \nwlinkedidentc{BEST_THREAT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
 .loop_high:
     JSR     \nwlinkedidentc{GET_ENTITY_THREAT}{PYNWmai0-A45UBXB4GHNPJITGSLH4DQKEGE000000-1}
     CMP     #$00
@@ -10446,19 +10449,19 @@ simply the total mob count.
     LDY     #$05
     LDA     ($F4),Y
     AND     #$1F
-    CMP     $5A88
+    CMP     \nwlinkedidentc{BEST_THREAT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     BMI     .skip_high
-    STA     $5A88
+    STA     \nwlinkedidentc{BEST_THREAT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     LDA     $F4
-    STA     $5A86
+    STA     \nwlinkedidentc{TARGET_PTR_LO}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     LDA     $F5
-    STA     $5A87
+    STA     \nwlinkedidentc{TARGET_PTR_HI}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
 .skip_high:
     JSR     \nwlinkedidentc{NEXT_GROUP_MEMBER}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}
     LDA     #$00
     CMP     $F5
     BNE     .loop_high
-    CMP     $5A88
+    CMP     \nwlinkedidentc{BEST_THREAT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     BEQ     .path_low
     LDA     #$01
     RTS
@@ -10482,29 +10485,29 @@ simply the total mob count.
     RTS
 .path_mid:
     LDA     #$00
-    STA     $5A88
+    STA     \nwlinkedidentc{BEST_THREAT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     JSR     \nwlinkedidentc{FIRST_GROUP_MEMBER}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}
 .loop_mid:
     JSR     \nwlinkedidentc{GET_ENTITY_THREAT}{PYNWmai0-A45UBXB4GHNPJITGSLH4DQKEGE000000-1}
-    CMP     $5A88
+    CMP     \nwlinkedidentc{BEST_THREAT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     BEQ     .skip_mid
     BMI     .skip_mid
-    STA     $5A88
+    STA     \nwlinkedidentc{BEST_THREAT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     LDA     $F4
-    STA     $5A86
+    STA     \nwlinkedidentc{TARGET_PTR_LO}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     LDA     $F5
-    STA     $5A87
+    STA     \nwlinkedidentc{TARGET_PTR_HI}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
 .skip_mid:
     JSR     \nwlinkedidentc{NEXT_GROUP_MEMBER}{PYNWmai0-N5WF7CLBP626OQIPH6GSP4CDCA000000-1}
     LDA     #$00
     CMP     $F5
     BNE     .loop_mid
-    CMP     $5A88
+    CMP     \nwlinkedidentc{BEST_THREAT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}
     BEQ     .path_low
     LDA     #$01
     RTS
 \nwindexdefn{\nwixident{SELECT{\_}COMBAT{\_}TARGET}}{SELECT:unCOMBAT:unTARGET}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{SELECT{\_}COMBAT{\_}TARGET}}{SELECT:unCOMBAT:unTARGET}}}\nwidentuses{\\{{\nwixident{CHECK{\_}ENCOUNTER}}{CHECK:unENCOUNTER}}\\{{\nwixident{CHECK{\_}THREATS{\_}HERE}}{CHECK:unTHREATS:unHERE}}\\{{\nwixident{FIRST{\_}GROUP{\_}MEMBER}}{FIRST:unGROUP:unMEMBER}}\\{{\nwixident{GET{\_}ENTITY{\_}THREAT}}{GET:unENTITY:unTHREAT}}\\{{\nwixident{NEXT{\_}GROUP{\_}MEMBER}}{NEXT:unGROUP:unMEMBER}}}\nwindexuse{\nwixident{CHECK{\_}ENCOUNTER}}{CHECK:unENCOUNTER}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwindexuse{\nwixident{CHECK{\_}THREATS{\_}HERE}}{CHECK:unTHREATS:unHERE}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwindexuse{\nwixident{FIRST{\_}GROUP{\_}MEMBER}}{FIRST:unGROUP:unMEMBER}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwindexuse{\nwixident{GET{\_}ENTITY{\_}THREAT}}{GET:unENTITY:unTHREAT}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwindexuse{\nwixident{NEXT{\_}GROUP{\_}MEMBER}}{NEXT:unGROUP:unMEMBER}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwendcode{}\nwbegindocs{489}\nwdocspar
+\nwidentdefs{\\{{\nwixident{SELECT{\_}COMBAT{\_}TARGET}}{SELECT:unCOMBAT:unTARGET}}}\nwidentuses{\\{{\nwixident{BEST{\_}THREAT}}{BEST:unTHREAT}}\\{{\nwixident{CHECK{\_}ENCOUNTER}}{CHECK:unENCOUNTER}}\\{{\nwixident{CHECK{\_}THREATS{\_}HERE}}{CHECK:unTHREATS:unHERE}}\\{{\nwixident{FIRST{\_}GROUP{\_}MEMBER}}{FIRST:unGROUP:unMEMBER}}\\{{\nwixident{GET{\_}ENTITY{\_}THREAT}}{GET:unENTITY:unTHREAT}}\\{{\nwixident{NEXT{\_}GROUP{\_}MEMBER}}{NEXT:unGROUP:unMEMBER}}\\{{\nwixident{TARGET{\_}PTR{\_}HI}}{TARGET:unPTR:unHI}}\\{{\nwixident{TARGET{\_}PTR{\_}LO}}{TARGET:unPTR:unLO}}}\nwindexuse{\nwixident{BEST{\_}THREAT}}{BEST:unTHREAT}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwindexuse{\nwixident{CHECK{\_}ENCOUNTER}}{CHECK:unENCOUNTER}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwindexuse{\nwixident{CHECK{\_}THREATS{\_}HERE}}{CHECK:unTHREATS:unHERE}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwindexuse{\nwixident{FIRST{\_}GROUP{\_}MEMBER}}{FIRST:unGROUP:unMEMBER}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwindexuse{\nwixident{GET{\_}ENTITY{\_}THREAT}}{GET:unENTITY:unTHREAT}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwindexuse{\nwixident{NEXT{\_}GROUP{\_}MEMBER}}{NEXT:unGROUP:unMEMBER}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwindexuse{\nwixident{TARGET{\_}PTR{\_}HI}}{TARGET:unPTR:unHI}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwindexuse{\nwixident{TARGET{\_}PTR{\_}LO}}{TARGET:unPTR:unLO}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}\nwendcode{}\nwbegindocs{489}\nwdocspar
 
 \nwenddocs{}\nwbegincode{490}\sublabel{PYNWmai0-JKIRIHK5BBUUQKW62F6RWOUO6M000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-JKIRIHK5BBUUQKW62F6RWOUO6M000000-1}}}\moddef{dispatch on mode~{\nwtagstyle{}\subpageref{PYNWmai0-JKIRIHK5BBUUQKW62F6RWOUO6M000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $1F0C
@@ -11467,6 +11470,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{BEQ.A,}}{BEQ.A,}}%
 \nwixlogsorted{i}{{\nwixident{BEQ.X,}}{BEQ.X,}}%
 \nwixlogsorted{i}{{\nwixident{BEQ.Y,}}{BEQ.Y,}}%
+\nwixlogsorted{i}{{\nwixident{BEST{\_}THREAT}}{BEST:unTHREAT}}%
 \nwixlogsorted{i}{{\nwixident{BLINK{\_}ALT{\_}CHAR}}{BLINK:unALT:unCHAR}}%
 \nwixlogsorted{i}{{\nwixident{BLINK{\_}CHAR}}{BLINK:unCHAR}}%
 \nwixlogsorted{i}{{\nwixident{BLINK{\_}COL}}{BLINK:unCOL}}%
@@ -11712,6 +11716,8 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{SUM{\_}HOSTILE{\_}AT{\_}POS}}{SUM:unHOSTILE:unAT:unPOS}}%
 \nwixlogsorted{i}{{\nwixident{S{\_}PRESS{\_}BUTTON}}{S:unPRESS:unBUTTON}}%
 \nwixlogsorted{i}{{\nwixident{S{\_}PRESS{\_}SPACE}}{S:unPRESS:unSPACE}}%
+\nwixlogsorted{i}{{\nwixident{TARGET{\_}PTR{\_}HI}}{TARGET:unPTR:unHI}}%
+\nwixlogsorted{i}{{\nwixident{TARGET{\_}PTR{\_}LO}}{TARGET:unPTR:unLO}}%
 \nwixlogsorted{i}{{\nwixident{TEARDOWN{\_}INPUT}}{TEARDOWN:unINPUT}}%
 \nwixlogsorted{i}{{\nwixident{TEXT{\_}COL}}{TEXT:unCOL}}%
 \nwixlogsorted{i}{{\nwixident{TEXT{\_}LEFT{\_}MARGIN}}{TEXT:unLEFT:unMARGIN}}%

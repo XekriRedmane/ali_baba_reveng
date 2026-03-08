@@ -261,8 +261,11 @@ CURRENT_ROW     EQU     $5A64   ; current row during turn
 MOVE_POINTS     EQU     $5A65   ; movement points remaining
 STEPS_TAKEN     EQU     $5A66   ; steps taken this turn
 INPUT_DIR       EQU     $5A67   ; direction/command from input (1-9)
-COMBAT_WILLINGNESS EQU  COMBAT_WILLINGNESS   ; accumulated willingness-to-fight score
-COMBAT_STRENGTH EQU     COMBAT_STRENGTH   ; result of CALC_COMBAT_STRENGTH
+COMBAT_WILLINGNESS EQU  $5A76   ; accumulated willingness-to-fight score
+COMBAT_STRENGTH EQU     $5A78   ; result of CALC_COMBAT_STRENGTH
+TARGET_PTR_LO   EQU     $5A86   ; selected combat target pointer (low byte)
+TARGET_PTR_HI   EQU     $5A87   ; selected combat target pointer (high byte)
+BEST_THREAT     EQU     $5A88   ; best threat level during target selection
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
     ORG     $0569
@@ -2127,7 +2130,7 @@ RESOLVE_ATTACK:
     ; Computes willingness score in COMBAT_WILLINGNESS based on char/target stats,
     ; then rolls random to determine if attack occurs.
     JSR     SET_BLINK_TARGET
-    LDA     $5A74
+    LDA     IS_PLAYER_TURN
     CMP     #$01
     BNE     .not_player
     LDA     #$1C
@@ -2237,14 +2240,14 @@ RESOLVE_ATTACK:
     JSR     PRINT_BOTTOM_CENTERED
     JSR     RESET_TEXT_WINDOW
     LDA     #$01
-    CMP     $5A74
+    CMP     IS_PLAYER_TURN
     BEQ     .is_player
     JSR     PRINT_MEMBER_NAME
 .is_player:
     JSR     DELAY_WITH_ANIMATION
     RTS
 .attack:
-    LDA     $5A74
+    LDA     IS_PLAYER_TURN
     BEQ     .mob_attack
     JMP     PLAYER_ATTACK
 .mob_attack:
@@ -2294,7 +2297,7 @@ SET_BLINK_TARGET:
     SUBROUTINE
 ; Calculates combat strength using RANDOM_IN_RANGE
 CALC_COMBAT_STRENGTH:
-    LDA     $5A74
+    LDA     IS_PLAYER_TURN
     CMP     #$01
     BEQ     .use_y7
     LDY     #$03
@@ -2324,7 +2327,7 @@ CALC_COMBAT_STRENGTH:
     PLA
     RTS
 .check_5a74:
-    LDA     $5A74
+    LDA     IS_PLAYER_TURN
     BNE     .exit_pla
     PLA
     TAY
@@ -2362,12 +2365,12 @@ CALC_COMBAT_STRENGTH:
     ORG     $199D
 LOAD_TARGET_PTR:
     SUBROUTINE
-    LDA     $5A86
+    LDA     TARGET_PTR_LO
     STA     $F4
-    LDA     $5A87
+    LDA     TARGET_PTR_HI
     STA     $F5
     LDA     #$00
-    STA     $5A74
+    STA     IS_PLAYER_TURN
     RTS
     ORG     $19AD
 GAME_TURN_LOOP:
@@ -3217,7 +3220,7 @@ SELECT_COMBAT_TARGET:
     BMI     .path_mid
     JSR     FIRST_GROUP_MEMBER
     LDA     #$00
-    STA     $5A88
+    STA     BEST_THREAT
 .loop_high:
     JSR     GET_ENTITY_THREAT
     CMP     #$00
@@ -3225,19 +3228,19 @@ SELECT_COMBAT_TARGET:
     LDY     #$05
     LDA     ($F4),Y
     AND     #$1F
-    CMP     $5A88
+    CMP     BEST_THREAT
     BMI     .skip_high
-    STA     $5A88
+    STA     BEST_THREAT
     LDA     $F4
-    STA     $5A86
+    STA     TARGET_PTR_LO
     LDA     $F5
-    STA     $5A87
+    STA     TARGET_PTR_HI
 .skip_high:
     JSR     NEXT_GROUP_MEMBER
     LDA     #$00
     CMP     $F5
     BNE     .loop_high
-    CMP     $5A88
+    CMP     BEST_THREAT
     BEQ     .path_low
     LDA     #$01
     RTS
@@ -3261,24 +3264,24 @@ SELECT_COMBAT_TARGET:
     RTS
 .path_mid:
     LDA     #$00
-    STA     $5A88
+    STA     BEST_THREAT
     JSR     FIRST_GROUP_MEMBER
 .loop_mid:
     JSR     GET_ENTITY_THREAT
-    CMP     $5A88
+    CMP     BEST_THREAT
     BEQ     .skip_mid
     BMI     .skip_mid
-    STA     $5A88
+    STA     BEST_THREAT
     LDA     $F4
-    STA     $5A86
+    STA     TARGET_PTR_LO
     LDA     $F5
-    STA     $5A87
+    STA     TARGET_PTR_HI
 .skip_mid:
     JSR     NEXT_GROUP_MEMBER
     LDA     #$00
     CMP     $F5
     BNE     .loop_mid
-    CMP     $5A88
+    CMP     BEST_THREAT
     BEQ     .path_low
     LDA     #$01
     RTS
