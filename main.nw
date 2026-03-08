@@ -6812,6 +6812,7 @@ skip first-visit logic on subsequent entries.
 The sentinel [[FFFF]] in the name pointer marks the end of the table.
 
 <<Location data>>=
+    ORG     $4009
 LOCATION_DATA:
     ; --- 0: ALI BABA HOME ---
     DC.W s_ALI_BABA_HOME
@@ -7372,9 +7373,11 @@ LOCATION_DATA:
     DC.B $00
 
     DC.W $FFFF                  ; end sentinel
+    HEX 12 01 00 00 00 00 A0   ; unused padding to $4240
 @ %def LOCATION_DATA
 
 <<Location names>>=
+    ORG     $4240
 LOCATION_NAMES:
 s_ALI_BABA_HOME:
     APSTR "ALI BABA HOME"
@@ -7556,6 +7559,7 @@ For scene events (\$D2--\$D4), a scene/event~ID.
 \end{itemize}
 
 <<Location events>>=
+    ORG     $451E
 LOCATION_EVENTS:
 ev_ali_baba_home:                       ; 0: ALI BABA HOME
     HEX FE 00 00 83 82 6F FF FF FF
@@ -11750,6 +11754,9 @@ The following root chunks produce the assembly files when tangled.
 <<handle mob encounter>>
 <<set target restricted>>
 <<dispatch on mode>>
+<<Location data>>
+<<Location names>>
+<<Location events>>
 <<init game state>>
 <<init game display>>
 <<draw border char>>

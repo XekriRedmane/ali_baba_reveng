@@ -3541,6 +3541,1043 @@ DISPATCH_ON_MODE:
     JMP     ANIM_TICK_AND_WAIT
 .mode_60:
     JMP     DELAY_WITH_ANIMATION
+    ORG     $4009
+LOCATION_DATA:
+    ; --- 0: ALI BABA HOME ---
+    DC.W s_ALI_BABA_HOME
+    DC.B $01                     ; mob head $01
+    DC.B 20*6+9                  ; min pos (6,9)
+    DC.B 20*9+13                 ; max pos (9,13)
+    DC.B $01                     ; map 1
+    DC.W ev_ali_baba_home
+    DC.B $01
+
+    ; --- 1: DUSTY ROAD ---
+    DC.W s_DUSTY_ROAD
+    DC.B $00                     ; no mobs
+    DC.B 20*3+7                  ; min pos (3,7)
+    DC.B 20*6+19                 ; max pos (6,19)
+    DC.B $01                     ; map 1
+    DC.W ev_dusty_road
+    DC.B $00
+
+    ; --- 2: SULTAN'S PALACE ---
+    DC.W s_SULTANS_PALACE
+    DC.B $3F                     ; mob head $3F
+    DC.B 20*0+0                  ; min pos (0,0)
+    DC.B 20*9+7                  ; max pos (9,7)
+    DC.B $01                     ; map 1
+    DC.W ev_sultans_palace
+    DC.B $00
+
+    ; --- 3: ROYAL LIBRARY ---
+    DC.W s_ROYAL_LIBRARY
+    DC.B $00                     ; no mobs
+    DC.B 20*0+7                  ; min pos (0,7)
+    DC.B 20*3+16                 ; max pos (3,16)
+    DC.B $01                     ; map 1
+    DC.W ev_royal_library
+    DC.B $00
+
+    ; --- 4: ASTROLOGER'S LAB ---
+    DC.W s_ASTROLOGERS_LAB
+    DC.B $4A                     ; mob head $4A
+    DC.B 20*0+3                  ; min pos (0,3)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $25                     ; map 37
+    DC.W ev_astrologers_lab
+    DC.B $00
+
+    ; --- 5: BEAR CAVE ---
+    DC.W s_BEAR_CAVE
+    DC.B $51                     ; mob head $51
+    DC.B 20*0+0                  ; min pos (0,0)
+    DC.B 20*5+14                 ; max pos (5,14)
+    DC.B $29                     ; map 41
+    DC.W ev_bear_cave
+    DC.B $00
+
+    ; --- 6: RATS NEST ---
+    DC.W s_RATS_NEST
+    DC.B $52                     ; mob head $52
+    DC.B 20*5+0                  ; min pos (5,0)
+    DC.B 20*9+14                 ; max pos (9,14)
+    DC.B $29                     ; map 41
+    DC.W ev_rats_nest
+    DC.B $00
+
+    ; --- 7: DRAGON LAIR ---
+    DC.W s_DRAGON_LAIR
+    DC.B $5F                     ; mob head $5F
+    DC.B 20*4+2                  ; min pos (4,2)
+    DC.B 20*9+9                  ; max pos (9,9)
+    DC.B $49                     ; map 73
+    DC.W ev_dragon_lair
+    DC.B $00
+
+    ; --- 8: GOLD FOR THE LUCKY ---
+    DC.W s_GOLD_FOR_THE_LUCKY
+    DC.B $60                     ; mob head $60
+    DC.B 20*4+9                  ; min pos (4,9)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $49                     ; map 73
+    DC.W ev_gold_for_the_lucky
+    DC.B $00
+
+    ; --- 9: SAVE THE WHALES ---
+    DC.W s_SAVE_THE_WHALES
+    DC.B $00                     ; no mobs
+    DC.B 20*0+2                  ; min pos (0,2)
+    DC.B 20*4+16                 ; max pos (4,16)
+    DC.B $49                     ; map 73
+    DC.W ev_save_the_whales
+    DC.B $00
+
+    ; --- 10: SLIDE ---
+    DC.W s_SLIDE
+    DC.B $00                     ; no mobs
+    DC.B 20*0+1                  ; min pos (0,1)
+    DC.B 20*9+3                  ; max pos (9,3)
+    DC.B $60                     ; map 96
+    DC.W ev_slide
+    DC.B $00
+
+    ; --- 11: DEEP DARK STAIRWAY ---
+    DC.W s_DEEP_DARK_STAIRWAY
+    DC.B $00                     ; no mobs
+    DC.B 20*1+3                  ; min pos (1,3)
+    DC.B 20*7+9                  ; max pos (7,9)
+    DC.B $61                     ; map 97
+    DC.W ev_deep_dark_stairway
+    DC.B $00
+
+    ; --- 12: MINOTAUR LABYRINTH ---
+    DC.W s_MINOTAUR_LABYRINTH
+    DC.B $6A                     ; mob head $6A
+    DC.B 20*0+3                  ; min pos (0,3)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $62                     ; map 98
+    DC.W ev_minotaur_labyrinth
+    DC.B $00
+
+    ; --- 13: STINGER STREWN CELL ---
+    DC.W s_STINGER_STREWN_CELL
+    DC.B $5C                     ; mob head $5C
+    DC.B 20*5+3                  ; min pos (5,3)
+    DC.B 20*9+8                  ; max pos (9,8)
+    DC.B $48                     ; map 72
+    DC.W ev_stinger_strewn_cell
+    DC.B $00
+
+    ; --- 14: GUARD ROOM ---
+    DC.W s_GUARD_ROOM
+    DC.B $57                     ; mob head $57
+    DC.B 20*0+3                  ; min pos (0,3)
+    DC.B 20*5+16                 ; max pos (5,16)
+    DC.B $48                     ; map 72
+    DC.W ev_guard_room
+    DC.B $00
+
+    ; --- 15: LONG WAY FROM HOME ---
+    DC.W s_LONG_WAY_FROM_HOME
+    DC.B $5E                     ; mob head $5E
+    DC.B 20*5+11                 ; min pos (5,11)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $48                     ; map 72
+    DC.W ev_long_way_from_home
+    DC.B $00
+
+    ; --- 16: FOREST ---
+    DC.W s_FOREST
+    DC.B $43                     ; mob head $43
+    DC.B 20*0+0                  ; min pos (0,0)
+    DC.B 20*9+13                 ; max pos (9,13)
+    DC.B $04                     ; map 4
+    DC.W ev_forest
+    DC.B $00
+
+    ; --- 17: VIEW FROM A TREE ---
+    DC.W s_VIEW_FROM_A_TREE
+    DC.B $00                     ; no mobs
+    DC.B 20*1+13                 ; min pos (1,13)
+    DC.B 20*7+19                 ; max pos (7,19)
+    DC.B $04                     ; map 4
+    DC.W ev_view_from_a_tree
+    DC.B $00
+
+    ; --- 18: FAILING WALL ---
+    DC.W s_FAILING_WALL
+    DC.B $6B                     ; mob head $6B
+    DC.B 20*1+0                  ; min pos (1,0)
+    DC.B 20*8+14                 ; max pos (8,14)
+    DC.B $64                     ; map 100
+    DC.W ev_failing_wall
+    DC.B $00
+
+    ; --- 19: MINOTAUR PLAYROOM ---
+    DC.W s_MINOTAUR_PLAYROOM
+    DC.B $6C                     ; mob head $6C
+    DC.B 20*1+5                  ; min pos (1,5)
+    DC.B 20*8+19                 ; max pos (8,19)
+    DC.B $65                     ; map 101
+    DC.W ev_minotaur_playroom
+    DC.B $00
+
+    ; --- 20: THIEVES CAVE ---
+    DC.W s_THIEVES_CAVE
+    DC.B $00                     ; no mobs
+    DC.B 20*0+3                  ; min pos (0,3)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $21                     ; map 33
+    DC.W ev_thieves_cave
+    DC.B $00
+
+    ; --- 21: O ---
+    DC.W s_O
+    DC.B $62                     ; mob head $62
+    DC.B 20*1+10                 ; min pos (1,10)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $40                     ; map 64
+    DC.W ev_o
+    DC.B $00
+
+    ; --- 22: SPIRAL STAIRCASE ---
+    DC.W s_SPIRAL_STAIRCASE
+    DC.B $00                     ; no mobs
+    DC.B 20*1+6                  ; min pos (1,6)
+    DC.B 20*7+10                 ; max pos (7,10)
+    DC.B $46                     ; map 70
+    DC.W ev_spiral_staircase
+    DC.B $00
+
+    ; --- 23: Y ---
+    DC.W s_Y
+    DC.B $63                     ; mob head $63
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $41                     ; map 65
+    DC.W ev_y
+    DC.B $00
+
+    ; --- 24: MAGIC TOURBILLION ---
+    DC.W s_MAGIC_TOURBILLION
+    DC.B $00                     ; no mobs
+    DC.B 20*5+9                  ; min pos (5,9)
+    DC.B 20*9+13                 ; max pos (9,13)
+    DC.B $60                     ; map 96
+    DC.W ev_magic_tourbillion
+    DC.B $00
+
+    ; --- 25: G. ---
+    DC.W s_G
+    DC.B $64                     ; mob head $64
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $42                     ; map 66
+    DC.W ev_g
+    DC.B $00
+
+    ; --- 26: CRYSTAL CAVE ---
+    DC.W s_CRYSTAL_CAVE
+    DC.B $00                     ; no mobs
+    DC.B 20*2+3                  ; min pos (2,3)
+    DC.B 20*8+15                 ; max pos (8,15)
+    DC.B $22                     ; map 34
+    DC.W ev_crystal_cave
+    DC.B $00
+
+    ; --- 27: B ---
+    DC.W s_B
+    DC.B $00                     ; no mobs
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $43                     ; map 67
+    DC.W ev_b
+    DC.B $00
+
+    ; --- 28: THIEVES CLEARING ---
+    DC.W s_THIEVES_CLEARING
+    DC.B $1B                     ; mob head $1B
+    DC.B 20*4+4                  ; min pos (4,4)
+    DC.B 20*9+13                 ; max pos (9,13)
+    DC.B $05                     ; map 5
+    DC.W ev_thieves_clearing
+    DC.B $00
+
+    ; --- 29: OLD MINE ROAD ---
+    DC.W s_OLD_MINE_ROAD
+    DC.B $47                     ; mob head $47
+    DC.B 20*1+0                  ; min pos (1,0)
+    DC.B 20*4+19                 ; max pos (4,19)
+    DC.B $05                     ; map 5
+    DC.W ev_old_mine_road
+    DC.B $00
+
+    ; --- 30: FOOTHILLS CEMETERY ---
+    DC.W s_FOOTHILLS_CEMETERY
+    DC.B $45                     ; mob head $45
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $02                     ; map 2
+    DC.W ev_foothills_cemetery
+    DC.B $00
+
+    ; --- 31: I ---
+    DC.W s_I
+    DC.B $68                     ; mob head $68
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $44                     ; map 68
+    DC.W ev_i
+    DC.B $00
+
+    ; --- 32: UNDERGROUND STREAM ---
+    DC.W s_UNDERGROUND_STREAM
+    DC.B $00                     ; no mobs
+    DC.B 20*0+7                  ; min pos (0,7)
+    DC.B 20*3+14                 ; max pos (3,14)
+    DC.B $60                     ; map 96
+    DC.W ev_underground_stream
+    DC.B $00
+
+    ; --- 33: V ---
+    DC.W s_V
+    DC.B $69                     ; mob head $69
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+18                 ; max pos (8,18)
+    DC.B $45                     ; map 69
+    DC.W ev_v
+    DC.B $00
+
+    ; --- 34: GEMINI ---
+    DC.W s_GEMINI
+    DC.B $55                     ; mob head $55
+    DC.B 20*0+2                  ; min pos (0,2)
+    DC.B 20*4+16                 ; max pos (4,16)
+    DC.B $20                     ; map 32
+    DC.W ev_gemini
+    DC.B $00
+
+    ; --- 35: R ---
+    DC.W s_R
+    DC.B $61                     ; mob head $61
+    DC.B 20*1+1                  ; min pos (1,1)
+    DC.B 20*8+10                 ; max pos (8,10)
+    DC.B $40                     ; map 64
+    DC.W ev_r
+    DC.B $00
+
+    ; --- 36: OLD MINE SHAFT ---
+    DC.W s_OLD_MINE_SHAFT
+    DC.B $00                     ; no mobs
+    DC.B 20*3+4                  ; min pos (3,4)
+    DC.B 20*5+14                 ; max pos (5,14)
+    DC.B $06                     ; map 6
+    DC.W ev_old_mine_shaft
+    DC.B $00
+
+    ; --- 37: GILDED PATHWAY ---
+    DC.W s_GILDED_PATHWAY
+    DC.B $00                     ; no mobs
+    DC.B 20*0+6                  ; min pos (0,6)
+    DC.B 20*9+10                 ; max pos (9,10)
+    DC.B $47                     ; map 71
+    DC.W ev_gilded_pathway
+    DC.B $00
+
+    ; --- 38: MINOTAUR'S DEN ---
+    DC.W s_MINOTAURS_DEN
+    DC.B $6D                     ; mob head $6D
+    DC.B 20*3+0                  ; min pos (3,0)
+    DC.B 20*9+7                  ; max pos (9,7)
+    DC.B $63                     ; map 99
+    DC.W ev_minotaurs_den
+    DC.B $00
+
+    ; --- 39: MINOTAUR'S VAULT ---
+    DC.W s_MINOTAURS_VAULT
+    DC.B $00                     ; no mobs
+    DC.B 20*6+7                  ; min pos (6,7)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $63                     ; map 99
+    DC.W ev_minotaurs_vault
+    DC.B $00
+
+    ; --- 40: INNER STAIRCASE ---
+    DC.W s_INNER_STAIRCASE
+    DC.B $00                     ; no mobs
+    DC.B 20*0+11                 ; min pos (0,11)
+    DC.B 20*6+16                 ; max pos (6,16)
+    DC.B $63                     ; map 99
+    DC.W ev_inner_staircase
+    DC.B $00
+
+    ; --- 41: SECRET PASSAGEWAY ---
+    DC.W s_SECRET_PASSAGEWAY
+    DC.B $00                     ; no mobs
+    DC.B 20*1+0                  ; min pos (1,0)
+    DC.B 20*3+11                 ; max pos (3,11)
+    DC.B $63                     ; map 99
+    DC.W ev_secret_passageway
+    DC.B $00
+
+    ; --- 42: VIRGO ---
+    DC.W s_VIRGO
+    DC.B $3A                     ; mob head $3A
+    DC.B 20*1+4                  ; min pos (1,4)
+    DC.B 20*8+9                  ; max pos (8,9)
+    DC.B $26                     ; map 38
+    DC.W ev_virgo
+    DC.B $00
+
+    ; --- 43: LEO ---
+    DC.W s_LEO
+    DC.B $4B                     ; mob head $4B
+    DC.B 20*1+0                  ; min pos (1,0)
+    DC.B 20*8+4                  ; max pos (8,4)
+    DC.B $26                     ; map 38
+    DC.W ev_leo
+    DC.B $00
+
+    ; --- 44: LIBRA ---
+    DC.W s_LIBRA
+    DC.B $00                     ; no mobs
+    DC.B 20*1+9                  ; min pos (1,9)
+    DC.B 20*8+14                 ; max pos (8,14)
+    DC.B $26                     ; map 38
+    DC.W ev_libra
+    DC.B $00
+
+    ; --- 45: SCORPIUS ---
+    DC.W s_SCORPIUS
+    DC.B $4C                     ; mob head $4C
+    DC.B 20*1+14                 ; min pos (1,14)
+    DC.B 20*8+19                 ; max pos (8,19)
+    DC.B $26                     ; map 38
+    DC.W ev_scorpius
+    DC.B $00
+
+    ; --- 46: SAGITTARIUS ---
+    DC.W s_SAGITTARIUS
+    DC.B $12                     ; mob head $12
+    DC.B 20*4+0                  ; min pos (4,0)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $27                     ; map 39
+    DC.W ev_sagittarius
+    DC.B $00
+
+    ; --- 47: CAPRICORNUS ---
+    DC.W s_CAPRICORNUS
+    DC.B $00                     ; no mobs
+    DC.B 20*0+0                  ; min pos (0,0)
+    DC.B 20*4+16                 ; max pos (4,16)
+    DC.B $27                     ; map 39
+    DC.W ev_capricornus
+    DC.B $00
+
+    ; --- 48: AQUARIUS ---
+    DC.W s_AQUARIUS
+    DC.B $00                     ; no mobs
+    DC.B 20*1+15                 ; min pos (1,15)
+    DC.B 20*8+19                 ; max pos (8,19)
+    DC.B $24                     ; map 36
+    DC.W ev_aquarius
+    DC.B $00
+
+    ; --- 49: PISCES ---
+    DC.W s_PISCES
+    DC.B $00                     ; no mobs
+    DC.B 20*1+11                 ; min pos (1,11)
+    DC.B 20*8+15                 ; max pos (8,15)
+    DC.B $24                     ; map 36
+    DC.W ev_pisces
+    DC.B $00
+
+    ; --- 50: HALLWAY ---
+    DC.W s_HALLWAY
+    DC.B $00                     ; no mobs
+    DC.B 20*1+8                  ; min pos (1,8)
+    DC.B 20*8+11                 ; max pos (8,11)
+    DC.B $24                     ; map 36
+    DC.W ev_hallway
+    DC.B $00
+
+    ; --- 51: ARIES ---
+    DC.W s_ARIES
+    DC.B $4E                     ; mob head $4E
+    DC.B 20*1+4                  ; min pos (1,4)
+    DC.B 20*8+8                  ; max pos (8,8)
+    DC.B $24                     ; map 36
+    DC.W ev_aries
+    DC.B $00
+
+    ; --- 52: TAURUS ---
+    DC.W s_TAURUS
+    DC.B $4D                     ; mob head $4D
+    DC.B 20*1+0                  ; min pos (1,0)
+    DC.B 20*8+4                  ; max pos (8,4)
+    DC.B $24                     ; map 36
+    DC.W ev_taurus
+    DC.B $00
+
+    ; --- 53: GEMINI (south) ---
+    DC.W s_GEMINI2
+    DC.B $00                     ; no mobs
+    DC.B 20*0+2                  ; min pos (0,2)
+    DC.B 20*4+16                 ; max pos (4,16)
+    DC.B $20                     ; map 32
+    DC.W ev_gemini2
+    DC.B $00
+
+    ; --- 54: CANCER ---
+    DC.W s_CANCER
+    DC.B $4F                     ; mob head $4F
+    DC.B 20*5+2                  ; min pos (5,2)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $20                     ; map 32
+    DC.W ev_cancer
+    DC.B $00
+
+    ; --- 55: THE MOUNTAIN ---
+    DC.W s_THE_MOUNTAIN
+    DC.B $49                     ; mob head $49
+    DC.B 20*0+2                  ; min pos (0,2)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $07                     ; map 7
+    DC.W ev_the_mountain
+    DC.B $00
+
+    ; --- 56: SHAHRIAR TREASURY ---
+    DC.W s_SHAHRIAR_TREASURY
+    DC.B $3C                     ; mob head $3C
+    DC.B 20*1+4                  ; min pos (1,4)
+    DC.B 20*8+13                 ; max pos (8,13)
+    DC.B $03                     ; map 3
+    DC.W ev_shahriar_treasury
+    DC.B $00
+
+    ; --- 57: AIR VENT ---
+    DC.W s_AIR_VENT
+    DC.B $00                     ; no mobs
+    DC.B 20*0+14                 ; min pos (0,14)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $28                     ; map 40
+    DC.W ev_air_vent
+    DC.B $00
+
+    ; --- 58: DESERTED TUNNEL ---
+    DC.W s_DESERTED_TUNNEL
+    DC.B $00                     ; no mobs
+    DC.B 20*6+6                  ; min pos (6,6)
+    DC.B 20*9+14                 ; max pos (9,14)
+    DC.B $28                     ; map 40
+    DC.W ev_deserted_tunnel
+    DC.B $00
+
+    ; --- 59: ROY G. BIV ---
+    DC.W s_ROY_G_BIV
+    DC.B $00                     ; no mobs
+    DC.B 20*3+0                  ; min pos (3,0)
+    DC.B 20*9+2                  ; max pos (9,2)
+    DC.B $28                     ; map 40
+    DC.W ev_roy_g_biv
+    DC.B $00
+
+    ; --- 60: JACKAL ALTAR ---
+    DC.W s_JACKAL_ALTAR
+    DC.B $50                     ; mob head $50
+    DC.B 20*0+2                  ; min pos (0,2)
+    DC.B 20*6+14                 ; max pos (6,14)
+    DC.B $28                     ; map 40
+    DC.W ev_jackal_altar
+    DC.B $00
+
+    ; --- 61: ASTROLOGER'S MAZE ---
+    DC.W s_ASTROLOGERS_MAZE
+    DC.B $14                     ; mob head $14
+    DC.B 20*0+3                  ; min pos (0,3)
+    DC.B 20*9+16                 ; max pos (9,16)
+    DC.B $23                     ; map 35
+    DC.W ev_astrologers_maze
+    DC.B $00
+
+    DC.W $FFFF                  ; end sentinel
+    HEX 12 01 00 00 00 00 A0   ; unused padding to $4240
+    ORG     $4240
+LOCATION_NAMES:
+s_ALI_BABA_HOME:
+    HEX 0D C1 CC C9 A0 C2 C1 C2 C1 A0 C8 CF CD C5
+s_DUSTY_ROAD:
+    HEX 0A C4 D5 D3 D4 D9 A0 D2 CF C1 C4
+s_SULTANS_PALACE:
+    HEX 0F D3 D5 CC D4 C1 CE A7 D3 A0 D0 C1 CC C1 C3 C5
+s_ROYAL_LIBRARY:
+    HEX 0D D2 CF D9 C1 CC A0 CC C9 C2 D2 C1 D2 D9
+s_ASTROLOGERS_LAB:
+    HEX 10 C1 D3 D4 D2 CF CC CF C7 C5 D2 A7 D3 A0 CC C1 C2
+s_BEAR_CAVE:
+    HEX 09 C2 C5 C1 D2 A0 C3 C1 D6 C5
+s_RATS_NEST:
+    HEX 09 D2 C1 D4 D3 A0 CE C5 D3 D4
+s_DRAGON_LAIR:
+    HEX 0B C4 D2 C1 C7 CF CE A0 CC C1 C9 D2
+s_GOLD_FOR_THE_LUCKY:
+    HEX 12 C7 CF CC C4 A0 C6 CF D2 A0 D4 C8 C5 A0 CC D5 C3 CB D9
+s_SAVE_THE_WHALES:
+    HEX 0F D3 C1 D6 C5 A0 D4 C8 C5 A0 D7 C8 C1 CC C5 D3
+s_SLIDE:
+    HEX 05 D3 CC C9 C4 C5
+s_DEEP_DARK_STAIRWAY:
+    HEX 12 C4 C5 C5 D0 A0 C4 C1 D2 CB A0 D3 D4 C1 C9 D2 D7 C1 D9
+s_MINOTAUR_LABYRINTH:
+    HEX 12 CD C9 CE CF D4 C1 D5 D2 A0 CC C1 C2 D9 D2 C9 CE D4 C8
+s_STINGER_STREWN_CELL:
+    HEX 13 D3 D4 C9 CE C7 C5 D2 A0 D3 D4 D2 C5 D7 CE A0 C3 C5 CC CC
+s_GUARD_ROOM:
+    HEX 0A C7 D5 C1 D2 C4 A0 D2 CF CF CD
+s_LONG_WAY_FROM_HOME:
+    HEX 12 CC CF CE C7 A0 D7 C1 D9 A0 C6 D2 CF CD A0 C8 CF CD C5
+s_FOREST:
+    HEX 06 C6 CF D2 C5 D3 D4
+s_VIEW_FROM_A_TREE:
+    HEX 10 D6 C9 C5 D7 A0 C6 D2 CF CD A0 C1 A0 D4 D2 C5 C5
+s_FAILING_WALL:
+    HEX 0C C6 C1 C9 CC C9 CE C7 A0 D7 C1 CC CC
+s_MINOTAUR_PLAYROOM:
+    HEX 11 CD C9 CE CF D4 C1 D5 D2 A0 D0 CC C1 D9 D2 CF CF CD
+s_THIEVES_CAVE:
+    HEX 0C D4 C8 C9 C5 D6 C5 D3 A0 C3 C1 D6 C5
+s_O:
+    HEX 01 CF
+s_SPIRAL_STAIRCASE:
+    HEX 10 D3 D0 C9 D2 C1 CC A0 D3 D4 C1 C9 D2 C3 C1 D3 C5
+s_Y:
+    HEX 01 D9
+s_MAGIC_TOURBILLION:
+    HEX 11 CD C1 C7 C9 C3 A0 D4 CF D5 D2 C2 C9 CC CC C9 CF CE
+s_G:
+    HEX 02 C7 AE
+s_CRYSTAL_CAVE:
+    HEX 0C C3 D2 D9 D3 D4 C1 CC A0 C3 C1 D6 C5
+s_B:
+    HEX 01 C2
+s_THIEVES_CLEARING:
+    HEX 10 D4 C8 C9 C5 D6 C5 D3 A0 C3 CC C5 C1 D2 C9 CE C7
+s_OLD_MINE_ROAD:
+    HEX 0D CF CC C4 A0 CD C9 CE C5 A0 D2 CF C1 C4
+s_FOOTHILLS_CEMETERY:
+    HEX 12 C6 CF CF D4 C8 C9 CC CC D3 A0 C3 C5 CD C5 D4 C5 D2 D9
+s_I:
+    HEX 01 C9
+s_UNDERGROUND_STREAM:
+    HEX 12 D5 CE C4 C5 D2 C7 D2 CF D5 CE C4 A0 D3 D4 D2 C5 C1 CD
+s_V:
+    HEX 01 D6
+s_GEMINI:
+    HEX 06 C7 C5 CD C9 CE C9
+s_R:
+    HEX 01 D2
+s_OLD_MINE_SHAFT:
+    HEX 0E CF CC C4 A0 CD C9 CE C5 A0 D3 C8 C1 C6 D4
+s_GILDED_PATHWAY:
+    HEX 0E C7 C9 CC C4 C5 C4 A0 D0 C1 D4 C8 D7 C1 D9
+s_MINOTAURS_DEN:
+    HEX 0E CD C9 CE CF D4 C1 D5 D2 A7 D3 A0 C4 C5 CE
+s_MINOTAURS_VAULT:
+    HEX 10 CD C9 CE CF D4 C1 D5 D2 A7 D3 A0 D6 C1 D5 CC D4
+s_INNER_STAIRCASE:
+    HEX 0F C9 CE CE C5 D2 A0 D3 D4 C1 C9 D2 C3 C1 D3 C5
+s_SECRET_PASSAGEWAY:
+    HEX 11 D3 C5 C3 D2 C5 D4 A0 D0 C1 D3 D3 C1 C7 C5 D7 C1 D9
+s_VIRGO:
+    HEX 05 D6 C9 D2 C7 CF
+s_LEO:
+    HEX 03 CC C5 CF
+s_LIBRA:
+    HEX 05 CC C9 C2 D2 C1
+s_SCORPIUS:
+    HEX 08 D3 C3 CF D2 D0 C9 D5 D3
+s_SAGITTARIUS:
+    HEX 0B D3 C1 C7 C9 D4 D4 C1 D2 C9 D5 D3
+s_CAPRICORNUS:
+    HEX 0B C3 C1 D0 D2 C9 C3 CF D2 CE D5 D3
+s_AQUARIUS:
+    HEX 08 C1 D1 D5 C1 D2 C9 D5 D3
+s_PISCES:
+    HEX 06 D0 C9 D3 C3 C5 D3
+s_HALLWAY:
+    HEX 07 C8 C1 CC CC D7 C1 D9
+s_ARIES:
+    HEX 05 C1 D2 C9 C5 D3
+s_TAURUS:
+    HEX 06 D4 C1 D5 D2 D5 D3
+s_GEMINI2:
+    HEX 06 C7 C5 CD C9 CE C9
+s_CANCER:
+    HEX 06 C3 C1 CE C3 C5 D2
+s_THE_MOUNTAIN:
+    HEX 0C D4 C8 C5 A0 CD CF D5 CE D4 C1 C9 CE
+s_SHAHRIAR_TREASURY:
+    HEX 11 D3 C8 C1 C8 D2 C9 C1 D2 A0 D4 D2 C5 C1 D3 D5 D2 D9
+s_AIR_VENT:
+    HEX 08 C1 C9 D2 A0 D6 C5 CE D4
+s_DESERTED_TUNNEL:
+    HEX 0F C4 C5 D3 C5 D2 D4 C5 C4 A0 D4 D5 CE CE C5 CC
+s_ROY_G_BIV:
+    HEX 0A D2 CF D9 A0 C7 AE A0 C2 C9 D6
+s_JACKAL_ALTAR:
+    HEX 0C CA C1 C3 CB C1 CC A0 C1 CC D4 C1 D2
+s_ASTROLOGERS_MAZE:
+    HEX 11 C1 D3 D4 D2 CF CC CF C7 C5 D2 A7 D3 A0 CD C1 DA C5
+    ORG     $451E
+LOCATION_EVENTS:
+ev_ali_baba_home:                       ; 0: ALI BABA HOME
+    HEX FE 00 00 83 82 6F FF FF FF
+
+ev_dusty_road:                          ; 1: DUSTY ROAD
+    HEX FE 00 00 6B 03 6A 45 04 31
+    HEX 83 81 97 4B 04 37 73 D4 48
+    HEX 8A 91 1E 63 9F 3E FF FF FF
+
+ev_sultans_palace:                      ; 2: SULTAN'S PALACE
+    HEX FE 00 00 1B 44 1C 51 C0 19
+    HEX 65 D4 4C 65 79 5C 79 C0 2D
+    HEX 69 D3 46 6B 42 6C FF FF FF
+
+ev_royal_library:                       ; 3: ROYAL LIBRARY
+    HEX FE 00 00 1B 43 1A 1D D2 47
+    HEX 45 02 59 1F D2 51 21 D2 5E
+    HEX 23 D2 5C 4B 02 5F FF FF FF
+
+ev_astrologers_lab:                     ; 4: ASTROLOGER'S LAB
+    HEX FE 00 00 FE 00 00 04 75 8E
+    HEX 07 74 92 0A 73 96 0C 72 99
+    HEX 0F 71 9D 3F 36 37 46 D2 56
+    HEX 4C 70 29 7B 77 9B 88 6F 8D
+    HEX B8 6C 2A BB 2B 2E BF 6D 34
+    HEX C3 6E 38 FF FF FF
+
+ev_bear_cave:                           ; 5: BEAR CAVE
+    HEX FE 00 00 19 FE 1F 1C FE DF
+    HEX 28 BA 37 2D FE 1F 2E C0 96
+    HEX 30 FE 1F 42 FE 1F 43 FE 1F
+    HEX 20 C0 64 70 47 84 FF FF FF
+
+ev_rats_nest:                           ; 6: RATS NEST
+    HEX FE 00 00 70 46 5C 78 BA 87
+    HEX 90 C0 32 FF FF FF
+
+ev_dragon_lair:                         ; 7: DRAGON LAIR
+    HEX FE 00 00 55 0A 41 A5 C1 2C
+    HEX A9 89 AA FF FF FF
+
+ev_gold_for_the_lucky:                  ; 8: GOLD FOR THE LUCKY
+    HEX FE 00 00 5D 0A 49 98 FE 1F
+    HEX 99 FE 1F 9A D3 59 A9 88 A8
+    HEX AB FE 1F AD C0 32 AD C1 F4
+    HEX AE FE 1F C1 AC 2B FF FF FF
+
+ev_save_the_whales:                     ; 9: SAVE THE WHALES
+    HEX FE 00 00 05 4E A5 0E 50 AE
+    HEX 1D FE D6 2A A9 23 30 FE D6
+    HEX 32 FE D6 45 FE D6 31 FE 95
+    HEX 31 D4 5A 31 C9 56 55 08 69
+    HEX 37 D6 E0 5D 09 85 FF FF FF
+
+ev_slide:                               ; 10: SLIDE
+    HEX 2A D3 5D 66 C0 64 02 BE 7E
+    HEX 3E 8B 52 66 8B 7A 8E 8B A2
+    HEX B6 8D 83 FF FF FF
+
+ev_deep_dark_stairway:                  ; 11: DEEP DARK STAIRWAY
+    HEX FE 00 00 18 A2 90 2E FE 1F
+    HEX 2F FE 9F 30 FE 1F 43 FE 9F
+    HEX 44 FE 1F 54 FE 1F 58 FE 1F
+    HEX 68 FE 1F 69 FE 9F 7C FE 1F
+    HEX 7D FE 9F 7E FE 1F 6D 8D 54
+    HEX 81 8D 68 93 13 29 FF FF FF
+
+ev_minotaur_labyrinth:                  ; 12: MINOTAUR LABYRINTH
+    HEX FE 00 00 19 FE DF 1E 8D 1D
+    HEX 1F C0 4B 23 AA 29 2E 8D 19
+    HEX 33 FE 1F 34 FE DF 35 FE 1F
+    HEX 36 FE 1F 37 FE 1F 40 FE DF
+    HEX 43 FE 1F 46 FE 1F 53 8C 6C
+    HEX 55 D3 5F 55 FE DF 58 FE 1F
+    HEX 59 FE DF 5E FE 12 60 A7 51
+    HEX 67 8C 80 68 8D 2C 6A FE 1F
+    HEX 6D 8D 6C 6E 8D 5A 6F FE 1F
+    HEX 71 FE C0 71 FE DA 71 FE 1F
+    HEX 7D 8D 83 7E FE C0 7E 99 AB
+    HEX 80 FE DF 82 8D 81 84 FE 1F
+    HEX 90 FE 04 93 8D 92 94 FE 1F
+    HEX 95 FE 1F 96 FE 9F 97 FE 1F
+    HEX 99 FE 9E 9A FE 1F A5 C0 7D
+    HEX A7 8D 93 A8 A1 1C A9 FE DB
+    HEX AE FE 1E FF FF FF
+
+ev_stinger_strewn_cell:                 ; 13: STINGER STREWN CELL
+    HEX FE 00 00 6A 0F 56 94 59 96
+    HEX A4 C0 E4 B9 0A 19 FF FF FF
+
+ev_guard_room:                          ; 14: GUARD ROOM
+    HEX FE 00 00 09 26 A8 6A 4E 7E
+    HEX 71 50 85 FF FF FF
+
+ev_long_way_from_home:                  ; 15: LONG WAY FROM HOME
+    HEX FE 00 00 71 0F 5D 97 59 98
+    HEX AF C0 88 C2 0A 22 FF FF FF
+
+ev_forest:                              ; 16: FOREST
+    HEX FE 00 00 0A 82 76 17 C0 03
+    HEX 2E D5 90 67 D6 58 33 FE 1F
+    HEX 3F FE 1F 40 FE 1F 45 FE 1F
+    HEX 46 FE 1F 6B FE 1F 7C FE 1F
+    HEX 7F FE 1F 95 FE 1F A1 C0 2F
+    HEX A9 FE 1F 85 92 86 AD 9E 29
+    HEX FF FF FF
+
+ev_view_from_a_tree:                    ; 17: VIEW FROM A TREE
+    HEX FE 00 00 24 95 A5 37 FE 1F
+    HEX 38 FE DF 39 FE 1F 4C D2 4E
+    HEX 85 91 84 9C 9E 2B FF FF FF
+
+ev_failing_wall:                        ; 18: FAILING WALL
+    HEX FE 00 00 31 FE 9E 44 FE 1E
+    HEX 57 FE 1E 6A FE 1E 7E FE 1E
+    HEX 91 FE C0 91 CA 2C 92 FE 1E
+    HEX 8F D5 46 6C FE 19 72 54 6A
+    HEX FF FF FF
+
+ev_minotaur_playroom:                   ; 19: MINOTAUR PLAYROOM
+    HEX FE 00 00 6B FE 19 97 C0 C8
+    HEX 38 94 38 4C 94 4C 61 94 61
+    HEX 76 94 76 26 67 A3 FF FF FF
+
+ev_thieves_cave:                        ; 20: THIEVES CAVE
+    HEX 1A C9 AF 1D C0 1E 20 C0 3C
+    HEX 60 1B 68 7C D3 50 7D FE 1F
+    HEX 7E FE 1F 92 FE 1F A5 D2 4F
+    HEX A6 FE 1F A9 C0 0A AC C9 C8
+    HEX AF C0 19 B9 92 4C FF FF FF
+
+ev_o:                                   ; 21: O
+    HEX FE 00 00 5C D3 57 82 56 83
+    HEX 73 C0 2D 74 FE 89 8A 58 2A
+    HEX FF FF FF
+
+ev_spiral_staircase:                    ; 22: SPIRAL STAIRCASE
+    HEX FE 00 00 1D 7E 23 44 FE 1F
+    HEX 45 FE 1F 6B FE 1F 6C FE 1F
+    HEX 93 18 38 FF FF FF
+
+ev_y:                                   ; 23: Y
+    HEX FE 00 00 24 57 7F 81 FE 1F
+    HEX 82 FE 1F 83 FE 1F 97 FE DF
+    HEX 95 5A 31 96 C9 E6 FF FF FF
+
+ev_magic_tourbillion:                   ; 24: MAGIC TOURBILLION
+    HEX FE 00 00 83 C0 64 97 80 97
+    HEX 82 D5 92 84 D6 A8 FF FF FF
+
+ev_g:                                   ; 25: G.
+    HEX FE 00 00 31 A2 90 8D 1C 39
+    HEX 97 C0 46 FF FF FF
+
+ev_crystal_cave:                        ; 26: CRYSTAL CAVE
+    HEX 31 BA AF 42 FE C0 42 C0 23
+    HEX 5C FE C0 5C C0 19 67 15 5F
+    HEX 6D C0 19 6D FE C0 6D FE C0
+    HEX 6D C0 32 72 FE C0 72 FE C0
+    HEX 72 C0 1E 73 BE 54 90 FE C0
+    HEX 90 FE C0 90 C0 32 94 D3 4D
+    HEX 94 FE C0 94 C0 23 A8 24 2D
+    HEX 84 FE C0 84 FE C0 84 FE C0
+    HEX 84 C0 46 FF FF FF
+
+ev_b:                                   ; 27: B
+    HEX 29 20 9D FE 00 00 33 9C 39
+    HEX 3F 9C 39 59 9C 39 6D 40 AC
+    HEX 8F D6 58 6E 9C 39 FF FF FF
+
+ev_thieves_clearing:                    ; 28: THIEVES CLEARING
+    HEX FE 00 00 58 1E 44 A6 C0 4B
+    HEX 97 C0 19 FF FF FF
+
+ev_old_mine_road:                       ; 29: OLD MINE ROAD
+    HEX FE 00 00 17 92 88 22 B8 AC
+    HEX 4B D6 A8 28 91 AC 43 FE 1F
+    HEX 44 FE DF 58 5D 6C 45 FE 1F
+    HEX 3A D3 4B 3A C0 14 3A 65 55
+    HEX FF FF FF
+
+ev_foothills_cemetery:                  ; 30: FOOTHILLS CEMETERY
+    HEX FE 00 00 3D 82 62 45 FE 5F
+    HEX 58 FE 5F 59 FE 9F 59 C0 64
+    HEX 5A FE 5F 6D FE 5F 81 FE 5F
+    HEX 7E C0 05 9E B8 7B FF FF FF
+
+ev_i:                                   ; 31: I
+    HEX FE 00 00 18 22 90 31 FE 1F
+    HEX 45 FE 1F 59 FE 1F 6D FE 1F
+    HEX 81 FE 9E 90 C0 7D 95 FE 1F
+    HEX FF FF FF
+
+ev_underground_stream:                  ; 32: UNDERGROUND STREAM
+    HEX 1D D3 5B 1D FE D6 1D D1 00
+    HEX 1D C0 32 1D FE D6 1D C0 32
+    HEX 1D FE D6 FE 00 00 34 D6 50
+    HEX 0D 40 AA 49 4D A8 FF FF FF
+
+ev_v:                                   ; 33: V
+    HEX FE 00 00 2E C0 41 3A 24 8E
+    HEX A4 8C 2C FF FF FF
+
+ev_gemini:                              ; 34: GEMINI
+    HEX FE 00 00 38 45 40 55 66 1C
+    HEX FF FF FF
+
+ev_r:                                   ; 35: R
+    HEX FE 00 00 19 1B 94 55 FE 1F
+    HEX 53 D5 82 69 FE 1F 7D FE 1F
+    HEX 91 FE 1F 90 C0 64 92 FE C0
+    HEX 92 C0 41 82 56 83 FF FF FF
+
+ev_old_mine_shaft:                      ; 36: OLD MINE SHAFT
+    HEX FE 00 00 54 9E 3A 59 D3 49
+    HEX 59 FE 1F 5E B5 29 FF FF FF
+
+ev_gilded_pathway:                      ; 37: GILDED PATHWAY
+    HEX FE 00 00 08 A3 41 31 80 97
+    HEX 43 80 AA 44 FE DF 59 C9 00
+    HEX 6B C9 00 93 8F 59 95 FE C9
+    HEX BC 4F 1D FF FF FF
+
+ev_minotaurs_den:                       ; 38: MINOTAUR'S DEN
+    HEX FE 00 00 FE 00 00 50 8D 5F
+    HEX A7 28 A8 FF FF FF
+
+ev_minotaurs_vault:                     ; 39: MINOTAUR'S VAULT
+    HEX FE 00 00 84 29 70 93 27 92
+    HEX AA CA 2C AE C9 C8 FF FF FF
+
+ev_inner_staircase:                     ; 40: INNER STAIRCASE
+    HEX FE 00 00 24 0A 2B 20 FE 1F
+    HEX 21 FE 9F 34 FE 1F 48 FE C0
+    HEX 48 AA 32 5F FE 1F 72 FE 5F
+    HEX 73 FE 1F 84 28 98 FF FF FF
+
+ev_secret_passageway:                   ; 41: SECRET PASSAGEWAY
+    HEX FE 00 00 28 0D 23 33 29 48
+    HEX FF FF FF
+
+ev_virgo:                               ; 42: VIRGO
+    HEX FE 00 00 1A 45 A7 81 6D 82
+    HEX FF FF FF
+
+ev_leo:                                 ; 43: LEO
+    HEX FE 00 00 16 45 A4 8E C0 FA
+    HEX 7C 2B 7D FF FF FF
+
+ev_libra:                               ; 44: LIBRA
+    HEX 20 45 AB 86 6E 87 6F FE B7
+    HEX 98 C9 64 FF FF FF
+
+ev_scorpius:                            ; 45: SCORPIUS
+    HEX 24 45 AF FE 00 00 8B 6F AC
+    HEX 9C C0 96 FF FF FF
+
+ev_sagittarius:                         ; 46: SAGITTARIUS
+    HEX FE 00 00 5C 70 48 7E FE 19
+    HEX 84 D3 53 8C 45 87 FF FF FF
+
+ev_capricornus:                         ; 47: CAPRICORNUS
+    HEX FE 00 00 0C 71 4E 1E FE 1F
+    HEX 28 45 4B 2D FE 0D 31 D4 55
+    HEX 32 FE 1F 37 C9 FA 41 FE 15
+    HEX 34 D6 F8 46 FE 1F FF FF FF
+
+ev_aquarius:                            ; 48: AQUARIUS
+    HEX FE 00 00 39 D1 00 4B 72 4A
+    HEX 61 FE 16 B1 45 23 FF FF FF
+
+ev_pisces:                              ; 49: PISCES
+    HEX FE 00 00 5D FE 95 71 D4 52
+    HEX 85 FE 55 AD 45 20 FF FF FF
+
+ev_hallway:                             ; 50: HALLWAY
+    HEX FE 00 00 1D BE A9 1E BE AA
+    HEX AA 45 1E FF FF FF
+
+ev_aries:                               ; 51: ARIES
+    HEX FE 00 00 40 75 3F 2E C0 64
+    HEX A6 45 1B FF FF FF
+
+ev_taurus:                              ; 52: TAURUS
+    HEX FE 00 00 28 A5 5D 3C 36 19
+    HEX 51 B5 52 A2 45 18 FF FF FF
+
+ev_gemini2:                             ; 53: GEMINI (south)
+    HEX FE 00 00 1C FE 01 44 FE 01
+    HEX 2D C9 64 38 45 40 55 77 7D
+    HEX FF FF FF
+
+ev_cancer:                              ; 54: CANCER
+    HEX FE 00 00 8F C0 32 9C 45 7C
+    HEX 84 D3 60 B9 6C 79 FF FF FF
+
+ev_the_mountain:                        ; 55: THE MOUNTAIN
+    HEX FE 00 00 17 D4 4A 18 FE 1F
+    HEX 23 7A 23 46 FE 1F 59 FE 1F
+    HEX 6C FE 1F 7F FE 1F AF D5 44
+    HEX 2B FE C0 2B 92 3A 2C FE 1F
+    HEX 40 FE 1F 4A FE 1F 4B FE 1F
+    HEX 5E FE 1F 5F C0 32 72 FE 1F
+    HEX 7A 9F 9D 82 C0 05 86 FE 1F
+    HEX A4 D4 58 C0 9E 36 FF FF FF
+
+ev_shahriar_treasury:                   ; 56: SHAHRIAR TREASURY
+    HEX FE 00 00 43 C9 FA 56 C0 32
+    HEX 57 C0 64 58 C0 32 6B C0 32
+    HEX 5D 83 66 FF FF FF
+
+ev_air_vent:                            ; 57: AIR VENT
+    HEX 0F B8 23 38 86 29 FE 00 00
+    HEX 5E BD 5D 88 87 79 AE BB AD
+    HEX C3 9B 45 FF FF FF
+
+ev_deserted_tunnel:                     ; 58: DESERTED TUNNEL
+    HEX FE 00 00 93 C0 2D 94 D3 54
+    HEX 95 FE 1F A7 FE 1F A8 FE C0
+    HEX A8 B8 73 AE BA AF FF FF FF
+
+ev_roy_g_biv:                           ; 59: ROY G. BIV
+    HEX 52 BD 53 65 FE C1 65 C0 64
+    HEX 8D FE C1 8D BC 79 A1 FE C0
+    HEX A1 63 2B FF FF FF
+
+ev_jackal_altar:                        ; 60: JACKAL ALTAR
+    HEX FE 00 00 17 C0 37 20 FE 1F
+    HEX 30 FE 1F 31 FE 1F 32 FE 1F
+    HEX 33 FE 1F 34 FE 1F 41 FE 1F
+    HEX 42 FE 1F 57 FE 1F 58 FE 1F
+    HEX 59 FE 1F 52 BC 51 5E BA 5F
+    HEX FF FF FF
+
+ev_astrologers_maze:                    ; 61: ASTROLOGER'S MAZE
+    HEX FE 00 00 1E FE 1F 23 97 31
+    HEX 2E FE 1F 33 FE 1F 35 FE 1F
+    HEX 36 FE 1F 37 FE 1F 43 FE 1F
+    HEX 46 FE 1F 53 9B 72 58 FE 1F
+    HEX 5E FE 1F 6A FE 1F 6D FE 1F
+    HEX 6E FE 1F 6F FE 1F 71 FE 1F
+    HEX 7D FE 1F 7E FE C0 7E 8B 16
+    HEX 83 C9 78 84 FE 1F 90 FE 1F
+    HEX 93 FE 1F 94 FE 1F 95 FE 1F
+    HEX 96 FE 1F 97 FE 1F 9A FE 1F
+    HEX A4 C0 32 A7 FE 1F AE FE 1F
+    HEX AF C0 0A BD B4 2F BE B3 32
+    HEX 1F D5 C6 FF FF FF
     ORG     $5B00
 INIT_GAME_STATE:
     SUBROUTINE

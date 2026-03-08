@@ -6991,7 +6991,8 @@ skip first-visit logic on subsequent entries.
 
 The sentinel {\Tt{}FFFF\nwendquote} in the name pointer marks the end of the table.
 
-\nwenddocs{}\nwbegincode{413}\sublabel{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}}}\moddef{Location data~{\nwtagstyle{}\subpageref{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{413}\sublabel{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}}}\moddef{Location data~{\nwtagstyle{}\subpageref{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $4009
 \nwlinkedidentc{LOCATION_DATA}{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}:
     ; --- 0: ALI BABA HOME ---
     DC.W s_ALI_BABA_HOME
@@ -7552,10 +7553,12 @@ The sentinel {\Tt{}FFFF\nwendquote} in the name pointer marks the end of the tab
     DC.B $00
 
     DC.W $FFFF                  ; end sentinel
+    HEX 12 01 00 00 00 00 A0   ; unused padding to $4240
 \nwindexdefn{\nwixident{LOCATION{\_}DATA}}{LOCATION:unDATA}{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{LOCATION{\_}DATA}}{LOCATION:unDATA}}}\nwnotused{Location data}\nwendcode{}\nwbegindocs{414}\nwdocspar
+\nwidentdefs{\\{{\nwixident{LOCATION{\_}DATA}}{LOCATION:unDATA}}}\nwendcode{}\nwbegindocs{414}\nwdocspar
 
-\nwenddocs{}\nwbegincode{415}\sublabel{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}}}\moddef{Location names~{\nwtagstyle{}\subpageref{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{415}\sublabel{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}}}\moddef{Location names~{\nwtagstyle{}\subpageref{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $4240
 \nwlinkedidentc{LOCATION_NAMES}{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}:
 s_ALI_BABA_HOME:
     APSTR "ALI BABA HOME"
@@ -7682,7 +7685,7 @@ s_JACKAL_ALTAR:
 s_ASTROLOGERS_MAZE:
     APSTR "ASTROLOGER'S MAZE"
 \nwindexdefn{\nwixident{LOCATION{\_}NAMES}}{LOCATION:unNAMES}{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{LOCATION{\_}NAMES}}{LOCATION:unNAMES}}}\nwnotused{Location names}\nwendcode{}\nwbegindocs{416}\nwdocspar
+\nwidentdefs{\\{{\nwixident{LOCATION{\_}NAMES}}{LOCATION:unNAMES}}}\nwendcode{}\nwbegindocs{416}\nwdocspar
 
 \subsection{Event list format}
 \label{sec:event-format}
@@ -7737,7 +7740,8 @@ For scene events (\$D2--\$D4), a scene/event~ID.
       random vs.\ specific encounters based on byte~1~$<$~\$40.
 \end{itemize}
 
-\nwenddocs{}\nwbegincode{417}\sublabel{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}}}\moddef{Location events~{\nwtagstyle{}\subpageref{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{417}\sublabel{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}}}\moddef{Location events~{\nwtagstyle{}\subpageref{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $451E
 \nwlinkedidentc{LOCATION_EVENTS}{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}:
 ev_ali_baba_home:                       ; 0: ALI BABA HOME
     HEX FE 00 00 83 82 6F FF FF FF
@@ -8087,7 +8091,7 @@ ev_astrologers_maze:                    ; 61: ASTROLOGER'S MAZE
     HEX AF C0 0A BD B4 2F BE B3 32
     HEX 1F D5 C6 FF FF FF
 \nwindexdefn{\nwixident{LOCATION{\_}EVENTS}}{LOCATION:unEVENTS}{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{LOCATION{\_}EVENTS}}{LOCATION:unEVENTS}}}\nwnotused{Location events}\nwendcode{}\nwbegindocs{418}\nwdocspar
+\nwidentdefs{\\{{\nwixident{LOCATION{\_}EVENTS}}{LOCATION:unEVENTS}}}\nwendcode{}\nwbegindocs{418}\nwdocspar
 
 \chapter{Combat}
 
@@ -12017,6 +12021,9 @@ The following root chunks produce the assembly files when tangled.
 \LA{}handle mob encounter~{\nwtagstyle{}\subpageref{PYNWmai0-BQ2BC5SCGY6MOAW5UUTBFYYMWQ000000-1}}\RA{}
 \LA{}set target restricted~{\nwtagstyle{}\subpageref{PYNWmai0-X6R76MOH2TJMSMNIB74Y4XDL4E000000-1}}\RA{}
 \LA{}dispatch on mode~{\nwtagstyle{}\subpageref{PYNWmai0-JKIRIHK5BBUUQKW62F6RWOUO6M000000-1}}\RA{}
+\LA{}Location data~{\nwtagstyle{}\subpageref{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}}\RA{}
+\LA{}Location names~{\nwtagstyle{}\subpageref{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}}\RA{}
+\LA{}Location events~{\nwtagstyle{}\subpageref{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}}\RA{}
 \LA{}init game state~{\nwtagstyle{}\subpageref{PYNWmai0-E3Y66EJZKZJGDUZ5YYIMTJODMQ000000-1}}\RA{}
 \LA{}init game display~{\nwtagstyle{}\subpageref{PYNWmai0-Y2IVI3KJLL6OMNKNQ5NTIWMK5E000000-1}}\RA{}
 \LA{}draw border char~{\nwtagstyle{}\subpageref{PYNWmai0-DEK4BXIA2537BOCNQO747FOMKY000000-1}}\RA{}
@@ -12472,9 +12479,9 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{EALDR reboot handler}{PYNWmai0-CJ3GS7PRCFSFHUAA5NYLZSDWXI000000-1}{\nwixu{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}\nwixd{PYNWmai0-CJ3GS7PRCFSFHUAA5NYLZSDWXI000000-1}}}%
 \nwixlogsorted{c}{{EALDR track pages}{PYNWmai0-IHL3JAUEITOY7NRQBJ3MQIEJFE000000-1}{\nwixu{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}\nwixd{PYNWmai0-IHL3JAUEITOY7NRQBJ3MQIEJFE000000-1}}}%
 \nwixlogsorted{c}{{Hit chance}{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}{\nwixd{PYNWmai0-X4FLZFQK2PJN7VH3YTA5N5PTO4000000-1}}}%
-\nwixlogsorted{c}{{Location data}{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}{\nwixd{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}}}%
-\nwixlogsorted{c}{{Location events}{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}{\nwixd{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}}}%
-\nwixlogsorted{c}{{Location names}{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}{\nwixd{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}}}%
+\nwixlogsorted{c}{{Location data}{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-ERFGCV2MLBMWTJDOVNONPK6K3I000000-1}}}%
+\nwixlogsorted{c}{{Location events}{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-D7TFMLJI347OTZBFRO5XVFS54M000000-1}}}%
+\nwixlogsorted{c}{{Location names}{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-SYU42WHLTH62BE4UW6NQDZ3FAY000000-1}}}%
 \nwixlogsorted{c}{{Macros}{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixu{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-1}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-2}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-3}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-4}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-5}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-6}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-7}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-8}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-9}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-10}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-11}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-12}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-13}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-14}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-15}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-16}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-17}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-18}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-19}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-20}\nwixd{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-21}}}%
 \nwixlogsorted{c}{{Message data}{PYNWmai0-MA3WDYAYUKINVQ6W4447HHOCBE000000-1}{\nwixd{PYNWmai0-MA3WDYAYUKINVQ6W4447HHOCBE000000-1}}}%
 \nwixlogsorted{c}{{add price component}{PYNWmai0-N5FNAXP5F7FECA2DI5YBCBOXQQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-N5FNAXP5F7FECA2DI5YBCBOXQQ000000-1}}}%
