@@ -317,6 +317,30 @@ ORG $06E0 define the overlapping bytes as code.
 **Rule:** When a data region overlaps with code, truncate the HEX data at
 the overlap boundary. The code ORG will define the overlapping bytes.
 
+## 18. Loop/retry labels must include the re-executed call
+
+When a loop re-calls a subroutine each iteration, the backward branch
+target must be BEFORE the JSR, not after it.
+
+**Example:** SELECT_COMBAT_TARGET has a loop that calls GET_ENTITY_THREAT
+each iteration:
+```
+.loop_high:
+    JSR     GET_ENTITY_THREAT   ; $18F7
+    CMP     #$00                ; $18FA
+    ...
+    BNE     .loop_high          ; branches to $18F7
+```
+
+Placing `.loop_high` at the CMP (after the JSR) makes the branch offset
+3 bytes short — the BNE targets $18FA instead of $18F7.
+
+**Symptom:** Branch offset mismatch of exactly 3 bytes (the size of JSR).
+
+**Rule:** When a loop body starts with a JSR that must be re-executed,
+place the loop label BEFORE the JSR. Same applies to JMP-based retry
+loops (VALIDATE_INPUT had `JMP .retry` needing to re-call `JSR FUN_600A`).
+
 ## Verification checklist
 
 After writing any new assembly chunk:

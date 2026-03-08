@@ -1396,7 +1396,7 @@ LOAD_CHAR_NAME_PTR:
     INY
     LDA     ($F8),Y
     STA     $BD
-    JMP     FUN_76D8
+    JMP     SETUP_TEXT_POS_COL20
     ORG     $0933
 SETUP_CHAR_SPRITE:
     SUBROUTINE
@@ -1542,9 +1542,136 @@ PRINT_ENTITY_NAME:
     JSR     PRINT_BOTTOM_CENTERED
     JMP     RESET_TEXT_WINDOW
     ORG     $116B
-FUN_116B:
+    SUBROUTINE
+; Sets $BC/$BD to handler address based on entity type at ($BE)
+CLASSIFY_ENTITY_TYPE:
+    LDA     #$00
+    CMP     $BF
+    BNE     .not_zero_page
+    CMP     $BE
+    BNE     .type_C3
+.type_E4:                      ; $1175 - reused by backward BMI from $1198
+    LDA     #$E4
+    STA     $BC
+    LDA     #$7F
+    STA     $BD
+    RTS
+.type_C3:                      ; $117E - reused by JMP from $11F9
+    LDA     #$C3
+    STA     $BC
+    LDA     #$7F
+    STA     $BD
+    RTS
+.not_zero_page:
+    LDY     #$01
+    LDA     ($BE),Y
+    BMI     .check_ranges
+.type_FC:                      ; $118D - reused by backward BMI from $11F5
+    LDA     #$FC
+    STA     $BC
+    LDA     #$7F
+    STA     $BD
+    RTS
+.check_ranges:
+    CMP     #$C0
+    BMI     .type_E4
+    CMP     #$D2
+    BPL     .check_d5
+    LDA     #$D3
+    STA     $BC
+    LDA     #$7F
+    STA     $BD
+    RTS
+.check_d5:
+    CMP     #$D5
+    BPL     .check_fe
+    LDA     #$16
+    STA     $BC
+    LDA     #$80
+    STA     $BD
+    RTS
+.check_fe:
+    CMP     #$FE
+    BEQ     .type_fe_entry
+    LDA     #$28
+    STA     $BC
+    LDA     #$80
+    STA     $BD
+    RTS
+.type_fe_entry:
+    LDY     #$02
+    LDA     ($BE),Y
+    TAX
+    AND     #$1F
+    BNE     .check_c0_bits
+    LDA     #$03
+    STA     $BC
+    LDA     #$80
+    STA     $BD
+    RTS
+.check_c0_bits:
+    TXA
+    AND     #$C0
+    CMP     #$C0
+    BNE     .check_1b
+.type_F0:                      ; $11DA - reused by backward BEQ from $11F7
+    LDA     #$F0
+    STA     $BC
+    LDA     #$7F
+    STA     $BD
+    RTS
+.check_1b:
+    TXA
+    AND     #$1F
+    CMP     #$1B
+    BPL     .check_1d
+    LDA     #$CA
+    STA     $BC
+    LDA     #$7F
+    STA     $BD
+    RTS
+.check_1d:
+    CMP     #$1D
+    BMI     .type_FC
+    BEQ     .type_F0
+    JMP     .type_C3
     ORG     $11FC
-FUN_11FC:
+    SUBROUTINE
+; Maps A to string table index, walks linked list from $803A
+MAP_VALUE_TO_STRING:
+    CMP     #$08
+    BMI     .use_as_is
+    CMP     #$10
+    BPL     .high_range
+    ROR
+    AND     #$03
+    ORA     #$08
+    BNE     .use_as_is
+.high_range:
+    ROR
+    ROR
+    AND     #$03
+    ORA     #$0C
+.use_as_is:
+    TAX
+    LDA     #$3A
+    STA     $BC
+    LDA     #$80
+    STA     $BD
+    LDY     #$00
+.loop:
+    DEX
+    BNE     .next
+    JMP     CENTER_PRINT_NAME
+.next:
+    SEC
+    LDA     ($BC),Y
+    ADC     $BC
+    STA     $BC
+    LDA     #$00
+    ADC     $BD
+    STA     $BD
+    BNE     .loop
     ORG     $12D0
 PICK_RANDOM_MEMBER:
     SUBROUTINE
@@ -1679,7 +1806,7 @@ CHECK_CAN_LEAVE:
     SUBROUTINE
     ; Check hostility threshold: if $5A18 >= $40, show message $1C
     ; and return 1; else show message $1D and return 0.
-    JSR     FUN_78A8
+    JSR     STEP_PRNG
     LDA     $5A18
     CMP     #$40
     BPL     .pass
@@ -1886,7 +2013,16 @@ APPLY_DAMAGE_TO_CURRENT:
     TXA
     JMP     APPLY_DAMAGE
     ORG     $1432
-FUN_1432:
+    SUBROUTINE
+; Copies $F4/$F5 -> $F6/$F7, then JMP SET_ENTITY_PTR with A
+COPY_F4_TO_F6_AND_SET:
+    TAX
+    LDA     $F4
+    STA     $F6
+    LDA     $F5
+    STA     $F7
+    TXA
+    JMP     SET_ENTITY_PTR
     ORG     $143F
 AUTO_HEAL:
     SUBROUTINE
@@ -1910,7 +2046,7 @@ AUTO_HEAL:
     STA     $5A16
 .heal_loop:
     JSR     INCREMENT_HP
-    JSR     FUN_78A8
+    JSR     STEP_PRNG
     LDA     $5A18
     CMP     #$50
     BPL     .heal_loop
@@ -1952,7 +2088,7 @@ TURN_DISPATCH:
     SUBROUTINE
     LDA     $5A05
     BEQ     .no_combat
-    JSR     FUN_18E4
+    JSR     SELECT_COMBAT_TARGET
     CMP     #$02
     BEQ     ENTER_COMBAT_STATE
     BMI     START_COMBAT
@@ -1988,7 +2124,7 @@ RESOLVE_ATTACK:
     ; Combat willingness calculation and attack resolution.
     ; Computes willingness score in $5A76 based on char/target stats,
     ; then rolls random to determine if attack occurs.
-    JSR     FUN_16A3
+    JSR     SET_BLINK_TARGET
     LDA     $5A74
     CMP     #$01
     BNE     .not_player
@@ -2119,7 +2255,74 @@ ADD_WILLINGNESS:
     STA     $5A76
     RTS
     ORG     $16E0
-FUN_16E0:
+    SUBROUTINE
+; Calculates combat strength using RANDOM_IN_RANGE
+CALC_COMBAT_STRENGTH:
+    LDA     $5A74
+    CMP     #$01
+    BEQ     .use_y7
+    LDY     #$03
+    LDA     ($F4),Y
+    CMP     ($F8),Y
+    BNE     .use_y7
+    LDY     #$09
+    BNE     .got_y
+.use_y7:
+    LDY     #$07
+.got_y:
+    TYA
+    PHA
+    LDA     ($F8),Y
+    AND     #$0F
+    TAX
+    JSR     RANDOM_IN_RANGE
+    STA     $5A78
+    TXA
+    JSR     RANDOM_IN_RANGE
+    SEC
+    ADC     $5A78
+    STA     $5A78
+    LDA     $5A05
+    BEQ     .check_5a74
+.exit_pla:                     ; $1712 - reused by backward BNE from $1717
+    PLA
+    RTS
+.check_5a74:
+    LDA     $5A74
+    BNE     .exit_pla
+    PLA
+    TAY
+    TAX
+    LDA     ($F8),Y
+    AND     #$80
+    BNE     .use_50
+    LDA     #$0D
+    BNE     .do_random
+.use_50:
+    LDA     #$50
+.do_random:
+    JSR     RANDOM_IN_RANGE
+    CMP     #$00
+    BEQ     .missed
+    RTS
+.missed:
+    TXA
+    TAY
+    LDA     #$81
+    STA     ($F8),Y
+    JSR     CLEAR_MSG_AREA
+    LDA     #$01
+    JSR     SCENE_LOOP
+    LDA     #$0A
+    JSR     RANDOM_IN_RANGE
+    SEC
+    ADC     $5A78
+    CMP     #$1F
+    BCC     .cap_ok
+    LDA     #$1F
+.cap_ok:
+    STA     $5A78
+    RTS
     ORG     $199D
 LOAD_TARGET_PTR:
     SUBROUTINE
@@ -2718,7 +2921,7 @@ HANDLE_EVENT_SLOT:
     AND     #$3F
     ORA     #$40
     STA     ($BE),Y
-    JSR     FUN_78A8
+    JSR     STEP_PRNG
     LDA     $5A18
     CMP     #$14
     BMI     .trap_damage
@@ -2730,7 +2933,7 @@ HANDLE_EVENT_SLOT:
     JSR     SET_RESTRICTED
     JSR     PRINT_MOB_NAME
     JSR     FUN_0D10
-    JSR     FUN_78A8
+    JSR     STEP_PRNG
     LDA     $5A18
     ROL
     ROL
@@ -2778,18 +2981,18 @@ FUN_1DDC:
     ORG     $1751
 PLAYER_ATTACK:
     SUBROUTINE
-    JSR     FUN_16E0
+    JSR     CALC_COMBAT_STRENGTH
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
     LDA     $5A78
-    JSR     FUN_11FC
+    JSR     MAP_VALUE_TO_STRING
     JSR     RESET_TEXT_WINDOW
     LDA     $F4
     STA     $BE
     LDA     $F5
     STA     $BF
-    JSR     FUN_116B
+    JSR     CLASSIFY_ENTITY_TYPE
     JSR     PRINT_BOTTOM_CENTERED
     LDY     $5A78
     LDX     #$02
@@ -2801,7 +3004,7 @@ PLAYER_ATTACK:
     CMP     #$40
     BCC     .roll_hit
 .immune:
-    JSR     FUN_1F0C
+    JSR     DISPATCH_ON_MODE
     JSR     RESET_TEXT_WINDOW
     LDA     #$14
     JMP     DISPLAY_MESSAGE
@@ -2810,7 +3013,7 @@ PLAYER_ATTACK:
     JSR     RANDOM_IN_RANGE
     CMP     $5A78
     BCS     .immune
-    JSR     FUN_1F0C
+    JSR     DISPATCH_ON_MODE
     LDY     #$01
     LDA     ($BE),Y
     ORA     #$40
@@ -2838,7 +3041,7 @@ PLAYER_ATTACK:
     AND     #$1F
     CMP     #$1D
     BPL     .immune
-    JSR     FUN_1849
+    JSR     PROCESS_ENTITY_SCRIPT
     JSR     SET_CURSOR_ROW21
     LDA     #$02
     JMP     SCENE_LOOP
@@ -2866,7 +3069,7 @@ PLAYER_ATTACK:
     STA     ($F4),Y
     LDX     #$0E
     JSR     SCRIPT_ENGINE
-    JSR     FUN_1F0C
+    JSR     DISPATCH_ON_MODE
     LDY     #$00
     LDA     ($F4),Y
     JSR     DRAW_CHAR_AT_POS
@@ -2876,7 +3079,7 @@ PLAYER_ATTACK:
     JSR     DISPLAY_MESSAGE
     JMP     FUN_1DDC
 .take_item:
-    JSR     FUN_1849
+    JSR     PROCESS_ENTITY_SCRIPT
     JSR     SET_CURSOR_ROW21
     LDY     #$02
     LDA     ($F4),Y
@@ -2887,21 +3090,33 @@ PLAYER_ATTACK:
     JSR     SCENE_LOOP
     JMP     FUN_1DDC
 .blocked:
-    JSR     FUN_1F0C
+    JSR     DISPATCH_ON_MODE
     JSR     SET_CURSOR_ROW21
     LDA     #$10
     JMP     DISPLAY_MESSAGE
     ORG     $1849
-FUN_1849:
+    SUBROUTINE
+; Saves entity char, marks as $FE, runs script $0E, dispatches, restores
+PROCESS_ENTITY_SCRIPT:
+    LDY     #$00
+    LDA     ($F4),Y
+    STA     $BA
+    LDA     #$FE
+    STA     ($F4),Y
+    LDX     #$0E
+    JSR     RUN_SCRIPT
+    JSR     DISPATCH_ON_MODE
+    LDA     $BA
+    JMP     DRAW_CHAR_AT_POS
     ORG     $1860
 MOB_ATTACK:
     SUBROUTINE
-    JSR     FUN_16E0
+    JSR     CALC_COMBAT_STRENGTH
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     RESET_TEXT_WINDOW
     LDA     $5A78
-    JSR     FUN_11FC
+    JSR     MAP_VALUE_TO_STRING
     JSR     RESET_TEXT_WINDOW
     JSR     PRINT_MEMBER_NAME
     LDY     $5A78
@@ -2914,7 +3129,7 @@ MOB_ATTACK:
     LDA     #$00
     STA     $423A
 .npc:
-    JSR     FUN_1F0C
+    JSR     DISPATCH_ON_MODE
     LDY     #$08
     LDA     ($F4),Y
     STA     $5A79
@@ -2922,7 +3137,7 @@ MOB_ATTACK:
     CMP     #$00
     BNE     .has_strength
     LDA     $5A78
-    JMP     FUN_1432
+    JMP     COPY_F4_TO_F6_AND_SET
 .has_strength:
     JSR     RESET_TEXT_WINDOW
     LDX     #$17
@@ -2956,9 +3171,83 @@ MOB_ATTACK:
     TXA
     JSR     DISPLAY_MESSAGE
     LDA     $5A78
-    JMP     FUN_1432
+    JMP     COPY_F4_TO_F6_AND_SET
     ORG     $18E4
-FUN_18E4:
+    SUBROUTINE
+; Selects combat target based on $5A05 (3 paths: <3, 3-4, >=5)
+SELECT_COMBAT_TARGET:
+    LDA     $5A05
+    CMP     #$03
+    BMI     .path_low
+    CMP     #$05
+    BMI     .path_mid
+    JSR     FIRST_GROUP_MEMBER
+    LDA     #$00
+    STA     $5A88
+.loop_high:
+    JSR     GET_ENTITY_THREAT
+    CMP     #$00
+    BEQ     .skip_high
+    LDY     #$05
+    LDA     ($F4),Y
+    AND     #$1F
+    CMP     $5A88
+    BMI     .skip_high
+    STA     $5A88
+    LDA     $F4
+    STA     $5A86
+    LDA     $F5
+    STA     $5A87
+.skip_high:
+    JSR     NEXT_GROUP_MEMBER
+    LDA     #$00
+    CMP     $F5
+    BNE     .loop_high
+    CMP     $5A88
+    BEQ     .path_low
+    LDA     #$01
+    RTS
+.path_low:
+    LDA     #$00
+    CMP     $5A66
+    BNE     .ret_2
+    LDY     #$03
+    LDA     ($F8),Y
+    JSR     CHECK_ENCOUNTER
+    LDA     #$02
+    CMP     $5A1F
+    BEQ     .ret_2
+    JSR     FUN_645F
+    CMP     #$01
+    BNE     .ret_2
+    LDA     #$04
+    RTS
+.ret_2:
+    LDA     #$02
+    RTS
+.path_mid:
+    LDA     #$00
+    STA     $5A88
+    JSR     FIRST_GROUP_MEMBER
+.loop_mid:
+    JSR     GET_ENTITY_THREAT
+    CMP     $5A88
+    BEQ     .skip_mid
+    BMI     .skip_mid
+    STA     $5A88
+    LDA     $F4
+    STA     $5A86
+    LDA     $F5
+    STA     $5A87
+.skip_mid:
+    JSR     NEXT_GROUP_MEMBER
+    LDA     #$00
+    CMP     $F5
+    BNE     .loop_mid
+    CMP     $5A88
+    BEQ     .path_low
+    LDA     #$01
+    RTS
     ORG     $1E5A
 HANDLE_MOB_ENCOUNTER:
     SUBROUTINE
@@ -2995,7 +3284,7 @@ HANDLE_MOB_ENCOUNTER:
     ASL
     ORA     #$03
     TAX
-    JSR     FUN_78A8
+    JSR     STEP_PRNG
     TXA
     CMP     $5A18
     BPL     .no_flee
@@ -3052,7 +3341,15 @@ SET_TARGET_RESTRICTED:
     STA     ($F4),Y
     RTS
     ORG     $1F0C
-FUN_1F0C:
+    SUBROUTINE
+; Dispatches on $7A7F: if $60 then DELAY_WITH_ANIMATION else ANIM_TICK_AND_WAIT
+DISPATCH_ON_MODE:
+    LDA     $7A7F
+    CMP     #$60
+    BEQ     .mode_60
+    JMP     ANIM_TICK_AND_WAIT
+.mode_60:
+    JMP     DELAY_WITH_ANIMATION
     ORG     $743B
 FILL_MAP:
     SUBROUTINE
@@ -3276,17 +3573,17 @@ INPUT_LOOP:
     STA     $5AAB
 .loop:
     LDA     $5AAB
-    JSR     FUN_5F8C
-    JSR     FUN_5FA2
+    JSR     CALC_RECORD_PTR
+    JSR     SETUP_CURSOR_EXT
     JSR     FUN_A44C
     BEQ     .exit
-    JSR     FUN_5FDD
+    JSR     VALIDATE_INPUT
     CMP     $5AAB
     BEQ     .run_script
     CMP     #$00
     BEQ     .run_script
     STA     $5AAB
-    JSR     FUN_5FA5
+    JSR     SETUP_CURSOR
     JMP     .loop
 .run_script:
     LDX     #$12
@@ -3318,23 +3615,86 @@ DRAW_INPUT_OPTIONS:
     STA     $5AAA
 .loop:
     LDA     $5AAA
-    JSR     FUN_5F8C
+    JSR     CALC_RECORD_PTR
     LDY     #$00
     LDA     ($C2),Y
     BEQ     .skip
-    JSR     FUN_604C
+    JSR     COPY_RECORD_DATA
 .skip:
     DEC     $5AAA
     BNE     .loop
     RTS
     ORG     $5F8C
-FUN_5F8C:
+    SUBROUTINE
+; $C2/$C3 = $C0/$C1 + A*10 - 6
+CALC_RECORD_PTR:
+    ASL
+    STA     $BA
+    ASL
+    ASL
+    CLC
+    ADC     $BA
+    ADC     #$FA
+    CLC
+    ADC     $C0
+    STA     $C2
+    LDA     $C1
+    ADC     #$00
+    STA     $C3
+    RTS
     ORG     $5FA2
-FUN_5FA2:
+    SUBROUTINE
+; JSR SET_HTAB_VTAB then falls through to SETUP_CURSOR
+SETUP_CURSOR_EXT:
+    JSR     SET_HTAB_VTAB
     ORG     $5FA5
-FUN_5FA5:
+    SUBROUTINE
+; Sets up cursor: calls $5FBC, positions, loads ptr from ($C2)+6/7, prints
+SETUP_CURSOR:
+    JSR     FUN_5FBC
+    JSR     PRINT_CTRL_AB
+    LDY     #$06
+    LDA     ($C2),Y
+    STA     $BC
+    INY
+    LDA     ($C2),Y
+    STA     $BD
+    JSR     PRINT_FROM_PTR
+    JMP     PRINT_CTRL_N
+    ORG     $5FBC
+FUN_5FBC:
     ORG     $5FDD
-FUN_5FDD:
+    SUBROUTINE
+; Validates input: saves $C2/$C3, loops reading input until valid record found
+VALIDATE_INPUT:
+    STA     $5B24
+    LDA     $C2
+    PHA
+    LDA     $C3
+    PHA
+.retry:
+    JSR     FUN_600A
+    CMP     #$00
+    BEQ     .done
+    CMP     $5AAB
+    BEQ     .done
+    PHA
+    JSR     CALC_RECORD_PTR
+    LDY     #$00
+    LDA     ($C2),Y
+    BNE     .found
+    PLA
+    JMP     .retry
+.found:
+    PLA
+.done:
+    TAY
+    PLA
+    STA     $C3
+    PLA
+    STA     $C2
+    TYA
+    RTS
     ORG     $6014
 CALL_INPUT_INIT:
     SUBROUTINE
@@ -3374,7 +3734,32 @@ RENDER_INPUT_BUFFER:
     BNE     .loop
     RTS
     ORG     $604C
-FUN_604C:
+    SUBROUTINE
+; Copies data from pointer at ($C2)+6/7 into $5AAC buffer
+COPY_RECORD_DATA:
+    LDY     #$06
+    LDA     ($C2),Y
+    STA     $BC
+    INY
+    LDA     ($C2),Y
+    STA     $BD
+    LDY     #$01
+    LDA     ($C2),Y
+    STA     $BA
+    DEY
+    LDA     ($BC),Y
+    TAY
+    DEC     $BA
+    CLC
+    ADC     $BA
+    TAX
+.copy_loop:
+    LDA     ($BC),Y
+    STA     $5AAC,X
+    DEX
+    DEY
+    BNE     .copy_loop
+    RTS
     ORG     $60C7
 TEARDOWN_INPUT:
     SUBROUTINE
@@ -3616,7 +4001,7 @@ CLEAR_AND_DISPLAY:
     ; Clear $5A57 and JMP $764A (display message)
     LDA     #$00
     STA     $5A57
-    JMP     FUN_764A
+    JMP     DISPLAY_MESSAGE_LOOP
     ORG     $6742
 NPC_MOVE_AI:
     SUBROUTINE
@@ -3728,7 +4113,7 @@ EVALUATE_DIRECTION:
     CMP     $5A70
     BEQ     .skip_target
     LDY     #$09
-    JSR     FUN_689F
+    JSR     INC_MOB_COUNTERS
 .skip_target:
     LDY     #$03
     LDA     ($F8),Y
@@ -3741,7 +4126,7 @@ EVALUATE_DIRECTION:
     CMP     $5A68
     BCC     .no_distance
     LDY     #$02
-    JSR     FUN_689F
+    JSR     INC_MOB_COUNTERS
 .no_distance:
     LDY     #$03
     LDA     $5A69
@@ -3755,7 +4140,7 @@ EVALUATE_DIRECTION:
     RTS
 .wall:
     LDY     #$07
-    JMP     FUN_689F
+    JMP     INC_MOB_COUNTERS
 .has_entity:
     CMP     #$80
     BCC     .mob
@@ -3766,39 +4151,48 @@ EVALUATE_DIRECTION:
     CMP     #$80
     BCS     .ge80
     LDY     #$03
-    JMP     FUN_689F
+    JMP     INC_MOB_COUNTERS
 .ge80:
     CMP     #$C0
     BCS     .geC0
     LDY     #$06
-    JMP     FUN_689F
+    JMP     INC_MOB_COUNTERS
 .geC0:
     CMP     #$D2
     BCS     .geD2
     LDY     #$01
-    JMP     FUN_689F
+    JMP     INC_MOB_COUNTERS
 .geD2:
     CMP     #$D5
     BCS     .geD5
     LDY     #$02
-    JMP     FUN_689F
+    JMP     INC_MOB_COUNTERS
 .geD5:
     CMP     #$D8
     BCS     .geD8
     LDY     #$03
-    JMP     FUN_689F
+    JMP     INC_MOB_COUNTERS
 .geD8:
     INY
     LDA     ($BE),Y
     CMP     #$40
     BCS     .safe
     LDY     #$07
-    JMP     FUN_689F
+    JMP     INC_MOB_COUNTERS
 .safe:
     LDY     #$01
-; falls through to FUN_689F
+; falls through to INC_MOB_COUNTERS
     ORG     $689F
-FUN_689F:
+    SUBROUTINE
+; Increments mob counters; Y = count-1 on entry
+INC_MOB_COUNTERS:
+    LDX     $5A6F
+    DEY
+    BPL     .do_inc
+    RTS
+.do_inc:
+    INC     $5A6A,X
+    BPL     INC_MOB_COUNTERS
     ORG     $68AB
 AI_CHOOSE_TARGET:
     SUBROUTINE
@@ -4274,8 +4668,37 @@ CHECK_COMBAT_ELIGIBILITY:
     STA     $5B25
 .done:
     RTS
-    ORG     $76D8
-FUN_76D8:
+    ORG     $76D2
+    SUBROUTINE
+; Two entry points: $76D2 (col 0) and $76D8 (col 20)
+SETUP_TEXT_POS:
+    LDA     #$00
+    STA     $24
+    BEQ     .set_row
+SETUP_TEXT_POS_COL20:          ; $76D8 - original SETUP_TEXT_POS_COL20 entry
+    LDA     #$14
+    STA     $24
+.set_row:
+    LDA     #$14
+    STA     $25
+    JSR     PRINT_CTRL_AB
+    LDA     #$8C
+    JSR     ROM_COUT1
+    LDX     #$14
+.space_loop:
+    LDA     #$A0
+    JSR     ROM_COUT1
+    DEX
+    BNE     .space_loop
+    LDA     #$14
+    STA     $25
+    LDA     #$0A
+    SEC
+    SBC     $24
+    STA     $24
+    JSR     SET_TEXT_WINDOW
+    LDA     #$8B
+    JMP     ROM_COUT1
     ORG     $769B
 RESET_TEXT_WINDOW:
     SUBROUTINE
@@ -4684,7 +5107,7 @@ DISPLAY_MESSAGE:
     CPX     #$00
     BNE     .skip_entry             ; more entries to skip
 
-FUN_764A:
+DISPLAY_MESSAGE_LOOP:
 .print_loop:
     LDY     #$00
     LDA     (PRINT_STRING_ADDR),Y   ; get length of current string
