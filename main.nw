@@ -2934,6 +2934,8 @@ MAIN_ENTRY:
 INPUT_MODE          EQU     $5A00   ; 0 = keyboard, 1 = joystick
 TOTAL_MOB_COUNT     EQU     $5A01   ; total mobs across all groups (excl. group 0)
 CURRENT_PLAYER      EQU     $5A02   ; current player index (1-based)
+CURRENT_ROOM        EQU     $5A03   ; current room/location being processed
+DAMAGE_AMOUNT       EQU     $5A10   ; damage to apply / new HP after subtraction
 ACTIVE_CHAR         EQU     $5A29   ; character index being processed
 SOURCE_CHAR         EQU     $5A28   ; source character for reorder
 REORDER_LINK        EQU     $5A2A   ; temp: saved next-link during reorder
@@ -2942,7 +2944,7 @@ LOCATION_FLAG       EQU     $5A55   ; location-change flag
 LOCATION_FLAG2      EQU     $5A56   ; current map scene ID (from record field 5, bits 0-6)
 SCENE_NUMBER        EQU     $5A99   ; current scene number
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
-@ %def INPUT_MODE TOTAL_MOB_COUNT CURRENT_PLAYER ACTIVE_CHAR SOURCE_CHAR REORDER_LINK REORDER_SORT_KEY LOCATION_FLAG LOCATION_FLAG2 SCENE_NUMBER ATTRACT_FLAG
+@ %def INPUT_MODE TOTAL_MOB_COUNT CURRENT_PLAYER CURRENT_ROOM DAMAGE_AMOUNT ACTIVE_CHAR SOURCE_CHAR REORDER_LINK REORDER_SORT_KEY LOCATION_FLAG LOCATION_FLAG2 SCENE_NUMBER ATTRACT_FLAG
 
 \subsection{select\_input\_mode (\$084E)}
 
@@ -3188,11 +3190,11 @@ REORDER_CHAR:
     BNE     .advance1
     ; Found predecessor: $BC/$BD points to the node being removed
     LDY     #$02
-    LDA     REORDER_LINK            ; \  if removed node's link == $5A03,
-    CMP     $5A03                   ;  |   update $5A03 to new link
+    LDA     REORDER_LINK            ; \  if removed node's link == CURRENT_ROOM,
+    CMP     CURRENT_ROOM                   ;  |   update CURRENT_ROOM to new link
     BNE     .patch1                 ; /
     LDA     ($BC),Y                 ; \
-    STA     $5A03                   ; /  $5A03 = ($BC)[2] (successor's link)
+    STA     CURRENT_ROOM                   ; /  CURRENT_ROOM = ($BC)[2] (successor's link)
 .patch1:
     LDA     ($BC),Y                 ; \  predecessor.byte2 = removed.byte2
     STA     ($BE),Y                 ; /  (skip over removed node)
@@ -3361,7 +3363,7 @@ SCENE_SETUP:
     INY                             ;  |
     STA     ($F4),Y                 ; /
     JSR     CLAMP_CHAR_FIELD        ; ensure byte 6 >= byte 5 minimum
-    LDA     $5A02                   ; current player index
+    LDA     CURRENT_PLAYER                   ; current player index
     CMP     ACTIVE_CHAR             ; compare with scene index
     BNE     .done                   ; not current player → skip
     LDY     #$03
@@ -5376,7 +5378,7 @@ SCRIPT_ADVANCE:
     RTS                             ; pressed → exit
 
 .continue:
-    LSR     $5A8C                   ; shift timing flag
+    LSR     WAIT_LOOP_COUNT                   ; shift timing flag
     JMP     SCRIPT_ENGINE.fetch     ; loop back to interpreter
 @ %def SCRIPT_ADVANCE
 
@@ -6842,7 +6844,10 @@ DIR_SCORES      EQU     $5A6A   ; array of 5 direction scores (indexed 0-4)
 AI_DIRECTION    EQU     $5A6F   ; current direction being evaluated / random range
 AI_TEST_POS     EQU     $5A70   ; position being tested for direction evaluation
 AI_TARGET_POS   EQU     $5A71   ; AI target position (set by AI_CHOOSE_TARGET)
+AI_TARGET_COL   EQU     $5A72   ; AI target column / min distance temp
+STAT_LEVEL_BITS EQU     $5A7F   ; level bits during stat modification
 MOB_DEFENSE     EQU     $5A79   ; mob defense value (low 4 bits of mob byte 8)
+SHOP_ITEM_OFFSET EQU    $5A85   ; offset into shop item table (5 per item)
 INPUT_OPTION_COUNT EQU  $5AAA   ; number of input options to draw
 CURRENT_SELECTION EQU   $5AAB   ; current menu selection index
 INPUT_BUFFER    EQU     $5AAC   ; 120-byte input text display buffer
@@ -6850,7 +6855,7 @@ INPUT_JMP_VEC   EQU     $5F5E   ; indirect jump vector for input callbacks
 UNDER_LEVEL     EQU     $5B25   ; 1 if char level < steps taken
 SAFE_TO_REST    EQU     $5B26   ; 1 if no adjacent threats or encounters
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
-@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR DIR_SCORES AI_DIRECTION AI_TEST_POS AI_TARGET_POS EVENT_SLOT_BYTE EVENT_SUB_VALUE MOB_DEFENSE INPUT_OPTION_COUNT COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT CURRENT_SELECTION INPUT_BUFFER INPUT_JMP_VEC UNDER_LEVEL SAFE_TO_REST TURN_ACTIVE
+@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR DIR_SCORES AI_DIRECTION AI_TEST_POS AI_TARGET_POS AI_TARGET_COL STAT_LEVEL_BITS EVENT_SLOT_BYTE EVENT_SUB_VALUE MOB_DEFENSE SHOP_ITEM_OFFSET INPUT_OPTION_COUNT COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT CURRENT_SELECTION INPUT_BUFFER INPUT_JMP_VEC UNDER_LEVEL SAFE_TO_REST TURN_ACTIVE
 
 <<game turn loop>>=
     ORG     $19AD
@@ -7144,7 +7149,7 @@ HANDLE_ENCOUNTER:
     AND     #$1C
     ORA     #$01
 .have_id:
-    STA     $5A29               ; store encounter ID
+    STA     ACTIVE_CHAR               ; store encounter ID
     ROR
     BCC     .no_clear
     LDY     #$04
@@ -7155,21 +7160,21 @@ HANDLE_ENCOUNTER:
     CMP     #$3F
     BPL     .no_clear
     LDA     #$00
-    STA     $5A29               ; clear ID if char in range $2A-$3E
+    STA     ACTIVE_CHAR               ; clear ID if char in range $2A-$3E
 .no_clear:
     LDY     #$02
     LDA     ($BE),Y             ; event byte 2 = destination pos
     STA     $5A5F
     JSR     COMMIT_MOVE            ; commit move
     LDA     $7ABE
-    STA     $5A8C
+    STA     WAIT_LOOP_COUNT
     JSR     REORDER_CURRENT_CHAR
     JSR     TIMED_WAIT
     LDY     #$03
     LDA     $5A5F
     STA     ($F8),Y             ; update char packed position
-    LDA     $5A29
-    CMP     $5A02               ; compare encounter ID with current scene
+    LDA     ACTIVE_CHAR
+    CMP     CURRENT_PLAYER               ; compare encounter ID with current scene
     BEQ     .same_scene
     JMP     RESET_TURN_POS            ; different → reset position
 .same_scene:
@@ -7191,11 +7196,11 @@ HANDLE_ENCOUNTER:
     STA     TURN_START_ROW
     JSR     RESET_TURN_POS            ; reset to turn start
     LDA     TURN_START_COL
-    STA     $5AA2
+    STA     BLINK_COL
     LDA     TURN_START_ROW
-    STA     $5AA3
+    STA     BLINK_ROW
     LDA     FONT_CHARNUM
-    STA     $5AA4
+    STA     BLINK_CHAR
     LDX     #$0C
     JSR     SCRIPT_ENGINE       ; run "avoided" script
     JSR     SET_CURSOR_ROW21
@@ -7373,7 +7378,7 @@ PICKUP_TREASURE:
 .after_trap:
     LDY     #$02
     LDA     ($F8),Y             ; char field 2 = room
-    CMP     $5A03               ; current room?
+    CMP     CURRENT_ROOM               ; current room?
     BEQ     .same_room
     DEY
     LDA     ($F4),Y             ; event byte 1
@@ -7484,7 +7489,7 @@ AI_CHOOSE_TARGET:
     LDA     $F9
     STA     $BD
     LDA     #$3C                ; initial min distance
-    STA     $5A72
+    STA     AI_TARGET_COL
     JSR     FIRST_GROUP_MEMBER
 .loop3:
     JSR     CHECK_HOSTILE
@@ -7493,9 +7498,9 @@ AI_CHOOSE_TARGET:
     LDY     #$03
     LDA     ($F4),Y             ; mob packed position
     JSR     MANHATTAN_DISTANCE            ; compute distance
-    CMP     $5A72
+    CMP     AI_TARGET_COL
     BCS     .skip3              ; not closer
-    STA     $5A72               ; new minimum
+    STA     AI_TARGET_COL               ; new minimum
     LDY     #$03
     LDA     ($F4),Y
     STA     AI_TARGET_POS               ; target = this mob's position
@@ -7503,7 +7508,7 @@ AI_CHOOSE_TARGET:
     JSR     NEXT_GROUP_MEMBER            ; next group member
     LDA     $F5
     BNE     .loop3
-    LDA     $5A72
+    LDA     AI_TARGET_COL
     CMP     #$3C
     BNE     .found3
     LDA     $5A5E               ; no hostile found → use default
@@ -7558,7 +7563,7 @@ AI_CHOOSE_TARGET:
 .done:
     LDA     AI_TARGET_POS
     JSR     POS_TO_COLROW
-    STA     $5A72               ; target column
+    STA     AI_TARGET_COL               ; target column
     STY     $5A73               ; target row
     RTS
 @ %def AI_CHOOSE_TARGET
@@ -7694,13 +7699,13 @@ PRINT_MEMBER_NAME:
     ORG     $1414
 REORDER_CURRENT_CHAR:
     SUBROUTINE
-    ; Copy $F8/$F9 → $BC/$BD, store $5A02 → $5A28, JMP $0F84
+    ; Copy $F8/$F9 → $BC/$BD, store CURRENT_PLAYER → SOURCE_CHAR, JMP $0F84
     LDA     $F8
     STA     $BC
     LDA     $F9
     STA     $BD
-    LDA     $5A02
-    STA     $5A28
+    LDA     CURRENT_PLAYER
+    STA     SOURCE_CHAR
     JMP     REORDER_CHAR
 @ %def REORDER_CURRENT_CHAR
 
@@ -7726,18 +7731,18 @@ COMMIT_MOVE:
     ; update char field 3, set font char, draw sprite
     LDA     CURRENT_COL
     STA     FONT_COL
-    STA     $5AA2
+    STA     BLINK_COL
     LDY     CURRENT_ROW
     STY     FONT_ROW
-    STY     $5AA3
+    STY     BLINK_ROW
     JSR     COLROW_TO_POS
     LDY     #$03
     STA     ($F8),Y             ; update char packed position
     LDA     $5A04
-    STA     $5A0E               ; FONT_CHARNUM
-    STA     $5AA4
+    STA     FONT_CHARNUM               ; FONT_CHARNUM
+    STA     BLINK_CHAR
     LDA     #$01
-    STA     $5A0F
+    STA     FONT_CHARSET
     JSR     DRAW_SPRITE            ; draw sprite
     LDX     #$16
     STX     $5AA9
@@ -7861,9 +7866,9 @@ APPLY_DAMAGE:
     ; Subtracts from field 6 (HP). Displays damage message,
     ; runs script. If HP drops to 0: death handling.
     AND     #$1F
-    STA     $5A10               ; damage amount
+    STA     DAMAGE_AMOUNT               ; damage amount
     JSR     SET_CURSOR_ROW21
-    LDA     $5A10
+    LDA     DAMAGE_AMOUNT
     LDX     #$03
 .ror_loop:
     INX
@@ -7872,7 +7877,7 @@ APPLY_DAMAGE:
     BNE     .ror_loop           ; count leading zeros → message index
     TXA
     JSR     DISPLAY_MESSAGE     ; show damage message
-    LDY     $5A10
+    LDY     DAMAGE_AMOUNT
     LDX     #$04
     JSR     SCRIPT_ENGINE       ; run damage script
     LDY     #$06
@@ -7880,16 +7885,16 @@ APPLY_DAMAGE:
     TAX
     AND     #$3F                ; HP only
     SEC
-    SBC     $5A10               ; HP - damage
+    SBC     DAMAGE_AMOUNT               ; HP - damage
     BCC     .dead               ; underflow → dead
     BEQ     .dead               ; zero → dead
-    STA     $5A10               ; new HP
+    STA     DAMAGE_AMOUNT               ; new HP
     TXA
     AND     #$C0                ; preserve high bits
-    ORA     $5A10
+    ORA     DAMAGE_AMOUNT
     STA     ($F6),Y             ; store updated field 6
     JSR     SET_CURSOR_ROW21
-    LDA     $5A10
+    LDA     DAMAGE_AMOUNT
     CMP     #$03
     BPL     .check8
     LDY     #$0F
@@ -7945,9 +7950,9 @@ APPLY_DAMAGE:
     TAX
     JSR     SCRIPT_ENGINE       ; death script
     LDA     #$00
-    STA     $5A29
-    LDA     $5A02
-    STA     $5A28
+    STA     ACTIVE_CHAR
+    LDA     CURRENT_PLAYER
+    STA     SOURCE_CHAR
     LDA     $F6
     STA     $BC
     LDA     $F7
@@ -8089,14 +8094,14 @@ SETUP_CHAR_SPRITE:
     JSR     POS_TO_COLROW
     STA     FONT_COL
     STY     FONT_ROW
-    STA     $5AA2
-    STY     $5AA3
+    STA     BLINK_COL
+    STY     BLINK_ROW
     TAX
     LDA     $5A04
-    STA     $5A0E
-    STA     $5AA4
+    STA     FONT_CHARNUM
+    STA     BLINK_CHAR
     LDA     #$01
-    STA     $5A0F
+    STA     FONT_CHARSET
     JMP     DRAW_SPRITE
 @ %def SETUP_CHAR_SPRITE
 
@@ -8199,7 +8204,7 @@ INCREMENT_HP:
     ORG     $14A3
 TURN_DISPATCH:
     SUBROUTINE
-    LDA     $5A05
+    LDA     CHAR_AI_MODE
     BEQ     .no_combat
     JSR     SELECT_COMBAT_TARGET
     CMP     #$02
@@ -9087,7 +9092,7 @@ NPC_MOVE_AI:
     ; NPC movement AI: evaluate 4 directions + stay, pick best
     ; direction based on distance to target and randomized scoring.
     JSR     ANIM_TICK_AND_WAIT
-    LDA     $5A05
+    LDA     CHAR_AI_MODE
     CMP     #$04
     BEQ     .do_ai
     LDA     AI_TARGET_POS
@@ -9142,7 +9147,7 @@ NPC_MOVE_AI:
     JSR     EVALUATE_DIRECTION
     LDA     #$06
     STA     AI_DIRECTION
-    LDA     $5A05
+    LDA     CHAR_AI_MODE
     CMP     #$04
     BNE     .not_phase4
     LDA     #$0F
@@ -9272,7 +9277,7 @@ DISPLAY_SHOP:
     SUBROUTINE
     ; Shop/store display: iterate through item bitmask,
     ; show prices and names for available items.
-    LDA     $5A05
+    LDA     CHAR_AI_MODE
     BEQ     .do_shop
     RTS
 .do_shop:
@@ -9304,7 +9309,7 @@ DISPLAY_SHOP:
     LDA     #$80
     STA     $5A80
     LDA     #$00
-    STA     $5A85
+    STA     SHOP_ITEM_OFFSET
 .item_loop:
     LDA     $5A83
     AND     $5A80
@@ -9314,7 +9319,7 @@ DISPLAY_SHOP:
     LDA     #$00
     STA     $5A81
     STA     $5A82
-    LDY     $5A85
+    LDY     SHOP_ITEM_OFFSET
     INY
     INY
     INY
@@ -9351,7 +9356,7 @@ DISPLAY_SHOP:
     LDA     #$7D
     STA     $BB
     JSR     NUM_TO_DECIMAL
-    LDY     $5A85
+    LDY     SHOP_ITEM_OFFSET
     INY
     INY
     LDA     ($E6),Y
@@ -9379,9 +9384,9 @@ DISPLAY_SHOP:
     JMP     .item_start
 .more_items:
     STA     $5A80
-    LDA     $5A85
+    LDA     SHOP_ITEM_OFFSET
     ADC     #$05
-    STA     $5A85
+    STA     SHOP_ITEM_OFFSET
     JMP     .item_loop
 @ %def DISPLAY_SHOP
 
@@ -9421,14 +9426,14 @@ DRAW_SPRITE:
     ; and direction, then call PRINT_STRING.
     JSR     FONT_POS_TO_TEXT_POS
     LDX     #$B1
-    LDA     $5A0F
+    LDA     FONT_CHARSET
     CMP     #$02
     BNE     .not2
     INX
     INX
 .not2:
     STX     $80A6
-    LDA     $5A0E
+    LDA     FONT_CHARNUM
 .check_range:
     CMP     #$18
     BCC     .in_range
@@ -9559,7 +9564,7 @@ MODIFY_CHAR_STATS:
     BPL     .decy
 .done_cnt:
     INY
-    STY     $5A7F
+    STY     STAT_LEVEL_BITS
     STY     $BA
     STY     $BB
 .outer_loop:
@@ -9584,13 +9589,13 @@ MODIFY_CHAR_STATS:
 .next_iter:
     DEX
     CLC
-    LDA     $5A7F
+    LDA     STAT_LEVEL_BITS
     ADC     #$10
-    STA     $5A7F
+    STA     STAT_LEVEL_BITS
     BNE     .outer_loop
 .store_final:
     TXA
-    ORA     $5A7F
+    ORA     STAT_LEVEL_BITS
     LDY     #$0C
     STA     ($F6),Y
     RTS
@@ -10166,7 +10171,7 @@ CALC_COMBAT_STRENGTH:
     SEC
     ADC     COMBAT_STRENGTH
     STA     COMBAT_STRENGTH
-    LDA     $5A05
+    LDA     CHAR_AI_MODE
     BEQ     .check_5a74
 .exit_pla:                     ; $1712 - reused by backward BNE from $1717
     PLA
@@ -10229,9 +10234,9 @@ PROCESS_ENTITY_SCRIPT:
 <<select combat target>>=
     ORG     $18E4
     SUBROUTINE
-; Selects combat target based on $5A05 (3 paths: <3, 3-4, >=5)
+; Selects combat target based on CHAR_AI_MODE (3 paths: <3, 3-4, >=5)
 SELECT_COMBAT_TARGET:
-    LDA     $5A05
+    LDA     CHAR_AI_MODE
     CMP     #$03
     BMI     .path_low
     CMP     #$05
