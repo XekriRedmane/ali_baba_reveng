@@ -3287,11 +3287,26 @@ MAIN_ENTRY:
     JMP     .restart                ; restart the game loop
 @ %def MAIN_ENTRY
 
-<<defines>>=
-FUN_6DFA                EQU     $6DFA   ; scene event processing
-FUN_0884                EQU     $0884   ; per-character mob processing
-FUN_65A9                EQU     $65A9   ; between-round random events
-@ %def FUN_6DFA FUN_0884 FUN_65A9
+<<fun 0884>>=
+; STUB — not yet disassembled
+    ORG     $0884
+FUN_0884:
+    SUBROUTINE
+@ %def FUN_0884
+
+<<fun 65a9>>=
+; STUB — not yet disassembled
+    ORG     $65A9
+FUN_65A9:
+    SUBROUTINE
+@ %def FUN_65A9
+
+<<fun 6dfa>>=
+; STUB — not yet disassembled
+    ORG     $6DFA
+FUN_6DFA:
+    SUBROUTINE
+@ %def FUN_6DFA
 
 <<defines>>=
 INPUT_MODE          EQU     $5A00   ; 0 = keyboard, 1 = joystick
@@ -10757,6 +10772,7 @@ The following root chunks produce the assembly files when tangled.
 <<pull two ret addrs>>
 <<main entry>>
 <<select input mode>>
+<<fun 0884>>
 <<setup scene display>>
 <<load char name ptr>>
 <<setup char sprite>>
@@ -10859,6 +10875,7 @@ The following root chunks produce the assembly files when tangled.
 <<inc field5 counter>>
 <<clear status slots>>
 <<clear and display>>
+<<fun 65a9>>
 <<npc move ai>>
 <<evaluate direction>>
 <<inc mob counters>>
@@ -10872,6 +10889,7 @@ The following root chunks produce the assembly files when tangled.
 <<restore zp pointers>>
 <<relocate hires staging>>
 <<load scene data>>
+<<fun 6dfa>>
 <<modify char stats>>
 <<modify current stats>>
 <<display shop>>
