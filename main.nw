@@ -2490,7 +2490,7 @@ DRAW_MAP_ENTITIES:
 .draw_it:                           ; $C0-$FF = draw
     JSR     SET_CURSOR_ROW21
     JSR     CLASSIFY_ENTITY_TYPE
-    JSR     $7705
+    JSR     PRINT_BOTTOM_CENTERED
     JSR     DRAW_MAP_ICON_B
 .next_col:
     INC     FONT_COL
@@ -2563,11 +2563,11 @@ DRAW_MAP_ICON_B:
     STA     BLINK_ROW
     LDA     FONT_CHARNUM
     STA     BLINK_CHAR
-    JSR     $74CB
+    JSR     DRAW_BLINK_ALT
     LDA     BLINK_DELAY
     STA     WAIT_LOOP_COUNT
     JSR     TIMED_WAIT
-    JSR     $74DD
+    JSR     DRAW_BLINK_NORMAL
     JSR     ANIM_TICK_AND_WAIT
     LDA     #$14
     STA     BLINK_COL               ; disable blink cursor
@@ -3346,7 +3346,7 @@ INIT_WORLD:
 
     LDX     #>WORLD_INIT_DATA       ; \ X/Y = pointer to init data
     LDY     #<WORLD_INIT_DATA       ; /
-    JMP     $5F19                   ; initialize world from data table
+    JMP     INPUT_LOOP              ; initialize world from data table
 
 <<defines>>=
 WORLD_INIT_DATA         EQU     $62B9   ; world initialization data table
@@ -4424,7 +4424,7 @@ PRINT_MOB_NAME:
     INY                             ;  |
     LDA     ($F8),Y                 ;  |
     STA     $BD                     ; /
-    JMP     $7705                   ; center and print on row 23
+    JMP     PRINT_BOTTOM_CENTERED   ; center and print on row 23
 @ %def PRINT_MOB_NAME
 
 \subsection{colrow\_to\_pos (\$0D98)}
