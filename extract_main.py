@@ -8,7 +8,8 @@ Reproduces what the EALDR VM does:
 
 Then reproduces the game_init relocation at $6DA5:
   5. Copy $2000-$32FF -> $9600-$A8FF  (HRCG code + standard font)
-  6. Clear $2000-$3FFF               (hi-res page now available)
+  6. Copy $3300-$3FFF -> $B300-$BFFF  (disk I/O routines)
+  7. Clear $2000-$3FFF               (hi-res page now available)
 """
 
 DSK_FILE = "Ali Baba and the Forty Thieves (4am and san inc crack).dsk"
@@ -16,8 +17,8 @@ EALDR_FILE = "ealdr.bin"
 OUTPUT_FILE = "main.bin"
 
 BASE_ADDR = 0x0500
-END_ADDR = 0xA900
-SIZE = END_ADDR - BASE_ADDR  # $A400 = 41984
+END_ADDR = 0xC000
+SIZE = END_ADDR - BASE_ADDR  # $BB00 = 47872
 
 # DOS 3.3 physical-to-logical skew (physical sector -> file sector)
 DOS_SKEW = [0, 7, 14, 6, 13, 5, 12, 4, 11, 3, 10, 2, 9, 1, 8, 15]
@@ -93,12 +94,18 @@ def main():
     mem_dest = 0x0500 - BASE_ADDR
     mem[mem_dest:mem_dest + 0x300] = ealdr[ealdr_src:ealdr_src + 0x300]
 
-    # game_init relocation at $6DA5: copy $2000-$32FF -> $9600-$A8FF
+    # game_init relocation at $6DA5:
+    # Copy $2000-$32FF -> $9600-$A8FF (19 pages, HRCG code + standard font)
     src = 0x2000 - BASE_ADDR
     dst = 0x9600 - BASE_ADDR
     mem[dst:dst + 0x1300] = mem[src:src + 0x1300]
+    # Copy $3300-$3FFF -> $B300-$BFFF (13 pages, disk I/O routines)
+    src2 = 0x3300 - BASE_ADDR
+    dst2 = 0xB300 - BASE_ADDR
+    mem[dst2:dst2 + 0x0D00] = mem[src2:src2 + 0x0D00]
     # Clear the source area ($2000-$3FFF)
-    mem[src:src + 0x2000] = bytearray(0x2000)
+    clear = 0x2000 - BASE_ADDR
+    mem[clear:clear + 0x2000] = bytearray(0x2000)
 
     with open(OUTPUT_FILE, "wb") as f:
         f.write(mem)
@@ -110,8 +117,9 @@ def main():
     print(f"  Size: {len(mem)} (expected {SIZE})")
     print(f"  $0500: {mem[0]:02X} {mem[1]:02X} {mem[2]:02X} (expected 4C 69 05)")
     print(f"  $0800: {mem[0x300]:02X} {mem[0x301]:02X} {mem[0x302]:02X}")
-    print(f"  $9600: {mem[0x9600-BASE_ADDR]:02X} (HRCG code continuation)")
+    print(f"  $9600: {mem[0x9600-BASE_ADDR]:02X} (HRCG code)")
     print(f"  $97A5: {mem[0x97A5-BASE_ADDR]:02X} {mem[0x97A6-BASE_ADDR]:02X} (std font, space=00 00)")
+    print(f"  $B300: {mem[0xB300-BASE_ADDR]:02X} {mem[0xB301-BASE_ADDR]:02X} {mem[0xB302-BASE_ADDR]:02X} (disk I/O routines)")
 
 
 if __name__ == "__main__":

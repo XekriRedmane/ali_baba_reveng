@@ -95,6 +95,7 @@ The loader adds this offset to a base page ($3E) to determine the destination ad
 | $4000-$67FF | Tracks $07-$09 (DXR decrypted) | Game data (encrypted) |
 | $6800-$95FF | Tracks $09-$0C | Game data (HRCG code at $92A8+) |
 | $9600-$A8FF | Relocated from $2000-$32FF | HRCG code ($9600-$97A4), standard font ($97A5-$9AA4) |
+| $B300-$BFFF | Relocated from $3300-$3FFF | Disk I/O routines |
 
 ## Font Data
 
@@ -107,4 +108,5 @@ The loader adds this offset to a base page ($3E) to determine the destination ad
 - Chunk names may contain letters, digits, spaces, hyphens, dots, and underscores
 - Output files: `main.asm`, `ealdr.asm`, `fontdata.asm`, `stdfontdata.asm`, `extract_main.py`
 - `extract_main.py` reproduces the EALDR loading + game_init relocation to produce `main.bin`
-- `main.bin`: 41984 bytes ($0500-$A8FF), load in Ghidra at $0500, entry $0800
+- `main.bin`: 47872 bytes ($0500-$BFFF), load in Ghidra at $0500, entry $0800
+- `recreate_main.py` reverses/re-applies game_init relocation on assembled output, compares with `main.bin`
