@@ -6838,10 +6838,14 @@ TARGET_PTR_HI   EQU     $5A87   ; selected combat target pointer (high byte)
 BEST_THREAT     EQU     $5A88   ; best threat level during target selection
 EVENT_SLOT_BYTE EQU     $5A59   ; saved byte 2 of event slot (type+value)
 EVENT_SUB_VALUE EQU     $5A5A   ; lower 5 bits of event slot byte 2
+DIR_SCORES      EQU     $5A6A   ; array of 5 direction scores (indexed 0-4)
+AI_DIRECTION    EQU     $5A6F   ; current direction being evaluated / random range
+AI_TEST_POS     EQU     $5A70   ; position being tested for direction evaluation
+AI_TARGET_POS   EQU     $5A71   ; AI target position (set by AI_CHOOSE_TARGET)
 MOB_DEFENSE     EQU     $5A79   ; mob defense value (low 4 bits of mob byte 8)
 CURRENT_SELECTION EQU   $5AAB   ; current menu selection index
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
-@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR EVENT_SLOT_BYTE EVENT_SUB_VALUE MOB_DEFENSE COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT CURRENT_SELECTION TURN_ACTIVE
+@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR DIR_SCORES AI_DIRECTION AI_TEST_POS AI_TARGET_POS EVENT_SLOT_BYTE EVENT_SUB_VALUE MOB_DEFENSE COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT CURRENT_SELECTION TURN_ACTIVE
 
 <<game turn loop>>=
     ORG     $19AD
@@ -7459,11 +7463,11 @@ AI_CHOOSE_TARGET:
     CMP     $BA
     BPL     .use_encounter
     LDA     #$00
-    STA     $5A71               ; no target
+    STA     AI_TARGET_POS               ; no target
     JMP     .done
 .use_encounter:
     JSR     FIND_NEAREST_EVENT            ; find encounter position
-    STA     $5A71
+    STA     AI_TARGET_POS
     JMP     .done
 
     ; --- mode 3: find nearest hostile ---
@@ -7489,7 +7493,7 @@ AI_CHOOSE_TARGET:
     STA     $5A72               ; new minimum
     LDY     #$03
     LDA     ($F4),Y
-    STA     $5A71               ; target = this mob's position
+    STA     AI_TARGET_POS               ; target = this mob's position
 .skip3:
     JSR     NEXT_GROUP_MEMBER            ; next group member
     LDA     $F5
@@ -7498,7 +7502,7 @@ AI_CHOOSE_TARGET:
     CMP     #$3C
     BNE     .found3
     LDA     $5A5E               ; no hostile found → use default
-    STA     $5A71
+    STA     AI_TARGET_POS
 .found3:
     JMP     .done
 
@@ -7506,7 +7510,7 @@ AI_CHOOSE_TARGET:
 .mode_ge4:
     BNE     .mode_gt4
     LDA     #$00
-    STA     $5A71
+    STA     AI_TARGET_POS
     JMP     .done
 
     ; --- mode 5+: find strongest hostile ---
@@ -7538,16 +7542,16 @@ AI_CHOOSE_TARGET:
     LDA     $BF
     BEQ     .no_target5
     LDA     $BE
-    STA     $5A71               ; strongest mob's position
+    STA     AI_TARGET_POS               ; strongest mob's position
     JMP     .done
 .no_target5:
     LDA     $5A5E               ; no hostile → use default
-    STA     $5A71
+    STA     AI_TARGET_POS
     JMP     .done
 
     ; --- convert target position to col/row ---
 .done:
-    LDA     $5A71
+    LDA     AI_TARGET_POS
     JSR     POS_TO_COLROW
     STA     $5A72               ; target column
     STY     $5A73               ; target row
@@ -9081,7 +9085,7 @@ NPC_MOVE_AI:
     LDA     $5A05
     CMP     #$04
     BEQ     .do_ai
-    LDA     $5A71
+    LDA     AI_TARGET_POS
     CMP     #$00
     BNE     .do_ai
     RTS
@@ -9092,72 +9096,72 @@ NPC_MOVE_AI:
     STA     $5A6D
     STA     $5A6E
     LDA     #$0A
-    STA     $5A6A
-    LDA     $5A71
+    STA     DIR_SCORES
+    LDA     AI_TARGET_POS
     JSR     MANHATTAN_DISTANCE
     STA     $5A68
     CMP     #$00
     BEQ     .no_target
     LDA     #$13
-    STA     $5A6A
+    STA     DIR_SCORES
 .no_target:
     LDX     $5A5D
     BEQ     .no_prev
-    INC     $5A6A,X
-    INC     $5A6A,X
-    INC     $5A6A,X
+    INC     DIR_SCORES,X
+    INC     DIR_SCORES,X
+    INC     DIR_SCORES,X
 .no_prev:
     LDA     #$01
-    STA     $5A6F
+    STA     AI_DIRECTION
     LDY     #$03
     LDA     ($F8),Y
     SEC
     SBC     #$14
-    STA     $5A70
+    STA     AI_TEST_POS
     JSR     EVALUATE_DIRECTION
-    INC     $5A6F
-    LDA     $5A70
+    INC     AI_DIRECTION
+    LDA     AI_TEST_POS
     CLC
     ADC     #$28
-    STA     $5A70
+    STA     AI_TEST_POS
     JSR     EVALUATE_DIRECTION
-    INC     $5A6F
-    LDA     $5A70
+    INC     AI_DIRECTION
+    LDA     AI_TEST_POS
     SEC
     SBC     #$15
-    STA     $5A70
+    STA     AI_TEST_POS
     JSR     EVALUATE_DIRECTION
-    INC     $5A6F
-    INC     $5A70
-    INC     $5A70
+    INC     AI_DIRECTION
+    INC     AI_TEST_POS
+    INC     AI_TEST_POS
     JSR     EVALUATE_DIRECTION
     LDA     #$06
-    STA     $5A6F
+    STA     AI_DIRECTION
     LDA     $5A05
     CMP     #$04
     BNE     .not_phase4
     LDA     #$0F
-    STA     $5A6F
+    STA     AI_DIRECTION
 .not_phase4:
     LDX     #$04
     CLC
 .score_loop:
-    LDA     $5A6A,X
+    LDA     DIR_SCORES,X
     ROL
     ROL
-    STA     $5A6A,X
-    LDA     $5A6F
+    STA     DIR_SCORES,X
+    LDA     AI_DIRECTION
     JSR     RANDOM_IN_RANGE
     CLC
-    ADC     $5A6A,X
-    STA     $5A6A,X
+    ADC     DIR_SCORES,X
+    STA     DIR_SCORES,X
     DEX
     BPL     .score_loop
     LDA     #$7F
     STA     $BA
     LDX     #$04
 .find_min:
-    LDA     $5A6A,X
+    LDA     DIR_SCORES,X
     CMP     $BA
     BCS     .not_lower
     STA     $BA
@@ -9182,8 +9186,8 @@ NPC_MOVE_AI:
     ORG     $6815
 EVALUATE_DIRECTION:
     SUBROUTINE
-    LDA     $5A71
-    CMP     $5A70
+    LDA     AI_TARGET_POS
+    CMP     AI_TEST_POS
     BEQ     .skip_target
     LDY     #$09
     JSR     INC_MOB_COUNTERS
@@ -9191,9 +9195,9 @@ EVALUATE_DIRECTION:
     LDY     #$03
     LDA     ($F8),Y
     STA     $5A69
-    LDA     $5A70
+    LDA     AI_TEST_POS
     STA     ($F8),Y
-    LDA     $5A71
+    LDA     AI_TARGET_POS
     BEQ     .no_distance
     JSR     MANHATTAN_DISTANCE
     CMP     $5A68
@@ -9204,7 +9208,7 @@ EVALUATE_DIRECTION:
     LDY     #$03
     LDA     $5A69
     STA     ($F8),Y
-    LDA     $5A70
+    LDA     AI_TEST_POS
     JSR     FIND_ENTITY_AT_POS
     LDA     $BF
     BNE     .has_entity
@@ -10425,12 +10429,12 @@ COPY_RECORD_DATA:
     SUBROUTINE
 ; Increments mob counters; Y = count-1 on entry
 INC_MOB_COUNTERS:
-    LDX     $5A6F
+    LDX     AI_DIRECTION
     DEY
     BPL     .do_inc
     RTS
 .do_inc:
-    INC     $5A6A,X
+    INC     DIR_SCORES,X
     BPL     INC_MOB_COUNTERS
 @ %def INC_MOB_COUNTERS
 
