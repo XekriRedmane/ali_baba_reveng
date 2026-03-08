@@ -179,7 +179,7 @@ DATA_PTR                EQU     $BE     ; data pointer / return value (2 bytes)
 RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
 HRCG_INIT               EQU     $92A8   ; HRCG entry/init routine
 GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
-FUN_A44C                EQU     $A44C   ; resident: read keyboard input
+READ_KEYBOARD                EQU     $A44C   ; resident: read keyboard input
 FONT_COL        EQU     $5A0C
 FONT_ROW        EQU     $5A0D
 FONT_CHARNUM        EQU     $5A0E
@@ -2239,7 +2239,7 @@ RESOLVE_ATTACK:
     BEQ     .is_player
     JSR     PRINT_MEMBER_NAME
 .is_player:
-    JSR     FUN_0D10
+    JSR     DELAY_WITH_ANIMATION
     RTS
 .attack:
     LDA     $5A74
@@ -2932,7 +2932,7 @@ HANDLE_EVENT_SLOT:
     JSR     DISPLAY_MESSAGE
     JSR     SET_RESTRICTED
     JSR     PRINT_MOB_NAME
-    JSR     FUN_0D10
+    JSR     DELAY_WITH_ANIMATION
     JSR     STEP_PRNG
     LDA     $5A18
     ROL
@@ -2974,7 +2974,7 @@ HANDLE_EVENT_SLOT:
     LDA     CURRENT_ROW
     STA     TURN_START_ROW
     JSR     RESET_TURN_POS
-    JSR     FUN_0D30
+    JSR     ANIM_TICK_AND_WAIT
     JMP     FUN_1DDC
     ORG     $1DDC
 FUN_1DDC:
@@ -3217,7 +3217,7 @@ SELECT_COMBAT_TARGET:
     LDA     #$02
     CMP     $5A1F
     BEQ     .ret_2
-    JSR     FUN_645F
+    JSR     CHECK_THREATS_HERE
     CMP     #$01
     BNE     .ret_2
     LDA     #$04
@@ -3262,7 +3262,7 @@ HANDLE_MOB_ENCOUNTER:
     LDA     CURRENT_COL
     LDY     CURRENT_ROW
     JSR     COLROW_TO_POS
-    JSR     FUN_0F49
+    JSR     SUM_HOSTILE_AT_POS
     LDA     $5A26
     BEQ     .no_flee
     LDY     #$05
@@ -3313,7 +3313,7 @@ HANDLE_MOB_ENCOUNTER:
 .one_threat:
     JMP     FUN_1A31
 .hostile:
-    JSR     FUN_12FA
+    JSR     FIRST_GROUP_MEMBER
 .walk_group:
     LDA     $F5
     BEQ     .group_done
@@ -3575,7 +3575,7 @@ INPUT_LOOP:
     LDA     $5AAB
     JSR     CALC_RECORD_PTR
     JSR     SETUP_CURSOR_EXT
-    JSR     FUN_A44C
+    JSR     READ_KEYBOARD
     BEQ     .exit
     JSR     VALIDATE_INPUT
     CMP     $5AAB
@@ -4007,7 +4007,7 @@ NPC_MOVE_AI:
     SUBROUTINE
     ; NPC movement AI: evaluate 4 directions + stay, pick best
     ; direction based on distance to target and randomized scoring.
-    JSR     FUN_0D30
+    JSR     ANIM_TICK_AND_WAIT
     LDA     $5A05
     CMP     #$04
     BEQ     .do_ai
@@ -4530,7 +4530,7 @@ DISPLAY_SHOP:
     STA     $BA
     LDA     #$7D
     STA     $BB
-    JSR     FUN_0DA1
+    JSR     NUM_TO_DECIMAL
     LDY     $5A85
     INY
     INY
@@ -4590,7 +4590,7 @@ DRAW_SPRITE:
     SUBROUTINE
     ; Draw sprite: set up HRCG parameters from font char number
     ; and direction, then call PRINT_STRING.
-    JSR     FUN_7723
+    JSR     FONT_POS_TO_TEXT_POS
     LDX     #$B1
     LDA     $5A0F
     CMP     #$02
