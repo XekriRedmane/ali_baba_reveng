@@ -141,32 +141,32 @@
         ROR    {1}+1
         ROR    {1}
     ENDM
-    MACRO BEQ.A
+    MACRO BAEQ
         CMP     {1}
         BEQ     {2}
     ENDM
 
-    MACRO BNE.A
+    MACRO BANE
         CMP     {1}
         BNE     {2}
     ENDM
 
-    MACRO BEQ.X
+    MACRO BXEQ
         CPX     {1}
         BEQ     {2}
     ENDM
 
-    MACRO BNE.X
+    MACRO BXNE
         CPX     {1}
         BNE     {2}
     ENDM
 
-    MACRO BEQ.Y
+    MACRO BYEQ
         CPY     {1}
         BEQ     {2}
     ENDM
 
-    MACRO BNE.Y
+    MACRO BYNE
         CPY     {1}
         BNE     {2}
     ENDM
@@ -2826,15 +2826,9 @@ MOVE_LOOP:                     ; $1A31 - external entry point
 .not_scene:
     CMP     #$DB
     BPL     .not_map_event
-    LDA     $BE                 ; $D5-$DA: map/area event
-    PHA
-    LDA     $BF
-    PHA
+    PSHW    $BE                 ; $D5-$DA: save $BE/$BF
     JSR     COMMIT_MOVE            ; commit move first
-    PLA
-    STA     $BF
-    PLA
-    STA     $BE
+    PULW    $BE                 ; restore $BE/$BF
     JMP     DISPLAY_SHOP
 
 .not_map_event:
@@ -3513,10 +3507,7 @@ SET_CURSOR_POS:
 ; Validates input: saves $C2/$C3, loops reading input until valid record found
 VALIDATE_INPUT:
     STA     $5B24
-    LDA     $C2
-    PHA
-    LDA     $C3
-    PHA
+    PSHW    $C2                 ; save $C2/$C3
 .retry:
     JSR     READ_INPUT_CHAR
     CMP     #$00
@@ -3534,10 +3525,7 @@ VALIDATE_INPUT:
     PLA
 .done:
     TAY
-    PLA
-    STA     $C3
-    PLA
-    STA     $C2
+    PULW    $C2                 ; restore $C2/$C3
     TYA
     RTS
     ORG     $600A
@@ -4375,15 +4363,9 @@ TEXT_RENDERER:
     NOP
     LDX     #$06
     JSR     SCRIPT_ENGINE           ; run attract script
-    LDA     $06                     ; \
-    PHA                             ;  | save $06/$07 (stream pointer)
-    LDA     $07                     ;  |
-    PHA                             ; /
+    PSHW    $06                     ; save $06/$07 (stream pointer)
     JSR     DISPLAY_STATUS_BAR      ; (clobbers $06/$07)
-    PLA                             ; \
-    STA     $07                     ;  | restore $06/$07
-    PLA                             ;  |
-    STA     $06                     ; /
+    PULW    $06                     ; restore $06/$07
     PLA                             ; restore stream index
     TAY
     NOP
@@ -5053,15 +5035,9 @@ DRAW_BLINK_CHAR:
     STA     FONT_CHARNUM
     LDA     #$01
     STA     FONT_CHARSET            ; charset 1
-    LDA     PRINT_STRING_ADDR       ; save $BC/$BD (used by PRINT_FONTCHAR)
-    PHA
-    LDA     PRINT_STRING_ADDR+1
-    PHA
+    PSHW    PRINT_STRING_ADDR       ; save $BC/$BD (used by PRINT_FONTCHAR)
     JSR     PRINT_FONTCHAR          ; render the character
-    PLA
-    STA     PRINT_STRING_ADDR+1     ; restore $BC/$BD
-    PLA
-    STA     PRINT_STRING_ADDR
+    PULW    PRINT_STRING_ADDR       ; restore $BC/$BD
     RTS
     ORG     $750C
 CHECK_COMBAT_ELIGIBILITY:
@@ -5663,10 +5639,10 @@ STATUS_BORDER_DATA:
     HEX     7F                      ; end of stream
     ORG     $7E97
 S_PRESS_SPACE:
-    APSTR   "  PRESS SPACE BAR TO CONTINUE   "
+    HEX 20 A0 A0 D0 D2 C5 D3 D3 A0 D3 D0 C1 C3 C5 A0 C2 C1 D2 A0 D4 CF A0 C3 CF CE D4 C9 CE D5 C5 A0 A0 A0
 
 S_PRESS_BUTTON:
-    APSTR   "  PRESS THE BUTTON TO CONTINUE  "
+    HEX 20 A0 A0 D0 D2 C5 D3 D3 A0 D4 C8 C5 A0 C2 D5 D4 D4 CF CE A0 D4 CF A0 C3 CF CE D4 C9 CE D5 C5 A0 A0
     ORG     $80A4
     HEX     09      ; num chars in this string
     HEX     81      ; ctrl-A (set character set)

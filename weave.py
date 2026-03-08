@@ -24,6 +24,7 @@ CHUNKREF = re.compile(r"<<([-._  0-9A-Za-z]*)>>")
 # the ref and optional leading whitespace before the name.
 SPACECHUNKREF = re.compile(r"\s*<<\s*([-._ 0-9A-Za-z]*)>>")
 LABELPREFIXSTART = "PYNW"
+APSTR = re.compile(r'^(\s*)APSTR\s+"(.*)"\s*$')
 ISDEF = re.compile(r"^@\s+%def.*$")
 DEFPREFIX = re.compile(r"^@\s+%def\s+")
 IDENT = re.compile(r"\b[a-zA-Z_]\w*\b")
@@ -745,11 +746,41 @@ class Weaver:
                 codepath = pathlib.Path(output_dir, name)
                 with open(codepath, mode="w") as f:
                     self.expand_chunk(name, "", code_content, set(name), f)
+                self.postprocess_apstr(codepath)
             else:
                 print(
                     f"Warning: unreferenced chunk <<{name}>> not output "
                     "because it is not a valid filename."
                 )
+
+    @staticmethod
+    def postprocess_apstr(filepath: pathlib.Path) -> None:
+        """Replace APSTR "string" directives with HEX data.
+
+        APSTR is a Pascal-string directive for Apple II: one length byte
+        followed by the string characters with the high bit set (Apple ASCII).
+        """
+        with open(filepath, "r") as f:
+            lines = f.readlines()
+
+        modified = False
+        new_lines: list[str] = []
+        for line in lines:
+            m = APSTR.match(line.rstrip("\n"))
+            if m:
+                indent = m.group(1)
+                text = m.group(2)
+                hex_bytes = [f"{len(text):02X}"]
+                for c in text:
+                    hex_bytes.append(f"{ord(c) | 0x80:02X}")
+                new_lines.append(f"{indent}HEX {' '.join(hex_bytes)}\n")
+                modified = True
+            else:
+                new_lines.append(line)
+
+        if modified:
+            with open(filepath, "w") as f:
+                f.writelines(new_lines)
 
     def run(
         self,
