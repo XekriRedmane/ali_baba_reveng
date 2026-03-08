@@ -297,6 +297,9 @@ the expense of functions being completely independent.
 \section{Macros}
 
 We use these macros to make our assembly language listings a little less verbose.
+However, a restriction is that you cannot use local labels as arguments to a macro,
+since macros implicitly create an anonymous local scope for themselves. Thus, they are
+not good candidates for use in self-modifying code.
 
 \subsection{STOW, STOW2}
 
@@ -595,36 +598,36 @@ Often there is a compare instruction ([[CMP, CPX, CPY]]) followed by a branch. T
 the two instructions as a one-liner.
 
 <<Macros>>=
-    MACRO BEQ.A
+    MACRO BAEQ
         CMP     {1}
         BEQ     {2}
     ENDM
 
-    MACRO BNE.A
+    MACRO BANE
         CMP     {1}
         BNE     {2}
     ENDM
 
-    MACRO BEQ.X
+    MACRO BXEQ
         CPX     {1}
         BEQ     {2}
     ENDM
 
-    MACRO BNE.X
+    MACRO BXNE
         CPX     {1}
         BNE     {2}
     ENDM
 
-    MACRO BEQ.Y
+    MACRO BYEQ
         CPY     {1}
         BEQ     {2}
     ENDM
 
-    MACRO BNE.Y
+    MACRO BYNE
         CPY     {1}
         BNE     {2}
     ENDM
-@ %def BEQ.A, BNE.A, BEQ.X, BNE.X, BEQ.Y, BNE.Y
+@ %def BAEQ, BANE, BXEQ, BXNE, BYEQ, BYNE
 
 \section{The APSTR postprocessor}
 
@@ -2909,15 +2912,9 @@ DRAW_BLINK_CHAR:
     STA     FONT_CHARNUM
     LDA     #$01
     STA     FONT_CHARSET            ; charset 1
-    LDA     PRINT_STRING_ADDR       ; save $BC/$BD (used by PRINT_FONTCHAR)
-    PHA
-    LDA     PRINT_STRING_ADDR+1
-    PHA
+    PSHW    PRINT_STRING_ADDR       ; save $BC/$BD (used by PRINT_FONTCHAR)
     JSR     PRINT_FONTCHAR          ; render the character
-    PLA
-    STA     PRINT_STRING_ADDR+1     ; restore $BC/$BD
-    PLA
-    STA     PRINT_STRING_ADDR
+    PULW    PRINT_STRING_ADDR       ; restore $BC/$BD
     RTS
 @ %def DRAW_BLINK_NORMAL DRAW_BLINK_CHAR
 
@@ -5156,15 +5153,9 @@ TEXT_RENDERER:
     NOP
     LDX     #$06
     JSR     SCRIPT_ENGINE           ; run attract script
-    LDA     $06                     ; \
-    PHA                             ;  | save $06/$07 (stream pointer)
-    LDA     $07                     ;  |
-    PHA                             ; /
+    PSHW    $06                     ; save $06/$07 (stream pointer)
     JSR     DISPLAY_STATUS_BAR      ; (clobbers $06/$07)
-    PLA                             ; \
-    STA     $07                     ;  | restore $06/$07
-    PLA                             ;  |
-    STA     $06                     ; /
+    PULW    $06                     ; restore $06/$07
     PLA                             ; restore stream index
     TAY
     NOP
@@ -7396,15 +7387,9 @@ MOVE_LOOP:                     ; $1A31 - external entry point
 .not_scene:
     CMP     #$DB
     BPL     .not_map_event
-    LDA     $BE                 ; $D5-$DA: map/area event
-    PHA
-    LDA     $BF
-    PHA
+    PSHW    $BE                 ; $D5-$DA: save $BE/$BF
     JSR     COMMIT_MOVE            ; commit move first
-    PLA
-    STA     $BF
-    PLA
-    STA     $BE
+    PULW    $BE                 ; restore $BE/$BF
     JMP     DISPLAY_SHOP
 
 .not_map_event:
@@ -10088,96 +10073,6 @@ LAB_162b:
     JMP      hit_mob?
 @
 
-<<Get item at pos in room>>=
-    ORG      $0B62
-    ; Takes A (pos) and TMP_PTR (pointer to room data)
-get_item_at_pos_in_room:
-    SUBROUTINE
-
-    STA      DAT_5a17_pos
-
-    ; load1 <- TMP_PTR
-    ; load3 <- TMP_PTR
-
-    LDA      TMP_PTR+1
-    STA      .load1+2
-    STA      .load3+2
-    LDA      TMP_PTR
-    STA      .load1+1
-    STA      .load3+1
-    JMP      .get_mob_link
-
-.inner_loop:
-    ; load2 <- room data[MAP]
-
-    LDX      #$06
-.load1:
-    LDA      .load1+1,X
-    STA      .load2+1-6,X
-    INX
-    BNE.X    #$08, .load1
-
-.load2:
-    ; Y <- (load2)
-
-    LDY      .load2+1
-    BNE.Y    #$FF, .not_ff          ; (load2) != 0xFF?
-    JMP      CHECK_AT_BOUNDARY     ; else goto CHECK_AT_BOUNDARY
-
-.not_ff:
-    BEQ.Y    DAT_5a17_pos, .return_load2  ; (load2) == DAT_5a17_pos?
-
-    ; load2 += 3
-
-    INCW     .load2
-    INCW     .load2
-    INC      .load2+1
-    BNE      .load2
-    INC      .load2+2
-    JMP      .load2
-
-.return_load2:
-    ; DATA_PTR <- load2
-
-    STOW     .load2+1, DATA_PTR
-    RTS
-
-.get_mob_link:
-
-    LDX      #$02
-.load3:
-    LDA      .load3+1,X  ; A <- load3[MOB]
-    BEQ.A    #$00, .inner_loop
-    JSR      mob_dataptr_to_load4
-
-    LDX      #$03
-.load4:
-    LDY      .load4+1,X  ; Y <- load4[POS]
-    BEQ.Y    DAT_5a17_pos, .return_load4
-
-    ; load3 <- load4
-
-    STOW     .load4+1, .load3+1
-    JMP      .get_mob_link
-
-.return_load4:
-    ; DATA_PTR = 0x8000 | load4
-
-    LDA      #$80
-    ORA      .load4+2
-    STA      DATA_PTR+1
-    LDA      .load4+1
-    STA      DATA_PTR
-    RTS
-
-mob_dataptr_to_load4:
-    ; load4 <- mob data for A (no SUBROUTINE — shares scope for .load4)
-
-    JSR      GET_MOB_DATA
-    STOW     DATA_PTR3, .load4
-    RTS
-@
-
 \subsection{init\_mob\_count (\$0C51)}
 
 Called once during [[GAME\_INIT]] to initialize [[TOTAL\_MOB\_COUNT]].
@@ -10607,10 +10502,7 @@ SETUP_CURSOR:
 ; Validates input: saves $C2/$C3, loops reading input until valid record found
 VALIDATE_INPUT:
     STA     $5B24
-    LDA     $C2
-    PHA
-    LDA     $C3
-    PHA
+    PSHW    $C2                 ; save $C2/$C3
 .retry:
     JSR     READ_INPUT_CHAR
     CMP     #$00
@@ -10628,10 +10520,7 @@ VALIDATE_INPUT:
     PLA
 .done:
     TAY
-    PLA
-    STA     $C3
-    PLA
-    STA     $C2
+    PULW    $C2                 ; restore $C2/$C3
     TYA
     RTS
 @ %def VALIDATE_INPUT
