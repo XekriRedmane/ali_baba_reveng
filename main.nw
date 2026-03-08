@@ -6837,8 +6837,9 @@ TARGET_PTR_LO   EQU     $5A86   ; selected combat target pointer (low byte)
 TARGET_PTR_HI   EQU     $5A87   ; selected combat target pointer (high byte)
 BEST_THREAT     EQU     $5A88   ; best threat level during target selection
 EVENT_SLOT_BYTE EQU     $5A59   ; saved byte 2 of event slot (type+value)
+EVENT_SUB_VALUE EQU     $5A5A   ; lower 5 bits of event slot byte 2
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
-@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR EVENT_SLOT_BYTE COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT TURN_ACTIVE
+@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR EVENT_SLOT_BYTE EVENT_SUB_VALUE COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT TURN_ACTIVE
 
 <<game turn loop>>=
     ORG     $19AD
@@ -7640,13 +7641,13 @@ MANHATTAN_DISTANCE:
     ; Input: A = packed position to measure from
     ; Uses char's position from ($F8)[3]
     JSR     POS_TO_COLROW       ; A → col in A, row in Y
-    STA     $5A0C               ; save target col
-    STY     $5A0D               ; save target row
+    STA     FONT_COL            ; save target col
+    STY     FONT_ROW            ; save target row
     LDY     #$03
     LDA     ($F8),Y             ; char packed position
     JSR     POS_TO_COLROW
     SEC
-    SBC     $5A0C               ; char col - target col
+    SBC     FONT_COL            ; char col - target col
     BCS     .pos1
     EOR     #$FF                ; negate (absolute value)
     ADC     #$01
@@ -7654,7 +7655,7 @@ MANHATTAN_DISTANCE:
     STA     $BA                 ; |delta col|
     TYA
     SEC
-    SBC     $5A0D               ; char row - target row
+    SBC     FONT_ROW            ; char row - target row
     BCS     .pos2
     EOR     #$FF
     ADC     #$01
@@ -7713,10 +7714,10 @@ COMMIT_MOVE:
     ; Commit move: store CURRENT_COL/ROW, convert to packed pos,
     ; update char field 3, set font char, draw sprite
     LDA     CURRENT_COL
-    STA     $5A0C
+    STA     FONT_COL
     STA     $5AA2
     LDY     CURRENT_ROW
-    STY     $5A0D
+    STY     FONT_ROW
     STY     $5AA3
     JSR     COLROW_TO_POS
     LDY     #$03
@@ -8075,8 +8076,8 @@ SETUP_CHAR_SPRITE:
     LDY     #$03
     LDA     ($F8),Y
     JSR     POS_TO_COLROW
-    STA     $5A0C
-    STY     $5A0D
+    STA     FONT_COL
+    STY     FONT_ROW
     STA     $5AA2
     STY     $5AA3
     TAX
@@ -8566,7 +8567,7 @@ EVENT_PRNG_CHECK:              ; $1DDC - external entry point
 .type40:
     LDA     EVENT_SLOT_BYTE
     AND     #$1F
-    STA     $5A5A
+    STA     EVENT_SUB_VALUE
     CMP     #$1B
     BPL     .big_treasure
     JSR     SET_CURSOR_ROW21
@@ -8577,13 +8578,13 @@ EVENT_PRNG_CHECK:              ; $1DDC - external entry point
     JSR     SET_CURSOR_ROW21
     LDA     #$12
     JSR     DISPLAY_MESSAGE
-    LDA     $5A5A
+    LDA     EVENT_SUB_VALUE
     CMP     #$1F
     BMI     .clear_slot
-    DEC     $5A5A
+    DEC     EVENT_SUB_VALUE
     LDA     EVENT_SLOT_BYTE
     AND     #$E0
-    ORA     $5A5A
+    ORA     EVENT_SUB_VALUE
     LDY     #$02
     STA     ($BE),Y
     JMP     .update_pos
@@ -8645,8 +8646,8 @@ PLAYER_ATTACK:
     DEY
     LDA     ($BE),Y
     JSR     POS_TO_COLROW
-    STY     $5A0D
-    STA     $5A0C
+    STY     FONT_ROW
+    STA     FONT_COL
     JSR     GET_ENTITY_FONTCHAR
     JSR     DRAW_SPRITE
     LDX     #$0C
