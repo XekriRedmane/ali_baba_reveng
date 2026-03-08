@@ -6838,8 +6838,10 @@ TARGET_PTR_HI   EQU     $5A87   ; selected combat target pointer (high byte)
 BEST_THREAT     EQU     $5A88   ; best threat level during target selection
 EVENT_SLOT_BYTE EQU     $5A59   ; saved byte 2 of event slot (type+value)
 EVENT_SUB_VALUE EQU     $5A5A   ; lower 5 bits of event slot byte 2
+MOB_DEFENSE     EQU     $5A79   ; mob defense value (low 4 bits of mob byte 8)
+CURRENT_SELECTION EQU   $5AAB   ; current menu selection index
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
-@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR EVENT_SLOT_BYTE EVENT_SUB_VALUE COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT TURN_ACTIVE
+@ %def CHAR_AI_MODE TURN_START_COL TURN_START_ROW CURRENT_COL CURRENT_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR EVENT_SLOT_BYTE EVENT_SUB_VALUE MOB_DEFENSE COMBAT_WILLINGNESS COMBAT_STRENGTH TARGET_PTR_LO TARGET_PTR_HI BEST_THREAT CURRENT_SELECTION TURN_ACTIVE
 
 <<game turn loop>>=
     ORG     $19AD
@@ -8746,7 +8748,7 @@ MOB_ATTACK:
     JSR     DISPATCH_ON_MODE
     LDY     #$08
     LDA     ($F4),Y
-    STA     $5A79
+    STA     MOB_DEFENSE
     AND     #$0F
     CMP     #$00
     BNE     .has_strength
@@ -8755,16 +8757,16 @@ MOB_ATTACK:
 .has_strength:
     JSR     RESET_TEXT_WINDOW
     LDX     #$17
-    LDA     $5A79
+    LDA     MOB_DEFENSE
     BMI     .negative
     LDX     #$18
 .negative:
-    LDA     $5A79
+    LDA     MOB_DEFENSE
     AND     #$0F
-    STA     $5A79
+    STA     MOB_DEFENSE
     LDA     COMBAT_STRENGTH
     SEC
-    SBC     $5A79
+    SBC     MOB_DEFENSE
     BEQ     .weak_hit
     BPL     .partial
 .weak_hit:
@@ -8795,7 +8797,7 @@ HANDLE_MOB_ENCOUNTER:
     ; Mob encounter on movement: check flee chance, commit move,
     ; check encounter type, walk group for combat.
     LDA     #$00
-    STA     $5A26
+    STA     ADJACENT_THREAT
     LDA     $F8
     STA     $BC
     LDA     $F9
@@ -8804,7 +8806,7 @@ HANDLE_MOB_ENCOUNTER:
     LDY     CURRENT_ROW
     JSR     COLROW_TO_POS
     JSR     SUM_HOSTILE_AT_POS
-    LDA     $5A26
+    LDA     ADJACENT_THREAT
     BEQ     .no_flee
     LDY     #$05
     LDA     ($F8),Y
@@ -8812,7 +8814,7 @@ HANDLE_MOB_ENCOUNTER:
     CLC
     ADC     #$10
     SEC
-    SBC     $5A26
+    SBC     ADJACENT_THREAT
     BMI     .clamp_low
     CMP     #$1D
     BMI     .in_range
@@ -8893,19 +8895,19 @@ INPUT_LOOP:
     JSR     SETUP_INPUT
     LDY     #$01
     LDA     ($C0),Y
-    STA     $5AAB
+    STA     CURRENT_SELECTION
 .loop:
-    LDA     $5AAB
+    LDA     CURRENT_SELECTION
     JSR     CALC_RECORD_PTR
     JSR     SETUP_CURSOR_EXT
     JSR     READ_KEYBOARD
     BEQ     .exit
     JSR     VALIDATE_INPUT
-    CMP     $5AAB
+    CMP     CURRENT_SELECTION
     BEQ     .run_script
     CMP     #$00
     BEQ     .run_script
-    STA     $5AAB
+    STA     CURRENT_SELECTION
     JSR     SETUP_CURSOR
     JMP     .loop
 .run_script:
@@ -9473,7 +9475,7 @@ CHECK_COMBAT_ELIGIBILITY:
     LDY     #$03
     LDA     ($F8),Y
     JSR     CHECK_ADJACENT_THREATS
-    LDA     $5A26
+    LDA     ADJACENT_THREAT
     BNE     .done
     LDY     #$03
     LDA     ($F8),Y
@@ -10367,7 +10369,7 @@ VALIDATE_INPUT:
     JSR     READ_INPUT_CHAR
     CMP     #$00
     BEQ     .done
-    CMP     $5AAB
+    CMP     CURRENT_SELECTION
     BEQ     .done
     PHA
     JSR     CALC_RECORD_PTR
