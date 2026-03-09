@@ -8893,6 +8893,4 @@ RWTS_ENTRY:
     RTS
     ORG     $BD00
 RWTS_CORE:
-    ; Standard DOS 3.3 RWTS --- not disassembled (see Beneath Apple DOS)
-    ; IOB pointer in $48/$49 (set by caller: Y→$48, A→$49)
-    ; Returns carry clear = success, carry set = error
+    INCLUDE "rwts.asm"

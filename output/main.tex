@@ -12951,9 +12951,7 @@ operations.  See~\emph{Beneath Apple DOS} chapter~4 for full documentation.
 \nwenddocs{}\nwbegincode{636}\sublabel{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}}}\moddef{rwts core~{\nwtagstyle{}\subpageref{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $BD00
 \nwlinkedidentc{RWTS_CORE}{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}:
-    ; Standard DOS 3.3 RWTS --- not disassembled (see Beneath Apple DOS)
-    ; IOB pointer in $48/$49 (set by caller: Y→$48, A→$49)
-    ; Returns carry clear = success, carry set = error
+    INCLUDE "rwts.asm"
 \nwindexdefn{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}\eatline
 \nwidentdefs{\\{{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}}}\nwendcode{}\nwbegindocs{637}\nwdocspar
 
