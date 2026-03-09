@@ -12623,47 +12623,31 @@ The main program calls two entry points in this area:
 \end{tabular}
 \end{center}
 
-\section{RWTS entry (\$B7B5)}
+\section{DOS 3.3 RWTS (\$B600--\$BFFF)}
 
-[[RWTS\_ENTRY]] is the game's Read/Write Track/Sector wrapper.  It
-disables interrupts (timing-critical), calls the core RWTS dispatcher
-at~[[\$BD00]], then returns carry clear on success or carry set on error.
-The caller passes [[A]]=IOB high byte and [[Y]]=IOB low byte, where the
-IOB (Input/Output Block) follows the standard Apple~II RWTS parameter
-format.
+The RWTS (Read/Write Track/Sector) at~[[\$B600--\$BFFF]] is a copy of
+the standard Apple~II DOS~3.3 RWTS from the system master, with the
+standard~[[\$80]] page relocation applied (disk pages [[\$36--\$3F]]
+relocated to~[[\$B6--\$BF]]).  Byte-for-byte comparison with the DOS~3.3
+System Master (680-0051-00) confirms that all code is identical after
+relocation, except for the three patched bytes noted above.  The
+remaining differences are runtime state in the IOB parameter block
+at~[[\$B7E8]] and the contents of the nibble buffers
+at~[[\$BB00--\$BC55]].
 
-<<rwts entry>>=
-    ORG     $B7B5
-RWTS_ENTRY:
-    SUBROUTINE
+The RWTS is fully documented in \emph{Beneath Apple DOS} (Worth \&
+Lechner, 1984), chapter~4, and is not disassembled here.  The binary
+data is included verbatim from [[dos.asm]].
 
-    PHP                             ; save processor flags
-    SEI                             ; disable interrupts (disk timing)
-    JSR     RWTS_CORE               ; call RWTS dispatcher
-    BCS     .error
-    PLP                             ; restore flags
-    CLC                             ; success
-    RTS
+<<defines>>=
+RWTS_ENTRY              EQU     $B7B5   ; RWTS entry: PHP/SEI, JSR RWTS_CORE, CLC/SEC
+RWTS_CORE               EQU     $BD00   ; RWTS core dispatcher
+@ %def RWTS_ENTRY RWTS_CORE
 
-.error:
-    PLP                             ; restore flags
-    SEC                             ; error
-    RTS
-@ %def RWTS_ENTRY
-
-\section{RWTS core (\$BD00)}
-
-The RWTS core at~[[\$BD00]] is the standard Apple~II DOS~3.3 RWTS
-dispatcher, unmodified from the system master.  It manages the IOB
-parameter block at~(\$48/\$49), handles drive motor control, phase
-stepping (seek), and dispatches to sector read, write, or format
-operations.  See~\emph{Beneath Apple DOS} chapter~4 for full documentation.
-
-<<rwts core>>=
-    ORG     $BD00
-RWTS_CORE:
-    INCLUDE "rwts.asm"
-@ %def RWTS_CORE
+<<dos33 rwts>>=
+    ORG     $B600
+    INCLUDE "dos.asm"
+@
 
 \section{Disk read field (\$B300)}
 
@@ -13774,8 +13758,7 @@ The following root chunks produce the assembly files when tangled.
 <<disk vm trampoline>>
 <<disk vm error accum>>
 <<disk vm saved state>>
-<<rwts entry>>
-<<rwts core>>
+<<dos33 rwts>>
 @
 
 <<fontdata.asm>>=

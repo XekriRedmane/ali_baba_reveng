@@ -357,6 +357,8 @@ UNDER_LEVEL     EQU     $5B25   ; 1 if char level < steps taken
 SAFE_TO_REST    EQU     $5B26   ; 1 if no adjacent threats or encounters
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
+RWTS_ENTRY              EQU     $B7B5   ; RWTS entry: PHP/SEI, JSR RWTS_CORE, CLC/SEC
+RWTS_CORE               EQU     $BD00   ; RWTS core dispatcher
     ORG     $0500
 STUB_ENTRY:
     JMP     ATTRACT_LOOP
@@ -8875,22 +8877,5 @@ DISK_VM_SCRATCH:
     HEX     00 00 00                ; $B5F7-$B5F9
     HEX     a0 a0                   ; $B5FA-$B5FB
     HEX     00 00 00 01             ; $B5FC-$B5FF
-    ORG     $B7B5
-RWTS_ENTRY:
-    SUBROUTINE
-
-    PHP                             ; save processor flags
-    SEI                             ; disable interrupts (disk timing)
-    JSR     RWTS_CORE               ; call RWTS dispatcher
-    BCS     .error
-    PLP                             ; restore flags
-    CLC                             ; success
-    RTS
-
-.error:
-    PLP                             ; restore flags
-    SEC                             ; error
-    RTS
-    ORG     $BD00
-RWTS_CORE:
-    INCLUDE "rwts.asm"
+    ORG     $B600
+    INCLUDE "dos.asm"

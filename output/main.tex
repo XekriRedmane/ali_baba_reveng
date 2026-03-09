@@ -7751,7 +7751,7 @@ at~{\Tt{}{\textbackslash}{\$}B7B5\nwendquote} with the IOB address from~\$08/\$0
     STA     ($08),Y                 ; ($08)+$03 = 0 (sector offset)
     LDA     $09                     ; \\ A/Y = slot parameter block
     LDY     $08                     ; /
-    JSR     \nwlinkedidentc{RWTS_ENTRY}{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}              ; seek to track
+    JSR     \nwlinkedidentc{RWTS_ENTRY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-31}              ; seek to track
     LDA     #$00
     STA     $48                     ; clear disk status
     RTS
@@ -12010,7 +12010,7 @@ and its appearance (byte 4) is converted to a font character number.
 On the player's turn, the player's column and row are taken directly from
 {\Tt{}CURRENT{\textbackslash}{\_}COL\nwendquote}/{\Tt{}CURRENT{\textbackslash}{\_}ROW\nwendquote}, and the font character is looked up via {\Tt{}{\textbackslash}{\$}0C7E\nwendquote}.
 
-\nwenddocs{}\nwbegincode{587}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-30}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-30}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-29}{\relax}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{587}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-30}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-30}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-29}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-31}\nwenddeflinemarkup
 \nwlinkedidentc{IS_PLAYER_TURN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-30}  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
 \nwindexdefn{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-30}\eatline
 \nwidentdefs{\\{{\nwixident{IS{\_}PLAYER{\_}TURN}}{IS:unPLAYER:unTURN}}}\nwendcode{}\nwbegindocs{588}\nwdocspar
@@ -12911,49 +12911,32 @@ The main program calls two entry points in this area:
 \end{tabular}
 \end{center}
 
-\section{RWTS entry (\$B7B5)}
+\section{DOS 3.3 RWTS (\$B600--\$BFFF)}
 
-{\Tt{}RWTS{\textbackslash}{\_}ENTRY\nwendquote} is the game's Read/Write Track/Sector wrapper.  It
-disables interrupts (timing-critical), calls the core RWTS dispatcher
-at~{\Tt{}{\textbackslash}{\$}BD00\nwendquote}, then returns carry clear on success or carry set on error.
-The caller passes {\Tt{}A\nwendquote}=IOB high byte and {\Tt{}Y\nwendquote}=IOB low byte, where the
-IOB (Input/Output Block) follows the standard Apple~II RWTS parameter
-format.
+The RWTS (Read/Write Track/Sector) at~{\Tt{}{\textbackslash}{\$}B600--{\textbackslash}{\$}BFFF\nwendquote} is a copy of
+the standard Apple~II DOS~3.3 RWTS from the system master, with the
+standard~{\Tt{}{\textbackslash}{\$}80\nwendquote} page relocation applied (disk pages {\Tt{}{\textbackslash}{\$}36--{\textbackslash}{\$}3F\nwendquote}
+relocated to~{\Tt{}{\textbackslash}{\$}B6--{\textbackslash}{\$}BF\nwendquote}).  Byte-for-byte comparison with the DOS~3.3
+System Master (680-0051-00) confirms that all code is identical after
+relocation, except for the three patched bytes noted above.  The
+remaining differences are runtime state in the IOB parameter block
+at~{\Tt{}{\textbackslash}{\$}B7E8\nwendquote} and the contents of the nibble buffers
+at~{\Tt{}{\textbackslash}{\$}BB00--{\textbackslash}{\$}BC55\nwendquote}.
 
-\nwenddocs{}\nwbegincode{634}\sublabel{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}}}\moddef{rwts entry~{\nwtagstyle{}\subpageref{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
-    ORG     $B7B5
-\nwlinkedidentc{RWTS_ENTRY}{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}:
-    SUBROUTINE
+The RWTS is fully documented in \emph{Beneath Apple DOS} (Worth \&
+Lechner, 1984), chapter~4, and is not disassembled here.  The binary
+data is included verbatim from {\Tt{}dos.asm\nwendquote}.
 
-    PHP                             ; save processor flags
-    SEI                             ; disable interrupts (disk timing)
-    JSR     \nwlinkedidentc{RWTS_CORE}{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}               ; call RWTS dispatcher
-    BCS     .error
-    PLP                             ; restore flags
-    CLC                             ; success
-    RTS
+\nwenddocs{}\nwbegincode{634}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-31}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-31}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-30}{\relax}\nwenddeflinemarkup
+\nwlinkedidentc{RWTS_ENTRY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-31}              EQU     $B7B5   ; RWTS entry: PHP/SEI, JSR \nwlinkedidentc{RWTS_CORE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-31}, CLC/SEC
+\nwlinkedidentc{RWTS_CORE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-31}               EQU     $BD00   ; RWTS core dispatcher
+\nwindexdefn{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-31}\nwindexdefn{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-31}\eatline
+\nwidentdefs{\\{{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}}\\{{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}}}\nwendcode{}\nwbegindocs{635}\nwdocspar
 
-.error:
-    PLP                             ; restore flags
-    SEC                             ; error
-    RTS
-\nwindexdefn{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}}}\nwidentuses{\\{{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}}}\nwindexuse{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}\nwendcode{}\nwbegindocs{635}\nwdocspar
-
-\section{RWTS core (\$BD00)}
-
-The RWTS core at~{\Tt{}{\textbackslash}{\$}BD00\nwendquote} is the standard Apple~II DOS~3.3 RWTS
-dispatcher, unmodified from the system master.  It manages the IOB
-parameter block at~(\$48/\$49), handles drive motor control, phase
-stepping (seek), and dispatches to sector read, write, or format
-operations.  See~\emph{Beneath Apple DOS} chapter~4 for full documentation.
-
-\nwenddocs{}\nwbegincode{636}\sublabel{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}}}\moddef{rwts core~{\nwtagstyle{}\subpageref{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
-    ORG     $BD00
-\nwlinkedidentc{RWTS_CORE}{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}:
-    INCLUDE "rwts.asm"
-\nwindexdefn{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}}}\nwendcode{}\nwbegindocs{637}\nwdocspar
+\nwenddocs{}\nwbegincode{636}\sublabel{PYNWmai0-4VZT35TKJMQVI6ZN27HVHBNXQI000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4VZT35TKJMQVI6ZN27HVHBNXQI000000-1}}}\moddef{dos33 rwts~{\nwtagstyle{}\subpageref{PYNWmai0-4VZT35TKJMQVI6ZN27HVHBNXQI000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B600
+    INCLUDE "dos.asm"
+\nwendcode{}\nwbegindocs{637}\nwdocspar
 
 \section{Disk read field (\$B300)}
 
@@ -14096,8 +14079,7 @@ The following root chunks produce the assembly files when tangled.
 \LA{}disk vm trampoline~{\nwtagstyle{}\subpageref{PYNWmai0-52EDTY2P6XACMBHKFKS45MCWBU000000-1}}\RA{}
 \LA{}disk vm error accum~{\nwtagstyle{}\subpageref{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}}\RA{}
 \LA{}disk vm saved state~{\nwtagstyle{}\subpageref{PYNWmai0-TC5SHQB655SMTUZ5XO3B24FCVA000000-1}}\RA{}
-\LA{}rwts entry~{\nwtagstyle{}\subpageref{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}}\RA{}
-\LA{}rwts core~{\nwtagstyle{}\subpageref{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}}\RA{}
+\LA{}dos33 rwts~{\nwtagstyle{}\subpageref{PYNWmai0-4VZT35TKJMQVI6ZN27HVHBNXQI000000-1}}\RA{}
 \nwnotused{main.asm}\nwendcode{}\nwbegindocs{704}\nwdocspar
 
 \nwenddocs{}\nwbegincode{705}\sublabel{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}}}\moddef{fontdata.asm~{\nwtagstyle{}\subpageref{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
@@ -14497,7 +14479,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{copy record data}{PYNWmai0-QAFLGM36KP7VDGVEYKRTTGIIV4000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-QAFLGM36KP7VDGVEYKRTTGIIV4000000-1}}}%
 \nwixlogsorted{c}{{decode dispatch relay}{PYNWmai0-E65AIYYMBOBXUD37K6QZUOOI4I000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-E65AIYYMBOBXUD37K6QZUOOI4I000000-1}}}%
 \nwixlogsorted{c}{{decode encrypted addr}{PYNWmai0-QPGMZCBHONP3ALTVEWGVE7O2I4000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-QPGMZCBHONP3ALTVEWGVE7O2I4000000-1}}}%
-\nwixlogsorted{c}{{defines}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-12}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-13}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-14}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-15}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-16}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-17}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-18}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-19}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-20}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-21}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-22}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-23}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-24}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-27}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-28}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-29}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-30}}}%
+\nwixlogsorted{c}{{defines}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-12}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-13}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-14}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-15}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-16}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-17}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-18}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-19}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-20}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-21}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-22}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-23}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-24}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-27}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-28}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-29}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-30}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-31}}}%
 \nwixlogsorted{c}{{delay loop}{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1}}}%
 \nwixlogsorted{c}{{delay with animation}{PYNWmai0-GR34WPZFUFAWF4EEF55HS6PMUU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-GR34WPZFUFAWF4EEF55HS6PMUU000000-1}}}%
 \nwixlogsorted{c}{{disk read field}{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}}}%
@@ -14532,6 +14514,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{display message}{PYNWmai0-PLQAK2MUE37THNKRCI7RJB7UJY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-PLQAK2MUE37THNKRCI7RJB7UJY000000-1}}}%
 \nwixlogsorted{c}{{display shop}{PYNWmai0-MTRYGF5E27RXHB5MSLJKGKYBZI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-MTRYGF5E27RXHB5MSLJKGKYBZI000000-1}}}%
 \nwixlogsorted{c}{{display status bar}{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-CAQTAAOHJTMFOSJ452F3J7I5JQ000000-1}}}%
+\nwixlogsorted{c}{{dos33 rwts}{PYNWmai0-4VZT35TKJMQVI6ZN27HVHBNXQI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-4VZT35TKJMQVI6ZN27HVHBNXQI000000-1}}}%
 \nwixlogsorted{c}{{draw blink alt}{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-D5AO3JLSN7XCTR2JDD26LFVLVU000000-1}}}%
 \nwixlogsorted{c}{{draw blink char}{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-CUGO4OOCVBOXMS5VIR3B3MURQE000000-1}}}%
 \nwixlogsorted{c}{{draw border char}{PYNWmai0-DEK4BXIA2537BOCNQO747FOMKY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-DEK4BXIA2537BOCNQO747FOMKY000000-1}}}%
@@ -14665,8 +14648,6 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{resident dispatch table}{PYNWmai0-LZD7UO27WADGX7M4TS77RNCD74000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-LZD7UO27WADGX7M4TS77RNCD74000000-1}}}%
 \nwixlogsorted{c}{{resolve attack}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}}}%
 \nwixlogsorted{c}{{restore zp pointers}{PYNWmai0-34VA5T5PRGU2LZRT6RKWJJ2FQI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-34VA5T5PRGU2LZRT6RKWJJ2FQI000000-1}}}%
-\nwixlogsorted{c}{{rwts core}{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}}}%
-\nwixlogsorted{c}{{rwts entry}{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}}}%
 \nwixlogsorted{c}{{save zp pointers}{PYNWmai0-XTFMNQODSGOW3IGUAVI6HJU56I000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-XTFMNQODSGOW3IGUAVI6HJU56I000000-1}}}%
 \nwixlogsorted{c}{{scan and reorder}{PYNWmai0-57X5LVQKSJRUL3VSPDY2CBOF6A000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-57X5LVQKSJRUL3VSPDY2CBOF6A000000-1}}}%
 \nwixlogsorted{c}{{scan for hostile}{PYNWmai0-E4YXUSA3JTJZCREU546HG62MHQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-E4YXUSA3JTJZCREU546HG62MHQ000000-1}}}%
