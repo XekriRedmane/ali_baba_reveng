@@ -7548,10 +7548,8 @@ HRCG_INIT:
     JMP     HRCG_INIT_BODY          ; main init entry
 HRCG_NUM_CHARSETS:
     DC.B    $0A                     ; 10 custom charsets
-HRCG_FONT_BASE_LO:
-    DC.B    $A5                     ; font base address low
-HRCG_FONT_BASE_HI:
-    DC.B    $83                     ; font base address high ($83A5)
+HRCG_FONT_BASE:
+    DC.W    FONT_DATA               ; font base address ($83A5)
 HRCG_ENTRY2:
     JMP     HRCG_RTS                ; secondary entry (disabled)
 HRCG_ENTRY3:
@@ -7818,15 +7816,15 @@ HRCG_CHARSET_SELECT:
     SBC     #$31                    ; A = char - '1' (carry set)
     CMP     #$09                    ; valid charset 1-9?
     BCS     HRCG_SET_STD_FONT       ; no -> use standard font
-    LDX     HRCG_FONT_BASE_LO      ; font base low ($A5)
+    LDX     HRCG_FONT_BASE          ; font base low ($A5)
     STA     $EE                     ; save index
     ASL                             ; A * 2
     ADC     $EE                     ; A * 3 (3 pages per charset)
-    ADC     HRCG_FONT_BASE_HI      ; add font base high ($83)
+    ADC     HRCG_FONT_BASE+1        ; add font base high ($83)
     BNE     .store_font             ; always branches
 HRCG_SET_STD_FONT:
-    LDX     #$A5                    ; standard font low
-    LDA     #$97                    ; standard font high ($97A5)
+    LDX     #<STD_FONT_DATA         ; standard font low
+    LDA     #>STD_FONT_DATA         ; standard font high ($97A5)
 .store_font:
     STX     HRCG_FONT_PTR_LO       ; font pointer low
     STA     HRCG_FONT_PTR_HI       ; font pointer high
