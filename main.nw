@@ -1609,6 +1609,45 @@ At the [[CALL0 \$0800]] instruction, memory is laid out as follows:
 
 Entry point: [[$0800]].
 
+\section{Runtime memory map}
+
+During [[GAME\_INIT]], [[RELOCATE\_HIRES\_STAGING]] copies data from the
+hi-res page area into its runtime addresses:
+\$2000--\$32FF~$\to$~\$9600--\$A8FF and
+\$3300--\$3FFF~$\to$~\$B300--\$BFFF.
+The source area (\$2000--\$3FFF) is then cleared, freeing the hi-res
+page for graphics.  After this relocation the full memory map is:
+
+\begin{center}
+\ra{1.15}
+\begin{tabular}{lrl}
+\toprule
+\thead{Address range} & \thead{Size} & \thead{Contents} \\
+\midrule
+\$0500--\$07FF &    768 & Resident routines (from EALDR \$A300--\$A5FF) \\
+\$0800--\$1FFF &  6\,144 & Main program code \\
+\$2000--\$3FFF &  8\,192 & Hi-res graphics page 1 (cleared by game\_init) \\
+\$4000--\$4008 &      9 & Character record header (record 0) \\
+\$4009--\$4239 &    561 & Location / character records (62 $\times$ 9 bytes) \\
+\$4240--\$451D &    734 & Location name strings \\
+\$451E--\$5AFF &  5\,602 & Event lists and mob/script data \\
+\$5B00--\$5FFF &  1\,280 & Game state, display setup, UI tables \\
+\$6000--\$7FFF &  8\,192 & Main program code (continued) \\
+\$80A4--\$83A4 &    769 & Script table and script bytecode \\
+\$83A5--\$92A4 &  3\,840 & Custom font data (120 chars $\times$ 32 bytes) \\
+\$92A8--\$97A4 &  1\,277 & HRCG library (Hi-Res Character Generator) \\
+\$97A5--\$9AA4 &    768 & Standard font data (96 chars $\times$ 8 bytes) \\
+\$9AA5--\$B2FF &  6\,235 & \emph{Unused / not mapped} \\
+\$B300--\$B5FF &    768 & Disk I/O: VM interpreter and bytecode \\
+\$B600--\$BFFF &  2\,560 & DOS 3.3 RWTS (unmodified, relocated) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The main program code occupies two non-contiguous regions
+(\$0800--\$1FFF and \$6000--\$7FFF) with game data tables and the hi-res
+framebuffer in between.
+
 \section{Extracting [[main.bin]]}
 
 The following script reads the disk image, applies the EALDR loading
