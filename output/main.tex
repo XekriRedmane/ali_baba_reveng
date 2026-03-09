@@ -1990,8 +1990,9 @@ which returns to {\Tt{}GAME{\textbackslash}{\_}INIT\nwendquote} via the patched 
 
 \nwenddocs{}\nwbegincode{104}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{\relax}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}\nwenddeflinemarkup
 \nwlinkedidentc{HRCG_INIT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}               EQU     $92A8   ; HRCG entry/init routine
-\nwindexdefn{\nwixident{HRCG{\_}INIT}}{HRCG:unINIT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{HRCG{\_}INIT}}{HRCG:unINIT}}}\nwendcode{}\nwbegindocs{105}\nwdocspar
+\nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           EQU     $C0EC   ; disk controller data register (active slot)
+\nwindexdefn{\nwixident{DISK{\_}DATA{\_}REG}}{DISK:unDATA:unREG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}\nwindexdefn{\nwixident{HRCG{\_}INIT}}{HRCG:unINIT}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}DATA{\_}REG}}{DISK:unDATA:unREG}}\\{{\nwixident{HRCG{\_}INIT}}{HRCG:unINIT}}}\nwendcode{}\nwbegindocs{105}\nwdocspar
 
 \nwenddocs{}\nwbegincode{106}\sublabel{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}}}\moddef{init hrcg~{\nwtagstyle{}\subpageref{PYNWmai0-ZKKBW7IOFWPQONKCR23DIN7HAI000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $791A
@@ -4659,9 +4660,8 @@ command code, buffer address, etc.).  The RWTS entry point is at {\Tt{}{\textbac
 
 \nwenddocs{}\nwbegincode{262}\sublabel{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-16}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-16}}}\moddef{defines~{\nwtagstyle{}\subpageref{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwprevnextdefs{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-15}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-17}\nwenddeflinemarkup
 \nwlinkedidentc{RWTS_IOB}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-16}                EQU     $B7E8   ; RWTS Input/Output Block (14 bytes)
-\nwlinkedidentc{RWTS_ENTRY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-16}              EQU     $B7B5   ; RWTS entry point
-\nwindexdefn{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-16}\nwindexdefn{\nwixident{RWTS{\_}IOB}}{RWTS:unIOB}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-16}\eatline
-\nwidentdefs{\\{{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}}\\{{\nwixident{RWTS{\_}IOB}}{RWTS:unIOB}}}\nwendcode{}\nwbegindocs{263}\nwdocspar
+\nwindexdefn{\nwixident{RWTS{\_}IOB}}{RWTS:unIOB}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-16}\eatline
+\nwidentdefs{\\{{\nwixident{RWTS{\_}IOB}}{RWTS:unIOB}}}\nwendcode{}\nwbegindocs{263}\nwdocspar
 
 \subsection{init\_stub2 (\$6B94)}
 
@@ -6800,10 +6800,10 @@ explosion-like sound.
 
 \subsection{setup\_disk\_read (\$6C18)}
 
-Prepares disk I/O parameters for the EALDR disk routines.  Stores
+Prepares disk I/O parameters for the disk routines.  Stores
 the track number (A) at offset~\$0C of the parameter block at~(\$08),
-clears the sector offset at~(\$08)+3, then calls the EALDR seek
-routine at~\$B7B5 with the slot address from~\$08/\$09.
+clears the sector offset at~(\$08)+3, then calls {\Tt{}RWTS{\textbackslash}{\_}ENTRY\nwendquote}
+at~{\Tt{}{\textbackslash}{\$}B7B5\nwendquote} with the IOB address from~\$08/\$09.
 
 \nwenddocs{}\nwbegincode{407}\sublabel{PYNWmai0-3U33XUD5TOMNWRAM7IHRXHS7HA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-3U33XUD5TOMNWRAM7IHRXHS7HA000000-1}}}\moddef{setup disk read~{\nwtagstyle{}\subpageref{PYNWmai0-3U33XUD5TOMNWRAM7IHRXHS7HA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $6C18
@@ -6817,19 +6817,20 @@ routine at~\$B7B5 with the slot address from~\$08/\$09.
     STA     ($08),Y                 ; ($08)+$03 = 0 (sector offset)
     LDA     $09                     ; \\ A/Y = slot parameter block
     LDY     $08                     ; /
-    JSR     $B7B5                   ; EALDR seek routine
+    JSR     \nwlinkedidentc{RWTS_ENTRY}{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}              ; seek to track
     LDA     #$00
     STA     $48                     ; clear disk status
     RTS
 \nwindexdefn{\nwixident{SETUP{\_}DISK{\_}READ}}{SETUP:unDISK:unREAD}{PYNWmai0-3U33XUD5TOMNWRAM7IHRXHS7HA000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{SETUP{\_}DISK{\_}READ}}{SETUP:unDISK:unREAD}}}\nwendcode{}\nwbegindocs{408}\nwdocspar
+\nwidentdefs{\\{{\nwixident{SETUP{\_}DISK{\_}READ}}{SETUP:unDISK:unREAD}}}\nwidentuses{\\{{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}}}\nwindexuse{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}{PYNWmai0-3U33XUD5TOMNWRAM7IHRXHS7HA000000-1}\nwendcode{}\nwbegindocs{408}\nwdocspar
 
 \subsection{load\_scene\_data (\$6DD8)}
 
 Loads scene-specific data from disk into the {\Tt{}{\textbackslash}{\$}5C00\nwendquote} region.  The disk
-read calls {\Tt{}{\textbackslash}{\$}B300\nwendquote}, which is part of the EALDR disk I/O code still
-resident in memory.  If the read fails, the routine fills a byte with
-PRNG output (a graceful degradation rather than crashing).
+read calls {\Tt{}DISK{\textbackslash}{\_}READ{\textbackslash}{\_}FIELD\nwendquote} at {\Tt{}{\textbackslash}{\$}B300\nwendquote}, which enters the disk~VM
+interpreter to perform the multi-sector read.  If the read fails, the
+routine fills a byte with PRNG output (a graceful degradation rather than
+crashing).
 
 \nwenddocs{}\nwbegincode{409}\sublabel{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}}}\moddef{load scene data~{\nwtagstyle{}\subpageref{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
     ORG     $6DD8
@@ -6843,7 +6844,7 @@ PRNG output (a graceful degradation rather than crashing).
     LDA     #$00
     JSR     \nwlinkedidentc{SETUP_DISK_READ}{PYNWmai0-3U33XUD5TOMNWRAM7IHRXHS7HA000000-1}         ; prepare disk parameters
     CLC
-    JSR     $B300                   ; EALDR disk read routine
+    JSR     \nwlinkedidentc{DISK_READ_FIELD}{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}         ; read sector data from disk
     BCS     .error
     RTS
 
@@ -6854,7 +6855,7 @@ PRNG output (a graceful degradation rather than crashing).
     STA     $9AA6,Y
     RTS
 \nwindexdefn{\nwixident{LOAD{\_}SCENE{\_}DATA}}{LOAD:unSCENE:unDATA}{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{LOAD{\_}SCENE{\_}DATA}}{LOAD:unSCENE:unDATA}}}\nwidentuses{\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{SETUP{\_}DISK{\_}READ}}{SETUP:unDISK:unREAD}}\\{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}}\nwindexuse{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}\nwindexuse{\nwixident{SETUP{\_}DISK{\_}READ}}{SETUP:unDISK:unREAD}{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}\nwindexuse{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}\nwendcode{}\nwbegindocs{410}\nwdocspar
+\nwidentdefs{\\{{\nwixident{LOAD{\_}SCENE{\_}DATA}}{LOAD:unSCENE:unDATA}}}\nwidentuses{\\{{\nwixident{DISK{\_}READ{\_}FIELD}}{DISK:unREAD:unFIELD}}\\{{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}}\\{{\nwixident{SETUP{\_}DISK{\_}READ}}{SETUP:unDISK:unREAD}}\\{{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}}}\nwindexuse{\nwixident{DISK{\_}READ{\_}FIELD}}{DISK:unREAD:unFIELD}{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}\nwindexuse{\nwixident{PRNG{\_}OUTPUT}}{PRNG:unOUTPUT}{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}\nwindexuse{\nwixident{SETUP{\_}DISK{\_}READ}}{SETUP:unDISK:unREAD}{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}\nwindexuse{\nwixident{STEP{\_}PRNG}}{STEP:unPRNG}{PYNWmai0-3XMQPOG4ARI455O23BBDT5GCTE000000-1}\nwendcode{}\nwbegindocs{410}\nwdocspar
 
 \section{Unresolved: \$A478}
 \label{sec:a478}
@@ -11945,11 +11946,967 @@ the routine at {\Tt{}{\$}6DA5\nwendquote} copies {\Tt{}{\$}3300--{\$}3FFF\nwendq
 These routines handle all disk access for the main game, including
 scene loading and save/restore operations.
 
-\nwenddocs{}\nwbegindocs{592}\chapter{Assembly output}
+The area splits into two distinct regions:
+\begin{itemize}
+\item {\Tt{}{\textbackslash}{\$}B300--{\textbackslash}{\$}B5FF\nwendquote}: Custom game disk code---a VM-driven sector
+  reader with its own data field verifier, context-swap mechanism,
+  and embedded bytecode program.
+\item {\Tt{}{\textbackslash}{\$}B600--{\textbackslash}{\$}BFFF\nwendquote}: Standard Apple~II DOS~3.3 RWTS (Read/Write
+  Track/Sector), byte-identical to the system master after relocation,
+  with only three patched bytes:
+  \begin{itemize}
+  \item {\Tt{}{\textbackslash}{\$}B748--{\textbackslash}{\$}B749\nwendquote}: JMP target changed from {\Tt{}{\textbackslash}{\$}9B03\nwendquote} (DOS
+    file manager) to {\Tt{}{\textbackslash}{\$}9D84\nwendquote} (game's handler).
+  \item {\Tt{}{\textbackslash}{\$}B7E1\nwendquote}: max-drives configuration byte changed from
+    {\Tt{}{\textbackslash}{\$}02\nwendquote} to {\Tt{}{\textbackslash}{\$}00\nwendquote}.
+  \end{itemize}
+  The standard RWTS is fully documented in \emph{Beneath Apple DOS}
+  (Worth \& Lechner, 1984) and will not be re-disassembled here.
+\end{itemize}
+
+The main program calls two entry points in this area:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\thead{Address} & \thead{Label} & \thead{Called from} \\
+\midrule
+{\Tt{}{\textbackslash}{\$}B300\nwendquote} & {\Tt{}DISK{\textbackslash}{\_}READ{\textbackslash}{\_}FIELD\nwendquote} & {\Tt{}LOAD{\textbackslash}{\_}SCENE{\textbackslash}{\_}DATA\nwendquote} (\$6DD8) \\
+{\Tt{}{\textbackslash}{\$}B7B5\nwendquote} & {\Tt{}RWTS{\textbackslash}{\_}ENTRY\nwendquote} & {\Tt{}SETUP{\textbackslash}{\_}DISK{\textbackslash}{\_}READ\nwendquote} (\$6C18) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{RWTS entry (\$B7B5)}
+
+{\Tt{}RWTS{\textbackslash}{\_}ENTRY\nwendquote} is the game's Read/Write Track/Sector wrapper.  It
+disables interrupts (timing-critical), calls the core RWTS dispatcher
+at~{\Tt{}{\textbackslash}{\$}BD00\nwendquote}, then returns carry clear on success or carry set on error.
+The caller passes {\Tt{}A\nwendquote}=IOB high byte and {\Tt{}Y\nwendquote}=IOB low byte, where the
+IOB (Input/Output Block) follows the standard Apple~II RWTS parameter
+format.
+
+\nwenddocs{}\nwbegincode{592}\sublabel{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}}}\moddef{rwts entry~{\nwtagstyle{}\subpageref{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B7B5
+\nwlinkedidentc{RWTS_ENTRY}{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}:
+    SUBROUTINE
+
+    PHP                             ; save processor flags
+    SEI                             ; disable interrupts (disk timing)
+    JSR     \nwlinkedidentc{RWTS_CORE}{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}               ; call RWTS dispatcher
+    BCS     .error
+    PLP                             ; restore flags
+    CLC                             ; success
+    RTS
+
+.error:
+    PLP                             ; restore flags
+    SEC                             ; error
+    RTS
+\nwindexdefn{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}}}\nwidentuses{\\{{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}}}\nwindexuse{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}\nwendcode{}\nwbegindocs{593}\nwdocspar
+
+\section{RWTS core (\$BD00)}
+
+The RWTS core at~{\Tt{}{\textbackslash}{\$}BD00\nwendquote} is the standard Apple~II DOS~3.3 RWTS
+dispatcher, unmodified from the system master.  It manages the IOB
+parameter block at~(\$48/\$49), handles drive motor control, phase
+stepping (seek), and dispatches to sector read, write, or format
+operations.  See~\emph{Beneath Apple DOS} chapter~4 for full documentation.
+
+\nwenddocs{}\nwbegincode{594}\sublabel{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}}}\moddef{rwts core~{\nwtagstyle{}\subpageref{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $BD00
+\nwlinkedidentc{RWTS_CORE}{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}:
+    ; Standard DOS 3.3 RWTS --- not disassembled (see Beneath Apple DOS)
+    ; IOB pointer in $48/$49 (set by caller: Y→$48, A→$49)
+    ; Returns carry clear = success, carry set = error
+\nwindexdefn{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}}}\nwendcode{}\nwbegindocs{595}\nwdocspar
+
+\section{Disk read field (\$B300)}
+
+{\Tt{}DISK{\textbackslash}{\_}READ{\textbackslash}{\_}FIELD\nwendquote} is the entry point called by {\Tt{}LOAD{\textbackslash}{\_}SCENE{\textbackslash}{\_}DATA\nwendquote}
+to read sector data from disk.  It is a trampoline into the disk~VM
+interpreter loop at~{\Tt{}{\textbackslash}{\$}B36A\nwendquote}, which uses an embedded bytecode program
+to control the multi-sector read process.  The carry flag is clear on
+entry (set by the caller) to indicate a read operation.
+
+\nwenddocs{}\nwbegincode{596}\sublabel{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}}}\moddef{disk read field~{\nwtagstyle{}\subpageref{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B300
+\nwlinkedidentc{DISK_READ_FIELD}{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}:
+    JMP     \nwlinkedidentc{DISK_VM_LOOP}{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}            ; enter VM interpreter
+    NOP                             ; pad
+\nwindexdefn{\nwixident{DISK{\_}READ{\_}FIELD}}{DISK:unREAD:unFIELD}{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}READ{\_}FIELD}}{DISK:unREAD:unFIELD}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}LOOP}}{DISK:unVM:unLOOP}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}LOOP}}{DISK:unVM:unLOOP}{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}\nwendcode{}\nwbegindocs{597}\nwdocspar
+
+\section{Verify data field (\$B304)}
+
+Searches for the standard data field prologue ({\Tt{}D5\ AA\ AD\nwendquote}) on
+the disk, then reads all 342 nibbles (86~secondary + 256~primary) and
+verifies each byte equals~{\Tt{}{\textbackslash}{\$}AF\nwendquote}.  Finally checks the data epilogue
+({\Tt{}DE\ AA\nwendquote}).  Returns carry clear on success, carry set on error.
+
+This routine is called internally by the disk~VM (via {\Tt{}JSR\ {\textbackslash}{\$}B304\nwendquote}).
+
+\nwenddocs{}\nwbegincode{598}\sublabel{PYNWmai0-F7XUTD7KQKIZ2LAWT3LZSLO5AM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-F7XUTD7KQKIZ2LAWT3LZSLO5AM000000-1}}}\moddef{verify data field~{\nwtagstyle{}\subpageref{PYNWmai0-F7XUTD7KQKIZ2LAWT3LZSLO5AM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B304
+\nwlinkedidentc{VERIFY_DATA_FIELD}{PYNWmai0-F7XUTD7KQKIZ2LAWT3LZSLO5AM000000-1}:
+    SUBROUTINE
+
+; --- Search for D5 AA AD data field prologue ---
+    LDY     #$20                    ; timeout counter = 32
+.search_d5:
+    DEY
+    BEQ     .error                  ; timeout
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           ; read disk nibble
+    BPL     *-3                     ; wait for data ready
+.check_d5:
+    EOR     #$D5                    ; check for D5
+    BNE     .search_d5              ; not D5, retry
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           ; read next nibble
+    BPL     *-3
+    CMP     #$AA                    ; check for AA
+    BNE     .check_d5               ; not AA, re-check as D5
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           ; read third nibble
+    BPL     *-3
+    CMP     #$AD                    ; check for AD
+    BNE     .check_d5               ; not AD, re-check as D5
+
+; --- Found D5 AA AD: read and verify data nibbles ---
+    PHA                             ; \\ waste cycles (timing)
+    PLA                             ; /
+    LDY     #$56                    ; 86 nibbles (secondary buffer)
+.read_secondary:
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           ; read nibble
+    BPL     *-3
+    BIT     $C000                   ; timing sync
+    CMP     #$AF                    ; verify nibble = $AF
+    BNE     .bad_nibble             ; mismatch → error
+    DEY
+    BNE     .read_secondary
+
+    LDY     #$00                    ; 256 nibbles (primary buffer)
+.read_primary:
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           ; read nibble
+    BPL     *-3
+    BIT     $C000                   ; timing sync
+    CMP     #$AF                    ; verify nibble = $AF
+    BNE     .bad_nibble             ; mismatch → error
+    DEY
+    BNE     .read_primary
+
+; --- Verify DE AA data field epilogue ---
+    LDY     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           ; read (discard) checksum nibble
+    BPL     *-3
+    PHA                             ; \\ waste cycles
+    PLA                             ; /
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           ; read epilogue byte 1
+    BPL     *-3
+    CMP     #$DE                    ; check for DE
+    BNE     .error                  ; bad epilogue
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           ; read epilogue byte 2
+    BPL     *-3
+    CMP     #$AA                    ; check for AA
+    BEQ     .ok                     ; good epilogue
+
+.error:
+    SEC                             ; carry set = error
+    RTS
+
+.ok:
+    CLC                             ; carry clear = success
+    RTS
+
+.bad_nibble:
+    STA     $B5F6                   ; save mismatched nibble for diagnostics
+    SEC                             ; carry set = error
+    RTS
+\nwindexdefn{\nwixident{VERIFY{\_}DATA{\_}FIELD}}{VERIFY:unDATA:unFIELD}{PYNWmai0-F7XUTD7KQKIZ2LAWT3LZSLO5AM000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{VERIFY{\_}DATA{\_}FIELD}}{VERIFY:unDATA:unFIELD}}}\nwidentuses{\\{{\nwixident{DISK{\_}DATA{\_}REG}}{DISK:unDATA:unREG}}}\nwindexuse{\nwixident{DISK{\_}DATA{\_}REG}}{DISK:unDATA:unREG}{PYNWmai0-F7XUTD7KQKIZ2LAWT3LZSLO5AM000000-1}\nwendcode{}\nwbegindocs{599}\nwdocspar
+
+\section{Disk VM loop (\$B36A)}
+
+The disk~VM interpreter loop.  Each iteration swaps the VM context
+(zero-page {\Tt{}{\textbackslash}{\$}50--{\textbackslash}{\$}5F\nwendquote} $\leftrightarrow$ saved state at {\Tt{}{\textbackslash}{\$}B5E5\nwendquote})
+and then dispatches the next VM opcode.  The VM bytecode program
+follows immediately after the {\Tt{}JMP\nwendquote} at~{\Tt{}{\textbackslash}{\$}B370\nwendquote} and controls the
+multi-sector disk read sequence.  The loop has no explicit exit; the
+VM program returns to the caller by manipulating the stack.
+
+\nwenddocs{}\nwbegincode{600}\sublabel{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}}}\moddef{disk vm loop~{\nwtagstyle{}\subpageref{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B36A
+\nwlinkedidentc{DISK_VM_LOOP}{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}:
+    JSR     \nwlinkedidentc{DISK_VM_SWAP}{PYNWmai0-YFYCU6Q2EWD6JQJOO76Z4EFCFU000000-1}            ; swap ZP $50-$5F with saved state
+    JSR     \nwlinkedidentc{DISK_VM_DISPATCH}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}        ; execute next VM opcode
+    JMP     \nwlinkedidentc{DISK_VM_LOOP}{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}            ; repeat
+; VM bytecode program follows at $B373
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}LOOP}}{DISK:unVM:unLOOP}{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}LOOP}}{DISK:unVM:unLOOP}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}DISPATCH}}{DISK:unVM:unDISPATCH}}\\{{\nwixident{DISK{\_}VM{\_}SWAP}}{DISK:unVM:unSWAP}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}DISPATCH}}{DISK:unVM:unDISPATCH}{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}SWAP}}{DISK:unVM:unSWAP}{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}\nwendcode{}\nwbegindocs{601}\nwdocspar
+
+\section{Disk VM bytecode program (\$B373--\$B3FE)}
+
+The VM bytecode program follows immediately after the VM loop.  All
+address operands are encrypted (low byte XOR~{\Tt{}{\textbackslash}{\$}9C\nwendquote}, high byte
+XOR~{\Tt{}{\textbackslash}{\$}AD\nwendquote}); immediate operands are XOR'd with~{\Tt{}{\textbackslash}{\$}7A\nwendquote}.  The program
+implements a disk copy-protection verifier: it checks code integrity,
+turns on the drive motor, reads data from multiple half-track positions,
+and exits with carry indicating success or failure.
+
+Decoded program flow:
+
+\begin{enumerate}
+\item Three integrity checks: verifies bytes at {\Tt{}{\textbackslash}{\$}B361\nwendquote}, {\Tt{}{\textbackslash}{\$}B362\nwendquote},
+  and {\Tt{}{\textbackslash}{\$}B368\nwendquote} (the {\Tt{}SEC\nwendquote}, {\Tt{}RTS\nwendquote}, and {\Tt{}SEC\nwendquote} opcodes in
+  {\Tt{}VERIFY{\textbackslash}{\_}DATA{\textbackslash}{\_}FIELD\nwendquote}).  Exits with error if any byte was patched.
+\item Calls the disk-read subroutine at {\Tt{}{\textbackslash}{\$}B3A8\nwendquote} (embedded below).
+  On failure, retries once; on second failure, allows up to~2 errors
+  before restarting.
+\item The subroutine turns on the motor, waits for spin-up, sets read
+  mode, calls the half-track verifier ({\Tt{}READ{\textbackslash}{\_}AND{\textbackslash}{\_}VERIFY\nwendquote}) from
+  multiple head positions, then turns off the motor.
+\item On success, exits via {\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}EXIT{\textbackslash}{\_}OK\nwendquote} (carry clear).
+\end{enumerate}
+
+\nwenddocs{}\nwbegincode{602}\sublabel{PYNWmai0-XUCNFCEPISMBQ62XBBUYF4U6FA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-XUCNFCEPISMBQ62XBBUYF4U6FA000000-1}}}\moddef{disk vm bytecode~{\nwtagstyle{}\subpageref{PYNWmai0-XUCNFCEPISMBQ62XBBUYF4U6FA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B373
+\nwlinkedidentc{DISK_VM_BYTECODE}{PYNWmai0-XUCNFCEPISMBQ62XBBUYF4U6FA000000-1}:
+; --- Integrity checks ---
+; LDA_ABS $B361; SUB_IMM #$38; BNZ $B48D  (verify SEC at .error)
+    HEX     04 fd 1e 07 42 02 11 19
+; LDA_ABS $B362; SUB_IMM #$60; BNZ $B48D  (verify RTS at .error+1)
+    HEX     04 fe 1e 07 1a 02 11 19
+; LDA_ABS $B368; SUB_IMM #$38; BNZ $B48D  (verify SEC at .bad_nibble+3)
+    HEX     04 f4 1e 07 42 02 11 19
+; --- First attempt ---
+; CALL $B3A8 (disk read sub); BNZ $B394 (retry on error)
+    HEX     05 34 1e
+; GOTO $B3A5 (exit OK path, skipping retry)
+    HEX     02 08 1e         ;BNZ $B394 (if error → retry)
+    HEX     0c 39 1e         ;GOTO $B3A5 (success → exit)
+; --- Retry (second attempt, at $B394) ---
+; CALL $B3A8; BNZ $B39D (error handler)
+    HEX     05 34 1e
+    HEX     02 01 1e         ;BNZ $B39D (if error → handler)
+; GOTO $B3A5 (exit OK)
+    HEX     0c 39 1e
+; --- Error handler at $B39D ---
+; SUB_IMM #$02; BNZ $B48D (fatal if >2 errors); GOTO $B373 (restart)
+    HEX     07 78 02 11 19 0c ef 1e
+; --- Success exit at $B3A5 ---
+; CALL0 $B492 (\nwlinkedidentc{DISK_VM_EXIT_OK}{PYNWmai0-GPMJOZWLZ5RVOPUPG24SCBP6HY000000-1})
+    HEX     09 0e 19
+; --- Disk read subroutine at $B3A8 ---
+; LDA_ABS $C0E9 (motor on)
+    HEX     04 75 6d
+; LDA_IMM #$FF; CALL1 $FCA8 (ROM WAIT)  ×2  (motor spin-up delay)
+    HEX     03 85 01 34 51
+    HEX     03 85 01 34 51
+; LDA_ABS $C0EE (Q7L = read mode)
+    HEX     04 72 6d
+; LDA_IMM #$00; STA_ABS $B5E2 (clear error accumulator)
+    HEX     03 7a 06 7e 18
+; CALL $B3D0 ×4 (half-track verification passes)
+    HEX     05 4c 1e
+    HEX     05 4c 1e
+    HEX     05 4c 1e
+    HEX     05 4c 1e
+; LDA_ABS $C0E8 (motor off)
+    HEX     04 74 6d
+; LDA_ABS $B5E2 (load error count); RET
+    HEX     04 7e 18 08
+; --- Half-track verifier subroutine at $B3D0 ---
+; LDA_IMM #$03; STA_ABS $B44D (set retry counter)
+    HEX     03 79 06 d1 19
+; CALL1 $B44E (\nwlinkedidentc{READ_AND_VERIFY}{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1})
+    HEX     01 d2 19
+; LDA_ABS $C0E7 (phase 3 on — half-track step)
+    HEX     04 7b 6d
+; CALL1 $B44E ×2
+    HEX     01 d2 19 01 d2 19
+; LDA_ABS $C0E1 (phase 0 on — half-track step)
+    HEX     04 7d 6d
+; CALL $B46B (PARK_STEPPER sub)
+    HEX     05 f7 19
+; LDA_IMM #$03; STA_ABS $B44D (reset retry counter)
+    HEX     03 79 06 d1 19
+; CALL1 $B44E (\nwlinkedidentc{READ_AND_VERIFY}{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1})
+    HEX     01 d2 19
+; LDA_ABS $C0E7 (phase 3 on)
+    HEX     04 7b 6d
+; CALL1 $B44E ×2
+    HEX     01 d2 19 01 d2 19
+; LDA_ABS $C0E5 (phase 2 on — half-track step)
+    HEX     04 79 6d
+; CALL $B46B (PARK_STEPPER); RET
+    HEX     05 f7 19 08
+; $B3FF: next byte ($A0) is the LDY opcode of \nwlinkedidentc{SEARCH_ADDR_FIELD}{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}BYTECODE}}{DISK:unVM:unBYTECODE}{PYNWmai0-XUCNFCEPISMBQ62XBBUYF4U6FA000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}BYTECODE}}{DISK:unVM:unBYTECODE}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}EXIT{\_}OK}}{DISK:unVM:unEXIT:unOK}}\\{{\nwixident{READ{\_}AND{\_}VERIFY}}{READ:unAND:unVERIFY}}\\{{\nwixident{SEARCH{\_}ADDR{\_}FIELD}}{SEARCH:unADDR:unFIELD}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}EXIT{\_}OK}}{DISK:unVM:unEXIT:unOK}{PYNWmai0-XUCNFCEPISMBQ62XBBUYF4U6FA000000-1}\nwindexuse{\nwixident{READ{\_}AND{\_}VERIFY}}{READ:unAND:unVERIFY}{PYNWmai0-XUCNFCEPISMBQ62XBBUYF4U6FA000000-1}\nwindexuse{\nwixident{SEARCH{\_}ADDR{\_}FIELD}}{SEARCH:unADDR:unFIELD}{PYNWmai0-XUCNFCEPISMBQ62XBBUYF4U6FA000000-1}\nwendcode{}\nwbegindocs{603}\nwdocspar
+
+\section{Search address field (\$B3FF)}
+
+Searches for the D5~AA~96 address field prologue on disk.  The entry
+point at {\Tt{}{\textbackslash}{\$}B3FF\nwendquote} sets~Y to~{\Tt{}{\textbackslash}{\$}FF\nwendquote} (256~inner retries), then falls
+through to the search loop.  The outer retry count is loaded from and
+saved back to the data byte at~{\Tt{}{\textbackslash}{\$}B44D\nwendquote}.  On success, returns with
+carry clear, X~=~1, and the last decoded address-field nibble
+(sector number) in~{\Tt{}{\textbackslash}{\$}50\nwendquote}.  On failure, returns with carry set.
+
+The 4-and-4 decoding loop reads three field pairs
+(volume, track, sector), each encoded as two disk nibbles whose
+even/odd bits must be combined via {\Tt{}ROL\nwendquote}/{\Tt{}AND\nwendquote}.
+
+\nwenddocs{}\nwbegincode{604}\sublabel{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}}}\moddef{search addr field~{\nwtagstyle{}\subpageref{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B3FF
+\nwlinkedidentc{SEARCH_ADDR_FIELD}{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}:
+    LDY     #$FF                    ; 256 inner retries
+; $B400: FF is the immediate operand (part of the LDY instruction)
+.search:
+    LDX     \nwlinkedidentc{SEARCH_RETRY_COUNT}{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}      ; outer retry count
+.next_nibble:
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           ; read nibble
+    BPL     *-3                     ; wait for ready
+    CMP     #$D5                    ; first prologue byte?
+    BEQ     .got_d5
+    DEY                             ; inner countdown
+    BNE     .next_nibble
+    DEX                             ; outer countdown
+    BNE     .next_nibble
+    RTS                             ; timeout (carry unchanged)
+
+.got_d5:
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}
+    BPL     *-3
+    CMP     #$AA                    ; second prologue byte?
+    BEQ     .got_aa
+    DEY
+    BNE     .next_nibble
+    SEC
+    RTS                             ; timeout
+
+.got_aa:
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}
+    BPL     *-3
+    CMP     #$96                    ; third prologue byte (addr mark)?
+    BEQ     .got_96
+    DEY
+    BNE     .next_nibble
+    SEC
+    RTS                             ; timeout
+
+.got_96:
+; --- Decode 3 address field pairs (4-and-4 encoding) ---
+    LDY     #$02                    ; 3 pairs: volume, track, sector
+.decode_pair:
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           ; read odd-bits nibble
+    BPL     *-3
+    ROL                             ; shift data, odd bits in even positions
+    STA     $50                     ; save partial
+    LDA     \nwlinkedidentc{DISK_DATA_REG}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}           ; read even-bits nibble
+    BPL     *-3
+    AND     $50                     ; combine: result = decoded byte
+    STA     $50                     ; last decoded value (sector on final iter)
+    DEY
+    STX     \nwlinkedidentc{SEARCH_RETRY_COUNT}{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}      ; save remaining retry count
+    BPL     .decode_pair            ; Y: 2→1→0→FF (3 iterations)
+
+    CLC                             ; success
+    LDX     #$01
+    RTS
+
+\nwlinkedidentc{SEARCH_RETRY_COUNT}{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}:
+    DC.B    3                       ; $B44D: outer retry counter (default 3)
+\nwindexdefn{\nwixident{SEARCH{\_}ADDR{\_}FIELD}}{SEARCH:unADDR:unFIELD}{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}\nwindexdefn{\nwixident{SEARCH{\_}RETRY{\_}COUNT}}{SEARCH:unRETRY:unCOUNT}{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{SEARCH{\_}ADDR{\_}FIELD}}{SEARCH:unADDR:unFIELD}}\\{{\nwixident{SEARCH{\_}RETRY{\_}COUNT}}{SEARCH:unRETRY:unCOUNT}}}\nwidentuses{\\{{\nwixident{DISK{\_}DATA{\_}REG}}{DISK:unDATA:unREG}}}\nwindexuse{\nwixident{DISK{\_}DATA{\_}REG}}{DISK:unDATA:unREG}{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}\nwendcode{}\nwbegindocs{605}\nwdocspar
+
+\section{Read and verify (\$B44E)}
+
+Native routine called by the VM via CALL1.  Searches for an address
+field ({\Tt{}JSR\ {\textbackslash}{\$}B3FF\nwendquote}), then verifies the data field
+({\Tt{}JSR\ VERIFY{\textbackslash}{\_}DATA{\textbackslash}{\_}FIELD\nwendquote}).  Accumulates errors in
+{\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}ERROR{\textbackslash}{\_}ACCUM\nwendquote} at~{\Tt{}{\textbackslash}{\$}B5E2\nwendquote}.  Afterward, turns off all
+four stepper motor phases (preventing motor heating).
+
+\nwenddocs{}\nwbegincode{606}\sublabel{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1}}}\moddef{read and verify~{\nwtagstyle{}\subpageref{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B44E
+\nwlinkedidentc{READ_AND_VERIFY}{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1}:
+    JSR     \nwlinkedidentc{SEARCH_ADDR_FIELD}{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}       ; find D5 AA 96 address prologue
+    BCS     .skip_verify            ; no address field → skip data verify
+    JSR     \nwlinkedidentc{VERIFY_DATA_FIELD}{PYNWmai0-F7XUTD7KQKIZ2LAWT3LZSLO5AM000000-1}       ; verify D5 AA AD data field
+.skip_verify:
+    LDA     #$00
+    ADC     \nwlinkedidentc{DISK_VM_ERROR_ACCUM}{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}     ; carry → error count
+    STA     \nwlinkedidentc{DISK_VM_ERROR_ACCUM}{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}
+; --- Turn off all stepper motor phases ---
+    LDA     $C0E0                   ; phase 0 off
+    LDA     $C0E2                   ; phase 1 off
+    LDA     $C0E4                   ; phase 2 off
+    LDA     $C0E6                   ; phase 3 off
+    RTS
+\nwindexdefn{\nwixident{READ{\_}AND{\_}VERIFY}}{READ:unAND:unVERIFY}{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{READ{\_}AND{\_}VERIFY}}{READ:unAND:unVERIFY}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}ERROR{\_}ACCUM}}{DISK:unVM:unERROR:unACCUM}}\\{{\nwixident{SEARCH{\_}ADDR{\_}FIELD}}{SEARCH:unADDR:unFIELD}}\\{{\nwixident{VERIFY{\_}DATA{\_}FIELD}}{VERIFY:unDATA:unFIELD}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}ERROR{\_}ACCUM}}{DISK:unVM:unERROR:unACCUM}{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1}\nwindexuse{\nwixident{SEARCH{\_}ADDR{\_}FIELD}}{SEARCH:unADDR:unFIELD}{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1}\nwindexuse{\nwixident{VERIFY{\_}DATA{\_}FIELD}}{VERIFY:unDATA:unFIELD}{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1}\nwendcode{}\nwbegindocs{607}\nwdocspar
+
+\section{VM subroutine: park stepper (\$B46B)}
+
+VM bytecode subroutine that delays and turns off all stepper motor
+phases.  Called via VM opcode~5 (CALL) from the half-track verifier.
+The delays allow the stepper motor to settle between half-track
+movements.
+
+\nwenddocs{}\nwbegincode{608}\sublabel{PYNWmai0-CZ7WUYZMRQOZ776KSWPCNVZLQI000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-CZ7WUYZMRQOZ776KSWPCNVZLQI000000-1}}}\moddef{disk vm sub park stepper~{\nwtagstyle{}\subpageref{PYNWmai0-CZ7WUYZMRQOZ776KSWPCNVZLQI000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B46B
+\nwlinkedidentc{DISK_VM_SUB_PARK_STEPPER}{PYNWmai0-CZ7WUYZMRQOZ776KSWPCNVZLQI000000-1}:
+; LDA_IMM #$70; CALL1 $B482 (\nwlinkedidentc{DELAY_LOOP}{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1})  — long delay
+    HEX     03 0a 01 1e 19
+; LDA_ABS $C0E0 (phase 0 off)
+    HEX     04 7c 6d
+; LDA_ABS $C0E2 (phase 1 off)
+    HEX     04 7e 6d
+; LDA_ABS $C0E4 (phase 2 off)
+    HEX     04 78 6d
+; LDA_ABS $C0E6 (phase 3 off)
+    HEX     04 7a 6d
+; LDA_IMM #$28; CALL1 $B482 (\nwlinkedidentc{DELAY_LOOP}{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1})  — short delay
+    HEX     03 52 01 1e 19
+; RET
+    HEX     08
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}SUB{\_}PARK{\_}STEPPER}}{DISK:unVM:unSUB:unPARK:unSTEPPER}{PYNWmai0-CZ7WUYZMRQOZ776KSWPCNVZLQI000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}SUB{\_}PARK{\_}STEPPER}}{DISK:unVM:unSUB:unPARK:unSTEPPER}}}\nwidentuses{\\{{\nwixident{DELAY{\_}LOOP}}{DELAY:unLOOP}}}\nwindexuse{\nwixident{DELAY{\_}LOOP}}{DELAY:unLOOP}{PYNWmai0-CZ7WUYZMRQOZ776KSWPCNVZLQI000000-1}\nwendcode{}\nwbegindocs{609}\nwdocspar
+
+\section{Delay loop (\$B482)}
+
+Native delay routine.  Takes the delay count in~{\Tt{}A\nwendquote} (passed from
+VM accumulator via CALL1).  Inner loop: {\Tt{}DEX\nwendquote} from {\Tt{}{\textbackslash}{\$}20\nwendquote} to~0
+(32~iterations).  Outer loop: {\Tt{}SBC{\textasciitilde}{\textbackslash}{\#}{\textbackslash}{\$}01\nwendquote} until A~reaches~0.
+Total delay $\approx$ 160~×~A cycles.
+
+\nwenddocs{}\nwbegincode{610}\sublabel{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1}}}\moddef{delay loop~{\nwtagstyle{}\subpageref{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B482
+\nwlinkedidentc{DELAY_LOOP}{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1}:
+    SUBROUTINE
+    LDX     #$20
+.inner:
+    DEX
+    BNE     .inner
+    SEC
+    SBC     #$01
+    BNE     \nwlinkedidentc{DELAY_LOOP}{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1}
+    RTS
+\nwindexdefn{\nwixident{DELAY{\_}LOOP}}{DELAY:unLOOP}{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DELAY{\_}LOOP}}{DELAY:unLOOP}}}\nwendcode{}\nwbegindocs{611}\nwdocspar
+
+\section{VM exit-with-error bytecode (\$B48D)}
+
+Short VM bytecode fragment that loads {\Tt{}{\textbackslash}{\$}20\nwendquote} into the accumulator
+and jumps to {\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}EXIT{\textbackslash}{\_}ERR\nwendquote}, which swaps context and returns
+to the caller with carry set.  Reached by the integrity-check and
+error-handler {\Tt{}BNZ\nwendquote} branches in the main bytecode program.
+
+\nwenddocs{}\nwbegincode{612}\sublabel{PYNWmai0-ZXIAUF3LVQ4RS7ZIP64X3QRMVM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ZXIAUF3LVQ4RS7ZIP64X3QRMVM000000-1}}}\moddef{disk vm sub exit err~{\nwtagstyle{}\subpageref{PYNWmai0-ZXIAUF3LVQ4RS7ZIP64X3QRMVM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B48D
+\nwlinkedidentc{DISK_VM_SUB_EXIT_ERR}{PYNWmai0-ZXIAUF3LVQ4RS7ZIP64X3QRMVM000000-1}:
+; LDA_IMM #$20; CALL0 $B497 (\nwlinkedidentc{DISK_VM_EXIT_ERR}{PYNWmai0-3PDBUTNAY2LH74GXKBLMC3S7IE000000-1})
+    HEX     03 5a 09 0b 19
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}SUB{\_}EXIT{\_}ERR}}{DISK:unVM:unSUB:unEXIT:unERR}{PYNWmai0-ZXIAUF3LVQ4RS7ZIP64X3QRMVM000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}SUB{\_}EXIT{\_}ERR}}{DISK:unVM:unSUB:unEXIT:unERR}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}EXIT{\_}ERR}}{DISK:unVM:unEXIT:unERR}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}EXIT{\_}ERR}}{DISK:unVM:unEXIT:unERR}{PYNWmai0-ZXIAUF3LVQ4RS7ZIP64X3QRMVM000000-1}\nwendcode{}\nwbegindocs{613}\nwdocspar
+
+\section{VM exit routines (\$B492--\$B49E)}
+
+These native routines exit the disk~VM\@.  Each calls
+{\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}SWAP\nwendquote} to restore the caller's zero-page state, then
+returns with carry flag indicating success or failure.
+
+\nwenddocs{}\nwbegincode{614}\sublabel{PYNWmai0-GPMJOZWLZ5RVOPUPG24SCBP6HY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-GPMJOZWLZ5RVOPUPG24SCBP6HY000000-1}}}\moddef{disk vm exit ok~{\nwtagstyle{}\subpageref{PYNWmai0-GPMJOZWLZ5RVOPUPG24SCBP6HY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B492
+\nwlinkedidentc{DISK_VM_EXIT_OK}{PYNWmai0-GPMJOZWLZ5RVOPUPG24SCBP6HY000000-1}:
+    JSR     \nwlinkedidentc{DISK_VM_SWAP}{PYNWmai0-YFYCU6Q2EWD6JQJOO76Z4EFCFU000000-1}            ; restore caller's ZP
+    CLC                             ; carry clear = success
+    RTS
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}EXIT{\_}OK}}{DISK:unVM:unEXIT:unOK}{PYNWmai0-GPMJOZWLZ5RVOPUPG24SCBP6HY000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}EXIT{\_}OK}}{DISK:unVM:unEXIT:unOK}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}SWAP}}{DISK:unVM:unSWAP}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}SWAP}}{DISK:unVM:unSWAP}{PYNWmai0-GPMJOZWLZ5RVOPUPG24SCBP6HY000000-1}\nwendcode{}\nwbegindocs{615}\nwdocspar
+
+\nwenddocs{}\nwbegincode{616}\sublabel{PYNWmai0-3PDBUTNAY2LH74GXKBLMC3S7IE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-3PDBUTNAY2LH74GXKBLMC3S7IE000000-1}}}\moddef{disk vm exit err~{\nwtagstyle{}\subpageref{PYNWmai0-3PDBUTNAY2LH74GXKBLMC3S7IE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B497
+\nwlinkedidentc{DISK_VM_EXIT_ERR}{PYNWmai0-3PDBUTNAY2LH74GXKBLMC3S7IE000000-1}:
+    JSR     \nwlinkedidentc{DISK_VM_SWAP}{PYNWmai0-YFYCU6Q2EWD6JQJOO76Z4EFCFU000000-1}            ; restore caller's ZP
+    SEC                             ; carry set = error
+    RTS
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}EXIT{\_}ERR}}{DISK:unVM:unEXIT:unERR}{PYNWmai0-3PDBUTNAY2LH74GXKBLMC3S7IE000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}EXIT{\_}ERR}}{DISK:unVM:unEXIT:unERR}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}SWAP}}{DISK:unVM:unSWAP}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}SWAP}}{DISK:unVM:unSWAP}{PYNWmai0-3PDBUTNAY2LH74GXKBLMC3S7IE000000-1}\nwendcode{}\nwbegindocs{617}\nwdocspar
+
+\nwenddocs{}\nwbegincode{618}\sublabel{PYNWmai0-BEPMJ3SFV2UOCBYC5OUXROTXJA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-BEPMJ3SFV2UOCBYC5OUXROTXJA000000-1}}}\moddef{disk vm misc b49c~{\nwtagstyle{}\subpageref{PYNWmai0-BEPMJ3SFV2UOCBYC5OUXROTXJA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B49C
+\nwlinkedidentc{DISK_VM_MISC_B49C}{PYNWmai0-BEPMJ3SFV2UOCBYC5OUXROTXJA000000-1}:
+    EOR     #$AD
+    RTS
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}MISC{\_}B49C}}{DISK:unVM:unMISC:unB49C}{PYNWmai0-BEPMJ3SFV2UOCBYC5OUXROTXJA000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}MISC{\_}B49C}}{DISK:unVM:unMISC:unB49C}}}\nwendcode{}\nwbegindocs{619}\nwdocspar
+
+\section{Disk VM context swap (\$B4CC)}
+
+Swaps 16~bytes between zero-page locations {\Tt{}{\textbackslash}{\$}50--{\textbackslash}{\$}5F\nwendquote} and the
+saved VM state at {\Tt{}{\textbackslash}{\$}B5E5--{\textbackslash}{\$}B5F4\nwendquote}.  This preserves the caller's
+zero-page state while the VM executes, and restores it afterward.
+
+\nwenddocs{}\nwbegincode{620}\sublabel{PYNWmai0-YFYCU6Q2EWD6JQJOO76Z4EFCFU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-YFYCU6Q2EWD6JQJOO76Z4EFCFU000000-1}}}\moddef{disk vm swap~{\nwtagstyle{}\subpageref{PYNWmai0-YFYCU6Q2EWD6JQJOO76Z4EFCFU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B4CC
+\nwlinkedidentc{DISK_VM_SWAP}{PYNWmai0-YFYCU6Q2EWD6JQJOO76Z4EFCFU000000-1}:
+    SUBROUTINE
+
+    LDX     #$0F                    ; 16 bytes ($50-$5F)
+.loop:
+    LDA     $50,X                   ; \\ swap ZP with saved state
+    PHA                             ;  |
+    LDA     $B5E5,X                 ;  |
+    STA     $50,X                   ;  |
+    PLA                             ;  |
+    STA     $B5E5,X                 ; /
+    DEX
+    BPL     .loop
+    RTS
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}SWAP}}{DISK:unVM:unSWAP}{PYNWmai0-YFYCU6Q2EWD6JQJOO76Z4EFCFU000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}SWAP}}{DISK:unVM:unSWAP}}}\nwendcode{}\nwbegindocs{621}\nwdocspar
+
+\section{Disk VM data area (\$B4DE--\$B4FF)}
+
+Scratch/data area between {\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}SWAP\nwendquote} and the opcode handlers.
+Contains mostly zeros with bytes~{\Tt{}{\textbackslash}{\$}4A\ {\textbackslash}{\$}4C\ {\textbackslash}{\$}4E\nwendquote} at~{\Tt{}{\textbackslash}{\$}B4EE--{\textbackslash}{\$}B4F0\nwendquote},
+mirroring the initial saved-state values for ZP~{\Tt{}{\textbackslash}{\$}5B--{\textbackslash}{\$}5D\nwendquote}.
+
+\nwenddocs{}\nwbegincode{622}\sublabel{PYNWmai0-XH5TLQEXYFHHOOER46HK6GDTMY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-XH5TLQEXYFHHOOER46HK6GDTMY000000-1}}}\moddef{disk vm data b4de~{\nwtagstyle{}\subpageref{PYNWmai0-XH5TLQEXYFHHOOER46HK6GDTMY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B4DE
+\nwlinkedidentc{DISK_VM_DATA_B4DE}{PYNWmai0-XH5TLQEXYFHHOOER46HK6GDTMY000000-1}:
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     4a 4c 4e
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}DATA{\_}B4DE}}{DISK:unVM:unDATA:unB4DE}{PYNWmai0-XH5TLQEXYFHHOOER46HK6GDTMY000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}DATA{\_}B4DE}}{DISK:unVM:unDATA:unB4DE}}}\nwendcode{}\nwbegindocs{623}\nwdocspar
+
+\section{Disk VM dispatch (\$B49F)}
+
+Executes one VM opcode.  Pulls the return address from the stack to
+locate the current instruction pointer, reads the next opcode byte,
+looks up the handler address (low byte) in the table at~{\Tt{}{\textbackslash}{\$}B4BF\nwendquote},
+and self-modifies a {\Tt{}JMP\nwendquote} at~{\Tt{}{\textbackslash}{\$}B5DF\nwendquote} to dispatch to the
+handler in page~{\Tt{}{\textbackslash}{\$}B5\nwendquote}.
+
+\nwenddocs{}\nwbegincode{624}\sublabel{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}}}\moddef{disk vm dispatch~{\nwtagstyle{}\subpageref{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B49F
+\nwlinkedidentc{DISK_VM_DISPATCH}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}:
+    SUBROUTINE
+
+    TXA
+    PHA                             ; save X
+    TYA
+    PHA                             ; save Y
+    JSR     \nwlinkedidentc{DISK_VM_PULL_IP}{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}         ; pull IP from stack → $52/$53
+    PLA
+    STA     $52                     ; \\ restore as VM instruction pointer
+    PLA                             ;  | (values set by \nwlinkedidentc{DISK_VM_PULL_IP}{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}
+    STA     $53                     ; /  via stack manipulation)
+    LDY     #$04
+\nwlinkedidentc{DISK_VM_RESUME}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}:
+    LDA     ($52),Y                 ; read opcode from VM program
+    INY
+    BNE     .no_page
+    INC     $53
+.no_page:
+    TAX
+    LDA     \nwlinkedidentc{DISK_VM_HANDLER_TBL}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1},X   ; look up handler low byte
+    STA     $B5E0                   ; self-modify JMP target at $B5DF
+    JMP     \nwlinkedidentc{DISK_VM_TRAMPOLINE}{PYNWmai0-52EDTY2P6XACMBHKFKS45MCWBU000000-1}      ; dispatch (JMP $B5xx)
+
+; --- VM opcode handler table ---
+; Each byte is the low address of a handler in page $B5.
+; Opcode index → handler address ($B5xx).
+\nwlinkedidentc{DISK_VM_HANDLER_TBL}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}:
+    HEX     79 27 55 5f 6d 8a ad b9 a2 4f ce 26 00
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}DISPATCH}}{DISK:unVM:unDISPATCH}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}\nwindexdefn{\nwixident{DISK{\_}VM{\_}HANDLER{\_}TBL}}{DISK:unVM:unHANDLER:unTBL}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}\nwindexdefn{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}DISPATCH}}{DISK:unVM:unDISPATCH}}\\{{\nwixident{DISK{\_}VM{\_}HANDLER{\_}TBL}}{DISK:unVM:unHANDLER:unTBL}}\\{{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}PULL{\_}IP}}{DISK:unVM:unPULL:unIP}}\\{{\nwixident{DISK{\_}VM{\_}TRAMPOLINE}}{DISK:unVM:unTRAMPOLINE}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}PULL{\_}IP}}{DISK:unVM:unPULL:unIP}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}TRAMPOLINE}}{DISK:unVM:unTRAMPOLINE}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}\nwendcode{}\nwbegindocs{625}\nwdocspar
+
+\nwenddocs{}\nwbegincode{626}\sublabel{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}}}\moddef{disk vm pull ip~{\nwtagstyle{}\subpageref{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B538
+\nwlinkedidentc{DISK_VM_PULL_IP}{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}:
+    SUBROUTINE
+
+; Pulls two return addresses from the stack.
+; The outer return address (from JSR \nwlinkedidentc{DISK_VM_DISPATCH}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}) becomes the
+; VM instruction pointer.  Resumes execution at the inner return
+; address + 1 (i.e., returns to the code after JSR \nwlinkedidentc{DISK_VM_PULL_IP}{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}).
+    PLA                             ; \\ inner return address
+    STA     $54                     ;  | (from JSR \nwlinkedidentc{DISK_VM_PULL_IP}{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1})
+    PLA                             ; /
+    STA     $55
+    PLA                             ; \\ outer return address
+    STA     $52                     ;  | (from JSR \nwlinkedidentc{DISK_VM_DISPATCH}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1})
+    PLA                             ; /  = VM instruction pointer
+    STA     $53
+    INC     $52                     ; adjust IP (6502 pushes addr-1)
+    INC     $54                     ; \\ adjust inner return address
+    BNE     .no_carry               ;  |
+    INC     $55                     ; /
+.no_carry:
+    JMP     ($54)                   ; resume at inner return + 1
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}PULL{\_}IP}}{DISK:unVM:unPULL:unIP}{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}PULL{\_}IP}}{DISK:unVM:unPULL:unIP}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}DISPATCH}}{DISK:unVM:unDISPATCH}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}DISPATCH}}{DISK:unVM:unDISPATCH}{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}\nwendcode{}\nwbegindocs{627}\nwdocspar
+
+\section{Disk VM read address (\$B510)}
+
+Shared subroutine used by most VM opcode handlers.  Reads two
+encrypted bytes from the bytecode stream at~{\Tt{}{\textbackslash}{\$}52/{\textbackslash}{\$}53\ +\ Y\nwendquote}, decrypts
+the address operand (low byte XOR~{\Tt{}{\textbackslash}{\$}9C\nwendquote}, high byte XOR~{\Tt{}{\textbackslash}{\$}AD\nwendquote}),
+stores the result in~{\Tt{}{\textbackslash}{\$}54/{\textbackslash}{\$}55\nwendquote}, and advances~Y past both bytes.
+
+\nwenddocs{}\nwbegincode{628}\sublabel{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}}}\moddef{disk vm read addr~{\nwtagstyle{}\subpageref{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B510
+\nwlinkedidentc{DISK_VM_READ_ADDR}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}:
+    LDA     ($52),Y                 ; read encrypted low byte
+    EOR     #$9C                    ; decrypt
+    INY
+    BNE     .no_page1
+    INC     $53
+.no_page1:
+    STA     $54                     ; operand low
+    LDA     ($52),Y                 ; read encrypted high byte
+    INY
+    BNE     .no_page2
+    INC     $53
+.no_page2:
+    EOR     #$AD                    ; decrypt
+    STA     $55                     ; operand high
+    RTS
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}}}\nwendcode{}\nwbegindocs{629}\nwdocspar
+
+\section{VM opcode handlers (\$B500--\$B5DE)}
+
+The disk~VM has 13~opcodes (indices 0--12).  Each handler's low
+address is stored in the table at~{\Tt{}{\textbackslash}{\$}B4BF\nwendquote}; dispatch jumps to
+{\Tt{}{\textbackslash}{\$}B5xx\nwendquote}.  Handlers return to the dispatch loop by jumping to
+{\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}RESUME\nwendquote} at~{\Tt{}{\textbackslash}{\$}B4AE\nwendquote}, which reads the next opcode and
+dispatches again.
+
+\begin{center}
+\begin{tabular}{rllp{5cm}}
+\toprule
+\thead{Op} & \thead{Addr} & \thead{Mnemonic} & \thead{Description} \\
+\midrule
+ 0 & \$B579 & LDA\_IDX  & ACC $\leftarrow$ *(addr + ACC) \\
+ 1 & \$B527 & CALL1     & Call native; A=ACC in, A$\to$ACC out \\
+ 2 & \$B555 & BNZ       & Branch if ACC $\ne$ 0 \\
+ 3 & \$B55F & LDA\_IMM  & ACC $\leftarrow$ immediate (XOR \$7A) \\
+ 4 & \$B56D & LDA\_ABS  & ACC $\leftarrow$ *(addr) \\
+ 5 & \$B58A & CALL      & VM subroutine call (push IP) \\
+ 6 & \$B5AD & STA\_ABS  & *(addr) $\leftarrow$ ACC \\
+ 7 & \$B5B9 & SUB\_IMM  & ACC $\leftarrow$ ACC $-$ immediate \\
+ 8 & \$B5A2 & RET       & VM subroutine return (pop IP) \\
+ 9 & \$B54F & CALL0     & Jump to native code (no return) \\
+10 & \$B5CE & INC\_LOAD & *(addr) += 1; ACC $\leftarrow$ result \\
+11 & \$B526 & HALT      & Exit VM (RTS) \\
+12 & \$B500 & GOTO      & Unconditional branch \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Opcode 12: GOTO (\$B500)}
+
+Unconditional branch.  Reads a 2-byte encrypted address operand and
+sets the VM instruction pointer to that address.
+
+\nwenddocs{}\nwbegincode{630}\sublabel{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}}}\moddef{disk vm op goto~{\nwtagstyle{}\subpageref{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B500
+\nwlinkedidentc{DISK_VM_OP_GOTO}{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}:
+    JSR     \nwlinkedidentc{DISK_VM_READ_ADDR}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}       ; read target → $54/$55
+\nwlinkedidentc{DISK_VM_SET_IP}{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}:
+    LDA     $54                     ; \\ set IP = operand
+    STA     $52                     ;  |
+    LDA     $55                     ;  |
+    STA     $53                     ; /
+    LDY     #$00
+    JMP     \nwlinkedidentc{DISK_VM_RESUME}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}          ; dispatch next opcode
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}GOTO}}{DISK:unVM:unOP:unGOTO}{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}\nwindexdefn{\nwixident{DISK{\_}VM{\_}SET{\_}IP}}{DISK:unVM:unSET:unIP}{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}OP{\_}GOTO}}{DISK:unVM:unOP:unGOTO}}\\{{\nwixident{DISK{\_}VM{\_}SET{\_}IP}}{DISK:unVM:unSET:unIP}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}}\\{{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}\nwendcode{}\nwbegindocs{631}\nwdocspar
+
+\subsection{Opcode 11: HALT (\$B526)}
+
+Exits the VM by executing {\Tt{}RTS\nwendquote}, which returns to the caller of
+{\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}DISPATCH\nwendquote}.  This handler is just the {\Tt{}RTS\nwendquote} at the end
+of {\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}READ{\textbackslash}{\_}ADDR\nwendquote}---the dispatch table points to~{\Tt{}{\textbackslash}{\$}B526\nwendquote}
+which is that instruction.
+
+(No separate chunk needed; {\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}READ{\textbackslash}{\_}ADDR\nwendquote} provides the {\Tt{}RTS\nwendquote}.)
+
+\subsection{Opcode 1: CALL1 (\$B527)}
+
+Calls a native 6502 subroutine.  Passes the VM accumulator in~{\Tt{}A\nwendquote}
+and captures the subroutine's return value from~{\Tt{}A\nwendquote} back into the
+accumulator.  The~Y register (bytecode offset) is preserved across
+the call.
+
+\nwenddocs{}\nwbegincode{632}\sublabel{PYNWmai0-FHYJF4PP462QWUAWT2MYOPQZQA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-FHYJF4PP462QWUAWT2MYOPQZQA000000-1}}}\moddef{disk vm op call1~{\nwtagstyle{}\subpageref{PYNWmai0-FHYJF4PP462QWUAWT2MYOPQZQA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B527
+\nwlinkedidentc{DISK_VM_OP_CALL1}{PYNWmai0-FHYJF4PP462QWUAWT2MYOPQZQA000000-1}:
+    SUBROUTINE
+    JSR     \nwlinkedidentc{DISK_VM_READ_ADDR}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}       ; read native addr → $54/$55
+    TYA
+    PHA                             ; save Y (bytecode offset)
+    LDA     $56                     ; A = VM accumulator
+    JSR     \nwlinkedidentc{DISK_VM_JMP_IND}{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}         ; call native routine via JMP ($54)
+    STA     $56                     ; capture return A → accumulator
+    PLA
+    TAY                             ; restore Y
+    JMP     \nwlinkedidentc{DISK_VM_RESUME}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}          ; dispatch next opcode
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}CALL1}}{DISK:unVM:unOP:unCALL1}{PYNWmai0-FHYJF4PP462QWUAWT2MYOPQZQA000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}OP{\_}CALL1}}{DISK:unVM:unOP:unCALL1}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}JMP{\_}IND}}{DISK:unVM:unJMP:unIND}}\\{{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}}\\{{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}JMP{\_}IND}}{DISK:unVM:unJMP:unIND}{PYNWmai0-FHYJF4PP462QWUAWT2MYOPQZQA000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}{PYNWmai0-FHYJF4PP462QWUAWT2MYOPQZQA000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}{PYNWmai0-FHYJF4PP462QWUAWT2MYOPQZQA000000-1}\nwendcode{}\nwbegindocs{633}\nwdocspar
+
+\subsection{Opcode 9: CALL0 / JMP\_NATIVE (\$B54F)}
+
+Jumps to a native 6502 routine and does not return to the VM\@.
+Used for operations like ``enter the main program'' or ``jump to
+a disk routine'' that take over control flow.  The {\Tt{}JMP\ ({\textbackslash}{\$}54)\nwendquote}
+at~{\Tt{}{\textbackslash}{\$}B552\nwendquote} also serves as a reusable trampoline for opcode~1.
+
+\nwenddocs{}\nwbegincode{634}\sublabel{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}}}\moddef{disk vm op call0~{\nwtagstyle{}\subpageref{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B54F
+\nwlinkedidentc{DISK_VM_OP_CALL0}{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}:
+    JSR     \nwlinkedidentc{DISK_VM_READ_ADDR}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}       ; read native addr → $54/$55
+\nwlinkedidentc{DISK_VM_JMP_IND}{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}:
+    JMP     ($54)                   ; indirect jump (no return to VM)
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}JMP{\_}IND}}{DISK:unVM:unJMP:unIND}{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}CALL0}}{DISK:unVM:unOP:unCALL0}{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}JMP{\_}IND}}{DISK:unVM:unJMP:unIND}}\\{{\nwixident{DISK{\_}VM{\_}OP{\_}CALL0}}{DISK:unVM:unOP:unCALL0}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}\nwendcode{}\nwbegindocs{635}\nwdocspar
+
+\subsection{Opcode 2: BNZ (\$B555)}
+
+Branch if the VM accumulator is nonzero.  Reads a 2-byte encrypted
+target address, then either branches (reuses {\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}SET{\textbackslash}{\_}IP\nwendquote})
+or falls through to the next opcode.
+
+\nwenddocs{}\nwbegincode{636}\sublabel{PYNWmai0-BBUI5IBSOBSYGICTQMG22WDXIU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-BBUI5IBSOBSYGICTQMG22WDXIU000000-1}}}\moddef{disk vm op bnz~{\nwtagstyle{}\subpageref{PYNWmai0-BBUI5IBSOBSYGICTQMG22WDXIU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B555
+\nwlinkedidentc{DISK_VM_OP_BNZ}{PYNWmai0-BBUI5IBSOBSYGICTQMG22WDXIU000000-1}:
+    JSR     \nwlinkedidentc{DISK_VM_READ_ADDR}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}       ; read branch target → $54/$55
+    LDA     $56                     ; test accumulator
+    BNE     \nwlinkedidentc{DISK_VM_SET_IP}{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}          ; nonzero → branch (reuse GOTO tail)
+    JMP     \nwlinkedidentc{DISK_VM_RESUME}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}          ; zero → continue
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}BNZ}}{DISK:unVM:unOP:unBNZ}{PYNWmai0-BBUI5IBSOBSYGICTQMG22WDXIU000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}OP{\_}BNZ}}{DISK:unVM:unOP:unBNZ}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}}\\{{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}}\\{{\nwixident{DISK{\_}VM{\_}SET{\_}IP}}{DISK:unVM:unSET:unIP}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}{PYNWmai0-BBUI5IBSOBSYGICTQMG22WDXIU000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}{PYNWmai0-BBUI5IBSOBSYGICTQMG22WDXIU000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}SET{\_}IP}}{DISK:unVM:unSET:unIP}{PYNWmai0-BBUI5IBSOBSYGICTQMG22WDXIU000000-1}\nwendcode{}\nwbegindocs{637}\nwdocspar
+
+\subsection{Opcode 3: LDA\_IMM (\$B55F)}
+
+Loads an immediate value into the VM accumulator.  The operand is a
+single encrypted byte (XOR~{\Tt{}{\textbackslash}{\$}7A\nwendquote}).
+
+\nwenddocs{}\nwbegincode{638}\sublabel{PYNWmai0-YYOHR72I2K632KNEY4FRZXJYXY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-YYOHR72I2K632KNEY4FRZXJYXY000000-1}}}\moddef{disk vm op lda imm~{\nwtagstyle{}\subpageref{PYNWmai0-YYOHR72I2K632KNEY4FRZXJYXY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B55F
+\nwlinkedidentc{DISK_VM_OP_LDA_IMM}{PYNWmai0-YYOHR72I2K632KNEY4FRZXJYXY000000-1}:
+    LDA     ($52),Y                 ; read encrypted byte
+    INY
+    BNE     .no_page
+    INC     $53
+.no_page:
+    EOR     #$7A                    ; decrypt
+    STA     $56                     ; accumulator = value
+    JMP     \nwlinkedidentc{DISK_VM_RESUME}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}LDA{\_}IMM}}{DISK:unVM:unOP:unLDA:unIMM}{PYNWmai0-YYOHR72I2K632KNEY4FRZXJYXY000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}OP{\_}LDA{\_}IMM}}{DISK:unVM:unOP:unLDA:unIMM}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}{PYNWmai0-YYOHR72I2K632KNEY4FRZXJYXY000000-1}\nwendcode{}\nwbegindocs{639}\nwdocspar
+
+\subsection{Opcode 4: LDA\_ABS (\$B56D)}
+
+Loads a byte from an absolute address into the VM accumulator.
+
+\nwenddocs{}\nwbegincode{640}\sublabel{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}}}\moddef{disk vm op lda abs~{\nwtagstyle{}\subpageref{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B56D
+\nwlinkedidentc{DISK_VM_OP_LDA_ABS}{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}:
+    JSR     \nwlinkedidentc{DISK_VM_READ_ADDR}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}       ; read address → $54/$55
+\nwlinkedidentc{DISK_VM_LOAD_IND}{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}:
+    LDX     #$00
+    LDA     ($54,X)                 ; ACC = *(address)
+    STA     $56
+    JMP     \nwlinkedidentc{DISK_VM_RESUME}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}LOAD{\_}IND}}{DISK:unVM:unLOAD:unIND}{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}LDA{\_}ABS}}{DISK:unVM:unOP:unLDA:unABS}{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}LOAD{\_}IND}}{DISK:unVM:unLOAD:unIND}}\\{{\nwixident{DISK{\_}VM{\_}OP{\_}LDA{\_}ABS}}{DISK:unVM:unOP:unLDA:unABS}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}}\\{{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}\nwendcode{}\nwbegindocs{641}\nwdocspar
+
+\subsection{Opcode 0: LDA\_IDX (\$B579)}
+
+Indexed load.  Reads a 2-byte base address, adds the VM accumulator
+as an offset, then loads the byte at (base~+~ACC) into the
+accumulator.  Useful for table lookups.  Falls into
+{\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}LOAD{\textbackslash}{\_}IND\nwendquote} to perform the actual load.
+
+\nwenddocs{}\nwbegincode{642}\sublabel{PYNWmai0-IZL4O3A7R7NJ65AFOK2WBU3GKA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-IZL4O3A7R7NJ65AFOK2WBU3GKA000000-1}}}\moddef{disk vm op lda idx~{\nwtagstyle{}\subpageref{PYNWmai0-IZL4O3A7R7NJ65AFOK2WBU3GKA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B579
+\nwlinkedidentc{DISK_VM_OP_LDA_IDX}{PYNWmai0-IZL4O3A7R7NJ65AFOK2WBU3GKA000000-1}:
+    SUBROUTINE
+    JSR     \nwlinkedidentc{DISK_VM_READ_ADDR}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}       ; read base addr → $54/$55
+    LDA     $56                     ; index = old accumulator
+    CLC
+    ADC     $54                     ; base_lo + index
+    STA     $54
+    BCC     .no_carry
+    INC     $55                     ; propagate carry
+.no_carry:
+    JMP     \nwlinkedidentc{DISK_VM_LOAD_IND}{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}        ; load from ($54/$55) → ACC
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}LDA{\_}IDX}}{DISK:unVM:unOP:unLDA:unIDX}{PYNWmai0-IZL4O3A7R7NJ65AFOK2WBU3GKA000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}OP{\_}LDA{\_}IDX}}{DISK:unVM:unOP:unLDA:unIDX}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}LOAD{\_}IND}}{DISK:unVM:unLOAD:unIND}}\\{{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}LOAD{\_}IND}}{DISK:unVM:unLOAD:unIND}{PYNWmai0-IZL4O3A7R7NJ65AFOK2WBU3GKA000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}{PYNWmai0-IZL4O3A7R7NJ65AFOK2WBU3GKA000000-1}\nwendcode{}\nwbegindocs{643}\nwdocspar
+
+\subsection{Opcode 5: CALL (\$B58A)}
+
+VM-level subroutine call.  Pushes the current absolute IP onto the
+6502 hardware stack, then branches to the operand address.
+
+\nwenddocs{}\nwbegincode{644}\sublabel{PYNWmai0-3QWD7BX5IJT4C2OKNNLRS6DWEE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-3QWD7BX5IJT4C2OKNNLRS6DWEE000000-1}}}\moddef{disk vm op call~{\nwtagstyle{}\subpageref{PYNWmai0-3QWD7BX5IJT4C2OKNNLRS6DWEE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B58A
+\nwlinkedidentc{DISK_VM_OP_CALL}{PYNWmai0-3QWD7BX5IJT4C2OKNNLRS6DWEE000000-1}:
+    SUBROUTINE
+    JSR     \nwlinkedidentc{DISK_VM_READ_ADDR}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}       ; read target → $54/$55
+    TYA
+    CLC
+    ADC     $52                     ; \\ resolve absolute IP
+    STA     $52                     ;  | (base + Y offset)
+    BCC     .no_carry
+    INC     $53                     ; /
+.no_carry:
+    LDA     $52                     ; \\ push IP for RET
+    PHA                             ;  |
+    LDA     $53                     ;  |
+    PHA                             ; /
+    LDY     #$00
+    JMP     \nwlinkedidentc{DISK_VM_SET_IP}{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}          ; GOTO target address
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}CALL}}{DISK:unVM:unOP:unCALL}{PYNWmai0-3QWD7BX5IJT4C2OKNNLRS6DWEE000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}OP{\_}CALL}}{DISK:unVM:unOP:unCALL}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}}\\{{\nwixident{DISK{\_}VM{\_}SET{\_}IP}}{DISK:unVM:unSET:unIP}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}{PYNWmai0-3QWD7BX5IJT4C2OKNNLRS6DWEE000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}SET{\_}IP}}{DISK:unVM:unSET:unIP}{PYNWmai0-3QWD7BX5IJT4C2OKNNLRS6DWEE000000-1}\nwendcode{}\nwbegindocs{645}\nwdocspar
+
+\subsection{Opcode 8: RET (\$B5A2)}
+
+VM-level subroutine return.  Pops the IP previously pushed by
+opcode~5 (CALL) and resumes execution there.
+
+\nwenddocs{}\nwbegincode{646}\sublabel{PYNWmai0-RTV2NMHWFMFP7DFFTHLWMZPUDM000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-RTV2NMHWFMFP7DFFTHLWMZPUDM000000-1}}}\moddef{disk vm op ret~{\nwtagstyle{}\subpageref{PYNWmai0-RTV2NMHWFMFP7DFFTHLWMZPUDM000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B5A2
+\nwlinkedidentc{DISK_VM_OP_RET}{PYNWmai0-RTV2NMHWFMFP7DFFTHLWMZPUDM000000-1}:
+    PLA                             ; \\ pop saved IP
+    STA     $53                     ;  | (high byte pushed last)
+    PLA                             ;  |
+    STA     $52                     ; / (low byte pushed first)
+    LDY     #$00
+    JMP     \nwlinkedidentc{DISK_VM_RESUME}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}RET}}{DISK:unVM:unOP:unRET}{PYNWmai0-RTV2NMHWFMFP7DFFTHLWMZPUDM000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}OP{\_}RET}}{DISK:unVM:unOP:unRET}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}{PYNWmai0-RTV2NMHWFMFP7DFFTHLWMZPUDM000000-1}\nwendcode{}\nwbegindocs{647}\nwdocspar
+
+\subsection{Opcode 6: STA\_ABS (\$B5AD)}
+
+Stores the VM accumulator to an absolute address.
+
+\nwenddocs{}\nwbegincode{648}\sublabel{PYNWmai0-GBEJGVQC4IV5VS7YJEW6DYRT7Y000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-GBEJGVQC4IV5VS7YJEW6DYRT7Y000000-1}}}\moddef{disk vm op sta abs~{\nwtagstyle{}\subpageref{PYNWmai0-GBEJGVQC4IV5VS7YJEW6DYRT7Y000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B5AD
+\nwlinkedidentc{DISK_VM_OP_STA_ABS}{PYNWmai0-GBEJGVQC4IV5VS7YJEW6DYRT7Y000000-1}:
+    JSR     \nwlinkedidentc{DISK_VM_READ_ADDR}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}       ; read address → $54/$55
+    LDA     $56                     ; A = accumulator
+    LDX     #$00
+    STA     ($54,X)                 ; *(address) = ACC
+    JMP     \nwlinkedidentc{DISK_VM_RESUME}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}STA{\_}ABS}}{DISK:unVM:unOP:unSTA:unABS}{PYNWmai0-GBEJGVQC4IV5VS7YJEW6DYRT7Y000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}OP{\_}STA{\_}ABS}}{DISK:unVM:unOP:unSTA:unABS}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}}\\{{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}{PYNWmai0-GBEJGVQC4IV5VS7YJEW6DYRT7Y000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}{PYNWmai0-GBEJGVQC4IV5VS7YJEW6DYRT7Y000000-1}\nwendcode{}\nwbegindocs{649}\nwdocspar
+
+\subsection{Opcode 7: SUB\_IMM (\$B5B9)}
+
+Subtracts an encrypted immediate value from the VM accumulator.
+
+\nwenddocs{}\nwbegincode{650}\sublabel{PYNWmai0-ZOSTYFEMLOABU7ZHW7SMEZNVI4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ZOSTYFEMLOABU7ZHW7SMEZNVI4000000-1}}}\moddef{disk vm op sub imm~{\nwtagstyle{}\subpageref{PYNWmai0-ZOSTYFEMLOABU7ZHW7SMEZNVI4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B5B9
+\nwlinkedidentc{DISK_VM_OP_SUB_IMM}{PYNWmai0-ZOSTYFEMLOABU7ZHW7SMEZNVI4000000-1}:
+    LDA     ($52),Y                 ; read encrypted byte
+    INY
+    BNE     .no_page
+    INC     $53
+.no_page:
+    EOR     #$7A                    ; decrypt
+    STA     $54                     ; temp
+    LDA     $56                     ; A = accumulator
+    SEC
+    SBC     $54                     ; ACC - immediate
+    STA     $56                     ; accumulator = result
+    JMP     \nwlinkedidentc{DISK_VM_RESUME}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}SUB{\_}IMM}}{DISK:unVM:unOP:unSUB:unIMM}{PYNWmai0-ZOSTYFEMLOABU7ZHW7SMEZNVI4000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}OP{\_}SUB{\_}IMM}}{DISK:unVM:unOP:unSUB:unIMM}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}{PYNWmai0-ZOSTYFEMLOABU7ZHW7SMEZNVI4000000-1}\nwendcode{}\nwbegindocs{651}\nwdocspar
+
+\subsection{Opcode 10: INC\_LOAD (\$B5CE)}
+
+Increments the byte at an absolute address and loads the new value
+into the VM accumulator.  Atomic read-modify-write.
+
+\nwenddocs{}\nwbegincode{652}\sublabel{PYNWmai0-GY2JRRVP4L6EUYZF2KA6ZLLY4M000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-GY2JRRVP4L6EUYZF2KA6ZLLY4M000000-1}}}\moddef{disk vm op inc load~{\nwtagstyle{}\subpageref{PYNWmai0-GY2JRRVP4L6EUYZF2KA6ZLLY4M000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B5CE
+\nwlinkedidentc{DISK_VM_OP_INC_LOAD}{PYNWmai0-GY2JRRVP4L6EUYZF2KA6ZLLY4M000000-1}:
+    JSR     \nwlinkedidentc{DISK_VM_READ_ADDR}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}       ; read address → $54/$55
+    LDX     #$00
+    LDA     ($54,X)                 ; read current value
+    CLC
+    ADC     #$01                    ; increment
+    STA     ($54,X)                 ; write back
+    STA     $56                     ; accumulator = new value
+    JMP     \nwlinkedidentc{DISK_VM_RESUME}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}OP{\_}INC{\_}LOAD}}{DISK:unVM:unOP:unINC:unLOAD}{PYNWmai0-GY2JRRVP4L6EUYZF2KA6ZLLY4M000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}OP{\_}INC{\_}LOAD}}{DISK:unVM:unOP:unINC:unLOAD}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}}\\{{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}{PYNWmai0-GY2JRRVP4L6EUYZF2KA6ZLLY4M000000-1}\nwindexuse{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}{PYNWmai0-GY2JRRVP4L6EUYZF2KA6ZLLY4M000000-1}\nwendcode{}\nwbegindocs{653}\nwdocspar
+
+\subsection{Dispatch trampoline (\$B5DF)}
+
+The self-modifying {\Tt{}JMP\nwendquote} instruction whose low byte is patched by
+{\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}DISPATCH\nwendquote} before each handler call.  The byte at
+{\Tt{}{\textbackslash}{\$}B5E0\nwendquote} is overwritten with the handler's low address from the
+opcode table.
+
+\nwenddocs{}\nwbegincode{654}\sublabel{PYNWmai0-52EDTY2P6XACMBHKFKS45MCWBU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-52EDTY2P6XACMBHKFKS45MCWBU000000-1}}}\moddef{disk vm trampoline~{\nwtagstyle{}\subpageref{PYNWmai0-52EDTY2P6XACMBHKFKS45MCWBU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B5DF
+\nwlinkedidentc{DISK_VM_TRAMPOLINE}{PYNWmai0-52EDTY2P6XACMBHKFKS45MCWBU000000-1}:
+    JMP     \nwlinkedidentc{DISK_VM_OP_GOTO}{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}         ; self-modified: low byte patched
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}TRAMPOLINE}}{DISK:unVM:unTRAMPOLINE}{PYNWmai0-52EDTY2P6XACMBHKFKS45MCWBU000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}TRAMPOLINE}}{DISK:unVM:unTRAMPOLINE}}}\nwidentuses{\\{{\nwixident{DISK{\_}VM{\_}OP{\_}GOTO}}{DISK:unVM:unOP:unGOTO}}}\nwindexuse{\nwixident{DISK{\_}VM{\_}OP{\_}GOTO}}{DISK:unVM:unOP:unGOTO}{PYNWmai0-52EDTY2P6XACMBHKFKS45MCWBU000000-1}\nwendcode{}\nwbegindocs{655}\nwdocspar
+
+\subsection{Error accumulator (\$B5E2)}
+
+Three bytes between the dispatch trampoline and the saved state.
+{\Tt{}{\textbackslash}{\$}B5E2\nwendquote} is the error accumulator used by {\Tt{}READ{\textbackslash}{\_}AND{\textbackslash}{\_}VERIFY\nwendquote}
+to count failed sector reads across multiple attempts.
+
+\nwenddocs{}\nwbegincode{656}\sublabel{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}}}\moddef{disk vm error accum~{\nwtagstyle{}\subpageref{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B5E2
+\nwlinkedidentc{DISK_VM_ERROR_ACCUM}{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}:
+    DC.B    0                       ; error count (updated by \nwlinkedidentc{READ_AND_VERIFY}{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1})
+    DC.B    0,0                     ; scratch
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}ERROR{\_}ACCUM}}{DISK:unVM:unERROR:unACCUM}{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}ERROR{\_}ACCUM}}{DISK:unVM:unERROR:unACCUM}}}\nwidentuses{\\{{\nwixident{READ{\_}AND{\_}VERIFY}}{READ:unAND:unVERIFY}}}\nwindexuse{\nwixident{READ{\_}AND{\_}VERIFY}}{READ:unAND:unVERIFY}{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}\nwendcode{}\nwbegindocs{657}\nwdocspar
+
+\subsection{VM saved state (\$B5E5--\$B5FF)}
+
+The 16-byte region at~{\Tt{}{\textbackslash}{\$}B5E5--{\textbackslash}{\$}B5F4\nwendquote} holds the saved copy of
+zero-page {\Tt{}{\textbackslash}{\$}50--{\textbackslash}{\$}5F\nwendquote} when the VM is not executing.  The context
+swap routine ({\Tt{}DISK{\textbackslash}{\_}VM{\textbackslash}{\_}SWAP\nwendquote}) exchanges these with the live
+zero-page values on each VM entry and exit.  Bytes~11--13 (\$5B--\$5D)
+hold initial values {\Tt{}{\textbackslash}{\$}4A\ {\textbackslash}{\$}4C\ {\textbackslash}{\$}4E\nwendquote}.
+
+Bytes at~{\Tt{}{\textbackslash}{\$}B5F5--{\textbackslash}{\$}B5FF\nwendquote} are additional VM workspace:
+{\Tt{}{\textbackslash}{\$}B5F6\nwendquote} stores a mismatched nibble from {\Tt{}VERIFY{\textbackslash}{\_}DATA{\textbackslash}{\_}FIELD\nwendquote}.
+
+\nwenddocs{}\nwbegincode{658}\sublabel{PYNWmai0-TC5SHQB655SMTUZ5XO3B24FCVA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-TC5SHQB655SMTUZ5XO3B24FCVA000000-1}}}\moddef{disk vm saved state~{\nwtagstyle{}\subpageref{PYNWmai0-TC5SHQB655SMTUZ5XO3B24FCVA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}\nwenddeflinemarkup
+    ORG     $B5E5
+\nwlinkedidentc{DISK_VM_SAVED_STATE}{PYNWmai0-TC5SHQB655SMTUZ5XO3B24FCVA000000-1}:
+;            $50                        $54                  $58
+    HEX     00 00 00 00 00 00 00 00 00 4a 4c 4e 00 00 00 00
+;           saved ZP $50-$5F; bytes 9-11 ($59-$5B) = $4A,$4C,$4E
+\nwlinkedidentc{DISK_VM_SCRATCH}{PYNWmai0-TC5SHQB655SMTUZ5XO3B24FCVA000000-1}:
+    HEX     00                      ; $B5F5
+    HEX     00                      ; $B5F6: bad nibble storage
+    HEX     00 00 00                ; $B5F7-$B5F9
+    HEX     a0 a0                   ; $B5FA-$B5FB
+    HEX     00 00 00 01             ; $B5FC-$B5FF
+\nwindexdefn{\nwixident{DISK{\_}VM{\_}SAVED{\_}STATE}}{DISK:unVM:unSAVED:unSTATE}{PYNWmai0-TC5SHQB655SMTUZ5XO3B24FCVA000000-1}\nwindexdefn{\nwixident{DISK{\_}VM{\_}SCRATCH}}{DISK:unVM:unSCRATCH}{PYNWmai0-TC5SHQB655SMTUZ5XO3B24FCVA000000-1}\eatline
+\nwidentdefs{\\{{\nwixident{DISK{\_}VM{\_}SAVED{\_}STATE}}{DISK:unVM:unSAVED:unSTATE}}\\{{\nwixident{DISK{\_}VM{\_}SCRATCH}}{DISK:unVM:unSCRATCH}}}\nwendcode{}\nwbegindocs{659}\nwdocspar
+
+\nwenddocs{}\nwbegindocs{660}\chapter{Assembly output}
 
 The following root chunks produce the assembly files when tangled.
 
-\nwenddocs{}\nwbegincode{593}\sublabel{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}}\moddef{main.asm~{\nwtagstyle{}\subpageref{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{661}\sublabel{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}}\moddef{main.asm~{\nwtagstyle{}\subpageref{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
     PROCESSOR 6502
 \LA{}Macros~{\nwtagstyle{}\subpageref{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-1}}\RA{}
 \LA{}zero page defines~{\nwtagstyle{}\subpageref{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}}\RA{}
@@ -12154,9 +13111,43 @@ The following root chunks produce the assembly files when tangled.
 \LA{}script pointer table~{\nwtagstyle{}\subpageref{PYNWmai0-33FGP2UXYD5EEQJUC5DEXEFVLE000000-1}}\RA{}
 \LA{}font data~{\nwtagstyle{}\subpageref{PYNWmai0-4CWZL3QTPT6M6623ENDBZQ3P5E000000-1}}\RA{}
 \LA{}std font data~{\nwtagstyle{}\subpageref{PYNWmai0-4GKD57O4UDC4T2RQHRJRRNKC7M000000-1}}\RA{}
-\nwnotused{main.asm}\nwendcode{}\nwbegindocs{594}\nwdocspar
+\LA{}disk read field~{\nwtagstyle{}\subpageref{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}}\RA{}
+\LA{}verify data field~{\nwtagstyle{}\subpageref{PYNWmai0-F7XUTD7KQKIZ2LAWT3LZSLO5AM000000-1}}\RA{}
+\LA{}disk vm loop~{\nwtagstyle{}\subpageref{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}}\RA{}
+\LA{}disk vm bytecode~{\nwtagstyle{}\subpageref{PYNWmai0-XUCNFCEPISMBQ62XBBUYF4U6FA000000-1}}\RA{}
+\LA{}search addr field~{\nwtagstyle{}\subpageref{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}}\RA{}
+\LA{}read and verify~{\nwtagstyle{}\subpageref{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1}}\RA{}
+\LA{}disk vm sub park stepper~{\nwtagstyle{}\subpageref{PYNWmai0-CZ7WUYZMRQOZ776KSWPCNVZLQI000000-1}}\RA{}
+\LA{}delay loop~{\nwtagstyle{}\subpageref{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1}}\RA{}
+\LA{}disk vm sub exit err~{\nwtagstyle{}\subpageref{PYNWmai0-ZXIAUF3LVQ4RS7ZIP64X3QRMVM000000-1}}\RA{}
+\LA{}disk vm exit ok~{\nwtagstyle{}\subpageref{PYNWmai0-GPMJOZWLZ5RVOPUPG24SCBP6HY000000-1}}\RA{}
+\LA{}disk vm exit err~{\nwtagstyle{}\subpageref{PYNWmai0-3PDBUTNAY2LH74GXKBLMC3S7IE000000-1}}\RA{}
+\LA{}disk vm misc b49c~{\nwtagstyle{}\subpageref{PYNWmai0-BEPMJ3SFV2UOCBYC5OUXROTXJA000000-1}}\RA{}
+\LA{}disk vm dispatch~{\nwtagstyle{}\subpageref{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}}\RA{}
+\LA{}disk vm swap~{\nwtagstyle{}\subpageref{PYNWmai0-YFYCU6Q2EWD6JQJOO76Z4EFCFU000000-1}}\RA{}
+\LA{}disk vm data b4de~{\nwtagstyle{}\subpageref{PYNWmai0-XH5TLQEXYFHHOOER46HK6GDTMY000000-1}}\RA{}
+\LA{}disk vm op goto~{\nwtagstyle{}\subpageref{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}}\RA{}
+\LA{}disk vm read addr~{\nwtagstyle{}\subpageref{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}}\RA{}
+\LA{}disk vm op call1~{\nwtagstyle{}\subpageref{PYNWmai0-FHYJF4PP462QWUAWT2MYOPQZQA000000-1}}\RA{}
+\LA{}disk vm pull ip~{\nwtagstyle{}\subpageref{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}}\RA{}
+\LA{}disk vm op call0~{\nwtagstyle{}\subpageref{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}}\RA{}
+\LA{}disk vm op bnz~{\nwtagstyle{}\subpageref{PYNWmai0-BBUI5IBSOBSYGICTQMG22WDXIU000000-1}}\RA{}
+\LA{}disk vm op lda imm~{\nwtagstyle{}\subpageref{PYNWmai0-YYOHR72I2K632KNEY4FRZXJYXY000000-1}}\RA{}
+\LA{}disk vm op lda abs~{\nwtagstyle{}\subpageref{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}}\RA{}
+\LA{}disk vm op lda idx~{\nwtagstyle{}\subpageref{PYNWmai0-IZL4O3A7R7NJ65AFOK2WBU3GKA000000-1}}\RA{}
+\LA{}disk vm op call~{\nwtagstyle{}\subpageref{PYNWmai0-3QWD7BX5IJT4C2OKNNLRS6DWEE000000-1}}\RA{}
+\LA{}disk vm op ret~{\nwtagstyle{}\subpageref{PYNWmai0-RTV2NMHWFMFP7DFFTHLWMZPUDM000000-1}}\RA{}
+\LA{}disk vm op sta abs~{\nwtagstyle{}\subpageref{PYNWmai0-GBEJGVQC4IV5VS7YJEW6DYRT7Y000000-1}}\RA{}
+\LA{}disk vm op sub imm~{\nwtagstyle{}\subpageref{PYNWmai0-ZOSTYFEMLOABU7ZHW7SMEZNVI4000000-1}}\RA{}
+\LA{}disk vm op inc load~{\nwtagstyle{}\subpageref{PYNWmai0-GY2JRRVP4L6EUYZF2KA6ZLLY4M000000-1}}\RA{}
+\LA{}disk vm trampoline~{\nwtagstyle{}\subpageref{PYNWmai0-52EDTY2P6XACMBHKFKS45MCWBU000000-1}}\RA{}
+\LA{}disk vm error accum~{\nwtagstyle{}\subpageref{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}}\RA{}
+\LA{}disk vm saved state~{\nwtagstyle{}\subpageref{PYNWmai0-TC5SHQB655SMTUZ5XO3B24FCVA000000-1}}\RA{}
+\LA{}rwts entry~{\nwtagstyle{}\subpageref{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}}\RA{}
+\LA{}rwts core~{\nwtagstyle{}\subpageref{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}}\RA{}
+\nwnotused{main.asm}\nwendcode{}\nwbegindocs{662}\nwdocspar
 
-\nwenddocs{}\nwbegincode{595}\sublabel{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}}}\moddef{fontdata.asm~{\nwtagstyle{}\subpageref{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{663}\sublabel{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}}}\moddef{fontdata.asm~{\nwtagstyle{}\subpageref{PYNWmai0-4OZOHETSG3Q64TUWMO75TPWKUQ000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     78 7C 66 66 7C 78 60 60 03 07 0C 0C 07 03 00 00
@@ -12397,9 +13388,9 @@ The following root chunks produce the assembly files when tangled.
     HEX     7F 03 00 7F 7F 00 78 70 7F 7E 00 7F 1F 00 7F 7F
     HEX     7F 01 00 7F 00 00 7F 7F 7F 78 00 7F 70 00 7F 7F
     HEX     07 07 00 1F 1F 00 7F 7F 00 00 00 00 00 00 00 00
-\nwnotused{fontdata.asm}\nwendcode{}\nwbegindocs{596}\nwdocspar
+\nwnotused{fontdata.asm}\nwendcode{}\nwbegindocs{664}\nwdocspar
 
-\nwenddocs{}\nwbegincode{597}\sublabel{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}}}\moddef{stdfontdata.asm~{\nwtagstyle{}\subpageref{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{665}\sublabel{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}}}\moddef{stdfontdata.asm~{\nwtagstyle{}\subpageref{PYNWmai0-2S7AQACQQAD54UQOFXDVSW7VRA000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
     HEX     00 00 00 00 00 00 00 00 08 08 08 08 08 00 08 00
     HEX     14 14 14 00 00 00 00 00 08 1C 3E 7F 1C 1C 1C 1C
     HEX     08 3C 0A 1C 28 1E 08 00 06 26 10 08 04 32 30 00
@@ -12448,9 +13439,9 @@ The following root chunks produce the assembly files when tangled.
     HEX     00 00 3E 10 08 04 3E 00 38 0C 0C 06 0C 0C 38 00
     HEX     08 08 08 08 08 08 08 08 0E 18 18 30 18 18 0E 00
     HEX     2C 1A 00 00 00 00 00 00 7F 7F 7F 7F 7F 7F 7F 7F
-\nwnotused{stdfontdata.asm}\nwendcode{}\nwbegindocs{598}\nwdocspar
+\nwnotused{stdfontdata.asm}\nwendcode{}\nwbegindocs{666}\nwdocspar
 
-\nwenddocs{}\nwbegincode{599}\sublabel{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}}}\moddef{ealdr defines~{\nwtagstyle{}\subpageref{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{667}\sublabel{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}}}\moddef{ealdr defines~{\nwtagstyle{}\subpageref{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}\nwenddeflinemarkup
 \nwlinkedidentc{ealdr_ptr}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}           EQU     $46     ; VM instruction pointer (2 bytes)
 \nwlinkedidentc{EALDR_psuedoacc}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}     EQU     $48     ; VM accumulator
 \nwlinkedidentc{ealdr_src}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}           EQU     $4C     ; VM source pointer (2 bytes)
@@ -12459,9 +13450,9 @@ The following root chunks produce the assembly files when tangled.
 \nwlinkedidentc{ealdr_bot}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}           EQU     $AC60   ; funny-increment low counter
 \nwlinkedidentc{ealdr_top}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}           EQU     $AC61   ; funny-increment high counter
 \nwindexdefn{\nwixident{EALDR{\_}psuedoacc}}{EALDR:unpsuedoacc}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}bot}}{ealdr:unbot}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}dest}}{ealdr:undest}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}ptr}}{ealdr:unptr}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}src}}{ealdr:unsrc}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}top}}{ealdr:untop}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\nwindexdefn{\nwixident{ealdr{\_}vm{\_}dispatch}}{ealdr:unvm:undispatch}{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}\eatline
-\nwidentdefs{\\{{\nwixident{EALDR{\_}psuedoacc}}{EALDR:unpsuedoacc}}\\{{\nwixident{ealdr{\_}bot}}{ealdr:unbot}}\\{{\nwixident{ealdr{\_}dest}}{ealdr:undest}}\\{{\nwixident{ealdr{\_}ptr}}{ealdr:unptr}}\\{{\nwixident{ealdr{\_}src}}{ealdr:unsrc}}\\{{\nwixident{ealdr{\_}top}}{ealdr:untop}}\\{{\nwixident{ealdr{\_}vm{\_}dispatch}}{ealdr:unvm:undispatch}}}\nwendcode{}\nwbegindocs{600}\nwdocspar
+\nwidentdefs{\\{{\nwixident{EALDR{\_}psuedoacc}}{EALDR:unpsuedoacc}}\\{{\nwixident{ealdr{\_}bot}}{ealdr:unbot}}\\{{\nwixident{ealdr{\_}dest}}{ealdr:undest}}\\{{\nwixident{ealdr{\_}ptr}}{ealdr:unptr}}\\{{\nwixident{ealdr{\_}src}}{ealdr:unsrc}}\\{{\nwixident{ealdr{\_}top}}{ealdr:untop}}\\{{\nwixident{ealdr{\_}vm{\_}dispatch}}{ealdr:unvm:undispatch}}}\nwendcode{}\nwbegindocs{668}\nwdocspar
 
-\nwenddocs{}\nwbegincode{601}\sublabel{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}}\moddef{ealdr.asm~{\nwtagstyle{}\subpageref{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\nwenddocs{}\nwbegincode{669}\sublabel{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}\nwmargintag{{\nwtagstyle{}\subpageref{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}}\moddef{ealdr.asm~{\nwtagstyle{}\subpageref{PYNWmai0-NFAQ7GXVG25LDEHMLE2D3NAUF4000000-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
     PROCESSOR 6502
 \LA{}Macros~{\nwtagstyle{}\subpageref{PYNWmai0-UDRZI6QCMYPCHBPEW5VLDMJPJU000000-1}}\RA{}
 \LA{}ealdr defines~{\nwtagstyle{}\subpageref{PYNWmai0-ZKRKWSFVRL2UDWYQR5YVDOYFWU000000-1}}\RA{}
@@ -12479,7 +13470,7 @@ The following root chunks produce the assembly files when tangled.
 \LA{}EALDR VM init~{\nwtagstyle{}\subpageref{PYNWmai0-JVSHYFZ5LSJCRGOWKY22MRDYOQ000000-1}}\RA{}
 \LA{}EALDR opcode handlers~{\nwtagstyle{}\subpageref{PYNWmai0-2T6DGWJW5W5V7YAHVDFFWQCSSY000000-1}}\RA{}
 \LA{}EALDR disk entry points~{\nwtagstyle{}\subpageref{PYNWmai0-6JYY2SO57ZRYJR7W2OZS4RWYYQ000000-1}}\RA{}
-\nwnotused{ealdr.asm}\nwendcode{}\nwbegindocs{602}\nwdocspar
+\nwnotused{ealdr.asm}\nwendcode{}\nwbegindocs{670}\nwdocspar
 
 \chapter{Index}\par\noindent
 \nowebindex
@@ -12554,7 +13545,36 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{decode dispatch relay}{PYNWmai0-E65AIYYMBOBXUD37K6QZUOOI4I000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-E65AIYYMBOBXUD37K6QZUOOI4I000000-1}}}%
 \nwixlogsorted{c}{{decode encrypted addr}{PYNWmai0-QPGMZCBHONP3ALTVEWGVE7O2I4000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-QPGMZCBHONP3ALTVEWGVE7O2I4000000-1}}}%
 \nwixlogsorted{c}{{defines}{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-1}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-2}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-3}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-4}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-5}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-6}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-7}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-8}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-9}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-10}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-11}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-12}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-13}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-14}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-15}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-16}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-17}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-18}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-19}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-20}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-21}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-22}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-23}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-24}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-25}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-26}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-27}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-28}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-29}\nwixd{PYNWmai0-4XHAE6ADBEGDO3TDMJXX7ROHNM000000-30}}}%
+\nwixlogsorted{c}{{delay loop}{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-AYPWB6RBUT4LN5CUQ4A26AMLNQ000000-1}}}%
 \nwixlogsorted{c}{{delay with animation}{PYNWmai0-GR34WPZFUFAWF4EEF55HS6PMUU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-GR34WPZFUFAWF4EEF55HS6PMUU000000-1}}}%
+\nwixlogsorted{c}{{disk read field}{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-7Q6U2HMH7OODAMFYNQVO4GCSAA000000-1}}}%
+\nwixlogsorted{c}{{disk vm bytecode}{PYNWmai0-XUCNFCEPISMBQ62XBBUYF4U6FA000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-XUCNFCEPISMBQ62XBBUYF4U6FA000000-1}}}%
+\nwixlogsorted{c}{{disk vm data b4de}{PYNWmai0-XH5TLQEXYFHHOOER46HK6GDTMY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-XH5TLQEXYFHHOOER46HK6GDTMY000000-1}}}%
+\nwixlogsorted{c}{{disk vm dispatch}{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-3WUSACKGWRVXW4WEKG7CMO6Q2Y000000-1}}}%
+\nwixlogsorted{c}{{disk vm error accum}{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-3LNGT77F4DQTH3TJC5JDNHUVFY000000-1}}}%
+\nwixlogsorted{c}{{disk vm exit err}{PYNWmai0-3PDBUTNAY2LH74GXKBLMC3S7IE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-3PDBUTNAY2LH74GXKBLMC3S7IE000000-1}}}%
+\nwixlogsorted{c}{{disk vm exit ok}{PYNWmai0-GPMJOZWLZ5RVOPUPG24SCBP6HY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-GPMJOZWLZ5RVOPUPG24SCBP6HY000000-1}}}%
+\nwixlogsorted{c}{{disk vm loop}{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-YZGRORWYCIPHUUXFRQEDWRNPDM000000-1}}}%
+\nwixlogsorted{c}{{disk vm misc b49c}{PYNWmai0-BEPMJ3SFV2UOCBYC5OUXROTXJA000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-BEPMJ3SFV2UOCBYC5OUXROTXJA000000-1}}}%
+\nwixlogsorted{c}{{disk vm op bnz}{PYNWmai0-BBUI5IBSOBSYGICTQMG22WDXIU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-BBUI5IBSOBSYGICTQMG22WDXIU000000-1}}}%
+\nwixlogsorted{c}{{disk vm op call}{PYNWmai0-3QWD7BX5IJT4C2OKNNLRS6DWEE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-3QWD7BX5IJT4C2OKNNLRS6DWEE000000-1}}}%
+\nwixlogsorted{c}{{disk vm op call0}{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-6ROXAR4TXGMCPDTWBEIOUIUDBY000000-1}}}%
+\nwixlogsorted{c}{{disk vm op call1}{PYNWmai0-FHYJF4PP462QWUAWT2MYOPQZQA000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-FHYJF4PP462QWUAWT2MYOPQZQA000000-1}}}%
+\nwixlogsorted{c}{{disk vm op goto}{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-6V42YT5TYM2DEE5FKAVFCDQSX4000000-1}}}%
+\nwixlogsorted{c}{{disk vm op inc load}{PYNWmai0-GY2JRRVP4L6EUYZF2KA6ZLLY4M000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-GY2JRRVP4L6EUYZF2KA6ZLLY4M000000-1}}}%
+\nwixlogsorted{c}{{disk vm op lda abs}{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-NZ7I5IVD6ZTADYVYPTUJZ74JME000000-1}}}%
+\nwixlogsorted{c}{{disk vm op lda idx}{PYNWmai0-IZL4O3A7R7NJ65AFOK2WBU3GKA000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-IZL4O3A7R7NJ65AFOK2WBU3GKA000000-1}}}%
+\nwixlogsorted{c}{{disk vm op lda imm}{PYNWmai0-YYOHR72I2K632KNEY4FRZXJYXY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-YYOHR72I2K632KNEY4FRZXJYXY000000-1}}}%
+\nwixlogsorted{c}{{disk vm op ret}{PYNWmai0-RTV2NMHWFMFP7DFFTHLWMZPUDM000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-RTV2NMHWFMFP7DFFTHLWMZPUDM000000-1}}}%
+\nwixlogsorted{c}{{disk vm op sta abs}{PYNWmai0-GBEJGVQC4IV5VS7YJEW6DYRT7Y000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-GBEJGVQC4IV5VS7YJEW6DYRT7Y000000-1}}}%
+\nwixlogsorted{c}{{disk vm op sub imm}{PYNWmai0-ZOSTYFEMLOABU7ZHW7SMEZNVI4000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-ZOSTYFEMLOABU7ZHW7SMEZNVI4000000-1}}}%
+\nwixlogsorted{c}{{disk vm pull ip}{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-A5B4HCW5L3AKHGBTUDGDGGKD7U000000-1}}}%
+\nwixlogsorted{c}{{disk vm read addr}{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-ZISC3PL4VWECRONWMEC26G53VU000000-1}}}%
+\nwixlogsorted{c}{{disk vm saved state}{PYNWmai0-TC5SHQB655SMTUZ5XO3B24FCVA000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-TC5SHQB655SMTUZ5XO3B24FCVA000000-1}}}%
+\nwixlogsorted{c}{{disk vm sub exit err}{PYNWmai0-ZXIAUF3LVQ4RS7ZIP64X3QRMVM000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-ZXIAUF3LVQ4RS7ZIP64X3QRMVM000000-1}}}%
+\nwixlogsorted{c}{{disk vm sub park stepper}{PYNWmai0-CZ7WUYZMRQOZ776KSWPCNVZLQI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-CZ7WUYZMRQOZ776KSWPCNVZLQI000000-1}}}%
+\nwixlogsorted{c}{{disk vm swap}{PYNWmai0-YFYCU6Q2EWD6JQJOO76Z4EFCFU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-YFYCU6Q2EWD6JQJOO76Z4EFCFU000000-1}}}%
+\nwixlogsorted{c}{{disk vm trampoline}{PYNWmai0-52EDTY2P6XACMBHKFKS45MCWBU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-52EDTY2P6XACMBHKFKS45MCWBU000000-1}}}%
 \nwixlogsorted{c}{{dispatch on mode}{PYNWmai0-JKIRIHK5BBUUQKW62F6RWOUO6M000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-JKIRIHK5BBUUQKW62F6RWOUO6M000000-1}}}%
 \nwixlogsorted{c}{{display message}{PYNWmai0-PLQAK2MUE37THNKRCI7RJB7UJY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-PLQAK2MUE37THNKRCI7RJB7UJY000000-1}}}%
 \nwixlogsorted{c}{{display shop}{PYNWmai0-MTRYGF5E27RXHB5MSLJKGKYBZI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-MTRYGF5E27RXHB5MSLJKGKYBZI000000-1}}}%
@@ -12658,6 +13678,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{pull two ret addrs}{PYNWmai0-ZQ3HACWSYBTTFFJTEM5GLS64PU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-ZQ3HACWSYBTTFFJTEM5GLS64PU000000-1}}}%
 \nwixlogsorted{c}{{random events}{PYNWmai0-QOXVCPUEVT3O42JX7V2L2CDWXU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-QOXVCPUEVT3O42JX7V2L2CDWXU000000-1}}}%
 \nwixlogsorted{c}{{random in range}{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-F6322QSFMTRJBO2IS2F3GEYRZU000000-1}}}%
+\nwixlogsorted{c}{{read and verify}{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-R67OK4YBMROAH3RWLL533FQFDE000000-1}}}%
 \nwixlogsorted{c}{{read input char}{PYNWmai0-NJKTNAHFCRYCRVDBACZOIBQD24000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-NJKTNAHFCRYCRVDBACZOIBQD24000000-1}}}%
 \nwixlogsorted{c}{{relocate hires staging}{PYNWmai0-2NL3TPDIV6BH32KNILRIC2G5ZE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-2NL3TPDIV6BH32KNILRIC2G5ZE000000-1}}}%
 \nwixlogsorted{c}{{render font char}{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-X3D3646XM7VEHJGRKDML2UKINQ000000-1}}}%
@@ -12670,6 +13691,8 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{resident dispatch table}{PYNWmai0-LZD7UO27WADGX7M4TS77RNCD74000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-LZD7UO27WADGX7M4TS77RNCD74000000-1}}}%
 \nwixlogsorted{c}{{resolve attack}{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-CUGGKDWDWBNMCH3BGUBFKX3CXI000000-1}}}%
 \nwixlogsorted{c}{{restore zp pointers}{PYNWmai0-34VA5T5PRGU2LZRT6RKWJJ2FQI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-34VA5T5PRGU2LZRT6RKWJJ2FQI000000-1}}}%
+\nwixlogsorted{c}{{rwts core}{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-62H73IRGZQNJSJCGQUXD3DI74A000000-1}}}%
+\nwixlogsorted{c}{{rwts entry}{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-NMBFKTB4JKE42AGRJ4ZF2CGWSY000000-1}}}%
 \nwixlogsorted{c}{{save zp pointers}{PYNWmai0-XTFMNQODSGOW3IGUAVI6HJU56I000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-XTFMNQODSGOW3IGUAVI6HJU56I000000-1}}}%
 \nwixlogsorted{c}{{scan and reorder}{PYNWmai0-57X5LVQKSJRUL3VSPDY2CBOF6A000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-57X5LVQKSJRUL3VSPDY2CBOF6A000000-1}}}%
 \nwixlogsorted{c}{{scan for hostile}{PYNWmai0-E4YXUSA3JTJZCREU546HG62MHQ000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-E4YXUSA3JTJZCREU546HG62MHQ000000-1}}}%
@@ -12680,6 +13703,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{script engine}{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-1}\nwixd{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-2}\nwixd{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-3}\nwixd{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-4}\nwixd{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-5}\nwixd{PYNWmai0-ETUEZGHCU2DXYIDN2GSMAGYCHA000000-6}}}%
 \nwixlogsorted{c}{{script helpers}{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-YKM7U5LKWXQRE6XMMPCFSM6W4I000000-1}}}%
 \nwixlogsorted{c}{{script pointer table}{PYNWmai0-33FGP2UXYD5EEQJUC5DEXEFVLE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-33FGP2UXYD5EEQJUC5DEXEFVLE000000-1}}}%
+\nwixlogsorted{c}{{search addr field}{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-J2SFLYLBSPJHVFZHPEHN3SZGUE000000-1}}}%
 \nwixlogsorted{c}{{select combat target}{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-6KDZQUTB2ST3NYFRT7XVP4FCSI000000-1}}}%
 \nwixlogsorted{c}{{select input mode}{PYNWmai0-IJNWOWVOLMPQXWDRQGGDMX6BUI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-IJNWOWVOLMPQXWDRQGGDMX6BUI000000-1}}}%
 \nwixlogsorted{c}{{set blink target}{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-2VA524SVP6PHW44TQJEWTMYFGE000000-1}}}%
@@ -12721,6 +13745,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{c}{{turn dispatch}{PYNWmai0-JHFEVAMUPKDCY3L64TRD56UQBI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-JHFEVAMUPKDCY3L64TRD56UQBI000000-1}}}%
 \nwixlogsorted{c}{{update event list}{PYNWmai0-XKWR6YQCHE3H3XYJIXKNEQP64I000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-XKWR6YQCHE3H3XYJIXKNEQP64I000000-1}}}%
 \nwixlogsorted{c}{{validate input}{PYNWmai0-EZRVGGNNVSNZAPYZLOQ7EISCNI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-EZRVGGNNVSNZAPYZLOQ7EISCNI000000-1}}}%
+\nwixlogsorted{c}{{verify data field}{PYNWmai0-F7XUTD7KQKIZ2LAWT3LZSLO5AM000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-F7XUTD7KQKIZ2LAWT3LZSLO5AM000000-1}}}%
 \nwixlogsorted{c}{{zero page defines}{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}{\nwixu{PYNWmai0-4RSQDT2TWU2QLEUIDKRLWKU4JE000000-1}\nwixd{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-1}\nwixd{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-2}\nwixd{PYNWmai0-AJE4SNIWWSAT23GB2VNG3SS6JI000000-3}}}%
 \nwixlogsorted{i}{{\nwixident{ACTIVE{\_}CHAR}}{ACTIVE:unCHAR}}%
 \nwixlogsorted{i}{{\nwixident{ADDA}}{ADDA}}%
@@ -12830,8 +13855,44 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{DECR{\_}GROUP{\_}COUNT}}{DECR:unGROUP:unCOUNT}}%
 \nwixlogsorted{i}{{\nwixident{DEFAULT{\_}CHAR}}{DEFAULT:unCHAR}}%
 \nwixlogsorted{i}{{\nwixident{DELAY{\_}COUNT}}{DELAY:unCOUNT}}%
+\nwixlogsorted{i}{{\nwixident{DELAY{\_}LOOP}}{DELAY:unLOOP}}%
 \nwixlogsorted{i}{{\nwixident{DELAY{\_}WITH{\_}ANIMATION}}{DELAY:unWITH:unANIMATION}}%
 \nwixlogsorted{i}{{\nwixident{DIR{\_}SCORES}}{DIR:unSCORES}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}DATA{\_}REG}}{DISK:unDATA:unREG}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}READ{\_}FIELD}}{DISK:unREAD:unFIELD}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}BYTECODE}}{DISK:unVM:unBYTECODE}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}DATA{\_}B4DE}}{DISK:unVM:unDATA:unB4DE}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}DISPATCH}}{DISK:unVM:unDISPATCH}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}ERROR{\_}ACCUM}}{DISK:unVM:unERROR:unACCUM}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}EXIT{\_}ERR}}{DISK:unVM:unEXIT:unERR}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}EXIT{\_}OK}}{DISK:unVM:unEXIT:unOK}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}HANDLER{\_}TBL}}{DISK:unVM:unHANDLER:unTBL}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}JMP{\_}IND}}{DISK:unVM:unJMP:unIND}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}LOAD{\_}IND}}{DISK:unVM:unLOAD:unIND}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}LOOP}}{DISK:unVM:unLOOP}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}MISC{\_}B49C}}{DISK:unVM:unMISC:unB49C}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}BNZ}}{DISK:unVM:unOP:unBNZ}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}CALL}}{DISK:unVM:unOP:unCALL}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}CALL0}}{DISK:unVM:unOP:unCALL0}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}CALL1}}{DISK:unVM:unOP:unCALL1}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}GOTO}}{DISK:unVM:unOP:unGOTO}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}INC{\_}LOAD}}{DISK:unVM:unOP:unINC:unLOAD}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}LDA{\_}ABS}}{DISK:unVM:unOP:unLDA:unABS}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}LDA{\_}IDX}}{DISK:unVM:unOP:unLDA:unIDX}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}LDA{\_}IMM}}{DISK:unVM:unOP:unLDA:unIMM}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}RET}}{DISK:unVM:unOP:unRET}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}STA{\_}ABS}}{DISK:unVM:unOP:unSTA:unABS}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}OP{\_}SUB{\_}IMM}}{DISK:unVM:unOP:unSUB:unIMM}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}PULL{\_}IP}}{DISK:unVM:unPULL:unIP}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}READ{\_}ADDR}}{DISK:unVM:unREAD:unADDR}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}RESUME}}{DISK:unVM:unRESUME}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}SAVED{\_}STATE}}{DISK:unVM:unSAVED:unSTATE}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}SCRATCH}}{DISK:unVM:unSCRATCH}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}SET{\_}IP}}{DISK:unVM:unSET:unIP}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}SUB{\_}EXIT{\_}ERR}}{DISK:unVM:unSUB:unEXIT:unERR}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}SUB{\_}PARK{\_}STEPPER}}{DISK:unVM:unSUB:unPARK:unSTEPPER}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}SWAP}}{DISK:unVM:unSWAP}}%
+\nwixlogsorted{i}{{\nwixident{DISK{\_}VM{\_}TRAMPOLINE}}{DISK:unVM:unTRAMPOLINE}}%
 \nwixlogsorted{i}{{\nwixident{DISPATCH{\_}ON{\_}MODE}}{DISPATCH:unON:unMODE}}%
 \nwixlogsorted{i}{{\nwixident{DISPATCH{\_}VEC}}{DISPATCH:unVEC}}%
 \nwixlogsorted{i}{{\nwixident{DISPLAY{\_}MESSAGE}}{DISPLAY:unMESSAGE}}%
@@ -12996,6 +14057,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{PULW}}{PULW}}%
 \nwixlogsorted{i}{{\nwixident{RANDOM{\_}EVENTS}}{RANDOM:unEVENTS}}%
 \nwixlogsorted{i}{{\nwixident{RANDOM{\_}IN{\_}RANGE}}{RANDOM:unIN:unRANGE}}%
+\nwixlogsorted{i}{{\nwixident{READ{\_}AND{\_}VERIFY}}{READ:unAND:unVERIFY}}%
 \nwixlogsorted{i}{{\nwixident{READ{\_}INPUT{\_}CHAR}}{READ:unINPUT:unCHAR}}%
 \nwixlogsorted{i}{{\nwixident{READ{\_}KEYBOARD}}{READ:unKEYBOARD}}%
 \nwixlogsorted{i}{{\nwixident{RELOCATE{\_}HIRES{\_}STAGING}}{RELOCATE:unHIRES:unSTAGING}}%
@@ -13018,6 +14080,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{ROM{\_}COUT1}}{ROM:unCOUT1}}%
 \nwixlogsorted{i}{{\nwixident{ROM{\_}WAIT}}{ROM:unWAIT}}%
 \nwixlogsorted{i}{{\nwixident{RORW}}{RORW}}%
+\nwixlogsorted{i}{{\nwixident{RWTS{\_}CORE}}{RWTS:unCORE}}%
 \nwixlogsorted{i}{{\nwixident{RWTS{\_}ENTRY}}{RWTS:unENTRY}}%
 \nwixlogsorted{i}{{\nwixident{RWTS{\_}IOB}}{RWTS:unIOB}}%
 \nwixlogsorted{i}{{\nwixident{RWTS{\_}IOB{\_}PTR}}{RWTS:unIOB:unPTR}}%
@@ -13052,6 +14115,8 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{SCRIPT{\_}PRNG{\_}MASK}}{SCRIPT:unPRNG:unMASK}}%
 \nwixlogsorted{i}{{\nwixident{SCRIPT{\_}TABLE}}{SCRIPT:unTABLE}}%
 \nwixlogsorted{i}{{\nwixident{SCROLL{\_}STATUS{\_}LINE}}{SCROLL:unSTATUS:unLINE}}%
+\nwixlogsorted{i}{{\nwixident{SEARCH{\_}ADDR{\_}FIELD}}{SEARCH:unADDR:unFIELD}}%
+\nwixlogsorted{i}{{\nwixident{SEARCH{\_}RETRY{\_}COUNT}}{SEARCH:unRETRY:unCOUNT}}%
 \nwixlogsorted{i}{{\nwixident{SELECT{\_}COMBAT{\_}TARGET}}{SELECT:unCOMBAT:unTARGET}}%
 \nwixlogsorted{i}{{\nwixident{SELECT{\_}INPUT{\_}MODE}}{SELECT:unINPUT:unMODE}}%
 \nwixlogsorted{i}{{\nwixident{SETUP{\_}CHAR{\_}SPRITE}}{SETUP:unCHAR:unSPRITE}}%
@@ -13130,6 +14195,7 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{UNDER{\_}LEVEL}}{UNDER:unLEVEL}}%
 \nwixlogsorted{i}{{\nwixident{UPDATE{\_}EVENT{\_}LIST}}{UPDATE:unEVENT:unLIST}}%
 \nwixlogsorted{i}{{\nwixident{VALIDATE{\_}INPUT}}{VALIDATE:unINPUT}}%
+\nwixlogsorted{i}{{\nwixident{VERIFY{\_}DATA{\_}FIELD}}{VERIFY:unDATA:unFIELD}}%
 \nwixlogsorted{i}{{\nwixident{VIEW{\_}MAX{\_}COL}}{VIEW:unMAX:unCOL}}%
 \nwixlogsorted{i}{{\nwixident{VIEW{\_}MAX{\_}ROW}}{VIEW:unMAX:unROW}}%
 \nwixlogsorted{i}{{\nwixident{VIEW{\_}MIN{\_}COL}}{VIEW:unMIN:unCOL}}%
@@ -13173,6 +14239,6 @@ The following root chunks produce the assembly files when tangled.
 \nwixlogsorted{i}{{\nwixident{s{\_}DECOR{\_}ROW3}}{s:unDECOR:unROW3}}%
 \nwixlogsorted{i}{{\nwixident{s{\_}PRESS{\_}SPACE}}{s:unPRESS:unSPACE}}%
 \nwixlogsorted{i}{{\nwixident{tone}}{tone}}%
-\nwbegindocs{603}\nwdocspar
+\nwbegindocs{671}\nwdocspar
 \end{document}
 \nwenddocs{}

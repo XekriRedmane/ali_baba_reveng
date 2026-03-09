@@ -200,6 +200,7 @@ AI_BEST_POS             EQU     $BE     ; best hostile position in ai_choose_tar
 DATA_PTR                EQU     $BE     ; general data pointer / return value (2 bytes)
 RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
 HRCG_INIT               EQU     $92A8   ; HRCG entry/init routine
+DISK_DATA_REG           EQU     $C0EC   ; disk controller data register (active slot)
 GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
 READ_KEYBOARD                EQU     $A44C   ; resident: read keyboard input
 UI_TEXT_STREAM          EQU     $5E55   ; text stream data for game UI background
@@ -291,7 +292,6 @@ SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
 WORLD_INIT_DATA         EQU     $62B9   ; world initialization data table
 RWTS_IOB                EQU     $B7E8   ; RWTS Input/Output Block (14 bytes)
-RWTS_ENTRY              EQU     $B7B5   ; RWTS entry point
 SAVED_BC            EQU     $5A9A   ; saved TARGET_REC/PRINT_STRING_ADDR (2 bytes)
 SAVED_F8            EQU     $5A9C   ; saved ENTITY_PTR pointer (2 bytes)
 SAVED_BE            EQU     $5A9E   ; saved CHAR_REC/ENTITY_REC (2 bytes)
@@ -5915,7 +5915,7 @@ SETUP_DISK_READ:
     STA     ($08),Y                 ; ($08)+$03 = 0 (sector offset)
     LDA     $09                     ; \ A/Y = slot parameter block
     LDY     $08                     ; /
-    JSR     $B7B5                   ; EALDR seek routine
+    JSR     RWTS_ENTRY              ; seek to track
     LDA     #$00
     STA     $48                     ; clear disk status
     RTS
@@ -6173,7 +6173,7 @@ LOAD_SCENE_DATA:
     LDA     #$00
     JSR     SETUP_DISK_READ         ; prepare disk parameters
     CLC
-    JSR     $B300                   ; EALDR disk read routine
+    JSR     DISK_READ_FIELD         ; read sector data from disk
     BCS     .error
     RTS
 
@@ -7546,3 +7546,523 @@ FONT_DATA:
     ORG     $97A5
 STD_FONT_DATA:
     INCLUDE "stdfontdata.asm"
+    ORG     $B300
+DISK_READ_FIELD:
+    JMP     DISK_VM_LOOP            ; enter VM interpreter
+    NOP                             ; pad
+    ORG     $B304
+VERIFY_DATA_FIELD:
+    SUBROUTINE
+
+; --- Search for D5 AA AD data field prologue ---
+    LDY     #$20                    ; timeout counter = 32
+.search_d5:
+    DEY
+    BEQ     .error                  ; timeout
+    LDA     DISK_DATA_REG           ; read disk nibble
+    BPL     *-3                     ; wait for data ready
+.check_d5:
+    EOR     #$D5                    ; check for D5
+    BNE     .search_d5              ; not D5, retry
+    LDA     DISK_DATA_REG           ; read next nibble
+    BPL     *-3
+    CMP     #$AA                    ; check for AA
+    BNE     .check_d5               ; not AA, re-check as D5
+    LDA     DISK_DATA_REG           ; read third nibble
+    BPL     *-3
+    CMP     #$AD                    ; check for AD
+    BNE     .check_d5               ; not AD, re-check as D5
+
+; --- Found D5 AA AD: read and verify data nibbles ---
+    PHA                             ; \ waste cycles (timing)
+    PLA                             ; /
+    LDY     #$56                    ; 86 nibbles (secondary buffer)
+.read_secondary:
+    LDA     DISK_DATA_REG           ; read nibble
+    BPL     *-3
+    BIT     $C000                   ; timing sync
+    CMP     #$AF                    ; verify nibble = $AF
+    BNE     .bad_nibble             ; mismatch → error
+    DEY
+    BNE     .read_secondary
+
+    LDY     #$00                    ; 256 nibbles (primary buffer)
+.read_primary:
+    LDA     DISK_DATA_REG           ; read nibble
+    BPL     *-3
+    BIT     $C000                   ; timing sync
+    CMP     #$AF                    ; verify nibble = $AF
+    BNE     .bad_nibble             ; mismatch → error
+    DEY
+    BNE     .read_primary
+
+; --- Verify DE AA data field epilogue ---
+    LDY     DISK_DATA_REG           ; read (discard) checksum nibble
+    BPL     *-3
+    PHA                             ; \ waste cycles
+    PLA                             ; /
+    LDA     DISK_DATA_REG           ; read epilogue byte 1
+    BPL     *-3
+    CMP     #$DE                    ; check for DE
+    BNE     .error                  ; bad epilogue
+    LDA     DISK_DATA_REG           ; read epilogue byte 2
+    BPL     *-3
+    CMP     #$AA                    ; check for AA
+    BEQ     .ok                     ; good epilogue
+
+.error:
+    SEC                             ; carry set = error
+    RTS
+
+.ok:
+    CLC                             ; carry clear = success
+    RTS
+
+.bad_nibble:
+    STA     $B5F6                   ; save mismatched nibble for diagnostics
+    SEC                             ; carry set = error
+    RTS
+    ORG     $B36A
+DISK_VM_LOOP:
+    JSR     DISK_VM_SWAP            ; swap ZP $50-$5F with saved state
+    JSR     DISK_VM_DISPATCH        ; execute next VM opcode
+    JMP     DISK_VM_LOOP            ; repeat
+; VM bytecode program follows at $B373
+    ORG     $B373
+DISK_VM_BYTECODE:
+; --- Integrity checks ---
+; LDA_ABS $B361; SUB_IMM #$38; BNZ $B48D  (verify SEC at .error)
+    HEX     04 fd 1e 07 42 02 11 19
+; LDA_ABS $B362; SUB_IMM #$60; BNZ $B48D  (verify RTS at .error+1)
+    HEX     04 fe 1e 07 1a 02 11 19
+; LDA_ABS $B368; SUB_IMM #$38; BNZ $B48D  (verify SEC at .bad_nibble+3)
+    HEX     04 f4 1e 07 42 02 11 19
+; --- First attempt ---
+; CALL $B3A8 (disk read sub); BNZ $B394 (retry on error)
+    HEX     05 34 1e
+; GOTO $B3A5 (exit OK path, skipping retry)
+    HEX     02 08 1e         ;BNZ $B394 (if error → retry)
+    HEX     0c 39 1e         ;GOTO $B3A5 (success → exit)
+; --- Retry (second attempt, at $B394) ---
+; CALL $B3A8; BNZ $B39D (error handler)
+    HEX     05 34 1e
+    HEX     02 01 1e         ;BNZ $B39D (if error → handler)
+; GOTO $B3A5 (exit OK)
+    HEX     0c 39 1e
+; --- Error handler at $B39D ---
+; SUB_IMM #$02; BNZ $B48D (fatal if >2 errors); GOTO $B373 (restart)
+    HEX     07 78 02 11 19 0c ef 1e
+; --- Success exit at $B3A5 ---
+; CALL0 $B492 (DISK_VM_EXIT_OK)
+    HEX     09 0e 19
+; --- Disk read subroutine at $B3A8 ---
+; LDA_ABS $C0E9 (motor on)
+    HEX     04 75 6d
+; LDA_IMM #$FF; CALL1 $FCA8 (ROM WAIT)  ×2  (motor spin-up delay)
+    HEX     03 85 01 34 51
+    HEX     03 85 01 34 51
+; LDA_ABS $C0EE (Q7L = read mode)
+    HEX     04 72 6d
+; LDA_IMM #$00; STA_ABS $B5E2 (clear error accumulator)
+    HEX     03 7a 06 7e 18
+; CALL $B3D0 ×4 (half-track verification passes)
+    HEX     05 4c 1e
+    HEX     05 4c 1e
+    HEX     05 4c 1e
+    HEX     05 4c 1e
+; LDA_ABS $C0E8 (motor off)
+    HEX     04 74 6d
+; LDA_ABS $B5E2 (load error count); RET
+    HEX     04 7e 18 08
+; --- Half-track verifier subroutine at $B3D0 ---
+; LDA_IMM #$03; STA_ABS $B44D (set retry counter)
+    HEX     03 79 06 d1 19
+; CALL1 $B44E (READ_AND_VERIFY)
+    HEX     01 d2 19
+; LDA_ABS $C0E7 (phase 3 on — half-track step)
+    HEX     04 7b 6d
+; CALL1 $B44E ×2
+    HEX     01 d2 19 01 d2 19
+; LDA_ABS $C0E1 (phase 0 on — half-track step)
+    HEX     04 7d 6d
+; CALL $B46B (PARK_STEPPER sub)
+    HEX     05 f7 19
+; LDA_IMM #$03; STA_ABS $B44D (reset retry counter)
+    HEX     03 79 06 d1 19
+; CALL1 $B44E (READ_AND_VERIFY)
+    HEX     01 d2 19
+; LDA_ABS $C0E7 (phase 3 on)
+    HEX     04 7b 6d
+; CALL1 $B44E ×2
+    HEX     01 d2 19 01 d2 19
+; LDA_ABS $C0E5 (phase 2 on — half-track step)
+    HEX     04 79 6d
+; CALL $B46B (PARK_STEPPER); RET
+    HEX     05 f7 19 08
+; $B3FF: next byte ($A0) is the LDY opcode of SEARCH_ADDR_FIELD
+    ORG     $B3FF
+SEARCH_ADDR_FIELD:
+    LDY     #$FF                    ; 256 inner retries
+; $B400: FF is the immediate operand (part of the LDY instruction)
+.search:
+    LDX     SEARCH_RETRY_COUNT      ; outer retry count
+.next_nibble:
+    LDA     DISK_DATA_REG           ; read nibble
+    BPL     *-3                     ; wait for ready
+    CMP     #$D5                    ; first prologue byte?
+    BEQ     .got_d5
+    DEY                             ; inner countdown
+    BNE     .next_nibble
+    DEX                             ; outer countdown
+    BNE     .next_nibble
+    RTS                             ; timeout (carry unchanged)
+
+.got_d5:
+    LDA     DISK_DATA_REG
+    BPL     *-3
+    CMP     #$AA                    ; second prologue byte?
+    BEQ     .got_aa
+    DEY
+    BNE     .next_nibble
+    SEC
+    RTS                             ; timeout
+
+.got_aa:
+    LDA     DISK_DATA_REG
+    BPL     *-3
+    CMP     #$96                    ; third prologue byte (addr mark)?
+    BEQ     .got_96
+    DEY
+    BNE     .next_nibble
+    SEC
+    RTS                             ; timeout
+
+.got_96:
+; --- Decode 3 address field pairs (4-and-4 encoding) ---
+    LDY     #$02                    ; 3 pairs: volume, track, sector
+.decode_pair:
+    LDA     DISK_DATA_REG           ; read odd-bits nibble
+    BPL     *-3
+    ROL                             ; shift data, odd bits in even positions
+    STA     $50                     ; save partial
+    LDA     DISK_DATA_REG           ; read even-bits nibble
+    BPL     *-3
+    AND     $50                     ; combine: result = decoded byte
+    STA     $50                     ; last decoded value (sector on final iter)
+    DEY
+    STX     SEARCH_RETRY_COUNT      ; save remaining retry count
+    BPL     .decode_pair            ; Y: 2→1→0→FF (3 iterations)
+
+    CLC                             ; success
+    LDX     #$01
+    RTS
+
+SEARCH_RETRY_COUNT:
+    DC.B    3                       ; $B44D: outer retry counter (default 3)
+    ORG     $B44E
+READ_AND_VERIFY:
+    JSR     SEARCH_ADDR_FIELD       ; find D5 AA 96 address prologue
+    BCS     .skip_verify            ; no address field → skip data verify
+    JSR     VERIFY_DATA_FIELD       ; verify D5 AA AD data field
+.skip_verify:
+    LDA     #$00
+    ADC     DISK_VM_ERROR_ACCUM     ; carry → error count
+    STA     DISK_VM_ERROR_ACCUM
+; --- Turn off all stepper motor phases ---
+    LDA     $C0E0                   ; phase 0 off
+    LDA     $C0E2                   ; phase 1 off
+    LDA     $C0E4                   ; phase 2 off
+    LDA     $C0E6                   ; phase 3 off
+    RTS
+    ORG     $B46B
+DISK_VM_SUB_PARK_STEPPER:
+; LDA_IMM #$70; CALL1 $B482 (DELAY_LOOP)  — long delay
+    HEX     03 0a 01 1e 19
+; LDA_ABS $C0E0 (phase 0 off)
+    HEX     04 7c 6d
+; LDA_ABS $C0E2 (phase 1 off)
+    HEX     04 7e 6d
+; LDA_ABS $C0E4 (phase 2 off)
+    HEX     04 78 6d
+; LDA_ABS $C0E6 (phase 3 off)
+    HEX     04 7a 6d
+; LDA_IMM #$28; CALL1 $B482 (DELAY_LOOP)  — short delay
+    HEX     03 52 01 1e 19
+; RET
+    HEX     08
+    ORG     $B482
+DELAY_LOOP:
+    SUBROUTINE
+    LDX     #$20
+.inner:
+    DEX
+    BNE     .inner
+    SEC
+    SBC     #$01
+    BNE     DELAY_LOOP
+    RTS
+    ORG     $B48D
+DISK_VM_SUB_EXIT_ERR:
+; LDA_IMM #$20; CALL0 $B497 (DISK_VM_EXIT_ERR)
+    HEX     03 5a 09 0b 19
+    ORG     $B492
+DISK_VM_EXIT_OK:
+    JSR     DISK_VM_SWAP            ; restore caller's ZP
+    CLC                             ; carry clear = success
+    RTS
+    ORG     $B497
+DISK_VM_EXIT_ERR:
+    JSR     DISK_VM_SWAP            ; restore caller's ZP
+    SEC                             ; carry set = error
+    RTS
+    ORG     $B49C
+DISK_VM_MISC_B49C:
+    EOR     #$AD
+    RTS
+    ORG     $B49F
+DISK_VM_DISPATCH:
+    SUBROUTINE
+
+    TXA
+    PHA                             ; save X
+    TYA
+    PHA                             ; save Y
+    JSR     DISK_VM_PULL_IP         ; pull IP from stack → $52/$53
+    PLA
+    STA     $52                     ; \ restore as VM instruction pointer
+    PLA                             ;  | (values set by DISK_VM_PULL_IP
+    STA     $53                     ; /  via stack manipulation)
+    LDY     #$04
+DISK_VM_RESUME:
+    LDA     ($52),Y                 ; read opcode from VM program
+    INY
+    BNE     .no_page
+    INC     $53
+.no_page:
+    TAX
+    LDA     DISK_VM_HANDLER_TBL,X   ; look up handler low byte
+    STA     $B5E0                   ; self-modify JMP target at $B5DF
+    JMP     DISK_VM_TRAMPOLINE      ; dispatch (JMP $B5xx)
+
+; --- VM opcode handler table ---
+; Each byte is the low address of a handler in page $B5.
+; Opcode index → handler address ($B5xx).
+DISK_VM_HANDLER_TBL:
+    HEX     79 27 55 5f 6d 8a ad b9 a2 4f ce 26 00
+    ORG     $B4CC
+DISK_VM_SWAP:
+    SUBROUTINE
+
+    LDX     #$0F                    ; 16 bytes ($50-$5F)
+.loop:
+    LDA     $50,X                   ; \ swap ZP with saved state
+    PHA                             ;  |
+    LDA     $B5E5,X                 ;  |
+    STA     $50,X                   ;  |
+    PLA                             ;  |
+    STA     $B5E5,X                 ; /
+    DEX
+    BPL     .loop
+    RTS
+    ORG     $B4DE
+DISK_VM_DATA_B4DE:
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     4a 4c 4e
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    ORG     $B500
+DISK_VM_OP_GOTO:
+    JSR     DISK_VM_READ_ADDR       ; read target → $54/$55
+DISK_VM_SET_IP:
+    LDA     $54                     ; \ set IP = operand
+    STA     $52                     ;  |
+    LDA     $55                     ;  |
+    STA     $53                     ; /
+    LDY     #$00
+    JMP     DISK_VM_RESUME          ; dispatch next opcode
+    ORG     $B510
+DISK_VM_READ_ADDR:
+    LDA     ($52),Y                 ; read encrypted low byte
+    EOR     #$9C                    ; decrypt
+    INY
+    BNE     .no_page1
+    INC     $53
+.no_page1:
+    STA     $54                     ; operand low
+    LDA     ($52),Y                 ; read encrypted high byte
+    INY
+    BNE     .no_page2
+    INC     $53
+.no_page2:
+    EOR     #$AD                    ; decrypt
+    STA     $55                     ; operand high
+    RTS
+    ORG     $B527
+DISK_VM_OP_CALL1:
+    SUBROUTINE
+    JSR     DISK_VM_READ_ADDR       ; read native addr → $54/$55
+    TYA
+    PHA                             ; save Y (bytecode offset)
+    LDA     $56                     ; A = VM accumulator
+    JSR     DISK_VM_JMP_IND         ; call native routine via JMP ($54)
+    STA     $56                     ; capture return A → accumulator
+    PLA
+    TAY                             ; restore Y
+    JMP     DISK_VM_RESUME          ; dispatch next opcode
+    ORG     $B538
+DISK_VM_PULL_IP:
+    SUBROUTINE
+
+; Pulls two return addresses from the stack.
+; The outer return address (from JSR DISK_VM_DISPATCH) becomes the
+; VM instruction pointer.  Resumes execution at the inner return
+; address + 1 (i.e., returns to the code after JSR DISK_VM_PULL_IP).
+    PLA                             ; \ inner return address
+    STA     $54                     ;  | (from JSR DISK_VM_PULL_IP)
+    PLA                             ; /
+    STA     $55
+    PLA                             ; \ outer return address
+    STA     $52                     ;  | (from JSR DISK_VM_DISPATCH)
+    PLA                             ; /  = VM instruction pointer
+    STA     $53
+    INC     $52                     ; adjust IP (6502 pushes addr-1)
+    INC     $54                     ; \ adjust inner return address
+    BNE     .no_carry               ;  |
+    INC     $55                     ; /
+.no_carry:
+    JMP     ($54)                   ; resume at inner return + 1
+    ORG     $B54F
+DISK_VM_OP_CALL0:
+    JSR     DISK_VM_READ_ADDR       ; read native addr → $54/$55
+DISK_VM_JMP_IND:
+    JMP     ($54)                   ; indirect jump (no return to VM)
+    ORG     $B555
+DISK_VM_OP_BNZ:
+    JSR     DISK_VM_READ_ADDR       ; read branch target → $54/$55
+    LDA     $56                     ; test accumulator
+    BNE     DISK_VM_SET_IP          ; nonzero → branch (reuse GOTO tail)
+    JMP     DISK_VM_RESUME          ; zero → continue
+    ORG     $B55F
+DISK_VM_OP_LDA_IMM:
+    LDA     ($52),Y                 ; read encrypted byte
+    INY
+    BNE     .no_page
+    INC     $53
+.no_page:
+    EOR     #$7A                    ; decrypt
+    STA     $56                     ; accumulator = value
+    JMP     DISK_VM_RESUME
+    ORG     $B56D
+DISK_VM_OP_LDA_ABS:
+    JSR     DISK_VM_READ_ADDR       ; read address → $54/$55
+DISK_VM_LOAD_IND:
+    LDX     #$00
+    LDA     ($54,X)                 ; ACC = *(address)
+    STA     $56
+    JMP     DISK_VM_RESUME
+    ORG     $B579
+DISK_VM_OP_LDA_IDX:
+    SUBROUTINE
+    JSR     DISK_VM_READ_ADDR       ; read base addr → $54/$55
+    LDA     $56                     ; index = old accumulator
+    CLC
+    ADC     $54                     ; base_lo + index
+    STA     $54
+    BCC     .no_carry
+    INC     $55                     ; propagate carry
+.no_carry:
+    JMP     DISK_VM_LOAD_IND        ; load from ($54/$55) → ACC
+    ORG     $B58A
+DISK_VM_OP_CALL:
+    SUBROUTINE
+    JSR     DISK_VM_READ_ADDR       ; read target → $54/$55
+    TYA
+    CLC
+    ADC     $52                     ; \ resolve absolute IP
+    STA     $52                     ;  | (base + Y offset)
+    BCC     .no_carry
+    INC     $53                     ; /
+.no_carry:
+    LDA     $52                     ; \ push IP for RET
+    PHA                             ;  |
+    LDA     $53                     ;  |
+    PHA                             ; /
+    LDY     #$00
+    JMP     DISK_VM_SET_IP          ; GOTO target address
+    ORG     $B5A2
+DISK_VM_OP_RET:
+    PLA                             ; \ pop saved IP
+    STA     $53                     ;  | (high byte pushed last)
+    PLA                             ;  |
+    STA     $52                     ; / (low byte pushed first)
+    LDY     #$00
+    JMP     DISK_VM_RESUME
+    ORG     $B5AD
+DISK_VM_OP_STA_ABS:
+    JSR     DISK_VM_READ_ADDR       ; read address → $54/$55
+    LDA     $56                     ; A = accumulator
+    LDX     #$00
+    STA     ($54,X)                 ; *(address) = ACC
+    JMP     DISK_VM_RESUME
+    ORG     $B5B9
+DISK_VM_OP_SUB_IMM:
+    LDA     ($52),Y                 ; read encrypted byte
+    INY
+    BNE     .no_page
+    INC     $53
+.no_page:
+    EOR     #$7A                    ; decrypt
+    STA     $54                     ; temp
+    LDA     $56                     ; A = accumulator
+    SEC
+    SBC     $54                     ; ACC - immediate
+    STA     $56                     ; accumulator = result
+    JMP     DISK_VM_RESUME
+    ORG     $B5CE
+DISK_VM_OP_INC_LOAD:
+    JSR     DISK_VM_READ_ADDR       ; read address → $54/$55
+    LDX     #$00
+    LDA     ($54,X)                 ; read current value
+    CLC
+    ADC     #$01                    ; increment
+    STA     ($54,X)                 ; write back
+    STA     $56                     ; accumulator = new value
+    JMP     DISK_VM_RESUME
+    ORG     $B5DF
+DISK_VM_TRAMPOLINE:
+    JMP     DISK_VM_OP_GOTO         ; self-modified: low byte patched
+    ORG     $B5E2
+DISK_VM_ERROR_ACCUM:
+    DC.B    0                       ; error count (updated by READ_AND_VERIFY)
+    DC.B    0,0                     ; scratch
+    ORG     $B5E5
+DISK_VM_SAVED_STATE:
+;            $50                        $54                  $58
+    HEX     00 00 00 00 00 00 00 00 00 4a 4c 4e 00 00 00 00
+;           saved ZP $50-$5F; bytes 9-11 ($59-$5B) = $4A,$4C,$4E
+DISK_VM_SCRATCH:
+    HEX     00                      ; $B5F5
+    HEX     00                      ; $B5F6: bad nibble storage
+    HEX     00 00 00                ; $B5F7-$B5F9
+    HEX     a0 a0                   ; $B5FA-$B5FB
+    HEX     00 00 00 01             ; $B5FC-$B5FF
+    ORG     $B7B5
+RWTS_ENTRY:
+    SUBROUTINE
+
+    PHP                             ; save processor flags
+    SEI                             ; disable interrupts (disk timing)
+    JSR     RWTS_CORE               ; call RWTS dispatcher
+    BCS     .error
+    PLP                             ; restore flags
+    CLC                             ; success
+    RTS
+
+.error:
+    PLP                             ; restore flags
+    SEC                             ; error
+    RTS
+    ORG     $BD00
+RWTS_CORE:
+    ; Standard DOS 3.3 RWTS --- not disassembled (see Beneath Apple DOS)
+    ; IOB pointer in $48/$49 (set by caller: Y→$48, A→$49)
+    ; Returns carry clear = success, carry set = error
