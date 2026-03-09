@@ -199,7 +199,6 @@ AI_BEST_STR             EQU     $BF     ; best hostile strength in ai_choose_tar
 AI_BEST_POS             EQU     $BE     ; best hostile position in ai_choose_target
 DATA_PTR                EQU     $BE     ; general data pointer / return value (2 bytes)
 RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
-HRCG_INIT               EQU     $92A8   ; HRCG entry/init routine
 DISK_DATA_REG           EQU     $C0EC   ; disk controller data register (active slot)
 GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
 READ_KEYBOARD                EQU     $A44C   ; resident: read keyboard input
@@ -7543,6 +7542,839 @@ SCRIPT_TABLE:
     ORG     $83A5
 FONT_DATA:
     INCLUDE "fontdata.asm"
+    ORG     $92A8
+HRCG_INIT:
+; --- HRCG entry jump table ---
+    JMP     HRCG_INIT_BODY          ; main init entry
+HRCG_NUM_CHARSETS:
+    DC.B    $0A                     ; 10 custom charsets
+HRCG_FONT_BASE_LO:
+    DC.B    $A5                     ; font base address low
+HRCG_FONT_BASE_HI:
+    DC.B    $83                     ; font base address high ($83A5)
+HRCG_ENTRY2:
+    JMP     HRCG_RTS                ; secondary entry (disabled)
+HRCG_ENTRY3:
+    JMP     HRCG_RTS                ; secondary entry (disabled)
+; --- HRCG_PRINT_VERSION ---
+HRCG_PRINT_VERSION:
+    SUBROUTINE
+    JSR     HRCG_INIT_BODY
+    LDY     #$00
+.loop:
+    LDA     HRCG_VERSION_STR,Y
+    JSR     ROM_COUT1
+    INY
+    CPY     #$1D                    ; 29 chars
+    BCC     .loop
+    RTS
+; --- HRCG_INIT_BODY ---
+HRCG_INIT_BODY:
+    SUBROUTINE
+    LDA     #<HRCG_GETKEY
+    STA     $38                     ; KSW low
+    LDA     #>HRCG_GETKEY
+    STA     $39                     ; KSW high
+    LDA     #<HRCG_COUT
+    STA     $36                     ; CSW low
+    LDA     #>HRCG_COUT
+    STA     $37                     ; CSW high
+    JSR     $03EA                   ; reconnect DOS (patched to NOPs by game)
+    BIT     $C052                   ; full-screen mode (no mixed)
+    BIT     $C057                   ; hi-res mode
+    JSR     HRCG_RESET
+    JSR     HRCG_DISPLAY_PAGE
+    BIT     $C050                   ; graphics mode on
+    RTS
+    ORG     $92E8
+HRCG_VERSION_STR:
+; "HI-RES CHAR GEN VERSION 1.0" with ctrl-P prefix and CR suffix (high-bit ASCII)
+    HEX     90 C8 C9 AD D2 C5 D3 A0 C3 C8 C1 D2 A0 C7 C5 CE
+    HEX     A0 D6 C5 D2 D3 C9 CF CE A0 B1 AE B0 8D
+    ORG     $9305
+HRCG_SHIFT_FLAG:
+    DC.B    $00                     ; $00=normal, $40=next-shifted, $80=charset-select
+HRCG_MODE_FLAGS:
+    DC.B    $00                     ; bit 7/6 shifted by ASL during dispatch
+HRCG_VIDEO_MODE:
+    DC.B    $20                     ; $20=replace, $40=OR, $80=AND, $C0=XOR
+HRCG_MASK:
+    DC.B    $00                     ; $00=normal, $7F=inverse
+HRCG_DRAW_MODE:
+    DC.B    $00                     ; video mode for drawing ($00/$80/$C0)
+HRCG_PAGE_MASK:
+    DC.B    $00                     ; $00=page1, $60=page2
+HRCG_WRAP_FLAG:
+    DC.B    $00                     ; $00=scroll, $FF=wrap
+HRCG_INVERT_FLAG:
+    DC.B    $00                     ; $00=normal, $80=lowercase, $C0=XOR-invert
+HRCG_FONT_PTR_LO:
+    DC.B    $A5                     ; font data pointer low
+HRCG_FONT_PTR_HI:
+    DC.B    $97                     ; font data pointer high ($97A5 = standard font)
+HRCG_SAVED_PARAMS:
+    DC.B    $20,$00,$00,$00,$00,$00,$A5,$97  ; saved copy of video mode..font ptr (8 bytes)
+    DC.B    $FF                     ; HRCG_SAVED_FLAG ($00=not saved, $FF=saved)
+HRCG_SAVED_CH:
+    DC.B    $01                     ; saved cursor X
+HRCG_SAVED_CV:
+    DC.B    $17                     ; saved cursor Y (23)
+    ORG     $931A
+HRCG_GETKEY:
+    SUBROUTINE
+; --- KSW handler: cursor blink + keyboard input ---
+    STA     ($28),Y                 ; save char at cursor pos (BASL)
+    STX     $EB                     ; save X
+    LDA     $28                     ; BASL
+    STA     $2A                     ; copy to $2A
+    LDA     $29                     ; BASH
+    ORA     #$1C                    ; set hi-res page offset bits
+    ORA     HRCG_VIDEO_MODE
+    STA     $2B                     ; store hi byte
+    LDX     #$01                    ; blink counter init
+.blink_loop:
+    LDA     ($2A),Y                 ; read screen byte at cursor
+    PHA                             ; save it
+.blink_wait:
+    INC     $4E                     ; increment blink timer low
+    BNE     .blink_check
+    INC     $4F                     ; increment blink timer high
+    DEX                             ; decrement blink counter
+    BNE     .blink_check
+    EOR     #$7F                    ; toggle cursor (invert bits 0-6)
+    STA     ($2A),Y                 ; write toggled cursor
+    LDX     #$50                    ; reset blink counter
+.blink_check:
+    BIT     $C000                   ; check keyboard
+    BPL     .blink_wait             ; no key -> keep blinking
+    PLA                             ; restore original screen byte
+    STA     ($2A),Y                 ; restore cursor position
+    TSX                             ; get stack pointer
+    LDA     $0104,X                 ; peek at return address high byte
+    CMP     #$F8                    ; called from ROM input ($F8xx)?
+    LDA     $C000                   ; read key
+    BIT     $C010                   ; clear keyboard strobe
+    BCC     .return_direct          ; not from ROM -> return key directly
+    PHA                             ; save key
+    BIT     HRCG_SHIFT_FLAG         ; check shift flag
+    BMI     .shifted                ; if set -> handle shifted key
+    CMP     #$9B                    ; ESC key?
+    BNE     .check_cr
+    LDA     #$80                    ; set shift flag
+    STA     HRCG_SHIFT_FLAG
+    BNE     .discard_key            ; always branch -> return
+.check_cr:
+    CMP     #$8D                    ; CR key?
+    BNE     .discard_key
+    JSR     HRCG_CLREOL             ; clear rest of line
+.reload_ch:
+    LDY     $24                     ; reload cursor X
+.discard_key:
+    PLA                             ; discard saved key
+.return_direct:
+    LDX     $EB                     ; restore X
+    RTS
+; --- Shifted key handling (ESC was pressed) ---
+.shifted:
+    CMP     #$C9                    ; 'I' ?
+    BCC     .try_other
+    CMP     #$CD                    ; 'M' ?
+    BEQ     .scroll_down
+    BCS     .try_other              ; > 'M' -> try as normal
+    CMP     #$CB                    ; 'K' ?
+    BEQ     .cursor_right
+    BCC     .discard_key            ; < 'K' (='J') -> ignore
+.try_other:
+    ASL     HRCG_SHIFT_FLAG         ; clear shift flag
+    CMP     #$C0                    ; '@' ?
+    BNE     .try_e
+    JSR     HRCG_HOME
+    JMP     .reload_ch
+.try_e:
+    CMP     #$C5                    ; 'E' ?
+    BNE     .try_f
+    JSR     HRCG_CLREOL
+    JMP     .reload_ch
+.try_f:
+    CMP     #$C6                    ; 'F' ?
+    BNE     .try_c
+    JSR     HRCG_CLRLINE
+    JMP     .reload_ch
+.try_c:
+    CMP     #$C3                    ; 'C' ?
+    BEQ     .scroll_down
+    CMP     #$C1                    ; 'A' ?
+    BNE     .discard_key            ; not recognized -> return
+.cursor_right:
+    INY                             ; cursor right: Y++
+    CPY     $21                     ; past right edge (WNDWDTH)?
+    BCC     .reload_ch
+.scroll_down:
+    LDY     $25                     ; get cursor Y (CV)
+    INY
+    CPY     $23                     ; past bottom (WNDBTM)?
+    BCC     .reload_ch
+    JSR     HRCG_SCROLL_UP
+    JMP     .reload_ch
+    ORG     $93BE
+HRCG_COUT:
+    SUBROUTINE
+; --- CSW handler: save regs, process char, restore ---
+    STA     $FF                     ; save A
+    STX     $EB                     ; save X
+    STY     $35                     ; save Y
+    JSR     HRCG_PROCESS_CHAR
+    LDY     $35                     ; restore Y
+    LDX     $EB                     ; restore X
+    LDA     $FF                     ; restore A
+    RTS
+; --- HRCG_PROCESS_CHAR ---
+HRCG_PROCESS_CHAR:
+    AND     #$7F                    ; strip high bit
+    ASL     HRCG_MODE_FLAGS         ; shift mode bit 7 into carry
+    BCS     HRCG_CHARSET_SELECT     ; if set -> charset select
+    CMP     #$20                    ; printable char (>= space)?
+    BCC     .ctrl_dispatch          ; no -> control char dispatch
+    JMP     HRCG_DRAW_CHAR
+.ctrl_dispatch:
+    CMP     #$1B                    ; >= ESC ($1B)?
+    BCS     .shift_and_rts          ; yes -> skip dispatch
+    ASL                             ; char * 2 for table index
+    TAX
+    LDA     HRCG_DISPATCH_TBL+1,X  ; high byte of handler-1
+    PHA
+    LDA     HRCG_DISPATCH_TBL,X    ; low byte of handler-1
+    PHA
+.shift_and_rts:
+    ASL     HRCG_MODE_FLAGS         ; shift mode bit 6 into carry
+    RTS                             ; RTS-trick dispatch
+    ORG     $93EE
+HRCG_DISPATCH_TBL:
+; Control character dispatch table (address-1 for RTS trick)
+; ctrl-@: no-op
+    DC.W    HRCG_CTRL_NOP-1
+; ctrl-A: set shift/charset flag
+    DC.W    HRCG_CTRL_A-1
+; ctrl-B: save state
+    DC.W    HRCG_CTRL_B_SAVE-1
+; ctrl-C: restore cursor / XOR mode
+    DC.W    HRCG_CTRL_C-1
+; ctrl-D: restore state / display page
+    DC.W    HRCG_CTRL_D-1
+; ctrl-E: clear EOL
+    DC.W    HRCG_CTRL_E-1
+; ctrl-F: clear to end of screen
+    DC.W    HRCG_CTRL_F-1
+; ctrl-G: bell
+    DC.W    $FBDC
+; ctrl-H: backspace
+    DC.W    HRCG_CTRL_H-1
+; ctrl-I: inverse video
+    DC.W    HRCG_CTRL_I-1
+; ctrl-J: line feed
+    DC.W    HRCG_LINE_FEED-1
+; ctrl-K: clear invert flag
+    DC.W    HRCG_CTRL_K-1
+; ctrl-L: set invert flag
+    DC.W    HRCG_CTRL_L-1
+; ctrl-M: carriage return
+    DC.W    HRCG_CTRL_M-1
+; ctrl-N: normal video
+    DC.W    HRCG_CTRL_N-1
+; ctrl-O: next-shifted / OR mode
+    DC.W    HRCG_CTRL_O-1
+; ctrl-P: home / clear draw mode
+    DC.W    HRCG_CTRL_P-1
+; ctrl-Q: goto saved cursor
+    DC.W    HRCG_CTRL_Q-1
+; ctrl-R: XOR draw mode
+    DC.W    HRCG_CTRL_R-1
+; ctrl-S: XOR invert / clear wrap
+    DC.W    HRCG_CTRL_S-1
+; ctrl-T: AND draw mode
+    DC.W    HRCG_CTRL_T-1
+; ctrl-U: no-op
+    DC.W    HRCG_CTRL_NOP-1
+; ctrl-V: set text window
+    DC.W    HRCG_CTRL_V-1
+; ctrl-W: set margins
+    DC.W    HRCG_CTRL_W-1
+; ctrl-X: no-op
+    DC.W    HRCG_CTRL_NOP-1
+; ctrl-Y: clear screen
+    DC.W    HRCG_CTRL_Y-1
+; ctrl-Z: reset
+    DC.W    HRCG_CTRL_Z-1
+    ORG     $9424
+HRCG_CTRL_A:
+    SUBROUTINE
+; --- ctrl-A handler: set shift flag ---
+    BCS     HRCG_SET_REPLACE        ; shifted -> set replace mode
+    LDA     #$80
+    STA     HRCG_MODE_FLAGS         ; set bit 7 (next char -> charset select)
+    RTS
+; --- Charset select (entered from HRCG_PROCESS_CHAR BCS) ---
+HRCG_CHARSET_SELECT:
+    SBC     #$31                    ; A = char - '1' (carry set)
+    CMP     #$09                    ; valid charset 1-9?
+    BCS     HRCG_SET_STD_FONT       ; no -> use standard font
+    LDX     HRCG_FONT_BASE_LO      ; font base low ($A5)
+    STA     $EE                     ; save index
+    ASL                             ; A * 2
+    ADC     $EE                     ; A * 3 (3 pages per charset)
+    ADC     HRCG_FONT_BASE_HI      ; add font base high ($83)
+    BNE     .store_font             ; always branches
+HRCG_SET_STD_FONT:
+    LDX     #$A5                    ; standard font low
+    LDA     #$97                    ; standard font high ($97A5)
+.store_font:
+    STX     HRCG_FONT_PTR_LO       ; font pointer low
+    STA     HRCG_FONT_PTR_HI       ; font pointer high
+    RTS
+    ORG     $944A
+HRCG_SET_REPLACE:
+; --- ctrl-A shifted: set replace video mode ---
+    LDA     #$20
+    STA     HRCG_VIDEO_MODE         ; video mode = replace ($20)
+    RTS
+; --- ctrl-B: save params + cursor ---
+HRCG_CTRL_B_SAVE:
+    SUBROUTINE
+    BCS     .set_or                 ; double-shifted -> set OR mode
+    BIT     HRCG_SAVED_PARAMS+8     ; already saved?
+    BMI     .save_cursor            ; yes -> just update cursor
+    LDA     #$FF
+    STA     HRCG_SAVED_PARAMS+8     ; mark as saved
+    LDY     #$07                    ; 8 bytes to save
+.save_loop:
+    LDA     HRCG_VIDEO_MODE,Y       ; active params
+    STA     HRCG_SAVED_PARAMS,Y     ; saved copy
+    DEY
+    BPL     .save_loop
+.save_cursor:
+    LDA     $24                     ; cursor X (CH)
+    STA     HRCG_SAVED_CH
+    LDA     $25                     ; cursor Y (CV)
+    STA     HRCG_SAVED_CV
+    RTS
+; --- ctrl-B double-shifted: OR video mode ---
+.set_or:
+    LDA     #$40
+    STA     HRCG_VIDEO_MODE         ; video mode = OR ($40)
+    RTS
+    ORG     $9478
+HRCG_CTRL_C:
+    SUBROUTINE
+; --- ctrl-C normal: restore cursor position ---
+    BCS     .set_xor_draw           ; shifted -> XOR draw mode
+    LDA     HRCG_SAVED_CH           ; saved CH
+    CMP     $24                     ; compare to current CH
+    STA     $24                     ; restore CH
+    BEQ     .do_lf                  ; same -> just do line feed
+    BCS     HRCG_CTRL_NOP           ; saved > current -> RTS
+.do_lf:
+    JMP     HRCG_LINE_FEED
+; --- ctrl-C shifted: XOR draw mode ---
+.set_xor_draw:
+    LDA     #$C0
+    STA     HRCG_DRAW_MODE          ; draw mode = XOR ($C0)
+    LDA     #$00
+    STA     HRCG_PAGE_MASK          ; page mask = 0
+    RTS
+    ORG     $9493
+HRCG_CTRL_D:
+    SUBROUTINE
+; --- ctrl-D normal: restore saved params ---
+    BCS     HRCG_DISPLAY_PAGE       ; shifted -> display page
+    BIT     HRCG_SAVED_PARAMS+8     ; params saved?
+    BPL     HRCG_CTRL_NOP           ; no -> NOP return
+    LDY     #$07                    ; 8 bytes
+.restore_loop:
+    LDA     HRCG_SAVED_PARAMS,Y     ; saved params
+    STA     HRCG_VIDEO_MODE,Y       ; restore to active
+    DEY
+    BPL     .restore_loop
+    LDA     #$00
+    STA     HRCG_SAVED_PARAMS+8     ; clear saved flag
+    STA     HRCG_SAVED_CH           ; clear saved CH
+    LDA     $22                     ; WNDTOP
+    STA     HRCG_SAVED_CV           ; set saved CV = WNDTOP
+    RTS
+; --- HRCG_DISPLAY_PAGE: page flip based on video mode ---
+HRCG_DISPLAY_PAGE:
+    BIT     $C054                   ; select page 1
+    LDA     HRCG_VIDEO_MODE         ; video mode
+    CMP     #$40                    ; OR mode?
+    BNE     HRCG_CTRL_NOP           ; no -> return (stay on page 1)
+    BIT     $C055                   ; yes -> select page 2
+    RTS
+    ORG     $94C1
+HRCG_CTRL_E:
+; --- ctrl-E normal: clear to end of line ---
+    BCS     HRCG_CTRL_NOP           ; shifted -> NOP
+    JSR     HRCG_CLREOL
+    JMP     $FC9C                   ; ROM CLREOLZ
+; --- ctrl-F normal: clear to end of screen ---
+HRCG_CTRL_F:
+    BCS     HRCG_CTRL_NOP           ; shifted -> NOP
+    JSR     HRCG_CLRLINE
+    JMP     $FC42                   ; ROM CLREOP
+; --- ctrl-H: backspace ---
+HRCG_CTRL_H:
+    SUBROUTINE
+    DEC     $24                     ; CH--
+    BPL     HRCG_CTRL_NOP           ; still >= 0 -> done
+    LDA     $21                     ; WNDWDTH
+    STA     $24                     ; CH = WNDWDTH
+    DEC     $24                     ; CH = WNDWDTH - 1
+    LDA     $22                     ; WNDTOP
+    CMP     $25                     ; CV >= WNDTOP?
+    BCS     HRCG_CTRL_NOP           ; at top -> can't go up
+    DEC     $25                     ; CV--
+    JMP     $FC22                   ; ROM VTAB
+; --- ctrl-I: inverse video ---
+HRCG_CTRL_I:
+    BCS     HRCG_CTRL_NOP           ; shifted -> NOP
+    LDA     #$7F
+    STA     HRCG_MASK               ; mask = $7F (invert all 7 pixels)
+HRCG_CTRL_NOP:
+    RTS                             ; shared NOP return
+    ORG     $94EE
+HRCG_CTRL_K:
+; --- ctrl-K: clear invert flag ---
+    BCS     HRCG_CTRL_NOP           ; shifted -> NOP
+    LDA     #$00
+    STA     HRCG_INVERT_FLAG        ; clear invert flag
+    RTS
+; --- ctrl-L: set invert flag ---
+HRCG_CTRL_L:
+    BCS     HRCG_CTRL_NOP           ; shifted -> NOP
+    LDA     #$80
+    STA     HRCG_INVERT_FLAG        ; invert flag = $80
+    RTS
+; --- ctrl-M: carriage return (with pause check) ---
+HRCG_CTRL_M:
+    SUBROUTINE
+    LDY     $C000                   ; check keyboard
+    BPL     .no_pause               ; no key -> skip pause
+    CPY     #$93                    ; ctrl-S (pause)?
+    BNE     .no_pause
+    BIT     $C010                   ; clear strobe
+.wait_key:
+    LDY     $C000                   ; wait for key
+    BPL     .wait_key
+    CPY     #$83                    ; ctrl-C (cancel)?
+    BEQ     .no_pause
+    BIT     $C010                   ; clear strobe
+.no_pause:
+    JMP     HRCG_CR_ENTRY           ; -> set CH=0, line feed
+    ORG     $9519
+HRCG_CTRL_N:
+; --- ctrl-N: normal video ---
+    BCS     HRCG_CTRL_NOP           ; shifted -> NOP
+    LDA     #$00
+    STA     HRCG_MASK               ; clear mask (normal video)
+    RTS
+; --- ctrl-O: set next-shifted / OR mode ---
+HRCG_CTRL_O:
+    SUBROUTINE
+    BCS     .set_or_draw            ; shifted -> OR draw mode
+    LDA     #$40
+    STA     HRCG_MODE_FLAGS         ; next ctrl -> shifted variant
+    RTS
+.set_or_draw:
+    LDA     #$80
+    STA     HRCG_DRAW_MODE          ; draw mode = OR ($80)
+    LDA     #$00
+    STA     HRCG_PAGE_MASK          ; page mask = 0
+    RTS
+; --- ctrl-P: home cursor ---
+HRCG_CTRL_P:
+    SUBROUTINE
+    BCS     .clear_draw             ; shifted -> clear draw mode
+    JSR     HRCG_HOME
+    JMP     $FC58                   ; ROM HOME (clear text screen)
+.clear_draw:
+    LDA     #$00
+    STA     HRCG_DRAW_MODE          ; draw mode = 0
+    STA     HRCG_PAGE_MASK          ; page mask = 0
+    RTS
+; --- ctrl-Q: goto saved cursor ---
+HRCG_CTRL_Q:
+    BCS     HRCG_CTRL_NOP           ; shifted -> NOP
+    LDA     HRCG_SAVED_CH           ; saved CH
+    STA     $24                     ; CH = saved
+    LDA     HRCG_SAVED_CV           ; saved CV
+    STA     $25                     ; CV = saved
+    JMP     $FC24                   ; ROM VTAB
+    ORG     $9554
+HRCG_CTRL_R:
+; --- ctrl-R shifted: XOR draw + page2 ---
+    BCC     HRCG_RTS                ; normal -> RTS (no-op)
+    LDA     #$C0
+    STA     HRCG_DRAW_MODE          ; draw mode = XOR ($C0)
+    LDA     #$60
+    STA     HRCG_PAGE_MASK          ; page mask = $60 (page 2)
+    RTS
+; --- ctrl-S: XOR invert / clear wrap ---
+HRCG_CTRL_S:
+    SUBROUTINE
+    BCS     .clear_wrap             ; shifted -> clear wrap
+    LDA     #$C0
+    STA     HRCG_INVERT_FLAG        ; invert = XOR ($C0)
+    RTS
+.clear_wrap:
+    LDA     #$00
+    STA     HRCG_WRAP_FLAG          ; wrap = 0 (scroll mode)
+    RTS
+; --- ctrl-T shifted: AND draw mode ---
+HRCG_CTRL_T:
+    BCC     HRCG_RTS                ; normal -> RTS (no-op)
+    LDA     #$80
+    STA     HRCG_DRAW_MODE          ; draw mode = AND ($80)
+    LDA     #$60
+    STA     HRCG_PAGE_MASK          ; page mask = $60
+    RTS
+    ORG     $957C
+HRCG_CTRL_V:
+    SUBROUTINE
+; --- ctrl-V: set text window ---
+    BCS     HRCG_RTS                ; shifted -> RTS
+    LDA     $24                     ; CH
+    ADC     $20                     ; + WNDLFT
+    CMP     #$28                    ; >= 40?
+    BCC     .store_lft
+    LDA     #$27                    ; clamp to 39
+.store_lft:
+    STA     $20                     ; WNDLFT = CH + old WNDLFT
+    SEC
+    LDA     $21                     ; WNDWDTH
+    SBC     $24                     ; - CH
+    STA     $21                     ; new WNDWDTH
+    LDA     #$00
+    STA     $24                     ; CH = 0
+    LDA     $25                     ; CV
+    CMP     #$18                    ; >= 24?
+    BCC     .store_top
+    LDA     #$17                    ; clamp to 23
+.store_top:
+    STA     $22                     ; WNDTOP = CV
+    BIT     HRCG_SAVED_PARAMS+8     ; params saved?
+    BMI     .do_vtab                ; yes -> skip saving CV
+    STA     HRCG_SAVED_CV           ; saved CV = WNDTOP
+.do_vtab:
+    JMP     $FC22                   ; ROM VTAB
+; --- ctrl-W: set right margin + bottom ---
+HRCG_CTRL_W:
+    SUBROUTINE
+    BCS     .set_wrap               ; shifted -> set wrap
+    LDA     $24                     ; CH
+    STA     $21                     ; WNDWDTH = CH
+    ADC     $20                     ; + WNDLFT
+    CMP     #$28                    ; >= 40?
+    BCC     .width_ok
+    LDA     #$27                    ; clamp to 39
+    SBC     $20                     ; - WNDLFT
+    STA     $21                     ; WNDWDTH = 39 - WNDLFT
+.width_ok:
+    INC     $21                     ; WNDWDTH + 1
+    LDA     $25                     ; CV
+    CMP     #$18                    ; >= 24?
+    BCC     .bottom_ok
+    LDA     #$17                    ; clamp to 23
+.bottom_ok:
+    STA     $23                     ; WNDBTM = CV
+    INC     $23                     ; WNDBTM + 1
+HRCG_RTS:
+    RTS                             ; shared RTS
+; --- ctrl-W shifted: set wrap mode ---
+.set_wrap:
+    LDA     #$FF
+    STA     HRCG_WRAP_FLAG          ; wrap flag = $FF (wrap mode)
+    RTS
+    ORG     $95D1
+HRCG_CTRL_Y:
+    SUBROUTINE
+; --- ctrl-Y normal: clear screen (reset window to full) ---
+    BCS     .jump_entry2            ; shifted -> JMP HRCG_ENTRY2
+HRCG_RESET_WINDOW:
+; --- shared: reset window to full screen ---
+    LDA     $20                     ; WNDLFT
+    ADC     $24                     ; + CH
+    STA     $24                     ; CH = absolute column
+    LDA     #$00
+    STA     $20                     ; WNDLFT = 0
+    STA     $22                     ; WNDTOP = 0
+    BIT     HRCG_SAVED_PARAMS+8     ; params saved?
+    BMI     .set_dims               ; yes -> skip
+    STA     HRCG_SAVED_CH           ; saved CH = 0
+    STA     HRCG_SAVED_CV           ; saved CV = 0
+.set_dims:
+    LDA     #$28                    ; 40
+    STA     $21                     ; WNDWDTH = 40
+    LDA     #$18                    ; 24
+    STA     $23                     ; WNDBTM = 24
+    JMP     $FC22                   ; ROM VTAB
+.jump_entry2:
+    JMP     HRCG_ENTRY2             ; -> secondary entry (disabled)
+; --- ctrl-Z: full reset ---
+HRCG_CTRL_Z:
+    SUBROUTINE
+    BCS     .jump_entry3            ; shifted -> JMP HRCG_ENTRY3
+HRCG_RESET:
+    LDA     #$00
+    LDY     #$12                    ; 19 bytes (indices 0-18)
+.clear_loop:
+    STA     HRCG_VIDEO_MODE,Y       ; clear param block
+    DEY
+    BPL     .clear_loop
+    JSR     HRCG_RESET_WINDOW       ; reset window
+    JSR     HRCG_SET_STD_FONT       ; set standard font ($97A5)
+    JSR     HRCG_SET_REPLACE        ; set replace video mode ($20)
+    LDA     #<HRCG_RTS
+    STA     HRCG_ENTRY2+1           ; patch entry2 low
+    STA     HRCG_ENTRY3+1           ; patch entry3 low
+    LDA     #>HRCG_RTS
+    STA     HRCG_ENTRY2+2           ; patch entry2 high
+    STA     HRCG_ENTRY3+2           ; patch entry3 high
+    RTS
+.jump_entry3:
+    JMP     HRCG_ENTRY3             ; -> secondary entry (disabled)
+    ORG     $9621
+HRCG_DRAW_CHAR:
+    SUBROUTINE
+; --- Main character rendering ---
+    ASL     HRCG_MODE_FLAGS         ; shift mode flags
+    BCS     HRCG_RTS                ; shifted -> RTS (ignore shifted printable)
+    BIT     HRCG_INVERT_FLAG        ; check invert flag
+    BPL     .normal_char            ; not set -> normal
+    BVC     .check_lower            ; bit 6 clear -> check lowercase
+    ASL     HRCG_INVERT_FLAG        ; shift invert flag ($C0 -> $80)
+    BCS     .normal_char            ; was $C0, now $80 -> treat as normal
+.check_lower:
+    CMP     #$41                    ; 'A' ?
+    BCC     .normal_char            ; < 'A' -> normal
+    CMP     #$5B                    ; '[' ?
+    BCC     .calc_offset            ; < '[' -> lowercase (skip subtract)
+.normal_char:
+    SEC
+    SBC     #$20                    ; convert to font index (char - $20)
+.calc_offset:
+    ASL                             ; \ index * 8 = byte offset in font
+    ROL     $EF                     ;  |
+    ASL                             ;  |
+    ROL     $EF                     ;  |
+    ASL                             ;  |
+    ROL     $EF                     ; /
+    CLC
+    ADC     HRCG_FONT_PTR_LO       ; + font pointer low
+    STA     $EE                     ; font address low
+    LDA     $EF
+    AND     #$07                    ; mask to 3 bits
+    ADC     HRCG_FONT_PTR_HI       ; + font pointer high
+    STA     $EF                     ; font address high
+    JSR     HRCG_CALC_HIRES_ADDR
+    ADC     $24                     ; + cursor X
+    STA     $2A                     ; screen address low
+    STA     $EC                     ; save copy
+    LDA     $2B                     ; screen address high
+    EOR     HRCG_PAGE_MASK          ; XOR with page mask (0 or $60)
+    STA     $ED                     ; alt-page address high
+    LDY     $24                     ; cursor X
+    LDA     $FF                     ; original character
+    STA     ($28),Y                 ; store char in text page
+    LDX     #$00
+    LDY     #$00
+; --- Render loop: 8 scan lines ---
+.render_loop:
+    LDA     ($EE),Y                 ; load font byte
+    EOR     HRCG_MASK               ; apply mask (inverse)
+    BIT     HRCG_DRAW_MODE          ; check draw mode
+    BPL     .store                  ; $00 -> replace mode
+    BVS     .xor_mode               ; $C0 -> XOR mode
+    BIT     HRCG_MASK               ; check mask for AND vs OR
+    BVS     .and_mode               ; mask $7F + draw $80 -> AND
+    ORA     ($EC,X)                 ; OR mode: combine with screen
+    BVC     .store                  ; always -> store
+.and_mode:
+    AND     ($EC,X)                 ; AND mode: mask with screen
+    BVS     .store                  ; always -> store
+.xor_mode:
+    EOR     ($EC,X)                 ; XOR mode: toggle screen bits
+.store:
+    STA     ($2A,X)                 ; write to screen
+    INY                             ; next font byte
+    CPY     #$08                    ; done 8 bytes?
+    BCS     HRCG_ADVANCE_CURSOR     ; yes -> advance cursor
+    LDA     $2B                     ; screen high byte
+    ADC     #$04                    ; next scan line group (+$0400)
+    STA     $2B
+    EOR     HRCG_PAGE_MASK          ; update alt-page address
+    STA     $ED
+    BCC     .render_loop            ; loop (always, carry clear)
+    ORG     $969E
+HRCG_ADVANCE_CURSOR:
+    SUBROUTINE
+; --- Advance cursor after character ---
+    INC     $24                     ; CH++
+    LDA     $24
+    CMP     $21                     ; >= WNDWDTH?
+    BCC     .done                   ; no -> done
+HRCG_CR_ENTRY:
+    LDA     #$00                    ; (CR entry point: set CH=0)
+    STA     $24
+; --- HRCG_LINE_FEED ---
+HRCG_LINE_FEED:
+    INC     $25                     ; CV++
+    LDA     $25
+    CMP     $23                     ; >= WNDBTM?
+    BCC     .update_cursor          ; no -> just update cursor
+    BIT     HRCG_WRAP_FLAG          ; check wrap flag
+    BVS     .wrap                   ; wrap mode -> wrap to top
+    DEC     $25                     ; CV-- (stay at bottom)
+    JSR     HRCG_SCROLL_UP
+    JMP     $FC70                   ; ROM SCROLL
+.wrap:
+    LDA     $22                     ; WNDTOP
+    STA     $25                     ; CV = WNDTOP (wrap)
+.update_cursor:
+    JSR     $FC24                   ; ROM VTAB
+.done:
+    RTS
+    ORG     $96C7
+HRCG_SCROLL_UP:
+    SUBROUTINE
+    LDA     $22                     ; WNDTOP (top row)
+    PHA                             ; save for later
+.next_row:
+    JSR     HRCG_CALC_HIRES_ROW     ; calc hi-res addr for row A
+.copy_row:
+    LDA     $2A                     ; dest address low
+    STA     $EC
+    LDA     $2B                     ; dest address high
+    AND     #$E3                    ; mask off scan line bits
+    STA     $ED
+    PLA                             ; restore source row
+    CLC
+    ADC     #$01                    ; source = dest + 1
+    CMP     $23                     ; >= WNDBTM?
+    BCS     .clear_last             ; yes -> done copying, clear last line
+    PHA
+    JSR     HRCG_CALC_HIRES_ROW     ; calc hi-res addr for source row
+    LDX     #$07                    ; 8 scan lines
+.copy_scanline:
+    LDY     $21                     ; WNDWDTH
+    DEY                             ; index = WNDWDTH - 1
+.copy_byte:
+    LDA     ($2A),Y                 ; read source
+    STA     ($EC),Y                 ; write dest
+    DEY
+    BPL     .copy_byte              ; next column
+    DEX
+    BMI     .copy_row               ; all 8 lines done -> next row
+    CLC
+    LDA     $2B                     ; advance source
+    ADC     #$04
+    STA     $2B
+    LDA     $ED                     ; advance dest
+    ADC     #$04
+    STA     $ED
+    BNE     .copy_scanline          ; always -> continue
+.clear_last:
+    LDA     HRCG_DRAW_MODE          ; save draw mode
+    PHA
+    LDA     $23                     ; WNDBTM
+    SBC     #$01                    ; last row index
+    LDY     #$00
+    STY     HRCG_DRAW_MODE          ; draw mode = 0 (replace)
+    JSR     HRCG_FILL_LINE          ; clear last row
+    PLA
+    STA     HRCG_DRAW_MODE          ; restore draw mode
+    RTS
+    ORG     $9716
+HRCG_HOME:
+    SUBROUTINE
+; --- Set cursor to top-left and clear screen ---
+    LDA     $22                     ; WNDTOP
+    STA     $25                     ; CV = WNDTOP
+    LDY     #$00
+    STY     $24                     ; CH = 0
+    BEQ     .clear_entry            ; always -> fall into clear loop
+; --- HRCG_CLRLINE: clear from current row to bottom ---
+HRCG_CLRLINE:
+    LDY     $24                     ; preserve CH for fill start column
+    LDA     $25                     ; CV = starting row
+.clear_entry:
+    PHA                             ; save row
+    JSR     HRCG_FILL_LINE          ; clear this row
+    PLA
+    CLC
+    ADC     #$01                    ; next row
+    CMP     $23                     ; >= WNDBTM?
+    LDY     #$00                    ; fill from column 0 for next rows
+    BCC     .clear_entry            ; continue loop
+    RTS
+; --- HRCG_CLREOL: clear from cursor to end of line ---
+HRCG_CLREOL:
+    LDY     $24                     ; start column = CH
+    LDA     $25                     ; current row = CV
+; --- HRCG_FILL_LINE: fill one row ---
+HRCG_FILL_LINE:
+    STY     $EE                     ; save start column
+    JSR     HRCG_CALC_HIRES_ROW     ; calc hi-res addr for row A
+    LDX     #$07                    ; 8 scan lines
+.fill_byte:
+    LDA     HRCG_MASK               ; fill byte (mask value)
+    BIT     HRCG_DRAW_MODE          ; check draw mode
+    BPL     .write                  ; replace mode -> write directly
+    LDA     $2A                     ; compute alt-page address
+    STA     $EC
+    LDA     $2B
+    EOR     HRCG_PAGE_MASK
+    STA     $ED
+    LDA     ($EC),Y                 ; read existing screen byte
+    BIT     HRCG_DRAW_MODE          ; check draw mode again
+    BVC     .write                  ; OR mode -> skip XOR
+    EOR     HRCG_MASK               ; XOR with mask
+.write:
+    STA     ($2A),Y                 ; write to screen
+    INY                             ; next column
+    CPY     $21                     ; >= WNDWDTH?
+    BCC     .fill_byte              ; no -> continue
+    DEX                             ; next scan line
+    BMI     .fill_done              ; all 8 done -> return
+    LDY     $EE                     ; reset column to start
+    LDA     $2B                     ; advance to next scan line
+    CLC
+    ADC     #$04
+    STA     $2B
+    BNE     .fill_byte              ; always -> continue
+.fill_done:
+    RTS
+    ORG     $9771
+HRCG_CALC_HIRES_ADDR:
+; --- Compute hi-res screen address from CV ---
+; Input: ZP $25 (CV)   Output: $2A/$2B
+    LDA     $25                     ; CV (cursor Y)
+HRCG_CALC_HIRES_ROW:
+; --- Alternate entry: row in A ---
+    LSR                             ; A = row / 2
+    TAX                             ; X = row / 2 (table index)
+    AND     #$03                    ; A = (row/2) % 4
+    ORA     HRCG_VIDEO_MODE         ; combine with page base ($20/$40)
+    STA     $2B                     ; screen high byte
+    LDA     HRCG_ROW_TABLE,X        ; row base from table
+    ROR                             ; rotate carry from LSR into bit 7
+    ADC     $20                     ; + WNDLFT
+    STA     $2A                     ; screen low byte
+    RTS
+; --- Row address table (12 entries) ---
+HRCG_ROW_TABLE:
+    HEX     00 00 00 00 50 50 50 50 A0 A0 A0 A0
+; --- Trailing data (20 bytes, purpose unknown) ---
+HRCG_TRAILING_DATA:
+    HEX     B9 A2 A0 D2 E9 A0 F2 A0 A5 B9 C1 80 C4 CD A0 8C
+    HEX     A0 AC A0 A0
     ORG     $97A5
 STD_FONT_DATA:
     INCLUDE "stdfontdata.asm"
