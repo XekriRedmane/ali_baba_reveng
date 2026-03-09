@@ -4579,6 +4579,9 @@ ev_astrologers_maze:                    ; 61: ASTROLOGER'S MAZE
     HEX A4 C0 32 A7 FE 1F AE FE 1F
     HEX AF C0 0A BD B4 2F BE B3 32
     HEX 1F D5 C6 FF FF FF
+    ORG     $4C80
+MOB_DATA_TABLE:
+    INCLUDE "mobdata.asm"
     ORG     $5B00
 INIT_GAME_STATE:
     SUBROUTINE

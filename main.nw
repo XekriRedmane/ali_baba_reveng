@@ -1630,7 +1630,10 @@ page for graphics.  After this relocation the full memory map is:
 \$4000--\$4008 &      9 & Character record header (record 0) \\
 \$4009--\$4239 &    561 & Location / character records (62 $\times$ 9 bytes) \\
 \$4240--\$451D &    734 & Location name strings \\
-\$451E--\$5AFF &  5\,602 & Event lists and mob/script data \\
+\$451E--\$4C7F &  1\,890 & Location event lists (3-byte entries per location) \\
+\$4C80--\$547F &  2\,048 & Mob data records (128 $\times$ 16 bytes) \\
+\$5480--\$59C8 &  1\,353 & Character / mob name strings \\
+\$59C9--\$5AFF &    311 & Residual debug text (unused) \\
 \$5B00--\$5FFF &  1\,280 & Game state, display setup, UI tables \\
 \$6000--\$7FFF &  8\,192 & Main program code (continued) \\
 \$80A4--\$83A4 &    769 & Script table and script bytecode \\
@@ -8863,6 +8866,29 @@ ev_astrologers_maze:                    ; 61: ASTROLOGER'S MAZE
     HEX 1F D5 C6 FF FF FF
 @ %def LOCATION_EVENTS
 
+\subsection{Mob data and name strings}
+
+Immediately after the event lists, the region [[\$4C80--\$5AFF]] holds
+the mob data table and associated name strings.
+
+\begin{itemize}
+\item [[\$4C80--\$547F]]: 128 mob data records, 16~bytes each.  Bytes
+  0--1 are a pointer to the mob's name string; the remaining 14~bytes
+  encode combat stats, group linkage, position, appearance, and level.
+  [[GET\_MOB\_DATA]] indexes into this table via the base pointer
+  at~[[\$4000/\$4001]].
+\item [[\$5480--\$59C8]]: Length-prefixed high-bit ASCII name strings
+  for all 128 mobs (``ALI BABA'', ``SCHEHERAZADE'', ``MINOTAUR'',~etc.).
+\item [[\$59C9--\$5AFF]]: Residual debug/diagnostic text (unused at
+  runtime).
+\end{itemize}
+
+<<mob data>>=
+    ORG     $4C80
+MOB_DATA_TABLE:
+    INCLUDE "mobdata.asm"
+@ %def MOB_DATA_TABLE
+
 \chapter{Combat}
 
 \section{Manual}
@@ -13638,6 +13664,7 @@ The following root chunks produce the assembly files when tangled.
 <<Location data>>
 <<Location names>>
 <<Location events>>
+<<mob data>>
 <<init game state>>
 <<init game display>>
 <<draw border char>>
