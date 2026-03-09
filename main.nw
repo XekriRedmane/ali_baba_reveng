@@ -7154,6 +7154,20 @@ DECODE_DISPATCH_RELAY:
     JMP     RESIDENT_DECODE_DISPATCH
 @ %def DECODE_DISPATCH_RELAY
 
+The remaining 30 bytes of the handler page ([[\$07E2--\$07FF]]) are
+unreferenced residual data left over from the EALDR copy
+([[\$A300--\$A5FF]]~$\to$~[[\$0500--\$07FF]]).  Decoded as Apple~II
+text the tail reads ``\texttt{SSSSSSSSSS}'' (ten high-bit~S) followed by
+the low-ASCII fragment ``\texttt{e checker}''.
+
+<<resident page tail>>=
+    ORG     $07E2
+; Unused residual data at end of resident handler page
+    HEX     0000000e968c41964120
+    HEX     d3d3d3d3d3d3d3d3d3d3
+    HEX     006520636865636b6572  ; "e checker" (low ASCII)
+@
+
 \subsection{Dispatch table (\$06D3)}
 
 The 18-byte table maps opcode indices to handler addresses in page [[\$07]]:
@@ -13751,6 +13765,7 @@ The following root chunks produce the assembly files when tangled.
 <<decode encrypted addr>>
 <<pull two ret addrs>>
 <<decode dispatch relay>>
+<<resident page tail>>
 <<main entry>>
 <<select input mode>>
 <<process mob groups>>

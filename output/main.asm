@@ -470,6 +470,11 @@ PULL_TWO_RET_ADDRS:
     ORG     $07DF
 DECODE_DISPATCH_RELAY:
     JMP     RESIDENT_DECODE_DISPATCH
+    ORG     $07E2
+; Unused residual data at end of resident handler page
+    HEX     0000000e968c41964120
+    HEX     d3d3d3d3d3d3d3d3d3d3
+    HEX     006520636865636b6572  ; "e checker" (low ASCII)
     ORG     $0800
 MAIN_ENTRY:
     SUBROUTINE
