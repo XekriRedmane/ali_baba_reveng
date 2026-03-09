@@ -1503,8 +1503,6 @@ EALDR_tracks:
 \chapter{Startup}
 
 When EALDR finishes, it transfers control to [[$0800]] via [[CALL0 0800]].
-To analyze the main program in Ghidra, we extract a flat binary
-[[main.bin]] that represents the memory image at the moment of that jump.
 
 \section{Memory map at entry}
 
@@ -1655,8 +1653,7 @@ framebuffer in between.
 
 The following script reads the disk image, applies the EALDR loading
 sequence, and writes a flat binary covering [[$0500]]--[[$95FF]]
-(37\,120 bytes).  For Ghidra, load at base address [[$0500]] with
-processor 6502:LE:8:default and set the entry point to [[$0800]].
+(37\,120 bytes).
 
 <<extract_main.py>>=
 <<extract main imports>>
@@ -5385,10 +5382,6 @@ Each character record is 9~bytes, stored sequentially starting at [[\$4000]].
 Returns [[\CHAR_REC/\CHAR_REC+1 = \$4000 + A $\times$ 9]].  If A~=~0, returns
 [[\CHAR_REC/\CHAR_REC+1 = \$4000]] immediately (index 0 is the base/header record).
 
-Note: Ghidra groups this with a separate routine at [[\$106F]] (entered via
-JMP from other functions) that handles character elimination/death logic.
-That code is not part of this entry point's normal return path.
-
 <<get char record>>=
     ORG     $1053
 GET_CHAR_RECORD:
@@ -7026,6 +7019,32 @@ before entering the main program.  This region contains a second bytecode
 interpreter, separate from the EALDR VM, that runs during gameplay and
 the attract screen.  It uses the same XOR encryption scheme as the EALDR
 VM (low byte XOR [[\$03]], high byte XOR [[\$D9]]).
+
+\paragraph{Disk origin.}
+The source data at [[$A300]]--[[$A5FF]] is part of the EALDR image that
+BOOT1 loads from tracks~1--2 into [[$A000]]--[[$BFFF]].  Within
+track~1, the three pages map to physical sectors via the custom loader
+interleave:
+
+\begin{center}
+\begin{tabular}{cccc}
+\toprule
+\thead{Page} & \thead{Physical sector} & \thead{DOS sector} & \thead{File offset} \\
+\midrule
+\$A3 & 6  & 12 & \$1C00 \\
+\$A4 & 8  & 11 & \$1B00 \\
+\$A5 & 10 & 10 & \$1A00 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+After [[GAME\_INIT]], the relocation
+[[\$2000--\$32FF]]~$\to$~[[\$9600--\$A8FF]] overwrites the original
+[[$A300]]--[[$A5FF]] with HRCG/font data.  From that point on, only the
+copy at [[$0500]]--[[$07FF]] survives.  The script pointer table
+(\S\ref{sec:script_engine}) references the original [[$A300]]-based
+addresses, which is safe because scripts~3--7 run only during attract
+mode, before [[GAME\_INIT]].
 
 \subsection{stub\_entry (\$0500)}
 
