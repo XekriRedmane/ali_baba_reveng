@@ -7076,6 +7076,17 @@ CONTEXT_SWAP:
     RTS
 @ %def CONTEXT_SWAP
 
+The 14 bytes between [[CONTEXT\_SWAP]] and [[RESIDENT\_DECODE\_DISPATCH]]
+([[\$06F2--\$06FF]]) are unreferenced and decode as the high-bit ASCII
+fragment ``\texttt{DON'T BREAK TH}''\,---likely a truncated development
+message.
+
+<<context swap padding>>=
+    ORG     $06F2
+; Residual string: "DON'T BREAK TH" (high-bit ASCII, truncated)
+    HEX     c4cfcea7d4a0c2d2c5c1cba0d4c8
+@
+
 \subsection{resident\_dispatch (\$06B3)}
 
 Dispatches one bytecode instruction using a stack trick.  X and Y hold
@@ -13761,6 +13772,7 @@ The following root chunks produce the assembly files when tangled.
 <<resident dispatch>>
 <<resident dispatch table>>
 <<context swap>>
+<<context swap padding>>
 <<resident decode dispatch>>
 <<decode encrypted addr>>
 <<pull two ret addrs>>

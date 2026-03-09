@@ -419,6 +419,9 @@ CONTEXT_SWAP:
     DEX
     BPL     .loop
     RTS
+    ORG     $06F2
+; Residual string: "DON'T BREAK TH" (high-bit ASCII, truncated)
+    HEX     c4cfcea7d4a0c2d2c5c1cba0d4c8
     ORG     $0700
 RESIDENT_DECODE_DISPATCH:
     SUBROUTINE
