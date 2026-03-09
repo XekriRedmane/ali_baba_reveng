@@ -369,6 +369,50 @@ ATTRACT_LOOP:
     JSR     CONTEXT_SWAP
     JSR     RESIDENT_DISPATCH
     JMP     ATTRACT_LOOP
+    ORG     $0572
+    SUBROUTINE
+; EALDR VM bytecodes + embedded native disk I/O routines ($0572-$06B2)
+; Bytecode encryption: low XOR $03, high XOR $D9, immediate XOR $4C
+;
+; Native routines within this region:
+;   $05FD  SEARCH_ADDR_FIELD — scan for D5 AA 96 address prologue
+;   $064B  READ_AND_VERIFY — read data with phase toggling
+;   $0681  DELAY_LOOP — nested countdown for motor timing
+;
+; $0572-$06A5: VM bytecodes (output as raw data)
+    HEX 0463dc0774028fdf0462dc072c028fdf ; $0572
+    HEX 0464dc0774028fdf05a4dc0290dc00a7 ; $0582
+    HEX dc05a4dc029fdc00a7dc074e028fdf00 ; $0592
+    HEX 71dc08a5df04ea1903b301ab2503b301 ; $05A2
+    HEX ab2504ed19034c06e1de05ccdc05ccdc ; $05B2
+    HEX 05ccdc05ccdc04eb1904e0de09034f06 ; $05C2
+    HEX 4fdf014edf04e419014edf014edf04e2 ; $05D2
+    HEX 190569df034f064fdf014edf04e41901 ; $05E2
+    HEX 4edf014edf04e6190569df09a0ffae4c ; $05F2
+    HEX 06adecc010fbc9d5f00788d0f4cad0f1 ; $0602
+    HEX 60adecc010fbc9aaf00588d0e43860ad ; $0612
+    HEX ecc010fbc996f00588d0d63860a002ad ; $0622
+    HEX ecc010fb2a8550adecc010fb25508550 ; $0632
+    HEX 888e4c0610e918a201600320fe05b003 ; $0642
+    HEX 200305a9006de2078de207ade0c0ade2 ; $0652
+    HEX c0ade4c0ade6c060033c0182df04e319 ; $0662
+    HEX 04e11904e71904e51903640182df09a2 ; $0672
+    HEX 20cad0fd38e901d0f6600603dd0a8ddf ; $0682
+    HEX 028fdf048cdf01b3df07b301b3df068c ; $0692
+    HEX df008fdf                           ; $06A2
+;
+; $06A6-$06B2: Native utility routines
+VM_EXIT_OK:
+    JSR     CONTEXT_SWAP                ; swap back to main ZP
+    CLC                                 ; carry clear = success
+    RTS
+VM_EXIT_ERR:
+    JSR     CONTEXT_SWAP                ; swap back to main ZP
+    SEC                                 ; carry set = error
+    RTS
+DECRYPT_HIGH_BYTE:
+    EOR     #$D9                        ; decrypt high byte of address
+    RTS
     ORG     $06B3
 RESIDENT_DISPATCH:
     SUBROUTINE
