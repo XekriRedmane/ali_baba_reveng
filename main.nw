@@ -12388,6 +12388,178 @@ DISPATCH_ON_MODE:
     JMP     DELAY_WITH_ANIMATION
 @ %def DISPATCH_ON_MODE
 
+\medskip
+The 231 bytes from [[\$1F19]] to [[\$1FFF]] contain an orphaned earlier
+version of [[HANDLE\_MOB\_ENCOUNTER]].  No external JSR, JMP, branch,
+pointer, or RTS-trick reference reaches any address in
+[[\$1F19--\$1FFD]]; the code is unreachable during gameplay.
+
+The logic mirrors the current [[HANDLE\_MOB\_ENCOUNTER]] almost exactly:
+threat assessment (strength~$+$~16~$-$~threats, clamped 4\ldots28,
+randomised), flee with message~\#\$1E, encounter dispatch, and a combat
+flag loop with message~\#\$1F.  However, all JSR/JMP targets point to
+addresses from an earlier build where every routine had shifted by a
+small offset (e.g.\ [[STEP\_PRNG]] was at [[\$764A]] instead of
+[[\$78A8]]).  The first five bytes are garbled---an [[ORA \$CE12]]
+into expansion-ROM space followed by two undocumented NMOS~6502
+[[\$5A]] NOPs---suggesting the entry point was partially overwritten.
+
+The only live byte is the [[RTS]] at [[\$1FFE]], which serves as a
+no-op stub for external callers at [[\$4A1F]] and [[\$4BE4]].
+
+<<orphaned encounter handler>>=
+    ORG     $1F19
+    SUBROUTINE
+; ---------------------------------------------------------------
+; DEAD CODE — orphaned encounter handler ($1F19-$1FFF)
+;
+; Earlier version of HANDLE_MOB_ENCOUNTER.  Unreachable: no
+; external reference to any address in $1F19-$1FFD.
+;
+; Call targets reference an earlier build's routine layout:
+;   $0DDF -> COLROW_TO_POS (now $0D98)
+;   $0F90 -> SUM_HOSTILE_AT_POS (now $0F49)
+;   $764A -> STEP_PRNG (now $78A8)
+;   $7444 -> SET_CURSOR_ROW21 (now $76BE)
+;   $0DD1 -> PRINT_MOB_NAME (now $0D8A)
+;   $7421 -> RESET_TEXT_WINDOW (now $769B)
+;   $739F -> DISPLAY_MESSAGE (now $761E)
+;   $0E6C -> CHECK_ENCOUNTER (now $0E25)
+;   $1C3C -> COMMIT_MOVE (now $1B52)
+;   $1C91 -> END_TURN (now $1BA7)
+;   $5F19 -> CHECK_THREATS_HERE (now $645F)
+;   $1AD8 -> MOVE_LOOP (now $1A31)
+;   $1341 -> FIRST_GROUP_MEMBER (now $12FA)
+;   $1347 -> NEXT_GROUP_MEMBER (now $1300)
+; ---------------------------------------------------------------
+
+; Garbled entry: ORA $CE12 + two undocumented $5A NOPs
+    HEX     0d12ce5a5a
+
+; Event record update (earlier build's entry path?)
+    LDA     EVENT_SLOT_BYTE         ; $5A59
+    AND     #$E0
+    ORA     EVENT_SUB_VALUE         ; $5A5A
+    LDY     #$02
+    STA     (EVENT_PTR),Y           ; store into event record byte 2
+    JMP     .save_pos
+
+; Alternate entry: mark record as deleted
+    LDY     #$00
+    LDA     #$FE
+    STA     (EVENT_PTR),Y
+
+.save_pos:                              ; $1F33
+    LDA     CURRENT_COL
+    STA     TURN_START_COL
+    LDA     CURRENT_ROW
+    STA     TURN_START_ROW
+    JSR     $1C6B                       ; setup (unknown)
+    LDA     #$14
+    STA     WAIT_LOOP_COUNT
+    JSR     $0DA4                       ; unknown
+    JMP     $1EC5                       ; unknown (return path?)
+
+; Threat assessment
+    LDA     #$00
+    STA     ADJACENT_THREAT
+    LDA     ENTITY_PTR
+    STA     TARGET_REC
+    LDA     ENTITY_PTR+1
+    STA     TARGET_REC+1
+    LDA     CURRENT_COL
+    LDY     CURRENT_ROW
+    JSR     $0DDF                       ; -> COLROW_TO_POS
+    JSR     $0F90                       ; -> SUM_HOSTILE_AT_POS
+    LDA     ADJACENT_THREAT
+    BEQ     .no_flee
+
+    ; Compute flee probability from strength vs threats
+    LDY     #$05
+    LDA     (ENTITY_PTR),Y             ; strength field
+    AND     #$1F
+    CLC
+    ADC     #$10                        ; base 16
+    SEC
+    SBC     ADJACENT_THREAT
+    BMI     .clamp_low
+    CMP     #$1D
+    BMI     .in_range
+    LDA     #$1C                        ; cap at 28
+    BNE     .in_range
+.clamp_low:
+    LDA     #$04                        ; minimum 4
+.in_range:
+    ASL
+    ASL
+    ORA     #$03                        ; form PRNG mask
+    TAX
+    JSR     $764A                       ; -> STEP_PRNG
+    TXA
+    CMP     PRNG_OUTPUT
+    BPL     .no_flee                    ; survived — skip flee
+
+    ; Entity overwhelmed — flee, restore position
+    JSR     $7444                       ; -> SET_CURSOR_ROW21
+    JSR     $0DD1                       ; -> PRINT_MOB_NAME
+    JSR     $7421                       ; -> RESET_TEXT_WINDOW
+    LDA     #$1E                        ; message: flee
+    JSR     $739F                       ; -> DISPLAY_MESSAGE
+    LDA     TURN_START_COL
+    STA     CURRENT_COL
+    LDA     TURN_START_ROW
+    STA     CURRENT_ROW
+    JMP     $1C91                       ; -> END_TURN
+
+.no_flee:                               ; $1FAF
+    JSR     $1C3C                       ; -> COMMIT_MOVE
+    LDY     #$03
+    LDA     (ENTITY_PTR),Y             ; entity position
+    JSR     $0E6C                       ; -> CHECK_ENCOUNTER
+    LDA     ENCOUNTER_RESULT
+    CMP     #$02
+    BPL     .hostile
+    JSR     $5F19                       ; -> CHECK_THREATS_HERE
+    CMP     #$01
+    BEQ     .one_threat
+    JMP     $1C91                       ; -> END_TURN
+.one_threat:
+    JMP     $1AD8                       ; -> MOVE_LOOP
+
+.hostile:                               ; $1FCD
+    JSR     $1341                       ; -> FIRST_GROUP_MEMBER
+.walk_group:
+    LDA     MOB_PTR+1
+    BEQ     .group_done
+    LDY     #$03
+    LDA     (ENTITY_PTR),Y             ; entity position
+    CMP     (MOB_PTR),Y                ; mob position
+    BNE     .next_member
+    JSR     .set_combat_flag
+.next_member:
+    JSR     $1347                       ; -> NEXT_GROUP_MEMBER
+    JMP     .walk_group
+
+.group_done:                            ; $1FE5
+    JSR     $7444                       ; -> SET_CURSOR_ROW21
+    JSR     $0DD1                       ; -> PRINT_MOB_NAME
+    JSR     $7421                       ; -> RESET_TEXT_WINDOW
+    LDA     #$1F                        ; message: engage combat
+    JSR     $739F                       ; -> DISPLAY_MESSAGE
+    JMP     $1C91                       ; -> END_TURN
+
+.set_combat_flag:                       ; $1FF6
+    LDY     #$0F
+    LDA     (MOB_PTR),Y                ; mob byte $0F
+    ORA     #$04                        ; set bit 2 = combat engaged
+    STA     (MOB_PTR),Y
+; $1FFE: RTS — also serves as no-op stub for callers at $4A1F/$4BE4
+    RTS
+
+; Trailing orphan byte
+    HEX     61
+@
+
 <<calc record ptr>>=
     ORG     $5F8C
     SUBROUTINE
@@ -13661,6 +13833,7 @@ The following root chunks produce the assembly files when tangled.
 <<handle mob encounter>>
 <<set target restricted>>
 <<dispatch on mode>>
+<<orphaned encounter handler>>
 <<Location data>>
 <<Location names>>
 <<Location events>>
