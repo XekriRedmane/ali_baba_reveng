@@ -358,7 +358,7 @@ class Weaver:
         f.write(chunk_sublabel)
         f.write(r"}}}")
         f.write(r"\moddef{")
-        f.write(chunk_name)
+        f.write(self.latex_escape_name(chunk_name))
         f.write(r"~{\nwtagstyle{}\subpageref{")
         f.write(chunk_label)
         f.write(r"}}}")
@@ -386,9 +386,13 @@ class Weaver:
             f.write(r"}")
         f.write(r"\nwenddeflinemarkup")
 
+    def latex_escape_name(self, name: str) -> str:
+        """Escapes underscores in chunk names for LaTeX output."""
+        return name.replace("_", r"\_")
+
     def weave_not_used_chunk(self, name: str, f: TextIOWrapper) -> None:
         f.write(r"\nwnotused{")
-        f.write(name)
+        f.write(self.latex_escape_name(name))
         f.write(r"}")
 
     def weave_insert(
@@ -409,7 +413,7 @@ class Weaver:
             line = line[text.end() :]
             label = name_to_label[name]
             f.write(r"\LA{}")
-            f.write(name)
+            f.write(self.latex_escape_name(name))
             f.write(r"~{\nwtagstyle{}\subpageref{")
             f.write(label)
             f.write(r"}}\RA{}")
@@ -568,7 +572,7 @@ class Weaver:
         chunk_names.sort()
         for name in chunk_names:
             f.write(r"\nwixlogsorted{c}{{")
-            f.write(name)
+            f.write(self.latex_escape_name(name))
             f.write(r"}{")
             f.write(labels_by_name[name])
             f.write(r"}{")
