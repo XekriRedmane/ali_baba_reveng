@@ -143,126 +143,6 @@ Useful resources:
 \item \href{https://www.masswerk.at/6502/6502_instruction_set.html}{6502 Instruction Set}, by Norbert Landsteiner.
 \end{itemize}
 
-\section{The booting of a disk}
-
-\textbf{Suggested reading:} \textit{Beneath Apple DOS}
-(Don Worth, Pieter Lechner, 1982) page 5-6,
-\href{https://archive.org/details/beneath-apple-dos/page/n57/mode/2up}{``What happens during booting''}.
-
-In general, booting the typical Apple disk until it runs the actual program
-looks like this:
-
-[[DISKCARD -> BOOT1 -> BOOT2 -> PROGRAM]]
-
-The disk card has a small ROM whose purpose is to load [[BOOT1]], which starts from
-track 0 sector 0, where the first byte of sector 0 tells the card how many sectors
-are in [[BOOT1]]. Standard [[DOS 3.3]]'s [[BOOT1]] is only one sector long, but
-other more custom disk loaders have more sectors (up to 16).
-
-The purpose of [[BOOT1]] is to load the next, larger stage, [[BOOT2]].
-
-In this case, [[BOOT2]] is a custom DOS, [[EALDR]] (the Electronic Arts loader). This
-is loaded from tracks 1--2 into [[$A000]]--[[$BFFF]],
-then [[BOOT1]] enters it at [[$A806]] via a return address pushed onto the stack.
-
-[[EALDR]] is a mini virtual machine that reads game data from various tracks,
-decrypts a portion of it, and then jumps to the main program at [[$0800]].
-
-Since we're interested in getting at the main program, we need to find out what
-[[EALDR]] loads from disk and where. If the program itself uses the
-disk for any reason, then we have to look at [[BOOT1]]'s disk routines more closely.
-
-\subsection{Sector interleaving}
-
-Within a single track, sectors are not necessarily stored in consecutive order.
-The reason is that it takes time for the program to process the data for a
-sector it just read. By the time the program is ready to read the next sector,
-the disk has rotated some amount.
-
-It would make loading multiple sectors faster if the program ``speed'' and the
-disk ``speed'' were coordinated. Thus, for example, sector 1 might be placed
-half the disk around from sector 0. In standard [[DOS 3.3]], sector 1 is placed
-nearly all the way around the disk -- [[7/8]] of the way around!
-
-The [[\texttt{.dsk}]] file stores sectors in [[DOS 3.3]] logical order. The mapping
-between physical sectors on the disk and logical sectors in the file is the
-standard [[DOS 3.3]] 2:1 software interleave:
-
-\begin{center}
-\begin{tabular}{r|cccccccccccccccc}
-Physical & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & 13 & 14 & 15 \\
-\hline
-DOS/File & 0 & 7 & 14 & 6 & 13 & 5 & 12 & 4 & 11 & 3 & 10 & 2 & 9 & 1 & 8 & 15 \\
-\end{tabular}
-\end{center}
-
-To find physical sector [[P]] of track [[T]] in the file:
-[[\texttt{file\_offset = (T * 16 + skew\_table[P]) * 256}]]
-
-The disk card's boot ROM reads physical sectors sequentially (0, 1, 2, \ldots)
-and loads them into consecutive memory pages starting at [[$0800]].
-
-In addition, the game's custom loader (in [[BOOT1]]) uses its own interleave
-table for loading data from tracks beyond track 0. This table maps physical
-sector numbers to memory page offsets within the target region:
-
-\begin{center}
-\begin{tabular}{r|cccccccccccccccc}
-Physical & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & 13 & 14 & 15 \\
-\hline
-Page offset & F & 8 & 1 & 9 & 2 & A & 3 & B & 4 & C & 5 & D & 6 & E & 7 & 0 \\
-\end{tabular}
-\end{center}
-
-The translation tables [[boot1\_xlat.txt]] and [[boot2\_xlat.txt]] encode the
-compound mapping from memory order to file position, accounting for both the
-DOS~3.3 skew and (for [[boot2\_xlat.txt]]) the custom loader interleave.
-
-\section{Extracting the sections}
-
-The disk image contains the following sections. Note that the disk has 16
-sectors per track, and we will refer to tracks and sectors only by
-[[16 * track + sector]].
-
-\begin{itemize}
-  \item Sector 0-4: [[BOOT1]]:
-    Target address [[$0800]], entry point [[$0801]].
-  \item Sector 16-47: [[EALDR]] (EA Loader VM):
-    Target address [[$A000]], entry point [[$A806]].
-  \item Tracks [[$0D]]--[[$10]] (sectors 208--271): Main program code.
-    Target address [[$0800]], entry point [[$0800]].
-    Track [[$0D]] loads to [[$0800]]--[[$17FF]], then track [[$0E]] overwrites
-    [[$1000]]--[[$1FFF]], so the final layout is [[$0800]]--[[$3FFF]].
-\end{itemize}
-
-The sections can be extracted from the disk image using the following commands:
-
-\begin{verbatim}
-python -m extract --first 0 -n 5 \
-  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o boot1.bin \
-  --table boot1_xlat.txt
-python -m extract --first 16 -n 32 \
-  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o ealdr.bin \
-  --table ealdr_xlat.txt
-python -m extract --first 208 -n 8 \
-  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o main_0800.bin \
-  --table ealdr_xlat.txt
-python -m extract --first 224 -n 48 \
-  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" -o main_1000.bin \
-  --table ealdr_xlat.txt
-cat main_0800.bin main_1000.bin > main.bin
-\end{verbatim}
-
-The main program extraction accounts for the overlap: track [[$0D]] is loaded
-at base page [[$08]] ([[$0800]]--[[$17FF]]), but track [[$0E]] at base page
-[[$10]] overwrites [[$1000]]--[[$17FF]]. We extract only the first 8 sectors
-(pages [[$08]]--[[$0F]]) from track [[$0D]], then all 48 sectors from tracks
-[[$0E]]--[[$10]], producing a contiguous [[$3800]]-byte image loadable at [[$0800]].
-
-Note: the [[EALDR]] also loads game data from tracks [[$07]]--[[$0C]] into
-[[$4000]]--[[$95FF]] and decrypts [[$4000]]--[[$67FF]] (see~\S\ref{sec:ealdr}).
-It also copies [[$A300]]--[[$A5FF]] from [[EALDR]] memory to [[$0500]]--[[$07FF]].
-
 \chapter{6502 programming techniques}
 
 \section{Zero page temporaries}
@@ -651,7 +531,129 @@ other such protection schemes that do not involve the disk.
 In this case, the game was distributed by Electronic Arts.
 Thus, it is important to understand what [[EALDR]] does during the boot process.
 
+\section{The booting of a disk}
+
+\textbf{Suggested reading:} \textit{Beneath Apple DOS}
+(Don Worth, Pieter Lechner, 1982) page 5-6,
+\href{https://archive.org/details/beneath-apple-dos/page/n57/mode/2up}{``What happens during booting''}.
+
+In general, booting the typical Apple disk until it runs the actual program
+looks like this:
+
+[[DISKCARD -> BOOT1 -> BOOT2 -> PROGRAM]]
+
+The disk card has a small ROM whose purpose is to load [[BOOT1]], which starts from
+track 0 sector 0, where the first byte of sector 0 tells the card how many sectors
+are in [[BOOT1]]. Standard [[DOS 3.3]]'s [[BOOT1]] is only one sector long, but
+other more custom disk loaders have more sectors (up to 16). In this case, it is
+5 sectors long (see~\S\ref{sec:boot1}).
+
+The purpose of [[BOOT1]] is to load the next, larger stage, [[BOOT2]].
+
+In this case, [[BOOT2]] is a custom DOS, [[EALDR]] (the Electronic Arts Loader). This
+is loaded from tracks 1--2 into [[$A000]]--[[$BFFF]],
+then [[BOOT1]] enters it at [[$A806]] via a return address pushed onto the stack.
+
+[[EALDR]] is a mini virtual machine that reads game data from various tracks,
+decrypts a portion of it, and then jumps to the main program at [[$0800]].
+
+Since we're interested in getting at the main program, we need to find out what
+[[EALDR]] loads from disk and where. If the program itself uses the
+disk for any reason, then we have to look at [[BOOT1]]'s disk routines more closely.
+
+\subsection{Sector interleaving}
+
+Within a single track, sectors are not necessarily stored in consecutive order.
+The reason is that it takes time for the program to process the data for a
+sector it just read. By the time the program is ready to read the next sector,
+the disk has rotated some amount.
+
+It would make loading multiple sectors faster if the program ``speed'' and the
+disk ``speed'' were coordinated. Thus, for example, sector 1 might be placed
+half the disk around from sector 0. In standard [[DOS 3.3]], sector 1 is placed
+nearly all the way around the disk -- [[7/8]] of the way around!
+
+The [[.dsk]] file stores sectors in [[DOS 3.3]] logical order. The mapping
+between physical sectors on the disk and logical sectors in the file is the
+standard [[DOS 3.3]] 2:1 software interleave:
+
+\begin{center}
+\begin{tabular}{r|cccccccccccccccc}
+Physical & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & 13 & 14 & 15 \\
+\hline
+DOS/File & 0 & 7 & 14 & 6 & 13 & 5 & 12 & 4 & 11 & 3 & 10 & 2 & 9 & 1 & 8 & 15 \\
+\end{tabular}
+\end{center}
+
+To find physical sector [[P]] of track [[T]] in the file:
+[[file_offset = (T * 16 + skew_table[P]) * 256]]
+
+The disk card's boot ROM reads physical sectors sequentially (0, 1, 2, \ldots)
+and loads them into consecutive memory pages starting at [[$0800]].
+
+In addition, the game's custom loader (in [[BOOT1]]) uses its own interleave
+table for loading data from tracks beyond track 0. This table maps physical
+sector numbers to memory page offsets within the target region:
+
+\begin{center}
+\begin{tabular}{r|cccccccccccccccc}
+Physical & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & 13 & 14 & 15 \\
+\hline
+Page offset & F & 8 & 1 & 9 & 2 & A & 3 & B & 4 & C & 5 & D & 6 & E & 7 & 0 \\
+\end{tabular}
+\end{center}
+
+The translation tables [[boot1\_xlat.txt]] and [[boot2\_xlat.txt]] encode the
+compound mapping from memory order to file position, accounting for both the
+DOS~3.3 skew and (for [[boot2\_xlat.txt]]) the custom loader interleave.
+
+\section{Extracting the sections for analysis}
+
+The disk image contains the following sections. Note that the disk has 16
+sectors per track, and we will refer to tracks and sectors only by
+[[16 * track + sector]].
+
+\begin{itemize}
+  \item Sector 0-4: [[BOOT1]]:
+    Target address [[$0800]], entry point [[$0801]].
+  \item Sector 16-47: [[EALDR]] (EA Loader VM):
+    Target address [[$A000]], entry point [[$A806]].
+  \item Tracks [[$0D]]--[[$10]] (sectors 208--271): Main program code.
+    Target address [[$0800]], entry point [[$0800]].
+    Track [[$0D]] loads to [[$0800]]--[[$17FF]], then track [[$0E]] overwrites
+    [[$1000]]--[[$1FFF]], so the final layout is [[$0800]]--[[$3FFF]].
+\end{itemize}
+
+The sections can be extracted from the disk image using the following commands:
+
+\begin{verbatim}
+python -m extract --first 0 -n 5 \
+  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" \
+  -o boot1.bin --table boot1_xlat.txt
+python -m extract --first 16 -n 32 \
+  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" \
+  -o ealdr.bin --table ealdr_xlat.txt
+python -m extract --first 208 -n 8 \
+  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" \
+  -o main_0800.bin --table ealdr_xlat.txt
+python -m extract --first 224 -n 48 \
+  -i "Ali Baba and the Forty Thieves (4am and san inc crack).dsk" \
+  -o main_1000.bin --table ealdr_xlat.txt
+cat main_0800.bin main_1000.bin > main.bin
+\end{verbatim}
+
+The main program extraction accounts for the overlap: track [[$0D]] is loaded
+at base page [[$08]] ([[$0800]]--[[$17FF]]), but track [[$0E]] at base page
+[[$10]] overwrites [[$1000]]--[[$17FF]]. We extract only the first 8 sectors
+(pages [[$08]]--[[$0F]]) from track [[$0D]], then all 48 sectors from tracks
+[[$0E]]--[[$10]], producing a contiguous [[$3800]]-byte image loadable at [[$0800]].
+
+Note: the [[EALDR]] also loads game data from tracks [[$07]]--[[$0C]] into
+[[$4000]]--[[$95FF]] and decrypts [[$4000]]--[[$67FF]] (see~\S\ref{sec:ealdr}).
+It also copies [[$A300]]--[[$A5FF]] from [[EALDR]] memory to [[$0500]]--[[$07FF]].
+
 \section{BOOT1}
+\label{sec:boot1}
 
 [[BOOT1]] consists of 5 sectors from track 0, loaded by the disk card's boot
 ROM into [[$0800]]--[[$0CFF]]. The boot ROM reads physical sectors 0--4 into
@@ -699,9 +701,9 @@ The VM has the following state:
 
 \subsubsection{Entry point}
 
-The entry code at [[$A806]] fills the hi-res HGR1 screen ([[$2000--$3FFF]]) with
-[[$FF]], copies splash screen data from [[$B000]]+ to [[$202C]]+, then jumps to the VM
-execution loop at [[$A849]].
+The entry code at [[$A806]] fills the hi-res HGR1 screen ([[$2000--$3FFF]]) and beyond
+([[$4000--$7FFF]]) with [[$FF]], copies the EA splash screen data from [[$B000]]+ to
+[[$202C]]+, then jumps to the VM execution loop at [[$A849]].
 
 <<EALDR entry>>=
     ORG     $A806
@@ -723,14 +725,12 @@ ealdr_entry:
 .copy_next:
     JSR      ealdr_copy_byte   ; copy byte, advance source
     INX
-    CPX      #$20              ; X = $00..$1F (first 32 bytes)
-    BNE      .copy_next
+    BXNE     #$20,.copy_next   ; X = $00..$1F (first 32 bytes)
     LDX      #$80
 .copy_hi:
     JSR      ealdr_copy_byte   ; X = $80..$9F (next 32 bytes)
     INX
-    CPX      #$A0
-    BNE      .copy_hi
+    BXNE     #$A0,.copy_hi
     INC      ealdr_copy_dst    ; self-modify: advance dest page
     LDA      ealdr_copy_dst
     CMP      #$40              ; done when dest page reaches $40
@@ -1950,7 +1950,7 @@ HRCG_ENTRY3:
     JMP     HRCG_RTS                ; secondary entry (disabled)
 ; --- HRCG_PRINT_VERSION ---
 HRCG_PRINT_VERSION:
-    SUBROUTINE
+    SUBROUTINE HRCG_PRINT_VERSION
     JSR     HRCG_INIT_BODY
     LDY     #$00
 .loop:
@@ -1962,7 +1962,7 @@ HRCG_PRINT_VERSION:
     RTS
 ; --- HRCG_INIT_BODY ---
 HRCG_INIT_BODY:
-    SUBROUTINE
+    SUBROUTINE HRCG_INIT_BODY
     LDA     #<HRCG_GETKEY
     STA     $38                     ; KSW low
     LDA     #>HRCG_GETKEY
@@ -2022,7 +2022,7 @@ HRCG_SAVED_CV:
 <<hrcg getkey>>=
     ORG     $931A
 HRCG_GETKEY:
-    SUBROUTINE
+    SUBROUTINE HRCG_GETKEY
 ; --- KSW handler: cursor blink + keyboard input ---
     STA     ($28),Y                 ; save char at cursor pos (BASL)
     STX     $EB                     ; save X
@@ -2122,7 +2122,7 @@ HRCG_GETKEY:
 <<hrcg cout>>=
     ORG     $93BE
 HRCG_COUT:
-    SUBROUTINE
+    SUBROUTINE HRCG_COUT
 ; --- CSW handler: save regs, process char, restore ---
     STA     $FF                     ; save A
     STX     $EB                     ; save X
@@ -2217,7 +2217,7 @@ HRCG_DISPATCH_TBL:
 <<hrcg ctrl a>>=
     ORG     $9424
 HRCG_CTRL_A:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_A
 ; --- ctrl-A handler: set shift flag ---
     BCS     HRCG_SET_REPLACE        ; shifted -> set replace mode
     LDA     #$80
@@ -2252,7 +2252,7 @@ HRCG_SET_REPLACE:
     RTS
 ; --- ctrl-B: save params + cursor ---
 HRCG_CTRL_B_SAVE:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_B_SAVE
     BCS     .set_or                 ; double-shifted -> set OR mode
     BIT     HRCG_SAVED_PARAMS+8     ; already saved?
     BMI     .save_cursor            ; yes -> just update cursor
@@ -2280,7 +2280,7 @@ HRCG_CTRL_B_SAVE:
 <<hrcg ctrl c>>=
     ORG     $9478
 HRCG_CTRL_C:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_C
 ; --- ctrl-C normal: restore cursor position ---
     BCS     .set_xor_draw           ; shifted -> XOR draw mode
     LDA     HRCG_SAVED_CH           ; saved CH
@@ -2302,7 +2302,7 @@ HRCG_CTRL_C:
 <<hrcg ctrl d>>=
     ORG     $9493
 HRCG_CTRL_D:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_D
 ; --- ctrl-D normal: restore saved params ---
     BCS     HRCG_DISPLAY_PAGE       ; shifted -> display page
     BIT     HRCG_SAVED_PARAMS+8     ; params saved?
@@ -2343,7 +2343,7 @@ HRCG_CTRL_F:
     JMP     $FC42                   ; ROM CLREOP
 ; --- ctrl-H: backspace ---
 HRCG_CTRL_H:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_H
     DEC     $24                     ; CH--
     BPL     HRCG_CTRL_NOP           ; still >= 0 -> done
     LDA     $21                     ; WNDWDTH
@@ -2379,7 +2379,7 @@ HRCG_CTRL_L:
     RTS
 ; --- ctrl-M: carriage return (with pause check) ---
 HRCG_CTRL_M:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_M
     LDY     $C000                   ; check keyboard
     BPL     .no_pause               ; no key -> skip pause
     CPY     #$93                    ; ctrl-S (pause)?
@@ -2405,7 +2405,7 @@ HRCG_CTRL_N:
     RTS
 ; --- ctrl-O: set next-shifted / OR mode ---
 HRCG_CTRL_O:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_O
     BCS     .set_or_draw            ; shifted -> OR draw mode
     LDA     #$40
     STA     HRCG_MODE_FLAGS         ; next ctrl -> shifted variant
@@ -2418,7 +2418,7 @@ HRCG_CTRL_O:
     RTS
 ; --- ctrl-P: home cursor ---
 HRCG_CTRL_P:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_P
     BCS     .clear_draw             ; shifted -> clear draw mode
     JSR     HRCG_HOME
     JMP     $FC58                   ; ROM HOME (clear text screen)
@@ -2449,7 +2449,7 @@ HRCG_CTRL_R:
     RTS
 ; --- ctrl-S: XOR invert / clear wrap ---
 HRCG_CTRL_S:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_S
     BCS     .clear_wrap             ; shifted -> clear wrap
     LDA     #$C0
     STA     HRCG_INVERT_FLAG        ; invert = XOR ($C0)
@@ -2471,7 +2471,7 @@ HRCG_CTRL_T:
 <<hrcg ctrl vw>>=
     ORG     $957C
 HRCG_CTRL_V:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_V
 ; --- ctrl-V: set text window ---
     BCS     HRCG_RTS                ; shifted -> RTS
     LDA     $24                     ; CH
@@ -2500,7 +2500,7 @@ HRCG_CTRL_V:
     JMP     $FC22                   ; ROM VTAB
 ; --- ctrl-W: set right margin + bottom ---
 HRCG_CTRL_W:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_W
     BCS     .set_wrap               ; shifted -> set wrap
     LDA     $24                     ; CH
     STA     $21                     ; WNDWDTH = CH
@@ -2531,7 +2531,7 @@ HRCG_RTS:
 <<hrcg ctrl yz>>=
     ORG     $95D1
 HRCG_CTRL_Y:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_Y
 ; --- ctrl-Y normal: clear screen (reset window to full) ---
     BCS     .jump_entry2            ; shifted -> JMP HRCG_ENTRY2
 HRCG_RESET_WINDOW:
@@ -2556,7 +2556,7 @@ HRCG_RESET_WINDOW:
     JMP     HRCG_ENTRY2             ; -> secondary entry (disabled)
 ; --- ctrl-Z: full reset ---
 HRCG_CTRL_Z:
-    SUBROUTINE
+    SUBROUTINE HRCG_CTRL_Z
     BCS     .jump_entry3            ; shifted -> JMP HRCG_ENTRY3
 HRCG_RESET:
     LDA     #$00
@@ -2582,7 +2582,7 @@ HRCG_RESET:
 <<hrcg draw char>>=
     ORG     $9621
 HRCG_DRAW_CHAR:
-    SUBROUTINE
+    SUBROUTINE HRCG_DRAW_CHAR
 ; --- Main character rendering ---
     ASL     HRCG_MODE_FLAGS         ; shift mode flags
     BCS     HRCG_RTS                ; shifted -> RTS (ignore shifted printable)
@@ -2657,7 +2657,7 @@ HRCG_DRAW_CHAR:
 <<hrcg advance cursor>>=
     ORG     $969E
 HRCG_ADVANCE_CURSOR:
-    SUBROUTINE
+    SUBROUTINE HRCG_ADVANCE_CURSOR
 ; --- Advance cursor after character ---
     INC     $24                     ; CH++
     LDA     $24
@@ -2689,7 +2689,7 @@ HRCG_LINE_FEED:
 <<hrcg scroll up>>=
     ORG     $96C7
 HRCG_SCROLL_UP:
-    SUBROUTINE
+    SUBROUTINE HRCG_SCROLL_UP
     LDA     $22                     ; WNDTOP (top row)
     PHA                             ; save for later
 .next_row:
@@ -2742,7 +2742,7 @@ HRCG_SCROLL_UP:
 <<hrcg home clr>>=
     ORG     $9716
 HRCG_HOME:
-    SUBROUTINE
+    SUBROUTINE HRCG_HOME
 ; --- Set cursor to top-left and clear screen ---
     LDA     $22                     ; WNDTOP
     STA     $25                     ; CV = WNDTOP
@@ -2836,7 +2836,7 @@ Ali Baba provides several convenience routines which translate to HRCG control c
 <<control routines>>=
     ORG     $7730
 SET_INVERSE_VIDEO:
-    SUBROUTINE
+    SUBROUTINE SET_INVERSE_VIDEO
 
     LDA     #$89        ; ctrl-I
     JMP     ROM_COUT1
@@ -2845,7 +2845,7 @@ SET_INVERSE_VIDEO:
 <<text window routines>>=
     ORG     $773A
 SET_TEXT_WINDOW_WRAP:
-    SUBROUTINE
+    SUBROUTINE SET_TEXT_WINDOW_WRAP
 
     LDA     #$8F        ; ctrl-O
     JSR     ROM_COUT1
@@ -2853,7 +2853,7 @@ SET_TEXT_WINDOW_WRAP:
     JMP     ROM_COUT1
 
 SET_TEXT_WINDOW_SCROLL:
-    SUBROUTINE
+    SUBROUTINE SET_TEXT_WINDOW_SCROLL
 
     LDA     #$8F        ; ctrl-O
     JSR     ROM_COUT1
@@ -2900,7 +2900,7 @@ DISK_DATA_REG           EQU     $C0EC   ; disk controller data register (active 
 <<init hrcg>>=
     ORG     $791A
 INIT_HRCG:
-    SUBROUTINE
+    SUBROUTINE INIT_HRCG
 
     LDA     #$60                    ; RTS opcode
     STA     $94B6                   ; patch HRCG init to return early
@@ -2943,7 +2943,7 @@ opening script.  Steps:
 <<init game state>>=
     ORG     $5B00
 INIT_GAME_STATE:
-    SUBROUTINE
+    SUBROUTINE INIT_GAME_STATE
 
     JSR     INIT_GAME_DISPLAY       ; set up game display / UI
     LDA     #<GAME_ACTION_HANDLER   ; \ $F6/DISPATCH_VEC+1 = game action handler
@@ -2997,7 +2997,7 @@ BORDER_LOOP_CTR        EQU     $5DC3   ; loop counter for border label drawing
 <<init game display>>=
     ORG     $5C6D
 INIT_GAME_DISPLAY:
-    SUBROUTINE
+    SUBROUTINE INIT_GAME_DISPLAY
 
     LDA     #$90                    ; HRCG control: clear hi-res screen
     JSR     ROM_COUT1
@@ -3095,7 +3095,7 @@ each position.  Selects HRCG charset~2 before drawing.
 <<draw border labels>>=
     ORG     $5CFD
 DRAW_BORDER_LABELS:
-    SUBROUTINE
+    SUBROUTINE DRAW_BORDER_LABELS
 
     ; Select HRCG charset 2
     LDA     #$81                    ; ctrl-A
@@ -3201,7 +3201,7 @@ TEXT_ROW                EQU     $25
 <<set text window upper left>>=
     ORG     $792D
 SET_TEXT_WINDOW_UPPER_LEFT_ALL:
-    SUBROUTINE
+    SUBROUTINE SET_TEXT_WINDOW_UPPER_LEFT_ALL
 
     LDA     #0
     JMP     SET_TEXT_WINDOW_UPPER_LEFT
@@ -3227,7 +3227,7 @@ row number can be specified by upper two bits (so 20 through 23).
 <<set cursor compressed>>=
     ORG     $776E
 SET_CURSOR_COMPRESSED:
-    SUBROUTINE
+    SUBROUTINE SET_CURSOR_COMPRESSED
 
     PHA
     AND     #$3F
@@ -3281,7 +3281,7 @@ DATA_PTR                EQU     $BE     ; general data pointer / return value (2
 <<print string>>=
     ORG     $7758
 PRINT_STRING_AT_ADDR:
-    SUBROUTINE
+    SUBROUTINE PRINT_STRING_AT_ADDR
 
     STX     PRINT_STRING_ADDR
     STY     PRINT_STRING_ADDR+1
@@ -3305,7 +3305,7 @@ current cursor's column. If the column is zero, the routine would center the tex
 <<print centered plus col>>=
     ORG     $7710
 PRINT_CENTERED_PLUS_COL:
-    SUBROUTINE
+    SUBROUTINE PRINT_CENTERED_PLUS_COL
 
     LDA     #40
     SEC
@@ -3325,7 +3325,7 @@ the screen.
 <<print bottom centered>>=
     ORG     $7705
 PRINT_BOTTOM_CENTERED:
-    SUBROUTINE
+    SUBROUTINE PRINT_BOTTOM_CENTERED
 
     LDA     #$17
     STA     TEXT_ROW
@@ -3356,7 +3356,7 @@ SET_TEXT_WINDOW EQU     $76C2   ; set text window parameters
 <<font pos>>=
     ORG     $7723
 FONT_POS_TO_TEXT_POS:
-    SUBROUTINE
+    SUBROUTINE FONT_POS_TO_TEXT_POS
 
     LDA     FONT_COL
     ASL
@@ -3448,7 +3448,7 @@ otherwise clears the flag.  Then draws the character, sets
 <<setup scene display>>=
     ORG     $0901
 SETUP_SCENE_DISPLAY:
-    SUBROUTINE
+    SUBROUTINE SETUP_SCENE_DISPLAY
 
     LDA     #$00
     STA     AI_WAIT_FLAG
@@ -3479,7 +3479,7 @@ boundary.  Converts [[LOCATION\_ID]] to column/row via
 <<check at boundary>>=
     ORG     $0BFA
 CHECK_AT_BOUNDARY:
-    SUBROUTINE
+    SUBROUTINE CHECK_AT_BOUNDARY
 
     LDA     LOCATION_ID
     JSR     POS_TO_COLROW
@@ -3524,7 +3524,7 @@ entity icons on the map.
 <<enter location>>=
     ORG     $72A7
 ENTER_LOCATION:
-    SUBROUTINE
+    SUBROUTINE ENTER_LOCATION
 
     LDA     CHAR_PTR
     CMP     LOCATION_POS
@@ -3592,7 +3592,7 @@ calling [[COLROW\_TO\_POS]], then calls [[FIND\_ENTITY\_AT\_POS]],
 <<draw map col>>=
     ORG     $7323
 DRAW_MAP_COL:
-    SUBROUTINE
+    SUBROUTINE DRAW_MAP_COL
 
     LDA     FONT_COL
     CLC
@@ -3630,7 +3630,7 @@ mob has no blink animation).
 <<draw map entities>>=
     ORG     $733B
 DRAW_MAP_ENTITIES:
-    SUBROUTINE
+    SUBROUTINE DRAW_MAP_ENTITIES
 
     LDY     #$05
     LDA     (CHAR_PTR),Y
@@ -3741,7 +3741,7 @@ Finishes by resetting [[BLINK\_COL]] to~\$14 (disabled).
 <<draw map icon b>>=
     ORG     $740B
 DRAW_MAP_ICON_B:
-    SUBROUTINE
+    SUBROUTINE DRAW_MAP_ICON_B
 
     JSR     SCROLL_STATUS_LINE
     JSR     RENDER_FONT_CHAR
@@ -3778,7 +3778,7 @@ MAP_FILL_CHAR           EQU     $7AC1   ; character used to fill the map grid
 <<fill map>>=
     ORG     $743B
 FILL_MAP:
-    SUBROUTINE
+    SUBROUTINE FILL_MAP
 
     LDA     #$13                    ; \ start at column 19, row 9
     STA     FONT_COL                ;  | (bottom-right corner)
@@ -3818,7 +3818,7 @@ TILE_BLINK_TAB          EQU     $7AD8   ; 4-byte table: blink alt char per style
 <<load map tiles>>=
     ORG     $746C
 LOAD_MAP_TILES:
-    SUBROUTINE
+    SUBROUTINE LOAD_MAP_TILES
 
     LDA     LOCATION_STYLE          ; location style byte
     ROL                             ; \ rotate bits 7-6 down to bits 1-0
@@ -3840,7 +3840,7 @@ LOAD_MAP_TILES:
     ORG     $7489
 RENDER_FONT_CHAR:
 PRINT_FONTCHAR:
-    SUBROUTINE
+    SUBROUTINE PRINT_FONTCHAR
 
     JSR     FONT_POS_TO_TEXT_POS    ; set TEXT_COL/TEXT_ROW from font pos
 PRINT_FONTCHAR_AT_TEXT_POS:
@@ -3904,7 +3904,7 @@ DEFAULT_CHAR            EQU     $7AC2   ; default entity character ($2C)
 <<get entity fontchar>>=
     ORG     $0C7E
 GET_ENTITY_FONTCHAR:
-    SUBROUTINE
+    SUBROUTINE GET_ENTITY_FONTCHAR
 
     LDA     #$01
     STA     FONT_CHARSET            ; custom font
@@ -3994,7 +3994,7 @@ the indexed loads and table walks.
 <<find entity at pos>>=
     ORG     $0B62
 FIND_ENTITY_AT_POS:
-    SUBROUTINE
+    SUBROUTINE FIND_ENTITY_AT_POS
 
     STA     DAT_5a17_pos            ; save target position
     LDA     CHAR_PTR+1                     ; \ patch base address into
@@ -4012,8 +4012,7 @@ FIND_ENTITY_AT_POS:
     LDA     $0B7B,X                 ; (self-modified base address)
     STA     .load4-5,X              ; patch .load4 operand (+6→low, +7→high)
     INX
-    CPX     #$08
-    BNE     .load3
+    BXNE    #$08,.load3
 .load4:
     LDY     $0B86                   ; (self-modified: read position from table)
     CPY     #$FF
@@ -4084,7 +4083,7 @@ BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
 <<draw blink alt>>=
     ORG     $74CB
 DRAW_BLINK_ALT:
-    SUBROUTINE
+    SUBROUTINE DRAW_BLINK_ALT
 
     LDA     BLINK_CHAR              ; save current blink char
     PHA
@@ -4115,7 +4114,7 @@ DRAW_BLINK_NORMAL:
     JSR     PRINT_CTRL_N            ; Ctrl-N → normal video
 
 DRAW_BLINK_CHAR:
-    SUBROUTINE
+    SUBROUTINE DRAW_BLINK_CHAR
 
     LDA     BLINK_COL               ; load blink column
     CMP     #$14                    ; >= 20? (disabled sentinel)
@@ -4146,7 +4145,7 @@ This is distinct from [[SET\_NORMAL\_VIDEO]] at [[\$75F9]] which uses
 <<print ctrl n>>=
     ORG     $7735
 PRINT_CTRL_N:
-    SUBROUTINE
+    SUBROUTINE PRINT_CTRL_N
 
     LDA     #$8E                    ; Ctrl-N with high bit
     JMP     ROM_COUT1                ; output via COUT1
@@ -4185,7 +4184,7 @@ coordinate in [[X]] and [[Y]].
 <<plot char>>=
     ORG     $5DB0
 PLOT_CHAR:
-    SUBROUTINE
+    SUBROUTINE PLOT_CHAR
 
     STA     FONT_CHARNUM
     STX     TEXT_COL
@@ -4227,7 +4226,7 @@ See \href{https://6502disassembly.com/a2-rom/}{The Oft Misunderstood WAIT} for a
 
 <<tone>>=
 tone:
-    SUBROUTINE
+    SUBROUTINE tone
 
     LDY      #$0A           ; 2 cycles
 
@@ -4259,7 +4258,7 @@ The frequency of the note played by [[high_tone]] will be equal to
 
 <<high tone>>=
 high_tone:
-    SUBROUTINE
+    SUBROUTINE high_tone
 
     LDY      #$0A           ; 2 cycles
 
@@ -4411,7 +4410,7 @@ The first thing the main program does:
 <<main entry>>=
     ORG     $0800
 MAIN_ENTRY:
-    SUBROUTINE
+    SUBROUTINE MAIN_ENTRY
 
     JSR     GAME_INIT
 .restart:
@@ -4459,7 +4458,7 @@ MAIN_ENTRY:
 <<process mob groups>>=
     ORG     $0884
 PROCESS_MOB_GROUPS:
-    SUBROUTINE
+    SUBROUTINE PROCESS_MOB_GROUPS
     ; Walk the mob linked list for the current character.
     ; For each group: inactive (type < 3) → display message + auto-heal;
     ; active (type >= 3) → set up scene and enter GAME_TURN_LOOP.
@@ -4503,7 +4502,7 @@ PROCESS_MOB_GROUPS:
 <<show idle status>>=
     ORG     $08D1
 SHOW_IDLE_STATUS:
-    SUBROUTINE
+    SUBROUTINE START_MOB_TURN
     ; Display a status message for an inactive mob group.
     JSR     SCROLL_STATUS_LINE
     JSR     PRINT_MOB_NAME
@@ -4515,7 +4514,7 @@ SHOW_IDLE_STATUS:
 <<start mob turn>>=
     ORG     $08DF
 START_MOB_TURN:
-    SUBROUTINE
+    SUBROUTINE START_MOB_TURN
     ; Set up the character sprite and enter the game turn loop
     ; for an active mob group (type >= 3).
     LDY     #$04
@@ -4537,7 +4536,7 @@ START_MOB_TURN:
 <<check mob needs turn>>=
     ORG     $0958
 CHECK_MOB_NEEDS_TURN:
-    SUBROUTINE
+    SUBROUTINE CHECK_MOB_NEEDS_TURN
     ; Check whether a mob group needs a game turn.
     ; Returns: carry set = needs turn, carry clear = skip.
     ; Skips if: AI mode is player (0), or record byte 12 low nibble
@@ -4569,7 +4568,7 @@ CHECK_MOB_NEEDS_TURN:
 <<random events>>=
     ORG     $65A9
 RANDOM_EVENTS:
-    SUBROUTINE
+    SUBROUTINE RANDOM_EVENTS
     ; Between-round random event dispatcher.  Each step rolls PRNG and
     ; compares against the event threshold at $4239 (~7% chance).
     ; Cascading: the deeper it goes, the more events fire at once.
@@ -4624,7 +4623,7 @@ EVENT_THRESHOLD         EQU     $4239   ; random event probability threshold (~7
 <<event pick mob>>=
     ORG     $660D
 EVENT_PICK_MOB:
-    SUBROUTINE
+    SUBROUTINE EVENT_PICK_CHAR
     ; Random event: pick a random mob, then process its char events.
     JSR     PICK_RANDOM_MOB
     JMP     PROCESS_CHAR_EVENTS
@@ -4633,7 +4632,7 @@ EVENT_PICK_MOB:
 <<event pick char>>=
     ORG     $6613
 EVENT_PICK_CHAR:
-    SUBROUTINE
+    SUBROUTINE EVENT_FACTION_SCENE
     ; Random event: pick a random character, then process its char events.
     JSR     PICK_RANDOM_CHAR
     JMP     PROCESS_CHAR_EVENTS
@@ -4642,7 +4641,7 @@ EVENT_PICK_CHAR:
 <<event faction scene>>=
     ORG     $6619
 EVENT_FACTION_SCENE:
-    SUBROUTINE
+    SUBROUTINE EVENT_FACTION_SCENE_CONT
     ; Random event: pick a random mob, check for matching faction
     ; in the mob list; if found, run SCENE_SETUP for that mob.
     JSR     PICK_RANDOM_MOB
@@ -4677,7 +4676,7 @@ EVENT_FACTION_SCENE_CONT:               ; alternate entry from RANDOM_EVENTS bur
 <<event spawn mob>>=
     ORG     $664E
 EVENT_SPAWN_MOB:
-    SUBROUTINE
+    SUBROUTINE EVENT_SPAWN_MOB
     ; Random event: pick a random character; if its byte 8 is nonzero
     ; (active), try again once.  If inactive, use its faction to find
     ; a matching mob and reorder it into the group.
@@ -4715,7 +4714,7 @@ EVENT_SPAWN_MOB:
 <<pick random mob>>=
     ORG     $6689
 PICK_RANDOM_MOB:
-    SUBROUTINE
+    SUBROUTINE PICK_RANDOM_MOB
     ; Pick a random mob group by weighted selection.
     ; Uses TOTAL_MOB_COUNT as the range, then iterates char records
     ; subtracting group counts (byte 8) until the target is reached.
@@ -4752,7 +4751,7 @@ COPY_BE_TO_FA:
 <<pick random char>>=
     ORG     $66BA
 PICK_RANDOM_CHAR:
-    SUBROUTINE
+    SUBROUTINE PROCESS_CHAR_EVENTS
     ; Pick a random character from players 2..CURRENT_PLAYER-1.
     ; Result: $FA/$FB points to the selected char record, CHAR_INDEX = index.
     LDA     CURRENT_PLAYER
@@ -4769,7 +4768,7 @@ PICK_RANDOM_CHAR:
 <<process char events>>=
     ORG     $66CE
 PROCESS_CHAR_EVENTS:
-    SUBROUTINE
+    SUBROUTINE PROCESS_CHAR_EVENTS
     ; Walk the 3-byte event list pointed to by char record bytes 6-7.
     ; For entries with byte 1 in range $40-$7F, subtract $40 from the
     ; value and trigger the event via CHECK_LOCATION_MATCH.
@@ -4811,7 +4810,7 @@ PROCESS_CHAR_EVENTS:
 <<find mob by faction>>=
     ORG     $6706
 FIND_MOB_BY_FACTION:
-    SUBROUTINE
+    SUBROUTINE FIND_MOB_BY_FACTION
     ; Walk the mob linked list from ($FA) byte 2, looking for a mob
     ; whose byte $0F has bit 7 set and bits 6-4 match FACTION_MASK (faction).
     ; Returns A=1 if found (with MOB_PTR/MOB_PTR+1 pointing to it), A=0 if not.
@@ -4843,7 +4842,7 @@ FIND_MOB_BY_FACTION:
 <<check scene events>>=
     ORG     $6DFA
 CHECK_SCENE_EVENTS:
-    SUBROUTINE
+    SUBROUTINE CHECK_SCENE_EVENTS
     ; Scene event dispatcher for players 1 & 3.  Checks encounter
     ; state and dispatches to SCENE_LOOP with mode 4-8 based on
     ; game state flags.  Called from MAIN_ENTRY's character loop.
@@ -4904,7 +4903,7 @@ SCENE_EVENT_RESULT      EQU     $423E   ; nonzero = event fully handled
 <<check location match>>=
     ORG     $672E
 CHECK_LOCATION_MATCH:
-    SUBROUTINE
+    SUBROUTINE SCAN_FOR_HOSTILE
     ; Load char record for ACTIVE_CHAR ($5A29), check if DATA_PTR matches
     ; LOCATION_POS.  If so, clear LOCATION_POS to force a redraw.
     LDA     ACTIVE_CHAR
@@ -4922,7 +4921,7 @@ CHECK_LOCATION_MATCH:
 <<scan for hostile>>=
     ORG     $6E5A
 SCAN_FOR_HOSTILE:
-    SUBROUTINE
+    SUBROUTINE SCAN_FOR_HOSTILE
     ; Scan mob groups starting from SCENE_GROUP_IDX for hostile encounters.
     ; Sets SCENE_FOUND_FLAG=1 if the group matches, SCENE_HOSTILE_FLAG
     ; nonzero if a hostile is found.
@@ -4964,7 +4963,7 @@ SCAN_FOR_HOSTILE:
 <<load char to fa>>=
     ORG     $6EC9
 LOAD_CHAR_TO_FA:
-    SUBROUTINE
+    SUBROUTINE SCAN_AND_REORDER
     ; Wrapper: GET_CHAR_RECORD then copy CHAR_REC → $FA/$FB.
     JSR     GET_CHAR_RECORD
     LDA     DATA_PTR
@@ -4977,7 +4976,7 @@ LOAD_CHAR_TO_FA:
 <<scan and reorder>>=
     ORG     $6ED5
 SCAN_AND_REORDER:
-    SUBROUTINE
+    SUBROUTINE PROCESS_SCENE_GROUPS
     ; Call SCAN_FOR_HOSTILE for current SCENE_GROUP_IDX.
     ; If a match is found, copy MOB_PTR/MOB_PTR+1 → TARGET_REC/TARGET_REC+1 and reorder.
     JSR     SCAN_FOR_HOSTILE
@@ -4995,7 +4994,7 @@ SCAN_AND_REORDER:
 <<process scene groups>>=
     ORG     $6E9E
 PROCESS_SCENE_GROUPS:
-    SUBROUTINE
+    SUBROUTINE PROCESS_SCENE_GROUPS
     ; Process mob groups $3F, $41, $42 with SCAN_AND_REORDER,
     ; bookended by LOAD_CHAR_TO_FA for save/restore.
     LDA     #$03
@@ -5061,7 +5060,7 @@ repositioned, and message~\$2F (joystick confirmation) is displayed.
 <<select input mode>>=
     ORG     $084E
 SELECT_INPUT_MODE:
-    SUBROUTINE
+    SUBROUTINE SELECT_INPUT_MODE
 
     LDA     #$38                    ; message $38: input mode prompt
     JSR     DISPLAY_MESSAGE
@@ -5102,7 +5101,7 @@ from [[GAME\_INIT]] to initialize locations and scene state.
 <<init world>>=
     ORG     $62E5
 INIT_WORLD:
-    SUBROUTINE
+    SUBROUTINE INIT_WORLD
 
     LDX     #>WORLD_INIT_DATA       ; \ X/Y = pointer to init data
     LDY     #<WORLD_INIT_DATA       ; /
@@ -5122,7 +5121,7 @@ various subsystem initialization.
 <<game init>>=
     ORG     $78C7
 GAME_INIT:
-    SUBROUTINE
+    SUBROUTINE GAME_INIT
 
     LDX     #$6F                    ; \
     LDY     #$A5                    ;  | reset vector = $A56F
@@ -5166,7 +5165,7 @@ into HGR mode showing the framebuffer at [[$2000]]--[[$3FFF]].
 <<attract screen>>=
     ORG     $09F4
 ATTRACT_SCREEN:
-    SUBROUTINE
+    SUBROUTINE ATTRACT_SCREEN
 
     LDA     #$01
     STA     ACTIVE_CHAR             ; scene/character index = 1
@@ -5218,7 +5217,7 @@ Called exclusively from [[REORDER\_CHAR]] (\$0F84).
 <<adjust char byte8>>=
     ORG     $102F
 DECR_GROUP_COUNT:
-    SUBROUTINE
+    SUBROUTINE DECR_GROUP_COUNT
 
     LDA     #$FF                    ; delta = -1
     BNE     .apply                  ; always taken
@@ -5274,7 +5273,7 @@ the insertion point instead of the level comparison.
 <<reorder char>>=
     ORG     $0F84
 REORDER_CHAR:
-    SUBROUTINE
+    SUBROUTINE REORDER_CHAR
 
 ; --- Phase 1: unlink character SOURCE_CHAR from its current chain ---
     LDA     SOURCE_CHAR             ; source character index
@@ -5377,7 +5376,7 @@ Returns [[\CHAR_REC/\CHAR_REC+1 = \$4000 + A $\times$ 9]].  If A~=~0, returns
 <<get char record>>=
     ORG     $1053
 GET_CHAR_RECORD:
-    SUBROUTINE
+    SUBROUTINE GET_CHAR_RECORD
 
     TAX                             ; X = index (loop counter)
     LDA     #$00                    ; \
@@ -5415,7 +5414,7 @@ pick a random column and row within the bounds.
 <<scene setup>>=
     ORG     $0A17
 SCENE_SETUP:
-    SUBROUTINE
+    SUBROUTINE SCENE_SETUP
 
     LDA     ACTIVE_CHAR             ; character/scene index
     JSR     GET_CHAR_RECORD         ; index → CHAR_REC = char record
@@ -5504,7 +5503,7 @@ INIT_STUB2:
 <<init disk iob>>=
     ORG     $6C2E
 INIT_DISK_IOB:
-    SUBROUTINE
+    SUBROUTINE INIT_DISK_IOB
 
     LDA     #>RWTS_IOB              ; \ set RWTS IOB pointer
     LDY     #<RWTS_IOB              ;  | $08/$09 = $B7E8
@@ -5521,7 +5520,7 @@ in~A.
 <<scene loop>>=
     ORG     $6C37
 SCENE_LOOP:
-    SUBROUTINE
+    SUBROUTINE SCENE_LOOP
 
     STA     SCENE_NUMBER            ; store scene number
     LDA     #$14
@@ -5593,7 +5592,7 @@ SAVED_F4            EQU     $5AA0   ; saved MOB_PTR pointer (2 bytes)
 <<save zp pointers>>=
     ORG     $6D53
 SAVE_ZP_POINTERS:
-    SUBROUTINE
+    SUBROUTINE SAVE_ZP_POINTERS
 
     LDA     TARGET_REC
     STA     SAVED_BC
@@ -5618,7 +5617,7 @@ SAVE_ZP_POINTERS:
 <<restore zp pointers>>=
     ORG     $6D7C
 RESTORE_ZP_POINTERS:
-    SUBROUTINE
+    SUBROUTINE RESTORE_ZP_POINTERS
 
     LDA     SAVED_BC
     STA     TARGET_REC
@@ -5663,7 +5662,7 @@ hi-res page zeroed for use as a graphics buffer.
 <<relocate hires staging>>=
     ORG     $6DA5
 RELOCATE_HIRES_STAGING:
-    SUBROUTINE
+    SUBROUTINE RELOCATE_HIRES_STAGING
 
     LDA     #$00
     STA     COPY_DEST                         ; \  dest = $9600
@@ -5706,7 +5705,7 @@ and stores both the full result and a shifted copy.
 <<step prng>>=
     ORG     $78A8
 STEP_PRNG:
-    SUBROUTINE
+    SUBROUTINE STEP_PRNG
 
     LDA     PRNG_STATE              ; val
     ASL                       ; val*2
@@ -5751,7 +5750,7 @@ RNG_MASK            EQU     $5A12   ; random\_in\_range bit mask
 <<random in range>>=
     ORG     $1317
 RANDOM_IN_RANGE:
-    SUBROUTINE
+    SUBROUTINE RANDOM_IN_RANGE
 
     STA     RNG_LIMIT               ; save range limit
     CMP     #$00
@@ -5850,7 +5849,7 @@ If the link is zero (end of chain), [[MOB\_PTR]] is set to null.
 <<advance group link>>=
     ORG     $12FA
 FIRST_GROUP_MEMBER:
-    SUBROUTINE
+    SUBROUTINE FIRST_GROUP_MEMBER
 
     LDY     #$02                    ; \
     LDA     (CHAR_PTR),Y                 ;  | check byte 2 of group head ($FA)
@@ -5882,7 +5881,7 @@ a minimum derived from another field.
 <<clamp char field>>=
     ORG     $0A93
 CLAMP_CHAR_FIELD:
-    SUBROUTINE
+    SUBROUTINE CLAMP_CHAR_FIELD
 
     LDY     #$05
     LDA     (MOB_PTR),Y                 ; byte 5 of record
@@ -5911,7 +5910,7 @@ determines its font character, and draws it.
 <<draw char at pos>>=
     ORG     $1156
 DRAW_CHAR_AT_POS:
-    SUBROUTINE
+    SUBROUTINE DRAW_CHAR_AT_POS
 
     JSR     POS_TO_COLROW           ; A=pos → A=col, Y=row
     STA     FONT_COL                ; set font column
@@ -5930,7 +5929,7 @@ CONTINUE'') message in the text window at the bottom of the screen.
 <<display status bar>>=
     ORG     $6D1F
 DISPLAY_STATUS_BAR:
-    SUBROUTINE
+    SUBROUTINE DISPLAY_STATUS_BAR
 
     LDA     #$90                    ; ctrl-P with high bit (toggle inverse)
     JSR     ROM_COUT1
@@ -5971,7 +5970,7 @@ Prints a length-prefixed string from [[PRINT_STRING_ADDR/PRINT_STRING_ADDR+1]] v
 <<print from ptr>>=
     ORG     $775C
 PRINT_FROM_PTR:
-    SUBROUTINE
+    SUBROUTINE PRINT_FROM_PTR
 
     LDY     #$00
     LDA     (PRINT_STRING_ADDR),Y                 ; first byte = length
@@ -6013,7 +6012,7 @@ MSG_LINE_COUNT          EQU     $5A57   ; lines printed so far
 <<display message>>=
     ORG     $761E
 DISPLAY_MESSAGE:
-    SUBROUTINE
+    SUBROUTINE DISPLAY_MESSAGE
 
     TAX                             ; X = message index
     LDA     MSG_TABLE_PTR           ; load table base into PRINT_STRING_ADDR/PRINT_STRING_ADDR+1
@@ -6040,8 +6039,7 @@ DISPLAY_MESSAGE:
 .next_index:
     DEX
 .check_index:
-    CPX     #$00
-    BNE     .skip_entry             ; more entries to skip
+    BXNE    #$00,.skip_entry         ; more entries to skip
 
 DISPLAY_MESSAGE_LOOP:
 .print_loop:
@@ -6103,7 +6101,7 @@ Sends Ctrl-A and [['0']] to COUT (selects character set~0 in the HRCG):
 <<print ctrl ab>>=
     ORG     $774E
 PRINT_CTRL_AB:
-    SUBROUTINE
+    SUBROUTINE PRINT_CTRL_AB
 
     LDA     #$81                    ; Ctrl-A with high bit
     JSR     ROM_COUT1
@@ -6122,7 +6120,7 @@ share all code from [[$76C4]] onward.
 <<set text window bottom>>=
     ORG     $76BE
 SET_CURSOR_ROW21:
-    SUBROUTINE
+    SUBROUTINE SET_CURSOR_ROW21
 
     LDA     #$15                    ; WNDBTM = 21
     BNE     .shared                 ; always taken (stretchy branch)
@@ -6153,7 +6151,7 @@ the remainder.
 <<pos to colrow>>=
     ORG     $0C25
 POS_TO_COLROW:
-    SUBROUTINE
+    SUBROUTINE POS_TO_COLROW
 
     LDY      #$00              ; row = 0
 .loop:
@@ -6177,7 +6175,7 @@ Used by 13~callers throughout the combat and interaction code.
 <<print mob name>>=
     ORG     $0D8A
 PRINT_MOB_NAME:
-    SUBROUTINE
+    SUBROUTINE PRINT_MOB_NAME
 
     LDY     #$00                    ; \
     LDA     (ENTITY_PTR),Y                 ;  | PRINT_STRING_ADDR/PRINT_STRING_ADDR+1 = bytes 0-1 of ($F8)
@@ -6198,7 +6196,7 @@ carry occurs (overflow past 255).
 <<colrow to pos>>=
     ORG     $0D98
 COLROW_TO_POS:
-    SUBROUTINE
+    SUBROUTINE COLROW_TO_POS
 
     CLC
 .loop:
@@ -6230,7 +6228,7 @@ starting output position and suppression behavior.
 <<num to decimal>>=
     ORG     $0DA1
 NUM_TO_DECIMAL:
-    SUBROUTINE
+    SUBROUTINE NUM_TO_DECIMAL
 
     LDY     #$00                    ; output index = 0
     STY     NUM_LEADING             ; leading-zero flag = 0 (suppress)
@@ -6328,7 +6326,7 @@ ENCOUNTER_RESULT        EQU     $5A1F   ; 0/1/2 from CHECK_ENCOUNTER
 <<check encounter>>=
     ORG     $0E25
 CHECK_ENCOUNTER:
-    SUBROUTINE
+    SUBROUTINE CHECK_ENCOUNTER
 
     JSR     FIND_ENTITY_AT_POS      ; look up char → ENTITY_REC/ENTITY_REC+1
     LDA     ENTITY_REC+1
@@ -6395,7 +6393,7 @@ COLOCATE_WRAPPED        EQU     $5A22   ; 1 if wrapped, 2 if ahead
 <<find mob at same pos>>=
     ORG     $0E6C
 FIND_MOB_AT_SAME_POS:
-    SUBROUTINE
+    SUBROUTINE FIND_MOB_AT_SAME_POS
 
     LDY     #$03
     LDA     (MOB_PTR),Y                 ; byte 3 = position of current mob
@@ -6458,7 +6456,7 @@ HOSTILE_Y               EQU     $5A25   ; saved Y from first GET_HOSTILITY
 <<check hostile>>=
     ORG     $0EB1
 CHECK_HOSTILE:
-    SUBROUTINE
+    SUBROUTINE CHECK_HOSTILE
 
     LDY     #$04
     LDA     (MOB_PTR),Y                 ; byte 4 of found mob (appearance)
@@ -6494,7 +6492,7 @@ groups 3--6 are hostile (Y$\leftarrow$1).  The value in~[[A]] is preserved.
 <<get hostility>>=
     ORG     $0EE3
 GET_HOSTILITY:
-    SUBROUTINE
+    SUBROUTINE GET_HOSTILITY
 
     CPY     #$03                    ; factions 0-2 = friendly
     BCC     .friendly
@@ -6534,7 +6532,7 @@ ADJACENT_POS            EQU     $5A27   ; saved position for adjacency check
 <<check adjacent threats>>=
     ORG     $0EF1
 CHECK_ADJACENT_THREATS:
-    SUBROUTINE
+    SUBROUTINE CHECK_ADJACENT_THREATS
 
     STA     ADJACENT_POS            ; save target position
     LDA     #$00
@@ -6601,7 +6599,7 @@ For each mob found at the position, checks hostility via
 <<sum hostile at pos>>=
     ORG     $0F49
 SUM_HOSTILE_AT_POS:
-    SUBROUTINE
+    SUBROUTINE SUM_HOSTILE_AT_POS
 
     JSR     FIND_ENTITY_AT_POS      ; A = position → ENTITY_REC/ENTITY_REC+1
     LDA     ENTITY_REC+1
@@ -6648,7 +6646,7 @@ where [[$4000/$4001]] holds the base address of the scene table.
     ORG     $0C32
 COMPUTE_SCENE_PTR:
 GET_MOB_DATA:
-    SUBROUTINE
+    SUBROUTINE GET_MOB_DATA
 
     CLC
     ADC     #$FF                    ; A = index - 1
@@ -6688,7 +6686,7 @@ quotient is nonzero, 32 is added to index into the next font group.
 <<appearance to fontchar>>=
     ORG     $0CF7
 APPEARANCE_TO_FONTCHAR:
-    SUBROUTINE
+    SUBROUTINE APPEARANCE_TO_FONTCHAR
 
     LDY      #$00              ; Y = quotient (font group)
 .loop:
@@ -6727,7 +6725,7 @@ DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
 <<delay with animation>>=
     ORG     $0D10
 DELAY_WITH_ANIMATION:
-    SUBROUTINE
+    SUBROUTINE DELAY_WITH_ANIMATION
 
     LDA     DELAY_COUNT             ; load iteration count
 .loop:
@@ -6762,7 +6760,7 @@ MAP_REDRAW_FLAG         EQU     $7AC4   ; non-zero = full map redraw needed
 <<tick anim counter>>=
     ORG     $0D1E
 TICK_ANIM_COUNTER:
-    SUBROUTINE
+    SUBROUTINE TICK_ANIM_COUNTER
 
     DEC     ANIM_FRAME_CTR          ; tick frame counter
     BNE     .reload                 ; not zero → just reload wait count
@@ -6786,7 +6784,7 @@ display and reloads the frame counter from the frame table at
 <<anim tick and wait>>=
     ORG     $0D30
 ANIM_TICK_AND_WAIT:
-    SUBROUTINE
+    SUBROUTINE ANIM_TICK_AND_WAIT
 
     JSR     TICK_ANIM_COUNTER       ; tick counter, reload wait count
     JSR     TIMED_WAIT              ; burn time
@@ -6811,7 +6809,7 @@ zero on entry, returns immediately.
 <<timed wait>>=
     ORG     $0D49
 TIMED_WAIT:
-    SUBROUTINE
+    SUBROUTINE TIMED_WAIT
 
     LDA     WAIT_LOOP_COUNT         ; anything to wait for?
     BNE     .wait                   ; yes → enter wait loop
@@ -6837,7 +6835,7 @@ ROM_WAIT                EQU     $FCA8   ; Apple II ROM WAIT routine
 <<call rom wait>>=
     ORG     $0D58
 CALL_ROM_WAIT:
-    SUBROUTINE
+    SUBROUTINE CALL_ROM_WAIT
 
     LDA     WAIT_DURATION           ; load duration parameter
     JMP     ROM_WAIT                ; tail-call ROM WAIT
@@ -6859,7 +6857,7 @@ TEXT_STREAM_IDX          EQU     $5A98   ; saved Y index into byte stream
 <<text renderer>>=
     ORG     $6C8E
 TEXT_RENDERER:
-    SUBROUTINE
+    SUBROUTINE TEXT_RENDERER
 
     LDY     #$00
 .init:
@@ -7056,7 +7054,7 @@ context (zero-page state) and dispatches one bytecode instruction.
 <<attract loop>>=
     ORG     $0569
 ATTRACT_LOOP:
-    SUBROUTINE
+    SUBROUTINE ATTRACT_LOOP
 
     JSR     CONTEXT_SWAP
     JSR     RESIDENT_DISPATCH
@@ -7096,7 +7094,7 @@ operations.
 
 <<resident data and bytecodes>>=
     ORG     $0572
-    SUBROUTINE
+    SUBROUTINE resident_data_and_bytecodes
 ; EALDR VM bytecodes + embedded native disk I/O routines ($0572-$06B2)
 ; Bytecode encryption: low XOR $03, high XOR $D9, immediate XOR $4C
 ;
@@ -7150,7 +7148,7 @@ temporaries that don't interfere with the main program.
 <<context swap>>=
     ORG     $06E0
 CONTEXT_SWAP:
-    SUBROUTINE
+    SUBROUTINE CONTEXT_SWAP
 
     LDX     #$0F
 .loop:
@@ -7186,7 +7184,7 @@ so the saved X/Y values end up in [[\$52/$53]] as the new bytecode pointer.
 <<resident dispatch>>=
     ORG     $06B3
 RESIDENT_DISPATCH:
-    SUBROUTINE
+    SUBROUTINE RESIDENT_DISPATCH
 
     TXA                             ; \
     PHA                             ;  | save X, Y on stack
@@ -7225,7 +7223,7 @@ after the [[JSR]] in [[RESIDENT\_DISPATCH]].
 <<pull two ret addrs>>=
     ORG     $0738
 PULL_TWO_RET_ADDRS:
-    SUBROUTINE
+    SUBROUTINE PULL_TWO_RET_ADDRS
 
     PLA                             ; own return addr (low)
     STA     $54
@@ -7319,7 +7317,7 @@ left in [[\$54/$55]].
 <<decode encrypted addr>>=
     ORG     $0710
 DECODE_ENCRYPTED_ADDR:
-    SUBROUTINE
+    SUBROUTINE DECODE_ENCRYPTED_ADDR
 
     LDA     ($52),Y                 ; read low byte
     EOR     #$03                    ; decrypt
@@ -7346,7 +7344,7 @@ Decodes an address and redirects execution there.
 <<resident decode dispatch>>=
     ORG     $0700
 RESIDENT_DECODE_DISPATCH:
-    SUBROUTINE
+    SUBROUTINE RESIDENT_DECODE_DISPATCH
 
     JSR     DECODE_ENCRYPTED_ADDR   ; → $54/$55
     LDA     $54                     ; \
@@ -7368,13 +7366,12 @@ sound, and game events.  It is called with a script index in X.
 <<script engine>>=
     ORG     $795B
 SCRIPT_ENGINE:
-    SUBROUTINE
+    SUBROUTINE SCRIPT_ENGINE
 
     STA     $C010                   ; clear keyboard strobe
     LDA     #$00
     STA     ATTRACT_FLAG            ; attract_flag = 0
-    CPX     #$06                    ; script index 6 = attract
-    BNE     .not_attract
+    BXNE    #$06,.not_attract        ; script index 6 = attract
     INC     ATTRACT_FLAG            ; attract_flag = 1
 .not_attract:
 
@@ -7579,7 +7576,7 @@ which exits the entire [[SCRIPT\_ENGINE]] call.
 <<script advance>>=
     ORG     $7A4F
 SCRIPT_ADVANCE:
-    SUBROUTINE
+    SUBROUTINE SCRIPT_ADVANCE
 
     JSR     SCRIPT_INC_PC           ; advance script pointer
     LDA     ATTRACT_FLAG            ; attract_flag
@@ -7619,7 +7616,7 @@ SCRIPT_ACTION_INDIRECT:
 <<script helpers>>=
     ORG     $7A77
 SCRIPT_INC_PC:
-    SUBROUTINE
+    SUBROUTINE SCRIPT_INC_PC
 
     INC     SCRIPT_PC
     BEQ     .carry
@@ -7640,7 +7637,7 @@ repeats [[SOUND\_DURATION]] times.  [[SOUND\_FREQ]] controls the pitch
 <<play tone>>=
     ORG     $7A7F
 PLAY_TONE:
-    SUBROUTINE
+    SUBROUTINE PLAY_TONE
 
 .outer:
     LDY     #$0A                    ; 10 speaker toggles per cycle
@@ -7666,7 +7663,7 @@ explosion-like sound.
 <<play noise>>=
     ORG     $7A91
 PLAY_NOISE:
-    SUBROUTINE
+    SUBROUTINE PLAY_NOISE
 
 .outer:
     LDY     #$0A                    ; 10 toggles per cycle
@@ -7700,7 +7697,7 @@ at~[[\$B7B5]] with the IOB address from~\$08/\$09.
 <<setup disk read>>=
     ORG     $6C18
 SETUP_DISK_READ:
-    SUBROUTINE
+    SUBROUTINE SETUP_DISK_READ
 
     LDY     #$0C
     STA     ($08),Y                 ; ($08)+$0C = track number (A)
@@ -7726,7 +7723,7 @@ crashing).
 <<load scene data>>=
     ORG     $6DD8
 LOAD_SCENE_DATA:
-    SUBROUTINE
+    SUBROUTINE LOAD_SCENE_DATA
 
     BIT     $C0E9                   ; check disk controller
     LDA     #$05                    ; \
@@ -9202,7 +9199,7 @@ TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
 <<game turn loop>>=
     ORG     $19AD
 GAME_TURN_LOOP:
-    SUBROUTINE
+    SUBROUTINE GAME_TURN_LOOP
 
     ; --- setup: save position, clear flags ---
     LDA     #$01
@@ -9436,7 +9433,7 @@ MOVE_LOOP:                     ; $1A31 - external entry point
 <<handle encounter>>=
     ORG     $1C01
 HANDLE_ENCOUNTER:
-    SUBROUTINE
+    SUBROUTINE HANDLE_ENCOUNTER
 
     ; --- random encounter path (event type $00-$3F) ---
     LDA     #$00
@@ -9555,7 +9552,7 @@ HANDLE_ENCOUNTER:
 <<trigger scene event>>=
     ORG     $1D04
 TRIGGER_SCENE_EVENT:
-    SUBROUTINE
+    SUBROUTINE TRIGGER_SCENE_EVENT
 
     LDA     #$00
     JSR     SET_CHAR_STATE            ; set char field 15 state to 0
@@ -9598,7 +9595,7 @@ TRIGGER_SCENE_EVENT:
 <<pickup treasure>>=
     ORG     $646B
 PICKUP_TREASURE:
-    SUBROUTINE
+    SUBROUTINE PICKUP_TREASURE
 
     LDA     #$00
     JSR     SET_CHAR_STATE            ; set char field 15 state to 0
@@ -9750,7 +9747,7 @@ PICKUP_TREASURE:
 <<ai choose target>>=
     ORG     $68AB
 AI_CHOOSE_TARGET:
-    SUBROUTINE
+    SUBROUTINE AI_CHOOSE_TARGET
 
     ; --- dispatch by AI mode ---
     LDA     #$00
@@ -9907,7 +9904,7 @@ AI_CHOOSE_TARGET:
 <<pick random member>>=
     ORG     $12D0
 PICK_RANDOM_MEMBER:
-    SUBROUTINE
+    SUBROUTINE PICK_RANDOM_MEMBER
     ; Pick a random eligible group member (field 4 in $00-$14 range)
     ; Uses ($FA)[8] as group size, calls RANDOM_IN_RANGE to pick Nth
 .loop:
@@ -9941,7 +9938,7 @@ PICK_RANDOM_MEMBER:
 <<find nearest event>>=
     ORG     $138D
 FIND_NEAREST_EVENT:
-    SUBROUTINE
+    SUBROUTINE FIND_NEAREST_EVENT
     ; Find nearest non-activated event (byte 1 < $C0) by Manhattan distance
     ; Returns position in A ($5A13)
     LDA     #$7F                ; initial min distance
@@ -9988,7 +9985,7 @@ FIND_NEAREST_EVENT:
 <<manhattan distance>>=
     ORG     $13DB
 MANHATTAN_DISTANCE:
-    SUBROUTINE
+    SUBROUTINE MANHATTAN_DISTANCE
     ; Manhattan distance: |col(A) - col(char)| + |row(A) - row(char)|
     ; Input: A = packed position to measure from
     ; Uses char's position from (ENTITY_PTR)[3]
@@ -10020,7 +10017,7 @@ MANHATTAN_DISTANCE:
 <<print member name>>=
     ORG     $1406
 PRINT_MEMBER_NAME:
-    SUBROUTINE
+    SUBROUTINE REORDER_CURRENT_CHAR
     ; Copy (MOB_PTR)[0..1] → PRINT_STRING_ADDR/PRINT_STRING_ADDR+1, then JMP $7705
     LDY     #$00
     LDA     (MOB_PTR),Y
@@ -10034,7 +10031,7 @@ PRINT_MEMBER_NAME:
 <<reorder current char>>=
     ORG     $1414
 REORDER_CURRENT_CHAR:
-    SUBROUTINE
+    SUBROUTINE APPLY_DAMAGE_TO_CURRENT
     ; Copy ENTITY_PTR/ENTITY_PTR+1 → TARGET_REC/TARGET_REC+1, store CURRENT_PLAYER → SOURCE_CHAR, JMP $0F84
     LDA     ENTITY_PTR
     STA     TARGET_REC
@@ -10048,7 +10045,7 @@ REORDER_CURRENT_CHAR:
 <<apply damage to current>>=
     ORG     $1425
 APPLY_DAMAGE_TO_CURRENT:
-    SUBROUTINE
+    SUBROUTINE COMMIT_MOVE
     ; Apply effect: copy ENTITY_PTR/ENTITY_PTR+1 → EFFECT_REC/EFFECT_REC+1, JMP $106F with A
     TAX
     LDA     ENTITY_PTR
@@ -10062,7 +10059,7 @@ APPLY_DAMAGE_TO_CURRENT:
 <<commit move>>=
     ORG     $1B52
 COMMIT_MOVE:
-    SUBROUTINE
+    SUBROUTINE COMMIT_MOVE
     ; Commit move: store CURRENT_COL/ROW, convert to packed pos,
     ; update char field 3, set font char, draw sprite
     LDA     CURRENT_COL
@@ -10106,7 +10103,7 @@ RESET_TURN_POS:
 <<set char state>>=
     ORG     $1BE0
 SET_CHAR_STATE:
-    SUBROUTINE
+    SUBROUTINE INC_FIELD5_COUNTER
     ; Set char field 15 low 2 bits to A
     STA     $5A60
     LDY     #$0F
@@ -10120,7 +10117,7 @@ SET_CHAR_STATE:
 <<inc field5 counter>>=
     ORG     $657B
 INC_FIELD5_COUNTER:
-    SUBROUTINE
+    SUBROUTINE INC_FIELD5_COUNTER
     ; Increment char field 5 low 5 bits (capped at $1F)
     LDY     #$05
     JMP     .body
@@ -10145,7 +10142,7 @@ INC_FIELD_COUNTER:
 <<clear status slots>>=
     ORG     $6593
 CLEAR_STATUS_SLOTS:
-    SUBROUTINE
+    SUBROUTINE CLEAR_AND_DISPLAY
     ; Clear 5 bytes at $7BAB-$7BAF and $7BCC-$7BD0 (spaces)
     LDA     #$20
     LDX     #$04
@@ -10160,7 +10157,7 @@ CLEAR_STATUS_SLOTS:
 <<clear and display>>=
     ORG     $65A1
 CLEAR_AND_DISPLAY:
-    SUBROUTINE
+    SUBROUTINE MODIFY_CURRENT_STATS
     ; Clear $5A57 and JMP $764A (display message)
     LDA     #$00
     STA     $5A57
@@ -10170,7 +10167,7 @@ CLEAR_AND_DISPLAY:
 <<modify current stats>>=
     ORG     $70D4
 MODIFY_CURRENT_STATS:
-    SUBROUTINE
+    SUBROUTINE RESET_TEXT_WINDOW
     ; Copy ENTITY_PTR/ENTITY_PTR+1 → EFFECT_REC/EFFECT_REC+1, JMP $704D (treasure lookup)
     LDA     ENTITY_PTR
     STA     EFFECT_REC
@@ -10183,7 +10180,7 @@ MODIFY_CURRENT_STATS:
     ORG     $769B
 RESET_TEXT_WINDOW:
 SCROLL_STATUS_LINE:
-    SUBROUTINE
+    SUBROUTINE SCROLL_STATUS_LINE
     ; Text display: init HRCG, set window bottom, output char $83, reset
     JSR     SET_TEXT_WINDOW_SCROLL
     JSR     SET_TEXT_WINDOW_UPPER_LEFT_LOW
@@ -10218,7 +10215,7 @@ CLEAR_MAP:
 <<apply damage>>=
     ORG     $106F
 APPLY_DAMAGE:
-    SUBROUTINE
+    SUBROUTINE APPLY_DAMAGE
     ; Apply damage A to char at (EFFECT_REC).
     ; Subtracts from field 6 (HP). Displays damage message,
     ; runs script. If HP drops to 0: death handling.
@@ -10334,7 +10331,7 @@ APPLY_DAMAGE:
 <<print entity name>>=
     ORG     $1142
 PRINT_ENTITY_NAME:
-    SUBROUTINE
+    SUBROUTINE UPDATE_EVENT_LIST
     ; Print entity name: cursor to row 21, load name ptr from (EFFECT_REC)[0..1],
     ; print centered at bottom, then reset text window.
     JSR     SET_CURSOR_ROW21
@@ -10351,7 +10348,7 @@ PRINT_ENTITY_NAME:
 <<update event list>>=
     ORG     $1260
 UPDATE_EVENT_LIST:
-    SUBROUTINE
+    SUBROUTINE UPDATE_EVENT_LIST
     ; Update event list for position A with value NUM_VALUE/NUM_VALUE+1.
     ; If NUM_VALUE/NUM_VALUE+1 = 0, return immediately.
     ; Scans 3-byte event entries at ($FA)[6..7]:
@@ -10432,7 +10429,7 @@ UPDATE_EVENT_LIST:
 <<load char name ptr>>=
     ORG     $0925
 LOAD_CHAR_NAME_PTR:
-    SUBROUTINE
+    SUBROUTINE SETUP_CHAR_SPRITE
     LDY     #$00
     LDA     (ENTITY_PTR),Y
     STA     PRINT_STRING_ADDR
@@ -10445,7 +10442,7 @@ LOAD_CHAR_NAME_PTR:
 <<setup char sprite>>=
     ORG     $0933
 SETUP_CHAR_SPRITE:
-    SUBROUTINE
+    SUBROUTINE CHECK_CAN_LEAVE
     LDY     #$03
     LDA     (ENTITY_PTR),Y
     JSR     POS_TO_COLROW
@@ -10465,7 +10462,7 @@ SETUP_CHAR_SPRITE:
 <<check can leave>>=
     ORG     $1231
 CHECK_CAN_LEAVE:
-    SUBROUTINE
+    SUBROUTINE CHECK_CAN_LEAVE
     ; Check hostility threshold: if PRNG_OUTPUT >= $40, show message $1C
     ; and return 1; else show message $1D and return 0.
     JSR     STEP_PRNG
@@ -10494,7 +10491,7 @@ CHECK_CAN_LEAVE:
 <<auto heal>>=
     ORG     $143F
 AUTO_HEAL:
-    SUBROUTINE
+    SUBROUTINE AUTO_HEAL
     ; Auto-heal: if HP < $28, randomly attempt healing via $1482.
     ; Loops while PRNG_OUTPUT >= $50 (still injured). Shows message $21
     ; if player heals for the first time.
@@ -10538,7 +10535,7 @@ AUTO_HEAL:
 <<increment hp>>=
     ORG     $1482
 INCREMENT_HP:
-    SUBROUTINE
+    SUBROUTINE INCREMENT_HP
     LDY     #$06
     LDA     (ENTITY_PTR),Y
     CLC
@@ -10560,7 +10557,7 @@ INCREMENT_HP:
 <<turn dispatch>>=
     ORG     $14A3
 TURN_DISPATCH:
-    SUBROUTINE
+    SUBROUTINE ENTER_COMBAT_STATE
     LDA     CHAR_AI_MODE
     BEQ     .no_combat
     JSR     SELECT_COMBAT_TARGET
@@ -10575,7 +10572,7 @@ TURN_DISPATCH:
 <<enter combat state>>=
     ORG     $14B7
 ENTER_COMBAT_STATE:
-    SUBROUTINE
+    SUBROUTINE START_COMBAT
     ; Check encounter, clear restricted flag, conditionally set it,
     ; then set char state to 2.
     JSR     CHECK_ENCOUNTER
@@ -10593,7 +10590,7 @@ ENTER_COMBAT_STATE:
 <<start combat>>=
     ORG     $14CD
 START_COMBAT:
-    SUBROUTINE
+    SUBROUTINE RESOLVE_ATTACK
     ; Set char state to 3, call $199D, jump to combat logic at $15AB.
     LDA     #$03
     JSR     SET_CHAR_STATE
@@ -10604,7 +10601,7 @@ START_COMBAT:
 <<resolve attack>>=
     ORG     $15AB
 RESOLVE_ATTACK:
-    SUBROUTINE
+    SUBROUTINE RESOLVE_ATTACK
     ; Combat willingness calculation and attack resolution.
     ; Computes willingness score in COMBAT_WILLINGNESS based on char/target stats,
     ; then rolls random to determine if attack occurs.
@@ -10736,7 +10733,7 @@ RESOLVE_ATTACK:
 <<add willingness>>=
     ORG     $169B
 ADD_WILLINGNESS:
-    SUBROUTINE
+    SUBROUTINE LOAD_TARGET_PTR
     CLC
     ADC     COMBAT_WILLINGNESS
     STA     COMBAT_WILLINGNESS
@@ -10746,7 +10743,7 @@ ADD_WILLINGNESS:
 <<load target ptr>>=
     ORG     $199D
 LOAD_TARGET_PTR:
-    SUBROUTINE
+    SUBROUTINE END_TURN
     LDA     TARGET_PTR_LO
     STA     MOB_PTR
     LDA     TARGET_PTR_HI
@@ -10759,7 +10756,7 @@ LOAD_TARGET_PTR:
 <<end turn>>=
     ORG     $1BA7
 END_TURN:
-    SUBROUTINE
+    SUBROUTINE END_TURN
     ; End turn: clear TURN_ACTIVE, check encounter, compare level vs STEPS_TAKEN
     LDA     #$00
     STA     TURN_ACTIVE
@@ -10781,7 +10778,7 @@ END_TURN:
 <<set state fight>>=
     ORG     $1BC6
 SET_STATE_FIGHT:
-    SUBROUTINE
+    SUBROUTINE CHECK_AND_RESTRICT
     ; Set char field 15 state to 1
     LDA     #$01
     JMP     SET_CHAR_STATE
@@ -10790,7 +10787,7 @@ SET_STATE_FIGHT:
 <<check and restrict>>=
     ORG     $1BCB
 CHECK_AND_RESTRICT:
-    SUBROUTINE
+    SUBROUTINE CLEAR_RESTRICTED
     ; Check encounter at char position, clear restricted flag,
     ; set it if encounter type is 2.
     LDY     #$03
@@ -10808,7 +10805,7 @@ CHECK_AND_RESTRICT:
 <<clear restricted>>=
     ORG     $1BEF
 CLEAR_RESTRICTED:
-    SUBROUTINE
+    SUBROUTINE SET_RESTRICTED
     ; Clear restricted flag (bit 2 of char field 15)
     LDY     #$0F
     LDA     (ENTITY_PTR),Y
@@ -10820,7 +10817,7 @@ CLEAR_RESTRICTED:
 <<set restricted>>=
     ORG     $1BF8
 SET_RESTRICTED:
-    SUBROUTINE
+    SUBROUTINE SHOW_LOCKED_MSG
     ; Set restricted flag (bit 2 of char field 15)
     LDY     #$0F
     LDA     (ENTITY_PTR),Y
@@ -10832,7 +10829,7 @@ SET_RESTRICTED:
 <<show locked msg>>=
     ORG     $1CF1
 SHOW_LOCKED_MSG:
-    SUBROUTINE
+    SUBROUTINE HANDLE_EVENT_SLOT
     ; Display message $0C and set char state to 0.
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
@@ -10846,7 +10843,7 @@ SHOW_LOCKED_MSG:
 <<handle event slot>>=
     ORG     $1D4D
 HANDLE_EVENT_SLOT:
-    SUBROUTINE
+    SUBROUTINE HANDLE_EVENT_SLOT
     ; Handle empty slot interaction: treasure pickup, traps,
     ; and event activation.
     LDA     #$00
@@ -10978,7 +10975,7 @@ EVENT_PRNG_CHECK:              ; $1DDC - external entry point
 <<player attack>>=
     ORG     $1751
 PLAYER_ATTACK:
-    SUBROUTINE
+    SUBROUTINE PLAYER_ATTACK
     JSR     CALC_COMBAT_STRENGTH
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
@@ -11097,7 +11094,7 @@ PLAYER_ATTACK:
 <<mob attack>>=
     ORG     $1860
 MOB_ATTACK:
-    SUBROUTINE
+    SUBROUTINE MOB_ATTACK
     JSR     CALC_COMBAT_STRENGTH
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
@@ -11164,7 +11161,7 @@ MOB_ATTACK:
 <<handle mob encounter>>=
     ORG     $1E5A
 HANDLE_MOB_ENCOUNTER:
-    SUBROUTINE
+    SUBROUTINE HANDLE_MOB_ENCOUNTER
     ; Mob encounter on movement: check flee chance, commit move,
     ; check encounter type, walk group for combat.
     LDA     #$00
@@ -11251,7 +11248,7 @@ HANDLE_MOB_ENCOUNTER:
 <<set target restricted>>=
     ORG     $1F03
 SET_TARGET_RESTRICTED:
-    SUBROUTINE
+    SUBROUTINE INPUT_LOOP
     LDY     #$0F
     LDA     (MOB_PTR),Y
     ORA     #$04
@@ -11262,7 +11259,7 @@ SET_TARGET_RESTRICTED:
 <<input loop>>=
     ORG     $5F19
 INPUT_LOOP:
-    SUBROUTINE
+    SUBROUTINE INPUT_LOOP
     JSR     SETUP_INPUT
     LDY     #$01
     LDA     ($C0),Y
@@ -11298,7 +11295,7 @@ INPUT_LOOP:
 <<setup input>>=
     ORG     $5F60
 SETUP_INPUT:
-    SUBROUTINE
+    SUBROUTINE DRAW_INPUT_OPTIONS
     ; Set up input: store X/Y in $C1/$C0, call setup routines.
     STX     $C1
     STY     $C0
@@ -11311,7 +11308,7 @@ SETUP_INPUT:
 <<draw input options>>=
     ORG     $5F70
 DRAW_INPUT_OPTIONS:
-    SUBROUTINE
+    SUBROUTINE CALL_INPUT_INIT
     LDY     #$00
     LDA     ($C0),Y
     STA     INPUT_OPTION_COUNT
@@ -11331,7 +11328,7 @@ DRAW_INPUT_OPTIONS:
 <<call input init>>=
     ORG     $6014
 CALL_INPUT_INIT:
-    SUBROUTINE
+    SUBROUTINE CLEAR_INPUT_BUFFER
     LDY     #$02
     LDA     ($C0),Y
     STA     INPUT_JMP_VEC
@@ -11344,7 +11341,7 @@ CALL_INPUT_INIT:
 <<clear input buffer>>=
     ORG     $6024
 CLEAR_INPUT_BUFFER:
-    SUBROUTINE
+    SUBROUTINE RENDER_INPUT_BUFFER
     LDY     #$77
     LDA     #$A0
 .loop:
@@ -11357,7 +11354,7 @@ CLEAR_INPUT_BUFFER:
 <<render input buffer>>=
     ORG     $602F
 RENDER_INPUT_BUFFER:
-    SUBROUTINE
+    SUBROUTINE RENDER_INPUT_BUFFER
     LDA     #$15
     STA     $25
     LDA     #$00
@@ -11378,7 +11375,7 @@ RENDER_INPUT_BUFFER:
 <<teardown input>>=
     ORG     $60C7
 TEARDOWN_INPUT:
-    SUBROUTINE
+    SUBROUTINE GET_INPUT_TABLE_PTR
     ; Teardown input and jump to $5F19.
     JSR     GET_INPUT_TABLE_PTR
     JMP     INPUT_LOOP
@@ -11387,7 +11384,7 @@ TEARDOWN_INPUT:
 <<get input table ptr>>=
     ORG     $60CD
 GET_INPUT_TABLE_PTR:
-    SUBROUTINE
+    SUBROUTINE CONFIGURE_INPUT
     ; Return X=$60, Y=$7D (pointer to input table).
     LDX     #$60
     LDY     #$7D
@@ -11397,7 +11394,7 @@ GET_INPUT_TABLE_PTR:
 <<configure input>>=
     ORG     $60D2
 CONFIGURE_INPUT:
-    SUBROUTINE
+    SUBROUTINE CONFIGURE_INPUT
     ; Configure input handler: patch game input table enable flags
     ; from UNDER_LEVEL/SAFE_TO_REST/MOVE_POINTS/TURN_ACTIVE.
     JSR     CHECK_COMBAT_ELIGIBILITY
@@ -11425,7 +11422,7 @@ CONFIGURE_INPUT:
 <<start game input>>=
     ORG     $6458
 START_GAME_INPUT:
-    SUBROUTINE
+    SUBROUTINE CHECK_THREATS_HERE
     LDX     #$64
     LDY     #$36
     JMP     INPUT_LOOP
@@ -11434,7 +11431,7 @@ START_GAME_INPUT:
 <<check threats here>>=
     ORG     $645F
 CHECK_THREATS_HERE:
-    SUBROUTINE
+    SUBROUTINE NPC_MOVE_AI
     ; Check adjacent threats at current col/row position.
     LDA     CURRENT_COL
     LDY     CURRENT_ROW
@@ -11445,7 +11442,7 @@ CHECK_THREATS_HERE:
 <<npc move ai>>=
     ORG     $6742
 NPC_MOVE_AI:
-    SUBROUTINE
+    SUBROUTINE NPC_MOVE_AI
     ; NPC movement AI: evaluate 4 directions + stay, pick best
     ; direction based on distance to target and randomized scoring.
     JSR     ANIM_TICK_AND_WAIT
@@ -11552,7 +11549,7 @@ NPC_MOVE_AI:
 <<evaluate direction>>=
     ORG     $6815
 EVALUATE_DIRECTION:
-    SUBROUTINE
+    SUBROUTINE EVALUATE_DIRECTION
     LDA     AI_TARGET_POS
     CMP     AI_TEST_POS
     BEQ     .skip_target
@@ -11631,7 +11628,7 @@ EVALUATE_DIRECTION:
 <<display shop>>=
     ORG     $70DF
 DISPLAY_SHOP:
-    SUBROUTINE
+    SUBROUTINE DISPLAY_SHOP
     ; Shop/store display: iterate through item bitmask,
     ; show prices and names for available items.
     LDA     CHAR_AI_MODE
@@ -11750,7 +11747,7 @@ DISPLAY_SHOP:
 <<advance shop ptr>>=
     ORG     $71F0
 ADVANCE_SHOP_PTR:
-    SUBROUTINE
+    SUBROUTINE ADD_PRICE_COMPONENT
     CLC
     LDA     $E6
     ADC     #$29
@@ -11764,7 +11761,7 @@ ADVANCE_SHOP_PTR:
 <<add price component>>=
     ORG     $71FC
 ADD_PRICE_COMPONENT:
-    SUBROUTINE
+    SUBROUTINE CHECK_COMBAT_ELIGIBILITY
     CLC
     LDA     ($E6),Y
     ADC     SHOP_PRICE
@@ -11778,7 +11775,7 @@ ADD_PRICE_COMPONENT:
 <<check combat eligibility>>=
     ORG     $750C
 CHECK_COMBAT_ELIGIBILITY:
-    SUBROUTINE
+    SUBROUTINE CHECK_COMBAT_ELIGIBILITY
     LDA     #$00
     STA     SAFE_TO_REST
     STA     UNDER_LEVEL
@@ -11823,7 +11820,7 @@ CHECK_COMBAT_ELIGIBILITY:
 <<modify char stats>>=
     ORG     $704D
 MODIFY_CHAR_STATS:
-    SUBROUTINE
+    SUBROUTINE MODIFY_CHAR_STATS
     ; Add or subtract gold from char record at (EFFECT_REC).
     ; Y=0: subtract NUM_VALUE/NUM_VALUE+1 from field 13/14
     ; Y≠0: add NUM_VALUE/NUM_VALUE+1 to field 13/14
@@ -11929,7 +11926,7 @@ IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
 <<set blink target>>=
     ORG     $16A3
 SET_BLINK_TARGET:
-    SUBROUTINE
+    SUBROUTINE SET_BLINK_TARGET
 
     LDA     IS_PLAYER_TURN
     CMP     #$01
@@ -12140,7 +12137,7 @@ simply the total mob count.
 <<init mob count>>=
     ORG     $0C51
 INIT_MOB_COUNT:
-    SUBROUTINE
+    SUBROUTINE INIT_MOB_COUNT
 
     LDA     #$00                    ; \
     STA     TOTAL_MOB_COUNT         ; / clear total
@@ -12172,7 +12169,7 @@ INIT_MOB_COUNT:
 
 <<classify entity type>>=
     ORG     $116B
-    SUBROUTINE
+    SUBROUTINE CLASSIFY_ENTITY_TYPE
 ; Sets HANDLER_PTR/HANDLER_PTR+1 to handler address based on entity type at (ENTITY_REC)
 CLASSIFY_ENTITY_TYPE:
     LDA     #$00
@@ -12269,7 +12266,7 @@ CLASSIFY_ENTITY_TYPE:
 
 <<map value to string>>=
     ORG     $11FC
-    SUBROUTINE
+    SUBROUTINE MAP_VALUE_TO_STRING
 ; Maps A to string table index, walks linked list from $803A
 MAP_VALUE_TO_STRING:
     CMP     #$08
@@ -12309,7 +12306,7 @@ MAP_VALUE_TO_STRING:
 
 <<copy f4 to f6 and set>>=
     ORG     $1432
-    SUBROUTINE
+    SUBROUTINE COPY_F4_TO_F6_AND_SET
 ; Copies MOB_PTR/MOB_PTR+1 -> EFFECT_REC/EFFECT_REC+1, then JMP APPLY_DAMAGE with A
 COPY_F4_TO_F6_AND_SET:
     TAX
@@ -12323,7 +12320,7 @@ COPY_F4_TO_F6_AND_SET:
 
 <<calc combat strength>>=
     ORG     $16E0
-    SUBROUTINE
+    SUBROUTINE CALC_COMBAT_STRENGTH
 ; Calculates combat strength using RANDOM_IN_RANGE
 CALC_COMBAT_STRENGTH:
     LDA     IS_PLAYER_TURN
@@ -12395,7 +12392,7 @@ CALC_COMBAT_STRENGTH:
 
 <<process entity script>>=
     ORG     $1849
-    SUBROUTINE
+    SUBROUTINE PROCESS_ENTITY_SCRIPT
 ; Saves entity char, marks as $FE, runs script $0E, dispatches, restores
 PROCESS_ENTITY_SCRIPT:
     LDY     #$00
@@ -12412,7 +12409,7 @@ PROCESS_ENTITY_SCRIPT:
 
 <<select combat target>>=
     ORG     $18E4
-    SUBROUTINE
+    SUBROUTINE SELECT_COMBAT_TARGET
 ; Selects combat target based on CHAR_AI_MODE (3 paths: <3, 3-4, >=5)
 SELECT_COMBAT_TARGET:
     LDA     CHAR_AI_MODE
@@ -12491,7 +12488,7 @@ SELECT_COMBAT_TARGET:
 
 <<dispatch on mode>>=
     ORG     $1F0C
-    SUBROUTINE
+    SUBROUTINE DISPATCH_ON_MODE
 ; Dispatches on PLAY_TONE: if $60 (RTS) then DELAY_WITH_ANIMATION else ANIM_TICK_AND_WAIT
 DISPATCH_ON_MODE:
     LDA     PLAY_TONE
@@ -12523,7 +12520,7 @@ no-op stub for external callers at [[\$4A1F]] and [[\$4BE4]].
 
 <<orphaned encounter handler>>=
     ORG     $1F19
-    SUBROUTINE
+    SUBROUTINE orphaned_encounter_handler
 ; ---------------------------------------------------------------
 ; DEAD CODE — orphaned encounter handler ($1F19-$1FFF)
 ;
@@ -12676,7 +12673,7 @@ no-op stub for external callers at [[\$4A1F]] and [[\$4BE4]].
 
 <<calc record ptr>>=
     ORG     $5F8C
-    SUBROUTINE
+    SUBROUTINE CALC_RECORD_PTR
 ; $C2/$C3 = $C0/$C1 + A*10 - 6
 CALC_RECORD_PTR:
     ASL
@@ -12697,7 +12694,7 @@ CALC_RECORD_PTR:
 
 <<setup cursor ext>>=
     ORG     $5FA2
-    SUBROUTINE
+    SUBROUTINE SETUP_CURSOR_EXT
 ; JSR SET_INVERSE_VIDEO then falls through to SETUP_CURSOR
 SETUP_CURSOR_EXT:
     JSR     SET_INVERSE_VIDEO
@@ -12705,7 +12702,7 @@ SETUP_CURSOR_EXT:
 
 <<setup cursor>>=
     ORG     $5FA5
-    SUBROUTINE
+    SUBROUTINE SETUP_CURSOR
 ; Sets up cursor: calls $5FBC, positions, loads ptr from ($C2)+6/7, prints
 SETUP_CURSOR:
     JSR     SET_CURSOR_POS
@@ -12722,7 +12719,7 @@ SETUP_CURSOR:
 
 <<validate input>>=
     ORG     $5FDD
-    SUBROUTINE
+    SUBROUTINE VALIDATE_INPUT
 ; Validates input: saves $C2/$C3, loops reading input until valid record found
 VALIDATE_INPUT:
     STA     $5B24
@@ -12751,7 +12748,7 @@ VALIDATE_INPUT:
 
 <<copy record data>>=
     ORG     $604C
-    SUBROUTINE
+    SUBROUTINE COPY_RECORD_DATA
 ; Copies data from pointer at ($C2)+6/7 into INPUT_BUFFER
 COPY_RECORD_DATA:
     LDY     #$06
@@ -12826,7 +12823,7 @@ GAME_INPUT_TABLE:
 
 <<inc mob counters>>=
     ORG     $689F
-    SUBROUTINE
+    SUBROUTINE INC_MOB_COUNTERS
 ; Increments mob counters; Y = count-1 on entry
 INC_MOB_COUNTERS:
     LDX     AI_DIRECTION
@@ -12840,7 +12837,7 @@ INC_MOB_COUNTERS:
 
 <<setup text pos>>=
     ORG     $76D2
-    SUBROUTINE
+    SUBROUTINE SETUP_TEXT_POS
 ; Two entry points: $76D2 (col 0) and $76D8 (col 20)
 SETUP_TEXT_POS:
     LDA     #$00
@@ -12880,7 +12877,7 @@ GET_ENTITY_THREAT:
 
 <<set cursor pos>>=
     ORG     $5FBC
-    SUBROUTINE
+    SUBROUTINE SET_CURSOR_POS
 ; Maps linear position at ($C2)+1 to VTAB ($25) and HTAB ($24)
 ; Positions 0-39 -> row 21, 40-79 -> row 22, 80+ -> row 23
 SET_CURSOR_POS:
@@ -12909,7 +12906,7 @@ SET_CURSOR_POS:
 
 <<read input char>>=
     ORG     $600A
-    SUBROUTINE
+    SUBROUTINE READ_INPUT_CHAR
 ; Returns character at ($C2) + $5B24 + 1
 READ_INPUT_CHAR:
     CLC
@@ -13027,7 +13024,7 @@ This routine is called internally by the disk~VM (via [[JSR \$B304]]).
 <<verify data field>>=
     ORG     $B304
 VERIFY_DATA_FIELD:
-    SUBROUTINE
+    SUBROUTINE VERIFY_DATA_FIELD
 
 ; --- Search for D5 AA AD data field prologue ---
     LDY     #$20                    ; timeout counter = 32
@@ -13353,7 +13350,7 @@ Total delay $\approx$ 160~×~A cycles.
 <<delay loop>>=
     ORG     $B482
 DELAY_LOOP:
-    SUBROUTINE
+    SUBROUTINE DELAY_LOOP
     LDX     #$20
 .inner:
     DEX
@@ -13416,7 +13413,7 @@ zero-page state while the VM executes, and restores it afterward.
 <<disk vm swap>>=
     ORG     $B4CC
 DISK_VM_SWAP:
-    SUBROUTINE
+    SUBROUTINE DISK_VM_SWAP
 
     LDX     #$0F                    ; 16 bytes ($50-$5F)
 .loop:
@@ -13456,7 +13453,7 @@ handler in page~[[\$B5]].
 <<disk vm dispatch>>=
     ORG     $B49F
 DISK_VM_DISPATCH:
-    SUBROUTINE
+    SUBROUTINE DISK_VM_DISPATCH
 
     TXA
     PHA                             ; save X
@@ -13489,7 +13486,7 @@ DISK_VM_HANDLER_TBL:
 <<disk vm pull ip>>=
     ORG     $B538
 DISK_VM_PULL_IP:
-    SUBROUTINE
+    SUBROUTINE DISK_VM_PULL_IP
 
 ; Pulls two return addresses from the stack.
 ; The outer return address (from JSR DISK_VM_DISPATCH) becomes the
@@ -13605,7 +13602,7 @@ the call.
 <<disk vm op call1>>=
     ORG     $B527
 DISK_VM_OP_CALL1:
-    SUBROUTINE
+    SUBROUTINE DISK_VM_OP_CALL1
     JSR     DISK_VM_READ_ADDR       ; read native addr → $54/$55
     TYA
     PHA                             ; save Y (bytecode offset)
@@ -13690,7 +13687,7 @@ accumulator.  Useful for table lookups.  Falls into
 <<disk vm op lda idx>>=
     ORG     $B579
 DISK_VM_OP_LDA_IDX:
-    SUBROUTINE
+    SUBROUTINE DISK_VM_OP_LDA_IDX
     JSR     DISK_VM_READ_ADDR       ; read base addr → $54/$55
     LDA     $56                     ; index = old accumulator
     CLC
@@ -13710,7 +13707,7 @@ VM-level subroutine call.  Pushes the current absolute IP onto the
 <<disk vm op call>>=
     ORG     $B58A
 DISK_VM_OP_CALL:
-    SUBROUTINE
+    SUBROUTINE DISK_VM_OP_CALL
     JSR     DISK_VM_READ_ADDR       ; read target → $54/$55
     TYA
     CLC

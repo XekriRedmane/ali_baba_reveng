@@ -751,6 +751,7 @@ class Weaver:
                 with open(codepath, mode="w") as f:
                     self.expand_chunk(name, "", code_content, set(name), f)
                 self.postprocess_apstr(codepath)
+                self.postprocess_local_macro_labels(codepath)
             else:
                 print(
                     f"Warning: unreferenced chunk <<{name}>> not output "
@@ -785,6 +786,88 @@ class Weaver:
         if modified:
             with open(filepath, "w") as f:
                 f.writelines(new_lines)
+
+    @staticmethod
+    def postprocess_local_macro_labels(filepath: pathlib.Path) -> None:
+        """Rename local labels passed as macro arguments to global labels.
+
+        dasm macros create their own local-label scope, so a .label passed
+        as a macro argument resolves in the macro's scope rather than the
+        caller's SUBROUTINE scope.  This postprocessor detects such usage
+        and renames every occurrence of the affected local label within its
+        SUBROUTINE to a global name: _subroutine.label.
+        """
+        with open(filepath, "r") as f:
+            lines = f.readlines()
+
+        # Pass 1: collect macro names from MACRO ... ENDM blocks.
+        macro_names: set[str] = set()
+        for line in lines:
+            m = re.match(r"\s+MACRO\s+(\w+)", line)
+            if m:
+                macro_names.add(m.group(1))
+        if not macro_names:
+            return
+
+        # Build a pattern that matches an invocation of any known macro.
+        macro_pat = re.compile(
+            r"^\s+(" + "|".join(re.escape(n) for n in macro_names) + r")\s+(.+)",
+            re.IGNORECASE,
+        )
+
+        # Pass 2: find SUBROUTINE boundaries and local labels used in macros.
+        # Each entry: (subroutine_name, start_line, end_line).
+        # Lines before the first SUBROUTINE use the filename stem as scope.
+        sub_ranges: list[tuple[str, int, int]] = []
+        current_sub: str | None = filepath.stem
+        current_start = 0
+
+        for i, line in enumerate(lines):
+            m = re.match(r"\s+SUBROUTINE\s+(\w+)", line)
+            if m:
+                if current_sub is not None:
+                    sub_ranges.append((current_sub, current_start, i))
+                current_sub = m.group(1)
+                current_start = i
+        if current_sub is not None:
+            sub_ranges.append((current_sub, current_start, len(lines)))
+
+        # For each subroutine, find local labels that appear as macro args.
+        labels_to_rename: dict[str, set[str]] = {}  # sub_name -> {".label", ...}
+        for sub_name, start, end in sub_ranges:
+            for i in range(start, end):
+                m = macro_pat.match(lines[i])
+                if not m:
+                    continue
+                # Split arguments on commas and look for .labels.
+                for arg in m.group(2).split(","):
+                    arg = arg.split(";")[0].strip()  # strip comments
+                    if arg.startswith("."):
+                        labels_to_rename.setdefault(sub_name, set()).add(arg)
+
+        if not labels_to_rename:
+            return
+
+        # Pass 3: rename all occurrences of affected labels within their
+        # subroutine scope.
+        modified = False
+        for sub_name, start, end in sub_ranges:
+            if sub_name not in labels_to_rename:
+                continue
+            for label in labels_to_rename[sub_name]:
+                global_name = f"_{sub_name}{label}"  # e.g. _start.skip
+                # Match the label only as a complete token (not a prefix of
+                # a longer label).
+                pat = re.compile(re.escape(label) + r"(?!\w)")
+                for i in range(start, end):
+                    new_line = pat.sub(global_name, lines[i])
+                    if new_line != lines[i]:
+                        lines[i] = new_line
+                        modified = True
+
+        if modified:
+            with open(filepath, "w") as f:
+                f.writelines(lines)
 
     def run(
         self,
