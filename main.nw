@@ -1762,8 +1762,49 @@ if __name__ == "__main__":
 
 @ %def INIT_WORLD
 
-Sets up the Apple II for the game---reset vector, graphics mode, and
-various subsystem initialization.
+@ [[GAME_INIT]] sets up the Apple II for the game.  It runs once at startup,
+before the main loop or attract screen.  The steps, in order:
+
+\begin{enumerate}
+\item Set the reset vector to [[$A56F]] via the ROM routine at [[$FB6F]].
+\item Disable the blink cursor by setting [[BLINK_COL]] to [[20]].
+\item Call [[RELOCATE_HIRES_STAGING]] to copy the HRCG library and disk I/O
+  routines from the staging area at [[$2000--$3FFF]] to their runtime
+  addresses ([[$9600+]] and [[$B300+]]), then clear the staging area to free
+  the hi-res page for graphics.
+\item Switch to hi-res graphics mode by setting the soft switches at
+  [[$C050]] (graphics), [[$C052]] (full screen), [[$C054]] (page~1), and
+  [[$C057]] (hi-res).
+\item Call [[INIT_DISK_IOB]] to set up the disk I/O parameter block.
+\item Call [[INIT_HRCG]] to patch and initialize the [[HRCG]] text engine.
+\item Call [[SET_TEXT_WINDOW_WRAP]] to enable text window wrap mode.
+\item Call [[INIT_STUB]] (a single RTS---likely a disabled hook point).
+\item Call [[INIT_GAME_STATE]] to draw the game display (borders, labels,
+  icons) and run the opening script.
+\item Call [[FILL_MAP]] to fill the map grid with default tiles.
+\item Call [[SET_TEXT_WINDOW_BOTTOM]] to confine text output to the bottom
+  three rows (the status/input area).
+\item Call [[INIT_STUB2]] (another no-op hook).
+\item Clear state variables to zero:
+  \begin{itemize}
+  \item [[LOCATION_POS]]---the last-drawn location identifier.  The main
+    loop compares this against the current character's location; when they
+    differ, it triggers a full map redraw.  Zeroing it here forces the first
+    [[ENTER_LOCATION]] call to redraw unconditionally.
+  \item [[LOCATION_STYLE]]---the current map tile style (which tile set to
+    use when drawing the map).  Zeroing ensures it will be reloaded from the
+    location record on the first scene entry.
+  \item [[ENTITY_PTR+1]]---the high byte of the entity record pointer
+    ([[$F8/$F9]]).  Zeroing signals ``no entity selected,'' preventing stale
+    pointer references before the first character is processed.
+  \end{itemize}
+\item Call [[SELECT_INPUT_MODE]] to detect keyboard or joystick.
+\item Call [[INIT_WORLD]] to initialize the game world from its data table.
+\item Call [[INIT_MOB_COUNT]] to count all active mob groups.
+\item Set [[CURRENT_PLAYER]] to~1.  The main loop walks the 62-entry
+  record table once per round, using [[CURRENT_PLAYER]] as a 1-based
+  index.  Initializing it to~1 starts the iteration at the first record.
+\end{enumerate}
 
 <<game init>>=
     ORG     $78C7
@@ -1774,11 +1815,11 @@ GAME_INIT:
     LDY     #$A5                    ;  | reset vector = $A56F
     STX     $03F2                   ;  |
     STY     $03F3                   ; /
-    JSR     $FB6F                   ; ROM: set reset vector checksum
+    JSR     $FB6F                   ; ROM: set reset vector
     LDA     #$14
     STA     BLINK_COL               ; disable blink cursor
     JSR     RELOCATE_HIRES_STAGING  ; copy $2000+ to $9600+/$B300+
-    LDA     $C050                   ; GR mode
+    LDA     $C050                   ; graphics mode
     LDA     $C052                   ; full screen (no text split)
     LDA     $C054                   ; page 1
     LDA     $C057                   ; hi-res

@@ -7263,11 +7263,11 @@ GAME_INIT:
     LDY     #$A5                    ;  | reset vector = $A56F
     STX     $03F2                   ;  |
     STY     $03F3                   ; /
-    JSR     $FB6F                   ; ROM: set reset vector checksum
+    JSR     $FB6F                   ; ROM: set reset vector
     LDA     #$14
     STA     BLINK_COL               ; disable blink cursor
     JSR     RELOCATE_HIRES_STAGING  ; copy $2000+ to $9600+/$B300+
-    LDA     $C050                   ; GR mode
+    LDA     $C050                   ; graphics mode
     LDA     $C052                   ; full screen (no text split)
     LDA     $C054                   ; page 1
     LDA     $C057                   ; hi-res
