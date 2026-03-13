@@ -191,23 +191,20 @@ ealdr_entry:
     INC      ealdr_src+1
     BPL      .fill             ; loop until page $80 (sign bit set)
 
-.copy_lo:
+_ealdr.copy_lo:
     LDX      #$00              ; Copy splash screen from $B000+
-.copy_next:
+_ealdr.copy_next:
     JSR      ealdr_copy_byte   ; copy byte, advance source
     INX
-    CPX      #$20              ; X = $00..$1F (first 32 bytes)
-    BNE      .copy_next
+    BXNE     #$20,_ealdr.copy_next   ; X = $00..$1F (first 32 bytes)
     LDX      #$80
-.copy_hi:
+_ealdr.copy_hi:
     JSR      ealdr_copy_byte   ; X = $80..$9F (next 32 bytes)
     INX
-    CPX      #$A0
-    BNE      .copy_hi
+    BXNE     #$A0,_ealdr.copy_hi
     INC      ealdr_copy_dst    ; self-modify: advance dest page
     LDA      ealdr_copy_dst
-    CMP      #$40              ; done when dest page reaches $40
-    BNE      .copy_lo
+    BANE    #$40,_ealdr.copy_lo    ; done when dest page reaches $40
     JMP      ealdr_vm_exec     ; enter VM
     ORG     $A83A
 ealdr_copy_byte:
@@ -234,15 +231,14 @@ ealdr_clear_text:
     LDA      #$04
     STA      ealdr_src+1       ; $4D = 4 -> pointer = $0400
     LDY      #$00
-.loop:
+_ealdr.loop:
     LDA      #$00
     STA      (ealdr_src),Y     ; zero out
     INY
-    BNE      .loop
+    BNE      _ealdr.loop
     INC      ealdr_src+1
     LDA      ealdr_src+1
-    CMP      #$08              ; done at $0800
-    BNE      .loop
+    BANE    #$08,_ealdr.loop    ; done at $0800
     RTS
     ORG     $A948
 ealdr_reboot:
@@ -266,10 +262,9 @@ ealdr_reboot:
 ealdr_funny_inc:
     INC      ealdr_bot         ; $AC60
     LDA      ealdr_bot
-    CMP      ealdr_top         ; $AC61
-    BEQ      .wrap
+    BAEQ    ealdr_top,_ealdr.wrap    ; $AC61
     RTS
-.wrap:
+_ealdr.wrap:
     LDA      #$01
     STA      ealdr_bot
     INC      ealdr_top
