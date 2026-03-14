@@ -3757,26 +3757,17 @@ PRINT_STRING_AT_ADDR:
     STX     PRINT_STRING_ADDR
     STY     PRINT_STRING_ADDR+1
 
-    ; falls through to PRINT_STRING / PRINT_FROM_PTR at $775C
+    ; falls through to PRINT_STRING at $775C
 @ %def PRINT_STRING_AT_ADDR
-[[PRINT_STRING]] is the same entry point as [[PRINT_FROM_PTR]] at [[$775C]]:
-both print a length-prefixed string from [[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]].
-[[PRINT_STRING_AT_ADDR]] at [[$7758]] stores [[X/Y]] into [[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]]
-first, then falls through.
+[[PRINT_STRING]] prints a length-prefixed string from
+[[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]] via COUT.
+[[PRINT_STRING_AT_ADDR]] at [[$7758]] stores [[X/Y]] into
+[[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]] first, then falls through.
 
 <<print string>>=
     ORG     $775C
-PRINT_STRING             ; same entry as PRINT_FROM_PTR
-@ %def PRINT_STRING
-The border box data at [[STATUS_BORDER_DATA]] is drawn via the hi-res
-text renderer.  The prompt text is printed via [[PRINT_FROM_PTR]].
-
-Prints a length-prefixed string from [[PRINT_STRING_ADDR/PRINT_STRING_ADDR+1]] via COUT:
-
-<<print from ptr>>=
-    ORG     $775C
-PRINT_FROM_PTR:
-    SUBROUTINE PRINT_FROM_PTR
+PRINT_STRING:
+    SUBROUTINE PRINT_STRING
 
     LDY     #$00
     LDA     (PRINT_STRING_ADDR),Y ; first byte = length
@@ -3791,7 +3782,7 @@ PRINT_FROM_PTR:
     LDA     (PRINT_STRING_ADDR),Y ; read next char
     JSR     ROM_COUT1
     JMP     .loop
-@ %def PRINT_FROM_PTR
+@ %def PRINT_STRING
 Sends Ctrl-A and [['0']] to COUT (selects character set~0 in the HRCG):
 
 <<print ctrl ab>>=
@@ -4183,17 +4174,16 @@ DISPLAY_MESSAGE_LOOP:
     JSR     PRINT_CTRL_AB         ; reset character set
     JMP     .print_loop           ; continue with next line
 @ %def DISPLAY_MESSAGE DISPLAY_MESSAGE_LOOP
-@ [[RESET_TEXT_WINDOW]] (also labelled [[SCROLL_STATUS_LINE]]) restores the
-HRCG text window to its default configuration after a status message.  It
-sets the window to scroll mode, positions the cursor at row~23, outputs
-control character~\$83 (which triggers a scroll-up in the HRCG handler), and
-then resets the window boundaries.  This sequence effectively clears the
-bottom status area while preserving the rest of the display.
+@ [[SCROLL_STATUS_LINE]] restores the HRCG text window to its default
+configuration after a status message.  It sets the window to scroll mode,
+positions the cursor at row~23, outputs control character~\$83 (which
+triggers a scroll-up in the HRCG handler), and then resets the window
+boundaries.  This sequence effectively clears the bottom status area while
+preserving the rest of the display.
 
 
-<<reset text window>>=
+<<scroll status line>>=
     ORG     $769B
-RESET_TEXT_WINDOW:
 SCROLL_STATUS_LINE:
     SUBROUTINE SCROLL_STATUS_LINE
     ; Text display: init HRCG, set window bottom, output char $83, reset
@@ -4205,7 +4195,7 @@ SCROLL_STATUS_LINE:
     JSR     ROM_COUT1
     JSR     SET_TEXT_WINDOW_UPPER_LEFT_ALL
     JMP     SET_TEXT_WINDOW_WRAP
-@ %def RESET_TEXT_WINDOW SCROLL_STATUS_LINE
+@ %def SCROLL_STATUS_LINE
 
 \chapter{Sound}
 
@@ -4654,18 +4644,16 @@ COLROW_TO_POS:
                                 ; carry set → return (overflow)
 @ %def COLROW_TO_POS
 
-@ [[COMPUTE_SCENE_PTR]] (also labeled [[GET_MOB_DATA]]) computes a pointer
-into the game data from a 1-based index in~A.  Each record is 16~bytes.
-The result [[MOB_DATA_PTR]] ([[$BA/$BB]]) = [[$4000/$4001]] base +
-(index$-$1)$\times$16.
+@ [[GET_MOB_DATA]] computes a pointer into the game data from a 1-based
+index in~A.  Each record is 16~bytes.  The result [[MOB_DATA_PTR]]
+([[$BA/$BB]]) = [[$4000/$4001]] base + (index$-$1)$\times$16.
 
 <<zero page defines>>=
 MOB_DATA_PTR            EQU     $BA     ; mob data record pointer (2 bytes, $BA/$BB)
 @ %def MOB_DATA_PTR
 
-<<compute scene ptr>>=
+<<get mob data>>=
     ORG     $0C32
-COMPUTE_SCENE_PTR:
 GET_MOB_DATA:
     SUBROUTINE GET_MOB_DATA
 
@@ -4690,7 +4678,7 @@ GET_MOB_DATA:
     INC     MOB_DATA_PTR+1 ; carry
 .done:
     RTS
-@ %def COMPUTE_SCENE_PTR GET_MOB_DATA
+@ %def GET_MOB_DATA
 
 \section{Timing and animation}
 
@@ -6167,7 +6155,7 @@ The attract screen call flow:
   \item [[MAIN_ENTRY]] ([[$0800]]): calls [[GAME_INIT]], then
         [[ATTRACT_SCREEN]] if [[TOTAL_MOB_COUNT]] is zero.
   \item [[ATTRACT_SCREEN]] ([[$09F4]]): sets scene index 1, calls
-        [[COMPUTE_SCENE_PTR]], tail-calls [[SCENE_LOOP]] with scene \$26.
+        [[GET_MOB_DATA]], tail-calls [[SCENE_LOOP]] with scene \$26.
   \item [[SCENE_LOOP]] ([[$6C37]]): saves ZP pointers, steps PRNG,
         conditionally loads scene data from disk.  In a loop: checks
         keyboard/timer via [[$A478]], displays status bar, renders scene
@@ -6571,9 +6559,9 @@ LOAD_MAP_TILES:
 @ %def LOAD_MAP_TILES
 Two basic routines print the font character stored in [[FONT_CHARNUM]].
 [[PRINT_FONTCHAR_AT_TEXT_POS]] converts the font position to a text position
-before calling [[PRINT_FONTCHAR]]. A stored control string at [[s_PRINT_FONT_CHAR]]
+before calling [[RENDER_FONT_CHAR]]. A stored control string at [[s_PRINT_FONT_CHAR]]
 has slots for the character set and the four character blocks that
-[[PRINT_FONTCHAR]] fills in before printing.
+[[RENDER_FONT_CHAR]] fills in before printing.
 
 When printing using the 2x2 font characters, we can set up the HRCG's
 "block display mode". This takes four characters and plots them in a 2x2
@@ -6588,7 +6576,7 @@ sets, with character set 1 starting off the table.
 Not only that, but the first character in the character set is ASCII 32
 (space), so we have to take that into account also.
 
-This is what the [[PRINT_FONTCHAR]], [[PRINT_FONTCHAR_AT_TEXT_POS]], and
+This is what the [[RENDER_FONT_CHAR]], [[PRINT_FONTCHAR_AT_TEXT_POS]], and
 [[PLOT_FONTCHAR]] routines do.
 
 
@@ -6596,7 +6584,7 @@ This is what the [[PRINT_FONTCHAR]], [[PRINT_FONTCHAR_AT_TEXT_POS]], and
 hi-res screen.  Three bytes at [[$5AA2]]--[[$5AA4]] mirror [[FONT_COL]],
 [[FONT_ROW]], and [[FONT_CHARNUM]]: they record which character to blink and
 where.  The rendering path (\$74E0) copies them into the [[FONT_]] variables
-before calling [[PRINT_FONTCHAR]].
+before calling [[RENDER_FONT_CHAR]].
 
 A [[BLINK_COL]] value of [[$14]] (20) acts as a sentinel meaning ``no active
 blink position,'' since valid font--column values are 0--19.  Both
@@ -7325,7 +7313,7 @@ GET_ENTITY_FONTCHAR:
 
 \section{Entity rendering}
 
-@ [[RENDER_FONT_CHAR]] (also labelled [[PRINT_FONTCHAR]]) is the main entry
+@ [[RENDER_FONT_CHAR]] is the main entry
 point for drawing a 2$\times$2 custom font character on the hi-res screen.
 It converts the font position to a text position, then computes which HRCG
 character set and base character code correspond to the font index in
@@ -7350,8 +7338,7 @@ s_PRINT_FONT_CHAR   EQU     $80A4   ; 10 bytes
 <<render font char>>=
     ORG     $7489
 RENDER_FONT_CHAR:
-PRINT_FONTCHAR:
-    SUBROUTINE PRINT_FONTCHAR
+    SUBROUTINE RENDER_FONT_CHAR
 
     JSR     FONT_POS_TO_TEXT_POS ; set TEXT_COL/TEXT_ROW from font pos
 PRINT_FONTCHAR_AT_TEXT_POS:
@@ -7389,7 +7376,7 @@ PRINT_FONTCHAR_AT_TEXT_POS:
     LDA     #>s_PRINT_FONT_CHAR  ;  |
     STA     PRINT_STRING_ADDR+1  ; /
     JMP     PRINT_STRING         ; output the 2×2 character
-@ %def RENDER_FONT_CHAR PRINT_FONTCHAR PRINT_FONTCHAR_AT_TEXT_POS
+@ %def RENDER_FONT_CHAR PRINT_FONTCHAR_AT_TEXT_POS
 Since each HRCG font character is effectively two by two "normal" characters,
 there is a routine to convert from font coordinate to text cursor coordinate
 so that the HRCG can locate the font character at the text coordinate (at
@@ -7561,9 +7548,9 @@ then falls through into [[DRAW_BLINK_CHAR]].  Called by
 [[DRAW_BLINK_CHAR]] copies the blink state ([[BLINK_COL]],
 [[BLINK_ROW]], [[BLINK_CHAR]]) into [[FONT_COL]], [[FONT_ROW]],
 [[FONT_CHARNUM]], sets [[FONT_CHARSET]]~=~1, and calls
-[[PRINT_FONTCHAR]] to render the character.  If [[BLINK_COL]]~$\ge$~20
+[[RENDER_FONT_CHAR]] to render the character.  If [[BLINK_COL]]~$\ge$~20
 (the disabled sentinel), it returns immediately.  Saves and restores
-[[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]] since [[PRINT_FONTCHAR]] uses that pointer.
+[[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]] since [[RENDER_FONT_CHAR]] uses that pointer.
 
 
 <<draw blink char>>=
@@ -7587,8 +7574,8 @@ DRAW_BLINK_CHAR:
     STA     FONT_CHARNUM
     LDA     #$01
     STA     FONT_CHARSET      ; charset 1
-    PSHW    PRINT_STRING_ADDR ; save PRINT_STRING_ADDR (used by PRINT_FONTCHAR)
-    JSR     PRINT_FONTCHAR    ; render the character
+    PSHW    PRINT_STRING_ADDR ; save PRINT_STRING_ADDR (used by RENDER_FONT_CHAR)
+    JSR     RENDER_FONT_CHAR  ; render the character
     PULW    PRINT_STRING_ADDR ; restore PRINT_STRING_ADDR
     RTS
 @ %def DRAW_BLINK_NORMAL DRAW_BLINK_CHAR
@@ -7903,7 +7890,7 @@ PRINT_ENTITY_NAME:
     LDA     (EFFECT_REC),Y ; name pointer high
     STA     PRINT_STRING_ADDR+1
     JSR     PRINT_BOTTOM_CENTERED
-    JMP     RESET_TEXT_WINDOW
+    JMP     SCROLL_STATUS_LINE
 @ %def PRINT_ENTITY_NAME
 Loads the name pointer from bytes~0--1 of the mob record at~[[ENTITY_PTR]]
 into~[[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]], then tail-calls the text centering routine
@@ -8059,7 +8046,7 @@ DISPLAY_STATUS_BAR:
 .set_margin:
     LDA     #$04
     STA     TEXT_COL                           ; WNDLFT = 4
-    JMP     PRINT_FROM_PTR                     ; print string, return
+    JMP     PRINT_STRING                       ; print string, return
 
 .joystick:
     LDA     #<S_PRESS_BUTTON
@@ -8115,7 +8102,7 @@ supports several control codes.
 
 @ [[TEXT_LEFT_MARGIN]] and [[TEXT_RIGHT_MARGIN]] define the column bounds
 for text wrapping.  [[TEXT_STREAM_IDX]] saves the Y index into the byte
-stream across [[PRINT_FONTCHAR]] calls, since rendering may clobber~Y.
+stream across [[RENDER_FONT_CHAR]] calls, since rendering may clobber~Y.
 [[TEXT_RENDERER]] initializes the margins (2 and 18) and row, then loops
 through bytes, advancing the column and wrapping to the next row when it
 passes the right margin.
@@ -8159,7 +8146,7 @@ TEXT_RENDERER:
     STA     FONT_CHARNUM        ; character code
     LDA     #$02
     STA     FONT_CHARSET        ; character width = 2
-    JSR     PRINT_FONTCHAR      ; draw at current position
+    JSR     RENDER_FONT_CHAR    ; draw at current position
     INC     FONT_COL            ; advance column
     LDA     FONT_COL
     CMP     TEXT_RIGHT_MARGIN   ; past right margin?
@@ -9230,7 +9217,7 @@ SETUP_CURSOR_EXT:
 current option record, sends HRCG control codes A/B via [[PRINT_CTRL_AB]]
 to enter character output mode, loads the option's display string pointer
 from bytes~6--7 of the record at [[$C2]], prints it with
-[[PRINT_FROM_PTR]], and finishes with ctrl-N to restore normal video.
+[[PRINT_STRING]], and finishes with ctrl-N to restore normal video.
 
 <<setup cursor>>=
     ORG     $5FA5
@@ -9245,7 +9232,7 @@ SETUP_CURSOR:
     INY
     LDA     ($C2),Y
     STA     PRINT_STRING_ADDR+1
-    JSR     PRINT_FROM_PTR
+    JSR     PRINT_STRING
     JMP     PRINT_CTRL_N
 @ %def SETUP_CURSOR
 @ [[SET_CURSOR_POS]] converts the linear position stored in byte~1 of the
@@ -10226,13 +10213,13 @@ RESOLVE_ATTACK:
     BEQ     .attack
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$D2
     STA     TARGET_REC
     LDA     #$7C
     STA     TARGET_REC+1
     JSR     PRINT_BOTTOM_CENTERED
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$01
     BAEQ    IS_PLAYER_TURN,.is_player
     JSR     PRINT_MEMBER_NAME
@@ -10271,10 +10258,10 @@ PLAYER_ATTACK:
     JSR     CALC_COMBAT_STRENGTH
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     COMBAT_STRENGTH
     JSR     MAP_VALUE_TO_STRING
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     MOB_PTR
     STA     ENTITY_REC
     LDA     MOB_PTR+1
@@ -10291,7 +10278,7 @@ PLAYER_ATTACK:
     BCC     .roll_hit
 .immune:
     JSR     DISPATCH_ON_MODE
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$14
     JMP     DISPLAY_MESSAGE
 .roll_hit:
@@ -10406,10 +10393,10 @@ MOB_ATTACK:
     JSR     CALC_COMBAT_STRENGTH
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     COMBAT_STRENGTH
     JSR     MAP_VALUE_TO_STRING
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     JSR     PRINT_MEMBER_NAME
     LDY     COMBAT_STRENGTH
     LDX     #$02
@@ -10430,7 +10417,7 @@ MOB_ATTACK:
     LDA     COMBAT_STRENGTH
     JMP     COPY_F4_TO_F6_AND_SET
 .has_strength:
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDX     #$17
     LDA     MOB_DEFENSE
     BMI     .negative
@@ -10829,7 +10816,7 @@ HANDLE_MOB_ENCOUNTER:
     BPL     .no_flee
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$1E
     JSR     DISPLAY_MESSAGE
     LDA     TURN_START_COL
@@ -10866,7 +10853,7 @@ HANDLE_MOB_ENCOUNTER:
 .group_done:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$1F
     JSR     DISPLAY_MESSAGE
     JMP     END_TURN
@@ -10941,7 +10928,7 @@ HANDLE_EVENT_SLOT:
 .small_val:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$0D
     JSR     DISPLAY_MESSAGE
     LDA     #$01
@@ -11033,7 +11020,7 @@ SHOW_LOCKED_MSG:
     ; Display message $0C and set char state to 0.
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$0C
     JSR     DISPLAY_MESSAGE
     LDA     #$00
@@ -11088,7 +11075,7 @@ no-op stub for external callers at [[$4A1F]] and [[$4BE4]].
 ;   $764A -> STEP_PRNG (now $78A8)
 ;   $7444 -> SET_CURSOR_ROW21 (now $76BE)
 ;   $0DD1 -> PRINT_MOB_NAME (now $0D8A)
-;   $7421 -> RESET_TEXT_WINDOW (now $769B)
+;   $7421 -> SCROLL_STATUS_LINE (now $769B)
 ;   $739F -> DISPLAY_MESSAGE (now $761E)
 ;   $0E6C -> CHECK_ENCOUNTER (now $0E25)
 ;   $1C3C -> COMMIT_MOVE (now $1B52)
@@ -11168,7 +11155,7 @@ no-op stub for external callers at [[$4A1F]] and [[$4BE4]].
     ; Entity overwhelmed — flee, restore position
     JSR     $7444           ; -> SET_CURSOR_ROW21
     JSR     $0DD1           ; -> PRINT_MOB_NAME
-    JSR     $7421           ; -> RESET_TEXT_WINDOW
+    JSR     $7421           ; -> SCROLL_STATUS_LINE
     LDA     #$1E            ; message: flee
     JSR     $739F           ; -> DISPLAY_MESSAGE
     LDA     TURN_START_COL
@@ -11208,7 +11195,7 @@ no-op stub for external callers at [[$4A1F]] and [[$4BE4]].
 .group_done:                            ; $1FE5
     JSR     $7444           ; -> SET_CURSOR_ROW21
     JSR     $0DD1           ; -> PRINT_MOB_NAME
-    JSR     $7421           ; -> RESET_TEXT_WINDOW
+    JSR     $7421           ; -> SCROLL_STATUS_LINE
     LDA     #$1F            ; message: engage combat
     JSR     $739F           ; -> DISPLAY_MESSAGE
     JMP     $1C91           ; -> END_TURN
@@ -11556,7 +11543,7 @@ AUTO_HEAL:
     BNE     .done
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$21
     JMP     DISPLAY_MESSAGE
 @ %def AUTO_HEAL
@@ -11583,7 +11570,7 @@ INCREMENT_HP:
 .notify:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$22
     STA     HEAL_NOTIFIED
     JMP     DISPLAY_MESSAGE
@@ -11702,7 +11689,7 @@ setting up the effect record pointer.
 <<modify current stats>>=
     ORG     $70D4
 MODIFY_CURRENT_STATS:
-    SUBROUTINE RESET_TEXT_WINDOW
+    SUBROUTINE SCROLL_STATUS_LINE
     ; Copy ENTITY_PTR/ENTITY_PTR+1 → EFFECT_REC/EFFECT_REC+1, JMP $704D (treasure lookup)
     LDA     ENTITY_PTR
     STA     EFFECT_REC
@@ -11934,7 +11921,7 @@ AI_CHOOSE_TARGET:
     LDA     #$24
     JSR     DISPLAY_MESSAGE     ; "joins party" message
     JSR     PRINT_MEMBER_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     JSR     DELAY_WITH_ANIMATION
     LDA     #$25
     JSR     DISPLAY_MESSAGE
@@ -13520,7 +13507,7 @@ CHECK_CAN_LEAVE:
 .pass:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$1C
     JSR     DISPLAY_MESSAGE
     LDA     #$01
@@ -13528,7 +13515,7 @@ CHECK_CAN_LEAVE:
 .fail:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$1D
     JSR     DISPLAY_MESSAGE
     LDA     #$00
@@ -13839,7 +13826,7 @@ ATTRACT_SCREEN:
     LDA     #$01
     STA     ACTIVE_CHAR        ; scene/character index = 1
     STA     SCENE_EVENT_RESULT ; mark event as handled
-    JSR     COMPUTE_SCENE_PTR  ; scene 1 pointer → MOB_DATA_PTR/MOB_DATA_PTR+1
+    JSR     GET_MOB_DATA  ; scene 1 pointer → MOB_DATA_PTR/MOB_DATA_PTR+1
     LDA     MOB_DATA_PTR       ; \
     STA     MOB_PTR            ;  | MOB_PTR/MOB_PTR+1 = MOB_DATA_PTR/MOB_DATA_PTR+1 (save pointer)
     LDA     MOB_DATA_PTR+1     ;  |
@@ -15055,7 +15042,7 @@ The following root chunks produce the assembly files when tangled.
 <<find entity at pos>>
 <<check at boundary>>
 <<pos to colrow>>
-<<compute scene ptr>>
+<<get mob data>>
 <<init mob count>>
 <<get entity fontchar>>
 <<appearance to fontchar>>
@@ -15202,7 +15189,7 @@ The following root chunks produce the assembly files when tangled.
 <<draw blink char>>
 <<check combat eligibility>>
 <<display message>>
-<<reset text window>>
+<<scroll status line>>
 <<clear map>>
 <<set text window bottom>>
 <<setup text pos>>
@@ -15214,7 +15201,6 @@ The following root chunks produce the assembly files when tangled.
 <<text window routines>>
 <<print ctrl ab>>
 <<print string>>
-<<print from ptr>>
 <<set cursor compressed>>
 <<step prng>>
 <<game init>>
