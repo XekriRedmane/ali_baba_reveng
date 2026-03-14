@@ -4966,6 +4966,11 @@ Each character record is 9~bytes, stored sequentially starting at [[$4000]].
 Returns [[\CHAR_REC/\CHAR_REC+1 = $4000 + A $\times$ 9]].  If A~=~0, returns
 [[\CHAR_REC/\CHAR_REC+1 = $4000]] immediately (index 0 is the base/header record).
 
+@ [[CHAR_REC]] is a 2-byte zero-page pointer at [[$BE/$BF]] that holds the
+result of [[GET_CHAR_RECORD]].  The routine below computes
+$4000 + \text{index} \times 9$ and stores the address in [[CHAR_REC]],
+giving the caller a pointer to the selected character's 9-byte record.
+
 <<zero page defines>>=
 CHAR_REC                EQU     $BE     ; character record pointer from GET_CHAR_RECORD (2 bytes)
 @ %def CHAR_REC
@@ -6352,6 +6357,13 @@ The bounding box bytes are packed map positions decoded by
 is exclusive of the border), then calls [[RANDOM_IN_RANGE]] twice to
 pick a random column and row within the bounds.
 
+@ [[SOURCE_CHAR]] records which character is being reordered.
+[[BOUNDS_MIN_COL]], [[BOUNDS_MIN_ROW]], [[BOUNDS_MAX_COL]], and
+[[BOUNDS_MAX_ROW]] hold the scene's bounding box after unpacking.
+[[FONT_COL]] is the font column coordinate, used here to store the
+randomly chosen column.  [[SCENE_SETUP]] initializes all of these from
+the character record and calls [[RANDOM_IN_RANGE]] for placement.
+
 <<defines>>=
 SOURCE_CHAR         EQU     $5A28   ; source character for reorder
 BOUNDS_MAX_COL      EQU     $5A52   ; scene setup: right column boundary
@@ -6427,6 +6439,12 @@ SCENE_SETUP:
 
 This is the main scene display loop.  It is called with the scene number
 in~A.
+
+@ [[SCENE_NUMBER]] holds the current scene index.  [[SCENE_TEXT_DATA]] is
+the base address of the scene's text byte stream, loaded from disk by
+[[LOAD_SCENE_DATA]].  [[SCENE_TRANSITION]] is a flag byte: when nonzero,
+[[SCENE_LOOP]] treats its value as a new scene number and restarts the
+display cycle.
 
 <<defines>>=
 SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene number)
@@ -6510,9 +6528,11 @@ LOAD_SCENE_DATA:
     STA     $9AA6,Y
     RTS
 @ %def LOAD_SCENE_DATA
-Selects the tile set for the current location style.  Bits 6--5 of
-[[LOCATION_STYLE]] index into three 4-entry tables to set
-[[DEFAULT_CHAR]], [[MAP_FILL_CHAR]], and [[BLINK_ALT_CHAR]].
+@ [[TILE_DEFAULT_TAB]], [[TILE_FILL_TAB]], and [[TILE_BLINK_TAB]] are
+three 4-entry lookup tables indexed by the 2-bit style code from
+[[LOCATION_STYLE]] bits 6--5.  [[LOAD_MAP_TILES]] reads all three tables
+to set [[DEFAULT_CHAR]], [[MAP_FILL_CHAR]], and [[BLINK_ALT_CHAR]] for
+the current location.
 
 <<defines>>=
 TILE_DEFAULT_TAB        EQU     $7AD0   ; 4-byte table: default char per style
@@ -6607,6 +6627,11 @@ otherwise clears the flag.  Then draws the character, sets
 [[WAIT_LOOP_COUNT]] to twice the wait flag (via ROL), and jumps to
 [[DRAW_SPRITE]].
 
+@ [[CHAR_AI_MODE]] distinguishes player-controlled characters (0) from
+AI-controlled mobs (modes 2--5).  [[AI_WAIT_FLAG]] is set to [[$0A]] when
+entering a scene with an AI character and cleared otherwise.
+[[SETUP_SCENE_DISPLAY]] tests both values to decide whether to invoke the
+[[SCRIPT_ENGINE]] and how long to delay before drawing the sprite.
 
 <<defines>>=
 CHAR_AI_MODE    EQU     $5A05   ; 0 = player, 2-5 = AI behavior modes
@@ -6648,6 +6673,12 @@ it calls [[DRAW_MAP_COL]] to render that cell.  Finally, if bit~7
 of field~5 is clear, it calls [[DRAW_MAP_ENTITIES]] to overlay
 entity icons on the map.
 
+@ [[EVENT_POS]] stores the event position computed by [[MANHATTAN_DISTANCE]].
+[[VIEW_MIN_COL]], [[VIEW_MIN_ROW]], [[VIEW_MAX_COL]], and [[VIEW_MAX_ROW]]
+define the visible map rectangle, extracted from fields 3 and 4 of the
+location record.  [[ENTER_LOCATION]] uses these bounds to drive a nested
+column/row loop that redraws the entire viewport.
+
 <<defines>>=
 EVENT_POS           EQU     $5A5E   ; event position (from MANHATTAN_DISTANCE)
 VIEW_MIN_ROW    EQU     $5A0B   ; viewport min row
@@ -6655,6 +6686,11 @@ VIEW_MIN_COL    EQU     $5A0A   ; viewport min column (from location field 3)
 VIEW_MAX_ROW    EQU     $5A09   ; viewport max row
 VIEW_MAX_COL    EQU     $5A08   ; viewport max column (from location field 4)
 @ %def EVENT_POS VIEW_MIN_ROW VIEW_MIN_COL VIEW_MAX_ROW VIEW_MAX_COL
+
+@ [[FONT_ROW]] is the current font row coordinate, and [[SET_TEXT_WINDOW]]
+is the routine at [[$76C2]] that configures the HRCG text window parameters.
+[[ENTER_LOCATION]] uses [[FONT_ROW]] as the row iterator in the map redraw
+loop and calls [[SET_TEXT_WINDOW]] during viewport setup.
 
 <<defines>>=
 FONT_ROW        EQU     $5A0D
@@ -6725,6 +6761,11 @@ boundary.  Converts [[LOCATION_ID]] to column/row via
 ([[VIEW_MIN_COL]], [[VIEW_MAX_COL]], [[VIEW_MIN_ROW]],
 [[VIEW_MAX_ROW]]).  If any match, sets [[\DATA_PTR]]=1 and [[\DATA_PTR+1]]=0
 (``at edge''); otherwise sets both to~0 (``interior'').
+
+@ [[LOCATION_ID]] stores the current map position index.
+[[CHECK_AT_BOUNDARY]] converts it to column/row coordinates and compares
+against each viewport edge to determine whether the character is standing
+on the map boundary.
 
 <<defines>>=
 LOCATION_ID     EQU     $5A17   ; current location/position index
@@ -6854,10 +6895,20 @@ After the grid scan (or redraw), iterates the mob group via
 icon using [[DRAW_BLINK_CHAR]] (or [[RENDER_FONT_CHAR]] if the
 mob has no blink animation).
 
+@ [[MAP_REDRAW_FLAG]] at [[$7AC4]] is a nonzero/zero flag.  When set,
+[[DRAW_MAP_ENTITIES]] skips the cell-by-cell grid scan and jumps directly
+to the mob-drawing phase, avoiding redundant work when the entire map has
+already been redrawn by a scroll operation.
 
 <<defines>>=
 MAP_REDRAW_FLAG         EQU     $7AC4   ; non-zero = full map redraw needed
 @ %def MAP_REDRAW_FLAG
+
+@ [[ENTITY_REC]] is a 2-byte zero-page pointer at [[$BE/$BF]] that
+receives the result of [[FIND_ENTITY_AT_POS]]: a pointer to the entity
+record occupying a given map position.  Bit 7 of the high byte
+distinguishes mobs (set) from player characters (clear).
+[[DRAW_MAP_ENTITIES]] uses it during the cell-by-cell grid scan.
 
 <<zero page defines>>=
 ENTITY_REC              EQU     $BE     ; entity lookup result from FIND_ENTITY_AT_POS (2 bytes)
@@ -6969,6 +7020,10 @@ blink cursor variables ([[BLINK_COL]]/[[BLINK_ROW]]/[[BLINK_CHAR]]),
 then calls [[TIMED_WAIT]] with the delay from [[BLINK_DELAY]].
 It finishes by resetting [[BLINK_COL]] to~\$14 (disabled).
 
+@ [[BLINK_CHAR]], [[BLINK_ROW]], and [[BLINK_DELAY]] are the blink-cursor
+state variables.  [[DRAW_MAP_ICON_B]] copies the current font position into
+[[BLINK_ROW]] and [[BLINK_CHAR]], then uses [[BLINK_DELAY]] as the
+argument to [[TIMED_WAIT]] so the icon flashes briefly on screen.
 
 <<defines>>=
 BLINK_CHAR      EQU     $5AA4   ; font character number
@@ -7004,6 +7059,9 @@ the track number (A) at offset~\$0C of the parameter block at~(\$08),
 clears the sector offset at~(\$08)+3, then calls [[RWTS_ENTRY]]
 at~[[$B7B5]] with the IOB address from~\$08/\$09.
 
+@ [[RWTS_ENTRY]] is the standard DOS 3.3 RWTS entry point at [[$B7B5]].
+[[SETUP_DISK_READ]] calls it after storing the track number and clearing
+the sector offset in the IOB parameter block.
 
 <<defines>>=
 RWTS_ENTRY              EQU     $B7B5   ; RWTS entry: PHP/SEI, JSR RWTS_CORE, CLC/SEC
@@ -7044,6 +7102,11 @@ low 5~bits and upper 2~bits select among three more handler addresses, with
 sub-values below~\$1B, at~\$1D, and above~\$1D each routed differently.
 Nine distinct handler addresses are used in total, covering the full range
 of entity types from empty slots to treasure, mobs, shops, and map features.
+
+@ [[HANDLER_PTR]] is a 2-byte zero-page pointer at [[$BC/$BD]] that
+[[CLASSIFY_ENTITY_TYPE]] sets to the address of the handler routine matching
+the entity's type.  Callers use this pointer to dispatch entity-specific
+behavior after classification.
 
 <<zero page defines>>=
 HANDLER_PTR             EQU     $BC     ; entity type handler address (2 bytes)
@@ -7276,6 +7339,10 @@ renders the 2$\times$2 block at the cursor position.
 [[PRINT_FONTCHAR_AT_TEXT_POS]] is an alternate entry point that skips the
 position conversion, useful when the caller has already set [[$24/$25]].
 
+@ [[s_PRINT_FONT_CHAR]] at [[$80A4]] is the 10-byte self-modifying HRCG
+control string that [[RENDER_FONT_CHAR]] patches with character-set and
+glyph codes before passing to [[PRINT_STRING]].
+
 <<defines>>=
 s_PRINT_FONT_CHAR   EQU     $80A4   ; 10 bytes
 @ %def s_PRINT_FONT_CHAR
@@ -7360,6 +7427,11 @@ start of a 3-byte-entry table whose first byte is a position.
 
 Uses heavy self-modifying code to patch absolute address operands for
 the indexed loads and table walks.
+
+@ [[DAT_5a17_pos]] at [[$5A17]] temporarily holds the target map position
+during [[FIND_ENTITY_AT_POS]].  The routine stores the search position
+here on entry, then compares each mob's byte-3 position and each player
+table entry against this saved value.
 
 <<defines>>=
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
@@ -7526,6 +7598,10 @@ and its appearance (byte 4) is converted to a font character number.
 On the player's turn, the player's column and row are taken directly from
 [[CURRENT_COL]]/[[CURRENT_ROW]], and the font character is looked up via [[$0C7E]].
 
+@ [[IS_PLAYER_TURN]] is 0 on a mob's turn and 1 on the player's turn.
+[[SET_BLINK_TARGET]] tests it to choose between unpacking the mob's
+packed position or reading [[CURRENT_COL]]/[[CURRENT_ROW]] directly.
+
 <<defines>>=
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
 @ %def IS_PLAYER_TURN
@@ -7597,6 +7673,12 @@ destination group's member count via [[INCR_GROUP_COUNT]].  Adjusts the
 
 When [[ACTIVE_CHAR]] is zero, a random decision (via [[STEP_PRNG]]) determines
 the insertion point instead of the level comparison.
+
+@ [[REORDER_SORT_KEY]] temporarily holds byte 11 (level) of the node being
+compared during the insertion phase.  [[REORDER_LINK]] saves the removed
+node's next-link so it can be spliced back in.  [[CURRENT_ROOM]] records
+which room is being processed.  [[REORDER_CHAR]] uses all three during
+the two-phase unlink-and-reinsert operation.
 
 <<defines>>=
 REORDER_SORT_KEY    EQU     $5A2B   ; temp: byte 11 of node for sorted insert
@@ -7721,6 +7803,10 @@ byte~8) on the head record pointed to by~[[\CHAR_REC/\CHAR_REC+1]]:
 Guards: bails out if [[\CHAR_REC]] is zero (null pointer) or if byte~4 of the
 record at~[[TARGET_REC]] is~$\ge$~\$15 (inactive/dead character).
 Called exclusively from [[REORDER_CHAR]] (\$0F84).
+
+@ [[GROUP_COUNT_DELTA]] holds +1 or $-$1, set by the two entry points
+[[INCR_GROUP_COUNT]] and [[DECR_GROUP_COUNT]] respectively.  The shared
+body adds this delta to the low nibble of byte 8 of the group head record.
 
 <<defines>>=
 GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
@@ -8026,6 +8112,13 @@ SETUP_TEXT_POS_COL20:          ; $76D8 - original SETUP_TEXT_POS_COL20 entry
 Reads a byte stream from the pointer at [[$06/$07]] and renders
 characters on the hi-res screen.  It maintains column/row state and
 supports several control codes.
+
+@ [[TEXT_LEFT_MARGIN]] and [[TEXT_RIGHT_MARGIN]] define the column bounds
+for text wrapping.  [[TEXT_STREAM_IDX]] saves the Y index into the byte
+stream across [[PRINT_FONTCHAR]] calls, since rendering may clobber~Y.
+[[TEXT_RENDERER]] initializes the margins (2 and 18) and row, then loops
+through bytes, advancing the column and wrapping to the next row when it
+passes the right margin.
 
 <<defines>>=
 TEXT_RIGHT_MARGIN        EQU     $5A96   ; right margin column for text wrap
@@ -8523,6 +8616,14 @@ If something occupies the destination cell, the result from
 \item \$FE --- empty-slot interaction $\to$ \$1D4D
 \end{itemize}
 
+@ [[TURN_START_COL]] and [[TURN_START_ROW]] record the character's
+position at the start of the turn (for restoring the old cell after a
+move).  [[MOVE_POINTS]] is the movement budget; [[STEPS_TAKEN]] counts
+steps consumed so far.  [[INPUT_DIR]] holds the direction or command
+code (1--9) from the player or AI.  [[TURN_ACTIVE]] is set to 1 while
+the turn loop is running.  All six variables are initialized by
+[[GAME_TURN_LOOP]] at the start of each character's turn.
+
 <<defines>>=
 TURN_START_COL  EQU     $5A61   ; column at start of turn
 TURN_START_ROW  EQU     $5A62   ; row at start of turn
@@ -8986,10 +9087,21 @@ cursor is repositioned and the loop continues; if the selection stays the
 same, the script engine is called with script type~\$12 to handle the
 in-place action.
 
+@ [[INPUT_JMP_VEC]] at [[$5F5E]] is a 2-byte indirect jump vector used by
+[[INPUT_LOOP]] to dispatch exit handlers and initialization callbacks.
+[[CURRENT_SELECTION]] tracks which menu option is currently highlighted.
+[[INPUT_LOOP]] writes the exit handler address from the selected record
+into [[INPUT_JMP_VEC]] and executes it via [[JMP (INPUT_JMP_VEC)]].
+
 <<defines>>=
 INPUT_JMP_VEC   EQU     $5F5E   ; indirect jump vector for input callbacks
 CURRENT_SELECTION EQU   $5AAB   ; current menu selection index
 @ %def INPUT_JMP_VEC CURRENT_SELECTION
+
+@ [[READ_KEYBOARD]] at [[$A44C]] is the resident keyboard input routine
+in the EALDR region.  [[INPUT_LOOP]] calls it to wait for a keypress; a
+zero return indicates the player pressed return (select), while any other
+value is passed to [[VALIDATE_INPUT]].
 
 <<defines>>=
 READ_KEYBOARD                EQU     $A44C   ; resident: read keyboard input
@@ -9592,6 +9704,12 @@ Returns in~[[A]]:
 
 On success, [[MOB_PTR]] is updated to point to the found mob.
 
+@ [[COLOCATE_POS]] saves the current mob's position (byte 3) as the
+comparison target.  [[COLOCATE_LINK]] saves the starting mob's next-link
+(byte 2) as a stop condition to detect a full circle.  [[COLOCATE_WRAPPED]]
+is set to 2 initially (found ahead in chain) and changed to 1 if the search
+wraps past the end.  [[FIND_MOB_AT_SAME_POS]] returns this value on success.
+
 <<defines>>=
 COLOCATE_POS            EQU     $5A21   ; saved position for co-location search
 COLOCATE_LINK           EQU     $5A20   ; saved next-link (stop condition)
@@ -9650,6 +9768,12 @@ by~21), then classifies via [[GET_HOSTILITY]]: groups 0--2 and~7 are
 Returns [[A]]=1 if the two mobs are on different sides, [[A]]=0 if same.
 When both are hostile (Y=1), they are still hostile to each other if
 their font-char remainders differ (different hostile sub-factions).
+
+@ [[HOSTILE_APP]] saves the appearance byte of the second mob so
+[[CHECK_HOSTILE]] can classify both mobs without losing state.
+[[HOSTILE_A]] and [[HOSTILE_Y]] save the return values (remainder and
+faction flag) from the first [[GET_HOSTILITY]] call, allowing the routine
+to compare both factions after the second call completes.
 
 <<defines>>=
 HOSTILE_APP             EQU     $5A23   ; saved appearance for hostility check
@@ -9719,6 +9843,11 @@ The threat total remains in [[$5A26]] for callers that check it directly.
 
 Boundary checks prevent wrapping: position~0 has no left neighbor,
 position~199 no right, positions~0--19 no up, positions~180--199 no down.
+
+@ [[ADJACENT_POS]] saves the target map position on entry to
+[[CHECK_ADJACENT_THREATS]].  The routine adds and subtracts offsets (1 for
+left/right, 20 for up/down) from this saved position to compute the four
+cardinal neighbors, passing each to [[SUM_HOSTILE_AT_POS]].
 
 <<defines>>=
 ADJACENT_POS            EQU     $5A27   ; saved position for adjacency check
@@ -10507,9 +10636,18 @@ the move, reorders the character into the appropriate group, and updates the
 character's position.  If the encounter ID is zero, it is derived from the
 PRNG.
 
+@ [[EVENT_DEST_POS]] holds the destination position from event byte 2
+during specific encounters (type [[$40]] and above).  [[HANDLE_ENCOUNTER]]
+writes the character's updated position from this variable after committing
+the move and reordering the character.
+
 <<defines>>=
 EVENT_DEST_POS      EQU     $5A5F   ; event handler: destination position
 @ %def EVENT_DEST_POS
+
+@ [[EVENT_PTR]] is a 2-byte zero-page pointer at [[$BE/$BF]] that points
+to the current event list entry.  [[HANDLE_ENCOUNTER]] reads the event
+type from byte 1 and the destination from byte 2 through this pointer.
 
 <<zero page defines>>=
 EVENT_PTR               EQU     $BE     ; event list entry pointer (2 bytes)
@@ -11102,9 +11240,16 @@ walk but ranks targets by field~5 strength instead of threat score, again
 returning~1 if a valid target is found.  If no hostile is found in the mid or
 high paths, execution falls through to the low path for a final check.
 
+@ [[BEST_THREAT]] accumulates the highest threat or strength score seen
+so far while [[SELECT_COMBAT_TARGET]] iterates through group members.
+
 <<defines>>=
 BEST_THREAT     EQU     $5A88   ; best threat level during target selection
 @ %def BEST_THREAT
+
+@ [[TARGET_PTR_LO]] and [[TARGET_PTR_HI]] record the pointer to the
+mob with the best score.  When [[SELECT_COMBAT_TARGET]] finishes and
+returns 1 (attack ready), the caller uses these to load the target.
 
 <<defines>>=
 TARGET_PTR_LO   EQU     $5A86   ; selected combat target pointer (low byte)
@@ -11745,11 +11890,21 @@ the group and tracking the highest strength value in [[AI_BEST_STR]].  After
 target selection, all modes converge at a common exit that unpacks the target
 position into column and row via [[POS_TO_COLROW]].
 
+@ [[AI_PREV_DIR]] stores the last direction the NPC moved, used by
+[[NPC_MOVE_AI]] as a bias to encourage straight-line travel.
+[[AI_TARGET_POS]] is the packed map position that [[AI_CHOOSE_TARGET]]
+selects as the destination, and [[AI_TARGET_COL]] holds the column
+component after unpacking.
+
 <<defines>>=
 AI_PREV_DIR         EQU     $5A5D   ; NPC AI: previous move direction (bias avoidance)
 AI_TARGET_COL   EQU     $5A72   ; AI target column / min distance temp
 AI_TARGET_POS   EQU     $5A71   ; AI target position (set by AI_CHOOSE_TARGET)
 @ %def AI_PREV_DIR AI_TARGET_COL AI_TARGET_POS
+
+@ [[AI_BEST_POS]] and [[AI_BEST_STR]] are zero-page temporaries at
+[[$BE]] and [[$BF]] that [[AI_CHOOSE_TARGET]] uses in mode 5 to track
+the strongest hostile mob found during the group iteration.
 
 <<zero page defines>>=
 AI_BEST_POS             EQU     $BE     ; best hostile position in ai_choose_target
@@ -11924,6 +12079,12 @@ ties unpredictably.  The direction with the lowest final score wins.  The
 chosen direction index is XOR'd with~3 or~7 (depending on whether it is
 below~3) to convert from the internal direction numbering to the movement
 encoding expected by the caller.
+
+@ [[DIR_SCORES]] is a 5-byte array holding the score for each direction
+(indices 0--4: stay, north, south, west, east).  [[AI_DIRECTION]] is the
+index currently being evaluated, and [[AI_TEST_POS]] holds the candidate
+position for that direction.  [[NPC_MOVE_AI]] fills the array, randomizes
+the scores, and picks the direction with the lowest value.
 
 <<defines>>=
 AI_TEST_POS     EQU     $5A70   ; position being tested for direction evaluation
@@ -12437,6 +12598,10 @@ Most rounds see zero or one random events, but occasionally a flurry of
 activity hits at once---new mobs spawn, faction skirmishes trigger, and the
 game world feels unpredictably alive.
 
+@ [[EVENT_THRESHOLD]] at [[$4239]] is the probability threshold for random
+events.  [[RANDOM_EVENTS]] compares each PRNG roll against this value; a
+roll below the threshold triggers the corresponding event handler.
+
 <<defines>>=
 EVENT_THRESHOLD         EQU     $4239   ; random event probability threshold (~7%)
 @ %def EVENT_THRESHOLD
@@ -12783,6 +12948,13 @@ different mode numbers depending on the situation:
 
 Several flag bytes in the [[$4230]] region track which phases have already
 been processed this round, preventing duplicate dispatches.
+
+@ [[SCENE_FOUND_FLAG]] and [[SCENE_HOSTILE_FLAG]] record the results
+of [[SCAN_FOR_HOSTILE]].  [[SCENE_GROUP_IDX]] is the starting group index
+for the scan.  [[SCENE_P1_DONE]], [[SCENE_P3_DONE]],
+[[SCENE_HOSTILE_DONE]], and [[SCENE_EVENT_RESULT]] are one-shot flags in
+the [[$4230]] region that [[CHECK_SCENE_EVENTS]] tests and sets to prevent
+the same phase from firing twice in one round.
 
 <<defines>>=
 SCENE_FOUND_FLAG        EQU     $5A89   ; scan result: 1 = matching group found
@@ -13370,6 +13542,11 @@ CHECK_CAN_LEAVE:
 The script engine runs short bytecode programs that control animations,
 sound, and game events.  It is called with a script index in X.
 
+@ [[ATTRACT_FLAG]] is set to 1 when [[SCRIPT_ENGINE]] is invoked with
+script index 6 (the attract/demo mode) and cleared to 0 for all other
+indices.  Downstream code checks this flag to alter behavior during the
+title screen sequence.
+
 <<defines>>=
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
 @ %def ATTRACT_FLAG
@@ -13398,7 +13575,10 @@ SCRIPT_ENGINE:
     DEY
     STY     $80E3             ; patch byte in script 2 data
 @
-The script base address is loaded from the table at [[$80AE]]:
+@ [[SCRIPT_PC]] is the 2-byte script instruction pointer at [[$E4/$E5]].
+The script base address is loaded from the table at [[$80AE]] into
+[[SCRIPT_PC]], and the interpreter reads successive bytes through this
+pointer, advancing it after each instruction.
 
 <<zero page defines>>=
 SCRIPT_PC               EQU     $E4     ; script instruction pointer (2 bytes, $E4/$E5)
@@ -13430,6 +13610,12 @@ SCRIPT_TABLE:
 also copied to [[$0500]]--[[$07FF]] by EALDR, but the script table
 points to the original addresses).
 
+@ [[SCRIPT_LOOP_CTR]] counts iterations of the script's built-in loop
+construct.  [[SCRIPT_PRNG_MASK]] controls action randomization: the
+interpreter ANDs the PRNG output with this mask before dispatching.
+Both are initialized to 0 and 1 respectively at the start of each
+script invocation.
+
 <<defines>>=
 SCRIPT_LOOP_CTR     EQU     $5A8D   ; script loop iteration counter
 SCRIPT_PRNG_MASK    EQU     $5A92   ; PRNG mask for action randomization
@@ -13452,6 +13638,11 @@ SCRIPT_ENGINE_FETCH:
     JMP     .action          ; ≥ $27 → action dispatch
 @
 \subsubsection{Control commands (< \$27)}
+
+@ [[SCRIPT_LOOP_ADDR]] is a 2-byte address saved by the ``set loop
+address'' command (\$1F).  When the loop counter has not yet reached the
+target byte value, the interpreter copies [[SCRIPT_LOOP_ADDR]] back into
+[[SCRIPT_PC]] to restart the loop body.
 
 <<defines>>=
 SCRIPT_LOOP_ADDR    EQU     $5A8E   ; script loop address (2 bytes)
@@ -13493,6 +13684,11 @@ terminates and the counter resets.  Otherwise, the counter increments
 and execution jumps back to the saved loop address.
 
 \subsubsection{Command implementations}
+
+@ [[SCRIPT_GOSUB_ADDR]] saves the return address for the script's gosub
+command (\$21): after the subroutine finishes, [[SCRIPT_PC]] is restored
+from this 2-byte value.  [[SCRIPT_ACTION_VEC]] is a 2-byte vector set by
+commands \$23 and \$24 to select between the tone and noise action handlers.
 
 <<defines>>=
 SCRIPT_GOSUB_ADDR   EQU     $5A90   ; script gosub return address (2 bytes)
@@ -14040,6 +14236,10 @@ The RWTS is fully documented in \emph{Beneath Apple DOS} (Worth \&
 Lechner, 1984), chapter~4, and is not disassembled here.  The binary
 data is included verbatim from [[dos.asm]].
 
+@ [[RWTS_CORE]] at [[$BD00]] is the main dispatcher inside the standard
+DOS 3.3 RWTS.  [[RWTS_ENTRY]] calls it after saving the processor status
+and disabling interrupts.
+
 <<defines>>=
 RWTS_CORE               EQU     $BD00   ; RWTS core dispatcher
 @ %def RWTS_CORE
@@ -14067,6 +14267,11 @@ verifies each byte equals~[[$AF]].  Finally checks the data epilogue
 ([[DE AA]]).  Returns carry clear on success, carry set on error.
 
 [[VERIFY_DATA_FIELD]] is called internally by the disk~VM (via [[JSR $B304]]).
+
+@ [[DISK_DATA_REG]] at [[$C0EC]] is the Disk~II controller's data
+register for the active slot.  [[VERIFY_DATA_FIELD]] reads nibble bytes
+from this register in a tight loop while searching for the D5~AA~AD
+prologue and verifying the data field contents.
 
 <<defines>>=
 DISK_DATA_REG           EQU     $C0EC   ; disk controller data register (active slot)
