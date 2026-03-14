@@ -211,14 +211,14 @@ s_DECOR_ROW1           EQU     $5EFF   ; decorative right-side row 1
 s_DECOR_ROW2           EQU     $5F07   ; decorative right-side row 2
 s_DECOR_ROW3           EQU     $5F10   ; decorative right-side row 3
 ROM_COUT1            EQU     $FDED   ; Apple II ROM COUT1 (character output)
-FONT_CHARNUM        EQU     $5A0E
-FONT_CHARSET        EQU     $5A0F
-BORDER_POS_VERT_R      EQU     $5E9B   ; 10 col/row pairs for vertical border labels (right)
-BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
+FONT_CHARNUM        EQU     $5A0E   ; font character number to render
+FONT_CHARSET        EQU     $5A0F   ; font charset index (1-5)
 BORDER_POS_HORIZ       EQU     $5E7B   ; 6 col/row pairs for horizontal border labels
 BORDER_POS_VERT_L      EQU     $5E87   ; 10 col/row pairs for vertical border labels (left)
+BORDER_POS_VERT_R      EQU     $5E9B   ; 10 col/row pairs for vertical border labels (right)
 BORDER_STR_HORIZ       EQU     $5EAF   ; horizontal border pattern string
 BORDER_STR_VERT_L      EQU     $5EC1   ; vertical border pattern string (left)
+BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
 BORDER_LOOP_CTR        EQU     $5DC3   ; loop counter for border label drawing
 WORLD_INIT_DATA         EQU     $62B9   ; world initialization data table
 RWTS_IOB                EQU     $B7E8   ; RWTS Input/Output Block (14 bytes)

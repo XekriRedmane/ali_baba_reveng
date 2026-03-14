@@ -1296,6 +1296,12 @@ ealdr_read_data:                ; $BC09
 Here is the decoded VM program. Addresses and values shown are after
 decryption.  The arrows show branch/jump targets within the listing.
 
+@ The EALDR program uses zero-page location [[$F8]] as a temporary
+(labeled [[ealdr_src]] in the VM listing).  In the main game this
+address becomes [[ENTITY_PTR]], the 2-byte pointer to the entity
+record currently being processed.  We define it here so the symbolic
+name is available when reading the VM program.
+
 <<zero page defines>>=
 ENTITY_PTR              EQU     $F8     ; entity record pointer (2 bytes, $F8/$F9)
 @ %def ENTITY_PTR
@@ -1811,6 +1817,11 @@ before the main loop or attract screen.  The steps, in order:
   index.  Initializing it to~1 starts the iteration at the first record.
 \end{enumerate}
 
+@ The following state variables are referenced by [[GAME_INIT]].
+[[BLINK_COL]] is the cursor blink column; storing [[$14]] disables the
+blink.  [[LOCATION_POS]], [[LOCATION_STYLE]], and [[CURRENT_PLAYER]] are
+the three variables cleared to zero during step~13/17 (described above).
+
 <<defines>>=
 BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
 LOCATION_POS        EQU     $5A55   ; current location position (triggers redraw when changed)
@@ -1855,9 +1866,9 @@ GAME_INIT:
     RTS
 @ %def GAME_INIT
 During startup, tracks [[$0F]] and [[$10]] are loaded into the hi-res
-page area [[$2000--$3FFF]] as a staging area.  This routine, called from
-[[GAME_INIT]], copies the staged data to its runtime addresses and clears
-the hi-res page:
+page area [[$2000--$3FFF]] as a staging area.  [[RELOCATE_HIRES_STAGING]],
+called from [[GAME_INIT]], copies the staged data to its runtime addresses
+and clears the hi-res page:
 
 \begin{center}
 \begin{tabular}{ccl}
@@ -1872,6 +1883,12 @@ the hi-res page:
 
 The copy loop at [[.copy]] also clears each source byte, leaving the
 hi-res page zeroed for use as a graphics buffer.
+
+@ [[RELOCATE_HIRES_STAGING]] uses two zero-page pointer pairs for
+its block copy: [[COPY_SRC]] ([[$BC/$BD]]) points to the source
+address in the staging area, and [[COPY_DEST]] ([[$BA/$BB]]) points
+to the runtime destination.  The loop copies one byte at a time,
+zeroing the source as it goes.
 
 <<zero page defines>>=
 COPY_SRC                EQU     $BC     ; block copy source pointer (2 bytes)
@@ -1986,6 +2003,11 @@ opening script.  Steps:
   disabling the indirect action handler now that init is complete.
 \end{enumerate}
 
+@ [[INIT_GAME_STATE]] stores [[GAME_ACTION_HANDLER]] into the zero-page
+vector [[DISPATCH_VEC]] ([[$F6/$F7]]).  The script engine uses this vector
+for indirect action dispatch; after the opening script finishes,
+[[INIT_GAME_STATE]] patches the dispatch site to bypass the vector entirely.
+
 <<defines>>=
 GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
 @ %def GAME_ACTION_HANDLER
@@ -2020,10 +2042,13 @@ INIT_GAME_STATE:
 
 @ %def INIT_GAME_STATE
 
-Draws the complete game UI: renders the background text stream,
-places 2$\times$2 border characters, draws border label text at
-hardcoded positions, plots decorative corner icons, and finally
-prints the copyright notice and ``press space bar'' prompt.
+@ [[INIT_GAME_DISPLAY]] draws the game's main screen layout.  It renders
+the background from the text stream at [[UI_TEXT_STREAM]], draws
+2$\times$2 border characters, places text labels via
+[[DRAW_BORDER_LABELS]], adds corner decorations via [[DRAW_BORDER_ICONS]],
+and finishes with the copyright notice ([[s_COPYRIGHT]]) and ``press
+space bar'' prompt ([[s_PRESS_SPACE]]).  The decorative strings
+[[s_DECOR_ROW1]] through [[s_DECOR_ROW3]] are drawn on the right panel.
 
 <<defines>>=
 UI_TEXT_STREAM          EQU     $5E55   ; text stream data for game UI background
@@ -2034,13 +2059,10 @@ s_DECOR_ROW2           EQU     $5F07   ; decorative right-side row 2
 s_DECOR_ROW3           EQU     $5F10   ; decorative right-side row 3
 @ %def UI_TEXT_STREAM s_COPYRIGHT s_PRESS_SPACE s_DECOR_ROW1 s_DECOR_ROW2 s_DECOR_ROW3
 
-@ [[INIT_GAME_DISPLAY]] draws the game's main screen layout.  It starts by
-sending HRCG control character~\$90 to clear the hi-res screen, then points
-the text stream at the UI layout data and calls [[TEXT_RENDERER]] to draw the
-background text (borders, labels, dividers).  Three 2$\times$2 border
-characters are drawn at the top of the right panel, followed by
-[[DRAW_BORDER_LABELS]] for text labels and [[DRAW_BORDER_ICONS]] for corner
-decorations.
+@ All character output in the game passes through [[ROM_COUT1]], the
+Apple~II ROM's character output routine at [[$FDED]].  When the HRCG is
+active, [[ROM_COUT1]] is redirected through the CSW vector to
+[[HRCG_COUT]], which renders characters in hi-res graphics mode.
 
 <<defines>>=
 ROM_COUT1            EQU     $FDED   ; Apple II ROM COUT1 (character output)
@@ -2128,12 +2150,15 @@ INIT_GAME_DISPLAY:
     LDY     #>s_DECOR_ROW3
     JMP     PRINT_STRING_AT_ADDR
 @ %def INIT_GAME_DISPLAY
-Helper for [[INIT_GAME_DISPLAY]].  Draws a 2$\times$2 font character
-from charset~2 at column~[[X]], row~3.  The character number is in~[[A]].
+@ [[DRAW_BORDER_CHAR]] is a helper for [[INIT_GAME_DISPLAY]].  It draws a
+2$\times$2 font character from charset~2 at column~[[X]], row~3.  The
+character number is passed in~A.  It stores the character number into
+[[FONT_CHARNUM]] and the charset into [[FONT_CHARSET]], then calls
+[[PRINT_FONTCHAR_AT_TEXT_POS]] to render it.
 
 <<defines>>=
-FONT_CHARNUM        EQU     $5A0E
-FONT_CHARSET        EQU     $5A0F
+FONT_CHARNUM        EQU     $5A0E   ; font character number to render
+FONT_CHARSET        EQU     $5A0F   ; font charset index (1-5)
 @ %def FONT_CHARNUM FONT_CHARSET
 
 <<draw border char>>=
@@ -2148,14 +2173,15 @@ DRAW_BORDER_CHAR:
     STA     FONT_CHARSET
     JMP     PRINT_FONTCHAR_AT_TEXT_POS
 @ %def DRAW_BORDER_CHAR
-Draws text labels around the game border.  Three loops iterate over
-tables of (column, row) pairs, printing a border pattern string at
-each position.  Selects HRCG charset~2 before drawing.
-
-<<defines>>=
-BORDER_POS_VERT_R      EQU     $5E9B   ; 10 col/row pairs for vertical border labels (right)
-BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
-@ %def BORDER_POS_VERT_R BORDER_STR_VERT_R
+@ [[DRAW_BORDER_LABELS]] draws text labels around the game border.
+Three loops iterate over tables of (column, row) pairs, printing a
+border pattern string at each position.  It selects HRCG charset~2
+before drawing.  The position tables ([[BORDER_POS_HORIZ]],
+[[BORDER_POS_VERT_L]], [[BORDER_POS_VERT_R]]) each contain pairs of
+column/row bytes.  The pattern strings ([[BORDER_STR_HORIZ]],
+[[BORDER_STR_VERT_L]], [[BORDER_STR_VERT_R]]) are printed at each
+position via [[PRINT_STRING_ADDR]] ([[$BC/$BD]]).  [[BORDER_LOOP_CTR]]
+is a RAM counter used to track the loop iteration.
 
 <<zero page defines>>=
 PRINT_STRING_ADDR       EQU     $BC     ; print string source pointer (2 bytes)
@@ -2164,10 +2190,12 @@ PRINT_STRING_ADDR       EQU     $BC     ; print string source pointer (2 bytes)
 <<defines>>=
 BORDER_POS_HORIZ       EQU     $5E7B   ; 6 col/row pairs for horizontal border labels
 BORDER_POS_VERT_L      EQU     $5E87   ; 10 col/row pairs for vertical border labels (left)
+BORDER_POS_VERT_R      EQU     $5E9B   ; 10 col/row pairs for vertical border labels (right)
 BORDER_STR_HORIZ       EQU     $5EAF   ; horizontal border pattern string
 BORDER_STR_VERT_L      EQU     $5EC1   ; vertical border pattern string (left)
+BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
 BORDER_LOOP_CTR        EQU     $5DC3   ; loop counter for border label drawing
-@ %def BORDER_POS_HORIZ BORDER_POS_VERT_L BORDER_STR_HORIZ BORDER_STR_VERT_L BORDER_LOOP_CTR
+@ %def BORDER_POS_HORIZ BORDER_POS_VERT_L BORDER_POS_VERT_R BORDER_STR_HORIZ BORDER_STR_VERT_L BORDER_STR_VERT_R BORDER_LOOP_CTR
 
 <<draw border labels>>=
     ORG     $5CFD
@@ -2266,9 +2294,11 @@ DRAW_BORDER_ICONS:
     LDY     #$0B
     JMP     PLOT_CHAR
 @ %def DRAW_BORDER_ICONS
-Thin wrapper that passes a pointer to the world initialization data
-at [[$62B9]] to the game setup routine at [[$5F19]].  Called once
-from [[GAME_INIT]] to initialize locations and scene state.
+
+@ [[INIT_WORLD]] is a thin wrapper that passes a pointer to the world
+initialization data table ([[WORLD_INIT_DATA]] at [[$62B9]]) to the game
+setup routine [[INPUT_LOOP]].  Called once from [[GAME_INIT]] to
+initialize locations and scene state.
 
 <<defines>>=
 WORLD_INIT_DATA         EQU     $62B9   ; world initialization data table
@@ -2283,15 +2313,6 @@ INIT_WORLD:
     LDY     #<WORLD_INIT_DATA ; /
     JMP     INPUT_LOOP        ; initialize world from data table
 
-@ Sets the zero-page pointer [[$08/$09]] to the RWTS Input/Output Block
-at [[$B7E8]].  Called once during [[GAME_INIT]].  The game's disk I/O
-routines (relocated to \$B300--\$BFFF during [[GAME_INIT]]) use this
-pointer to access the IOB fields via indirect-indexed addressing:
-e.g.\ [[STA ($08),Y]] with [[Y]] selecting the field (track, sector,
-command code, buffer address, etc.).  The RWTS entry point is at [[$B7B5]].
-
-
-
 @ A single [[RTS]]---another no-op stub called from [[GAME_INIT]], like
 [[INIT_STUB]] at [[$7919]].
 
@@ -2300,10 +2321,13 @@ command code, buffer address, etc.).  The RWTS entry point is at [[$B7B5]].
 INIT_STUB2:
     RTS
 @ %def INIT_STUB2
-@ [[INIT_DISK_IOB]] sets the zero-page pointer [[$08/$09]] to the address
-of the RWTS Input/Output Block at~\$B7E8.  This single-assignment call during
-[[GAME_INIT]] enables all subsequent disk operations to access the IOB fields
-through indirect-indexed addressing.
+
+@ [[INIT_DISK_IOB]] sets the zero-page pointer [[RWTS_IOB_PTR]]
+([[$08/$09]]) to the address of the RWTS Input/Output Block
+([[RWTS_IOB]] at [[$B7E8]]).  This single-assignment call during
+[[GAME_INIT]] enables all subsequent disk operations to access the IOB
+fields through indirect-indexed addressing (e.g.\ [[LDA ($08),Y]]
+with~Y selecting the field).
 
 <<defines>>=
 RWTS_IOB                EQU     $B7E8   ; RWTS Input/Output Block (14 bytes)
@@ -2368,15 +2392,17 @@ SELECT_INPUT_MODE:
     LDA     #$2F           ; message $2F: joystick confirmation
     JMP     DISPLAY_MESSAGE
 @ %def SELECT_INPUT_MODE
-Called once during [[GAME_INIT]] to initialize [[TOTAL_MOB_COUNT]].
-Walks all 9-byte character records starting from index~1 (skipping
-the group-0 header at [[$4000]]), summing byte~8 (group member count)
-of each record until the end sentinel (byte~1 = [[$FF]]) is reached.
 
-The result is the total number of mobs assigned to groups~1 and above.
-At startup, byte~8 contains only the group count in bits~3--0 (the
-upper bits---pending XP and status flag---are zero), so the sum is
-simply the total mob count.
+@ [[INIT_MOB_COUNT]] is called once during [[GAME_INIT]] to initialize
+[[TOTAL_MOB_COUNT]].  It walks all 9-byte character records using
+[[CHAR_PTR]] ([[$FA/$FB]]) starting from index~1 (skipping the group-0
+header at [[$4000]]), summing byte~8 (group member count) of each record
+until the end sentinel (byte~1 = [[$FF]]) is reached.
+
+The result in [[TOTAL_MOB_COUNT]] is the total number of mobs assigned to
+groups~1 and above.  At startup, byte~8 contains only the group count in
+bits~3--0 (the upper bits---pending XP and status flag---are zero), so the
+sum is simply the total mob count.
 
 <<zero page defines>>=
 CHAR_PTR                EQU     $FA     ; character record pointer (2 bytes, $FA/$FB)
@@ -6500,9 +6526,10 @@ LOAD_MAP_TILES:
     RTS
 @ %def LOAD_MAP_TILES
 Two basic routines print the font character stored in [[FONT_CHARNUM]].
-One routine simply does the font position to text position conversion before
-calling the second. There is a stored string which has spots for the character
-set and the four character blocks that this routine sets.
+[[PRINT_FONTCHAR_AT_TEXT_POS]] converts the font position to a text position
+before calling [[PRINT_FONTCHAR]]. A stored control string at [[s_PRINT_FONT_CHAR]]
+has slots for the character set and the four character blocks that
+[[PRINT_FONTCHAR]] fills in before printing.
 
 When printing using the 2x2 font characters, we can set up the HRCG's
 "block display mode". This takes four characters and plots them in a 2x2
@@ -6912,11 +6939,11 @@ DRAW_MAP_ENTITIES:
     BNE     .mob_loop
     RTS
 @ %def DRAW_MAP_ENTITIES
-After drawing a map entity, this routine copies the current font
+After drawing a map entity, [[DRAW_MAP_ICON_B]] copies the current font
 position ([[FONT_COL]]/[[FONT_ROW]]/[[FONT_CHARNUM]]) into the
 blink cursor variables ([[BLINK_COL]]/[[BLINK_ROW]]/[[BLINK_CHAR]]),
 then calls [[TIMED_WAIT]] with the delay from [[BLINK_DELAY]].
-Finishes by resetting [[BLINK_COL]] to~\$14 (disabled).
+It finishes by resetting [[BLINK_COL]] to~\$14 (disabled).
 
 
 <<defines>>=
@@ -13520,8 +13547,8 @@ The ``advance'' routine is the target of all [[JMP SCRIPT_ADVANCE]] in
 the control commands.  It increments the script pointer, checks for user
 input (during attract mode), and loops back to [[.fetch]].
 
-During the attract screen ([[ATTRACT_FLAG]] = 1), this routine checks for
-keyboard or joystick input.  If detected, it returns immediately via RTS,
+During the attract screen ([[ATTRACT_FLAG]] = 1), [[SCRIPT_ADVANCE]] checks
+for keyboard or joystick input.  If detected, it returns immediately via RTS,
 which exits the entire [[SCRIPT_ENGINE]] call.
 
 <<script advance>>=
@@ -14015,7 +14042,7 @@ the disk, then reads all 342 nibbles (86~secondary + 256~primary) and
 verifies each byte equals~[[$AF]].  Finally checks the data epilogue
 ([[DE AA]]).  Returns carry clear on success, carry set on error.
 
-This routine is called internally by the disk~VM (via [[JSR $B304]]).
+[[VERIFY_DATA_FIELD]] is called internally by the disk~VM (via [[JSR $B304]]).
 
 <<defines>>=
 DISK_DATA_REG           EQU     $C0EC   ; disk controller data register (active slot)
