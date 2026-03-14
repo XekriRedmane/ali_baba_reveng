@@ -3982,6 +3982,14 @@ A second entry point at~[[$0DA4]] (1~caller) skips the initialization
 of~Y and the leading-zero flag, allowing the caller to control the
 starting output position and suppression behavior.
 
+@ [[NUM_TO_DECIMAL]] converts a 16-bit value in [[NUM_VALUE]] ([[$BC/$BD]])
+to a decimal ASCII string stored at [[DECIMAL_OUT_PTR]] ([[$BA/$BB]]).  It
+divides repeatedly by powers of ten (10000, 1000, 100, 10, 1), accumulating
+each digit in [[NUM_DIGIT]] and writing it to the output buffer.
+[[NUM_LEADING]] suppresses leading zeros: it starts at~0 (suppress) and
+flips to~1 after the first nonzero digit.  [[NUM_DIVISOR]] ([[$5A1C/$5A1D]])
+holds the current power-of-ten divisor.
+
 <<defines>>=
 NUM_LEADING         EQU     $5A1E   ; leading-zero suppress flag (0=suppress, 1=print)
 NUM_DIVISOR         EQU     $5A1C   ; 16-bit divisor for decimal conversion (2 bytes)
@@ -4079,6 +4087,12 @@ third and subsequent lines, it scrolls, prints, then calls [[$0D10]]
 
 An entry with a zero length byte terminates the message.  If exactly
 two lines were printed, a final scroll is performed on exit.
+
+@ [[DISPLAY_MESSAGE]] indexes into the message table at [[MSG_TABLE_PTR]]
+([[$4005/$4006]]) to find the string for message number~A.  It walks the
+table by skipping length-prefixed entries until the desired index is
+reached.  [[MSG_LINE_COUNT]] tracks how many lines have been printed so
+far, which controls whether the routine scrolls before or after printing.
 
 <<defines>>=
 MSG_TABLE_PTR           EQU     $4005   ; message table base (2 bytes)
@@ -4276,12 +4290,12 @@ high_tone:
     BNE      high_tone     ; 3 cycles
     RTS
 @ %def high_tone
-Generates a square wave tone by toggling the Apple~II speaker.
-The outer loop runs 10~iterations (Y), each toggling the speaker
-then delaying by X cycles.  After all 10~toggles, the whole sequence
-repeats [[SOUND_DURATION]] times.  [[SOUND_FREQ]] controls the pitch
-(higher value = lower frequency).
 
+@ [[PLAY_TONE]] generates a square wave tone by toggling the Apple~II
+speaker at [[$C030]].  The outer loop runs 10~iterations (Y), each toggling
+the speaker then delaying by~X cycles.  After all 10~toggles, the whole
+sequence repeats [[SOUND_DURATION]] times.  [[SOUND_FREQ]] controls the
+pitch (higher value = lower frequency).
 
 <<zero page defines>>=
 SOUND_FREQ              EQU     $E1     ; sound frequency / script modified action
@@ -4306,10 +4320,11 @@ PLAY_TONE:
     BNE     .outer
     RTS
 @ %def PLAY_TONE
-Generates noise by toggling the speaker while rotating a shift
-register ([[NOISE_SHIFT]]).  The ROL/ROR pair with the speaker read
-creates pseudo-random bit patterns that produce a ``hiss'' or
-explosion-like sound.
+
+@ [[PLAY_NOISE]] generates noise by toggling the speaker while rotating
+[[NOISE_SHIFT]], a zero-page shift register.  The ROL/ROR pair with the
+speaker read creates pseudo-random bit patterns that produce a ``hiss''
+or explosion-like sound.
 
 <<zero page defines>>=
 NOISE_SHIFT             EQU     $E3     ; noise generator shift register
@@ -4449,6 +4464,11 @@ The pseudo-random number generator computes:
 $$\texttt{val}_{n+1} = 69 \cdot \texttt{val}_n + \$53 \pmod{256}$$
 and stores both the full result and a shifted copy.
 
+@ [[STEP_PRNG]] maintains three state variables: [[PRNG_STATE]] holds the
+full LCG state, [[PRNG_TEMP]] is a scratch byte used during the $69\times$
+multiplication, and [[PRNG_OUTPUT]] receives the state shifted right by one
+bit---this is the value most callers test for random decisions.
+
 <<defines>>=
 PRNG_STATE          EQU     $5A19   ; PRNG full state: val = 69*val + $53 (mod 256)
 PRNG_TEMP           EQU     $5A1A   ; PRNG temporary for multiplication
@@ -4492,9 +4512,14 @@ or equal to the shifted limit.  This avoids modulo bias.
 Input: A~=~range limit (1--127).  If A~=~0, returns~0 immediately.
 Output: A~=~random value in [[0..limit$-$1]].
 
+@ [[RANDOM_IN_RANGE]] saves the limit in [[RNG_LIMIT]] and computes a
+bitmask in [[RNG_MASK]] that covers the range.  It then loops, calling
+[[STEP_PRNG]] and masking [[PRNG_OUTPUT]] with [[RNG_MASK]], rejecting
+values that exceed the limit.
+
 <<defines>>=
-RNG_LIMIT           EQU     $5A11   ; random\_in\_range temporary (limit/shift count)
-RNG_MASK            EQU     $5A12   ; random\_in\_range bit mask
+RNG_LIMIT           EQU     $5A11   ; random_in_range temporary (limit/shift count)
+RNG_MASK            EQU     $5A12   ; random_in_range bit mask
 @ %def RNG_LIMIT RNG_MASK
 
 @ The implementation below uses bit-mask tables for each power-of-two range
@@ -4628,10 +4653,11 @@ COLROW_TO_POS:
     BCC     .loop ; no overflow → continue
                                 ; carry set → return (overflow)
 @ %def COLROW_TO_POS
-Computes a pointer into the game data from a 1-based scene index in~A.
-Each scene record is 16 bytes.  The result
-[[MOB_DATA_PTR/MOB_DATA_PTR+1 = ($4000) + (index - 1) \times 16$]] is stored in [[MOB_DATA_PTR]]/[[MOB_DATA_PTR+1]],
-where [[$4000/$4001]] holds the base address of the scene table.
+
+@ [[COMPUTE_SCENE_PTR]] (also labeled [[GET_MOB_DATA]]) computes a pointer
+into the game data from a 1-based index in~A.  Each record is 16~bytes.
+The result [[MOB_DATA_PTR]] ([[$BA/$BB]]) = [[$4000/$4001]] base +
+(index$-$1)$\times$16.
 
 <<zero page defines>>=
 MOB_DATA_PTR            EQU     $BA     ; mob data record pointer (2 bytes, $BA/$BB)
@@ -4668,12 +4694,9 @@ GET_MOB_DATA:
 
 \section{Timing and animation}
 
-Delays for a configurable duration while keeping the status window
-animation running.  Loads an iteration count from [[$7ABF]] and calls
-[[$0D30]] (the per-tick animation/wait handler) that many times.
-Each call to [[$0D30]] ticks an animation counter, runs a timed wait
-via the ROM [[WAIT]] routine, and advances the animation frame when
-the counter expires.
+@ [[DELAY_WITH_ANIMATION]] delays for a configurable duration while keeping
+the status window animation running.  It loads an iteration count from
+[[DELAY_COUNT]] and calls [[ANIM_TICK_AND_WAIT]] that many times.
 
 <<defines>>=
 DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
@@ -4697,10 +4720,11 @@ DELAY_WITH_ANIMATION:
     BNE     .loop              ; loop until zero
     RTS
 @ %def DELAY_WITH_ANIMATION
-Decrements the animation frame counter at [[$7AAF]].  When it reaches
-zero, calls [[$74CB]] to advance the animation frame.  Then reloads
-the wait loop count from the timing table at [[$7AB0]] (indexed by
-the current animation index at [[$7ABD]]) into [[$5A8C]].
+
+@ [[TICK_ANIM_COUNTER]] decrements [[ANIM_FRAME_CTR]].  When it reaches
+zero, it calls [[$74CB]] to advance the animation frame, then reloads the
+wait loop count from [[ANIM_WAIT_TABLE]] (indexed by [[ANIM_INDEX]]) into
+[[WAIT_LOOP_COUNT]].
 
 <<defines>>=
 ANIM_FRAME_CTR          EQU     $7AAF   ; animation frame countdown
@@ -4725,12 +4749,12 @@ TICK_ANIM_COUNTER:
     STA     WAIT_LOOP_COUNT   ; store for timed_wait to use
     RTS
 @ %def TICK_ANIM_COUNTER
-Combined animation tick and wait.  Calls [[TICK_ANIM_COUNTER]] to
-decrement the frame counter and set up the wait count, then calls
-[[TIMED_WAIT]] to burn time.  If the frame counter has reached zero
-(meaning the animation frame expired), calls [[$74DD]] to update the
-display and reloads the frame counter from the frame table at
-[[$7AB6]].
+
+@ [[ANIM_TICK_AND_WAIT]] combines an animation tick and a timed wait.
+It calls [[TICK_ANIM_COUNTER]], then [[TIMED_WAIT]] to burn time.  If
+the frame counter has reached zero, it calls [[DRAW_BLINK_NORMAL]] to
+restore the display and reloads [[ANIM_FRAME_CTR]] from the frame
+duration table [[ANIM_FRAME_TABLE]] (indexed by [[ANIM_INDEX]]).
 
 <<defines>>=
 ANIM_FRAME_TABLE        EQU     $7AB6   ; per-frame frame counts (indexed)
@@ -4754,9 +4778,10 @@ ANIM_TICK_AND_WAIT:
     STA     ANIM_FRAME_CTR     ; reset frame counter
     RTS
 @ %def ANIM_TICK_AND_WAIT
-Calls the ROM [[WAIT]] wrapper [[$0D58]] repeatedly, decrementing
-[[WAIT_LOOP_COUNT]] until it reaches zero.  If the count is already
-zero on entry, returns immediately.
+
+@ [[TIMED_WAIT]] calls the ROM [[WAIT]] wrapper [[CALL_ROM_WAIT]]
+repeatedly, decrementing [[WAIT_LOOP_COUNT]] until it reaches zero.
+If the count is already zero on entry, it returns immediately.
 
 <<timed wait>>=
     ORG     $0D49
@@ -4773,19 +4798,15 @@ TIMED_WAIT:
     BNE     .wait           ; loop until zero
     RTS
 @ %def TIMED_WAIT
-Loads the wait duration from [[WAIT_DURATION]] and jumps to the
-Apple~II ROM [[WAIT]] routine at [[$FCA8]], which delays for
-approximately $A \times 2.5 + 13.5$ microseconds.
+
+@ [[CALL_ROM_WAIT]] loads the wait duration from [[WAIT_DURATION]] and
+tail-calls the Apple~II ROM [[WAIT]] routine ([[ROM_WAIT]] at [[$FCA8]]),
+which delays for approximately $A \times 2.5 + 13.5$ microseconds.
 
 <<defines>>=
 ROM_WAIT                EQU     $FCA8   ; Apple II ROM WAIT routine
-@ %def ROM_WAIT
-
-@ The routine below loads the duration and tail-calls the ROM.
-
-<<defines>>=
 WAIT_DURATION           EQU     $7AAD   ; ROM WAIT duration parameter
-@ %def WAIT_DURATION
+@ %def ROM_WAIT WAIT_DURATION
 
 <<call rom wait>>=
     ORG     $0D58
@@ -4817,12 +4838,12 @@ DISPATCH_ON_MODE:
 
 \section{Field utilities}
 
-Ensures that byte~6 of the character record at [[MOB_PTR]] has its lower 6~bits
-at least as large as byte~5's lower 5~bits.  If byte~6 is smaller, its low
-bits are replaced with byte~5's value (preserving byte~6's top 2~bits).
-This clamps a stat floor---likely ensuring current HP does not fall below
-a minimum derived from another field.
-
+@ [[CLAMP_CHAR_FIELD]] ensures that byte~6 of the record at [[MOB_PTR]]
+([[$F4/$F5]]) has its lower 6~bits at least as large as byte~5's lower
+5~bits.  If byte~6 is smaller, its low bits are replaced with byte~5's
+value (preserving byte~6's top 2~bits).  This clamps a stat floor---
+likely ensuring current HP does not fall below a minimum derived from
+another field.
 
 <<zero page defines>>=
 MOB_PTR                 EQU     $F4     ; mob data pointer (2 bytes, $F4/$F5)
@@ -4860,9 +4881,14 @@ transition.
 The [[$5C00]] region is populated dynamically by [[LOAD_SCENE_DATA]]
 from disk.  Its contents change with each scene.
 
-These routines save and restore four zero-page pointer pairs to/from
-fixed addresses in the [[$5A00]] page.  The pointers are used throughout
-the game for character records, text buffers, and cursor state.
+@ [[SAVE_ZP_POINTERS]] and [[RESTORE_ZP_POINTERS]] save and restore four
+zero-page pointer pairs to/from fixed addresses in the [[$5A00]] page.
+The saved pairs are [[$BC/$BD]] ([[TARGET_REC]]/[[PRINT_STRING_ADDR]]),
+[[$F8/$F9]] ([[ENTITY_PTR]]), [[$BE/$BF]] ([[CHAR_REC]]/[[DATA_PTR]]), and
+[[$F4/$F5]] ([[MOB_PTR]]).  These pointers are heavily aliased---the same
+zero-page bytes serve different roles in different routines---so saving
+and restoring them is necessary when entering nested operations like
+scene loading or disk I/O.
 
 <<defines>>=
 SAVED_BC            EQU     $5A9A   ; saved TARGET_REC/PRINT_STRING_ADDR (2 bytes)
@@ -4870,8 +4896,6 @@ SAVED_F8            EQU     $5A9C   ; saved ENTITY_PTR pointer (2 bytes)
 SAVED_BE            EQU     $5A9E   ; saved CHAR_REC/ENTITY_REC (2 bytes)
 SAVED_F4            EQU     $5AA0   ; saved MOB_PTR pointer (2 bytes)
 @ %def SAVED_BC SAVED_F8 SAVED_BE SAVED_F4
-
-@ The routine below copies the four pointer pairs to their save slots.
 
 <<zero page defines>>=
 DATA_PTR                EQU     $BE     ; general data pointer / return value (2 bytes)

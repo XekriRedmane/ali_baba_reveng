@@ -232,8 +232,8 @@ MSG_LINE_COUNT          EQU     $5A57   ; lines printed so far
 PRNG_STATE          EQU     $5A19   ; PRNG full state: val = 69*val + $53 (mod 256)
 PRNG_TEMP           EQU     $5A1A   ; PRNG temporary for multiplication
 PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random tests
-RNG_LIMIT           EQU     $5A11   ; random\_in\_range temporary (limit/shift count)
-RNG_MASK            EQU     $5A12   ; random\_in\_range bit mask
+RNG_LIMIT           EQU     $5A11   ; random_in_range temporary (limit/shift count)
+RNG_MASK            EQU     $5A12   ; random_in_range bit mask
 DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
 ANIM_FRAME_CTR          EQU     $7AAF   ; animation frame countdown
 ANIM_INDEX              EQU     $7ABD   ; current animation table index
