@@ -652,41 +652,698 @@ Note: the [[EALDR]] also loads game data from tracks [[$07]]--[[$0C]] into
 [[$4000]]--[[$95FF]] and decrypts [[$4000]]--[[$67FF]] (see~\S\ref{sec:ealdr}).
 It also copies [[$A300]]--[[$A5FF]] from [[EALDR]] memory to [[$0500]]--[[$07FF]].
 
-\section{BOOT1}
+\chapter{BOOT1}
 \label{sec:boot1}
 
 [[BOOT1]] consists of 5 sectors from track 0, loaded by the disk card's boot
 ROM into [[$0800]]--[[$0CFF]]. The boot ROM reads physical sectors 0--4 into
 consecutive pages. After loading, execution enters at [[$0801]].
 
-[[BOOT1]] contains:
-\begin{itemize}
-  \item The boot code at [[$0800]] (sets reset vector, loads [[EALDR]], enters it).
-  \item Disk read routines at [[$0900]]--[[$0AFF]] (sector search, nibble decoding).
-  \item Translation table data at [[$0B00]].
-  \item The sector loader at [[$0C00]] with the custom interleave table at [[$0C48]].
-\end{itemize}
+\begin{center}
+\begin{tabular}{lll}
+Address & Size & Contents \\
+\hline
+[[$0800]]         &   1 & Sector count byte ([[$05]]) \\
+[[$0801]]--[[$0803]] &   3 & [[JMP \$0804]] \\
+[[$0804]]--[[$083F]] &  60 & [[BOOT1_ENTRY]]: set reset vector, load EALDR, enter it \\
+[[$0840]]--[[$086D]] &  46 & 4am crack: language card check, BLOAD crack code \\
+[[$086E]]--[[$0880]] &  19 & 4am crack: no-language-card path (print error, JMP \$03D0) \\
+[[$0881]]--[[$08DD]] &  93 & 4am crack: high-bit ASCII strings \\
+[[$08DE]]--[[$08E3]] &   6 & Zero padding \\
+[[$08E4]]--[[$08E7]] &   4 & [[BOOT1_PRINT_CR]]: [[JSR ROM_CRDO]]; [[RTS]] \\
+[[$08E8]]--[[$08FD]] &  22 & Zero padding \\
+[[$08FE]]--[[$08FF]] &   2 & Reset vector complement ([[$B7 \$FF]]) \\
+[[$0900]]--[[$0901]] &   2 & [[BOOT1_READ_ERROR]]: [[SEC]]; [[RTS]] \\
+[[$0902]]--[[$09C5]] & 196 & [[BOOT1_READ_SECTOR]]: nibble-decode a data field \\
+[[$09C6]]             &   1 & [[BOOT1_TRACK]]: current track number \\
+[[$09C7]]             &   1 & [[BOOT1_ERROR_FLAG]]: set on timeout \\
+[[$09C8]]--[[$09F7]] &  48 & [[BOOT1_SEEK_TRACK]]: half-track arm stepping \\
+[[$09F8]]--[[$0A04]] &  13 & [[BOOT1_PHASE_ON]]: activate stepper phase \\
+[[$0A05]]--[[$0A12]] &  14 & [[BOOT1_DELAY]]: nested delay loop \\
+[[$0A13]]--[[$0A14]] &   2 & [[BOOT1_ADDR_ERROR]]: [[SEC]]; [[RTS]] \\
+[[$0A15]]--[[$0A6F]] &  91 & [[BOOT1_FIND_SECTOR]]: search for address field \\
+[[$0A70]]--[[$0A97]] &  40 & Nibble translation table (secondary) + ASCII fragment \\
+[[$0A98]]--[[$0AFF]] & 104 & Nibble translation table (6-and-2 primary decode) \\
+[[$0B00]]--[[$0BFF]] & 256 & Nibble translation table (pair decode) \\
+[[$0C00]]--[[$0C47]] &  72 & [[BOOT1_LOAD_TRACK]]: read all 16 sectors of a track \\
+[[$0C48]]--[[$0C57]] &  16 & Custom interleave table \\
+[[$0C58]]--[[$0C67]] &  16 & Destination page table (runtime-computed) \\
+[[$0C68]]--[[$0CFF]] & 152 & 4am crack text \\
+\end{tabular}
+\end{center}
 
-The boot code loads [[EALDR]] from tracks 1--2 using the sector loader:
+After the disk card reads [[BOOT1]], the zero-page location [[$3E]] is
+left as the pointer to the page just after [[BOOT1]], so that [[BOOT1]] knows
+where it ends.  The location [[$2B]] is the disk card's slot index (slot$\times$16).
+
+@ [[BOOT1_ENTRY]] sets the reset vector to [[$C600]] (reboot), turns on the
+drive motor, then loads [[EALDR]] from tracks 1--2 using [[BOOT1_LOAD_TRACK]]:
 first track 2 into [[$B000]]--[[$BFFF]] (base page [[$B0]]),
 then track 1 into [[$A000]]--[[$AFFF]] (base page [[$A0]]).
-It then pushes [[$A805]] onto the stack as a return address and, after
+It pushes [[$A805]] onto the stack as a return address and, after
 a delay loop, executes [[RTS]] to enter [[EALDR]] at [[$A806]].
 
-After the disk card reads [[BOOT1]], the zero-page location [[IWMDATAPTR]] is
-left as the pointer to memory just after [[BOOT1]]. The
-location [[IWMSLTNDX]] is the disk card's slot index (slot times 16).
+@ [[SOFTEV]] ([[$03F2]]) and [[PWREDUP]] ([[$03F4]]) are the Apple~II reset
+vector and its complement byte.  [[IWM_MOTORON]] ([[$C0E9]]) turns on the
+disk drive motor for slot~6.
 
-<<BOOT1>>=
+<<boot1 defines>>=
+SOFTEV          EQU     $03F2   ; reset vector (2 bytes)
+PWREDUP         EQU     $03F4   ; power-up byte (EOR of SOFTEV bytes)
+IWM_MOTORON     EQU     $C0E9   ; IWM motor on (slot-indexed)
+@ %def SOFTEV PWREDUP IWM_MOTORON
+
+<<boot1 entry>>=
+    ORG     $0800
+    HEX     05              ; sector count: 5 sectors in BOOT1
+    JMP     BOOT1_ENTRY
+
+    ORG     $0804
+BOOT1_ENTRY:
+    SUBROUTINE BOOT1_ENTRY
+
+    LDA     #$00            ; \
+    STA     SOFTEV          ;  | reset vector = $C600 (reboot)
+    LDA     #$C6            ;  |
+    STA     SOFTEV+1        ; /
+    EOR     #$A5            ;  PWREDUP = $C6 EOR $A5 = $63
+    STA     PWREDUP
+    LDA     #$00
+    STA     BOOT1_ERROR_FLAG ; clear error flag
+    LDA     IWM_MOTORON     ; turn on drive motor
+
+    ; Load track 2 → $B000-$BFFF
+    LDA     #$B0
+    STA     $3E             ; base page = $B0
+    LDA     #$02            ; track 2
+    JSR     BOOT1_LOAD_TRACK
+
+    ; Load track 1 → $A000-$AFFF
+    LDA     #$A0
+    STA     $3E             ; base page = $A0
+
+    ; Push $A8 (high byte of EALDR entry - 1)
+    LDA     #$A8
+    PHA
+
+    ; Load track 1 → $A000-$AFFF
+    LDA     #$01            ; track 1
+    JSR     BOOT1_LOAD_TRACK
+
+    ; Push $05 (low byte), completing return address $A805 → RTS enters $A806
+    LDA     #$05
+    PHA
+
+    ; Seek to track 0 and wait
+    LDA     #$00
+    JSR     BOOT1_SEEK_TRACK
+
+    ; Check for errors, retry or enter EALDR
+    LDA     BOOT1_ERROR_FLAG
+    BNE     BOOT1_ENTRY     ; retry on error
+    JMP     BOOT1_DELAY     ; delay, then RTS → $A806
+@ %def BOOT1_ENTRY
+
+@ The region at [[$0840]]--[[$08FF]] contains the 4am crack code that
+replaced the original protection check.  On entry it checks for a
+language card, loads the crack's two-part ASM.CODE overlay, and
+enters the Applesoft interpreter.  If no language card is present,
+it prints an error message via [[ROM_COUT1]] and jumps to the
+monitor warm-start at [[$03D0]].  [[ROM_COUT1]] ([[$FDED]]) is the
+standard Apple~II character output routine.  [[ROM_CRDO]] ([[$FDDA]])
+outputs a carriage return.
+
+<<boot1 defines>>=
+ROM_COUT1       EQU     $FDED   ; character output
+ROM_CRDO        EQU     $FDDA   ; output carriage return
 @
 
-\section{EALDR: The Electronic Arts Loader}
+<<boot1 crack>>=
+    ORG     $0840
+BOOT1_CRACK:
+    SUBROUTINE BOOT1_CRACK
+    ; --- Language card present path ---
+    HEX     89 C0           ; BIT #$C0 (65C02) — no-op on NMOS 6502
+    LDA     $C089           ; read RAM bank 2 (two accesses to enable)
+.print1:
+    LDA     .s_bload1,Y     ; \
+    BEQ     .exec1          ;  | print BLOAD command string 1
+    JSR     ROM_COUT1       ;  |
+    INY                     ;  |
+    JMP     .print1         ; /
+.exec1:
+    LDA     $C083           ; \  read/write RAM bank 2
+    LDA     $C083           ;  | (two accesses)
+    LDA     $C083           ; /  (third for good measure)
+    LDY     #$00
+.print2:
+    LDA     .s_bload2,Y     ; \
+    BEQ     .exec2          ;  | print BLOAD command string 2
+    JSR     ROM_COUT1       ;  |
+    INY                     ;  |
+    JMP     .print2         ; /
+.exec2:
+    LDA     $C080           ; read RAM bank 2 (enable lang card)
+    JMP     $E000           ; enter Applesoft interpreter
+
+    ; --- No language card path ---
+BOOT1_CRACK_NOLC:
+    LDX     #$00
+.print_err:
+    LDA     .s_no_langcard,X ; \
+    BEQ     .done           ;  | print "NO LANGUAGE CARD INSTALLED"
+    JSR     ROM_COUT1       ;  |
+    INX                     ;  |
+    BNE     .print_err      ; /
+.done:
+    LDA     $C081           ; read ROM, write RAM bank 2
+    JMP     $03D0           ; monitor warm-start
+
+    ; High-bit ASCII strings
+.s_no_langcard:
+    HEX     CE CF A0 CC C1  ; "NO LANGUAGE CARD INSTALLED" (high-bit)
+    HEX     CE C7 D5 C1 C7
+    HEX     C5 A0 C3 C1 D2
+    HEX     C4 A0 C9 CE D3
+    HEX     D4 C1 CC CC C5
+    HEX     C4 8D 87 00
+.s_bload1:
+    HEX     8D 84 C2 CC CF  ; CR, Ctrl-D, "BLOAD ASM.CODE.1,A$D000" (high-bit)
+    HEX     C1 C4 A0 C1 D3
+    HEX     CD AE C3 CF C4
+    HEX     C5 AE B1 AC C1
+    HEX     A4 C4 B0 B0 B0
+    HEX     8D 00
+.s_bload2:
+    HEX     8D 84 C2 CC CF  ; CR, Ctrl-D, "BLOAD ASM.CODE.2,A$D000" (high-bit)
+    HEX     C1 C4 A0 C1 D3
+    HEX     CD AE C3 CF C4
+    HEX     C5 AE B2 AC C1
+    HEX     A4 C4 B0 B0 B0
+    HEX     8D
+.s_mono:
+    HEX     84 CD CF CE CF  ; Ctrl-D, "MONO,I,C" (high-bit)
+    HEX     AC C9 AC C3 8D
+    HEX     00
+
+    ; Padding and small utility
+    DS      6,$00           ; zero padding
+BOOT1_PRINT_CR:
+    JSR     ROM_CRDO
+    RTS
+
+    DS      22,$00          ; zero padding
+    HEX     B7 FF           ; reset vector complement
+@ %def BOOT1_CRACK BOOT1_CRACK_NOLC BOOT1_PRINT_CR
+
+@ [[BOOT1_READ_ERROR]] and [[BOOT1_ADDR_ERROR]] are the two error-return
+entry points: both set carry and return.  Code branches here when
+a timeout or checksum mismatch occurs.
+
+@ [[BOOT1_READ_SECTOR]] reads and decodes one sector's data field from
+the disk.  It searches for the [[D5 AA AD]] data prologue, then reads
+the 6-and-2 encoded nibbles, decodes them through the translation
+tables at [[$0A00]] and [[$0B00]], and stores 256 bytes at the address
+in [[$44]]/[[$45]].  Returns with carry clear on success, carry set on error.
+
+The routine uses self-modifying code: the [[STA]] instructions at
+[[$0960]], [[$0987]], and [[$099F]] have their high byte patched by
+[[BOOT1_READ_SECTOR]] itself (at [[$0906]]/[[$0909]], [[$0916]]/[[$0919]],
+[[$0921]]/[[$0924]]) to set up three different destination regions within
+the 256-byte output page.
+
+<<boot1 read error>>=
+    ORG     $0900
+BOOT1_READ_ERROR:
+    SEC
+    RTS
+@ %def BOOT1_READ_ERROR
+
+<<boot1 read sector>>=
+    ORG     $0902
+BOOT1_READ_SECTOR:
+    SUBROUTINE BOOT1_READ_SECTOR
+
+    ; Self-modify STA targets based on destination address ($44/$45)
+    LDA     #$00
+    LDY     $45             ; destination page
+    STA     .sta_1+1        ; \  patch STA $xx00,Y low byte
+    STY     .sta_1+2        ;  | patch STA $xx00,Y high byte
+    SEC
+    SBC     #$54            ; \
+    BCS     .no_borrow1     ;  | subtract $54, borrow from page
+    DEY                     ;  |
+    SEC                     ; /
+.no_borrow1:
+    STA     .sta_2+1        ; \  patch second STA target
+    STY     .sta_2+2        ; /
+    SBC     #$57            ; \
+    BCS     .no_borrow2     ;  | subtract $57, borrow from page
+    DEY                     ; /
+.no_borrow2:
+    STA     .sta_3+1        ; \  patch third STA target
+    STY     .sta_3+2        ; /
+
+    ; Search for data prologue: D5 AA AD
+    LDY     #$20            ; timeout counter
+.search:
+    DEY
+    BEQ     BOOT1_READ_ERROR ; timeout
+.wait1:
+    LDA     $C0EC           ; read nibble
+    BPL     .wait1
+.check_d5:
+    EOR     #$D5
+    BNE     .search
+    NOP
+.wait2:
+    LDA     $C0EC
+    BPL     .wait2
+    CMP     #$AA
+    BNE     .check_d5       ; not AA → re-check for D5
+    NOP
+.wait3:
+    LDA     $C0EC
+    BPL     .wait3
+    CMP     #$AD
+    BNE     .check_d5       ; not AD → re-check for D5
+
+    ; Read 86 bytes of secondary data ($AA-$FF range of page)
+    LDY     #$AA
+    LDA     #$00
+.read_secondary:
+    STA     $26             ; running checksum
+.read_secondary_wait:
+    LDX     $C0EC
+    BPL     .read_secondary_wait
+    LDA     $0A00,X         ; decode via primary nibble table
+    STA     $0200,Y         ; store in buffer
+    EOR     $26             ; update checksum
+    INY
+    BNE     .read_secondary ; loop $AA..$FF (86 bytes)
+
+    ; Read and decode primary data (86 bytes → page+$00..$55)
+    LDY     #$AA
+    BNE     .read_primary_start
+.sta_3:
+    STA     $FFFF,Y         ; self-modified: page+$AC..$FF
+.read_primary_start:
+    LDX     $C0EC
+    BPL     .read_primary_start
+    EOR     $0A00,X         ; decode nibble
+    LDX     $0200,Y         ; secondary data
+    EOR     $0B00,X         ; secondary decode table
+    INY
+    BNE     .sta_3          ; loop $AA..$FF (86 bytes)
+    PHA                     ; save last decoded value
+    AND     #$FC
+
+    ; Read and decode middle data (86 bytes → page+$56..$AB)
+    LDY     #$AA
+.read_mid:
+    LDX     $C0EC
+    BPL     .read_mid
+    EOR     $0A00,X
+    LDX     $0200,Y
+    EOR     $0B01,X         ; offset +1 in decode table
+.sta_2:
+    STA     $FFFF,Y         ; self-modified: page+$56..$AB
+    INY
+    BNE     .read_mid
+
+    ; Read and decode final data (84 bytes → page+$00..$53)
+.wait_final1:
+    LDX     $C0EC
+    BPL     .wait_final1
+    AND     #$FC
+    LDY     #$AC
+.read_final:
+    EOR     $0A00,X
+    LDX     $01FE,Y         ; secondary data (offset -2)
+    EOR     $0B02,X         ; offset +2 in decode table
+.sta_1:
+    STA     $FFFF,Y         ; self-modified: page+$00..$55
+.wait_final2:
+    LDX     $C0EC
+    BPL     .wait_final2
+    INY
+    BNE     .read_final
+
+    ; Verify checksum byte
+    AND     #$FC
+    EOR     $0A00,X         ; decode final nibble
+    LDX     $2B             ; restore slot index
+    TAY
+    BNE     .checksum_bad   ; checksum must be zero
+
+    ; Read epilogue byte (expect $DE)
+.wait_epilogue:
+    LDA     $C0EC
+    BPL     .wait_epilogue
+    CMP     #$DE
+    BEQ     .ok
+.checksum_bad:
+    SEC                     ; error: carry set
+    HEX     24              ; BIT $zp opcode — hides next CLC byte
+.ok:
+    CLC                     ; success: carry clear
+    PLA                     ; discard saved byte
+    LDY     #$55
+    STA     ($44),Y         ; store final byte
+    RTS
+@ %def BOOT1_READ_SECTOR
+
+@ [[BOOT1_TRACK]] is the current track number, modified by
+[[BOOT1_SEEK_TRACK]].  [[BOOT1_ERROR_FLAG]] is set by
+[[BOOT1_LOAD_TRACK]] when a timeout occurs.
+
+<<boot1 track vars>>=
+    ORG     $09C6
+BOOT1_TRACK:
+    HEX     00              ; current track number
+BOOT1_ERROR_FLAG:
+    HEX     00              ; nonzero = error occurred
+@ %def BOOT1_TRACK BOOT1_ERROR_FLAG
+
+@ [[BOOT1_SEEK_TRACK]] moves the drive head to the track in~A.
+The target track (doubled for half-track stepping) is compared
+against the current position.  It steps inward or outward one
+half-track at a time, activating the stepper phases via
+[[BOOT1_PHASE_ON]] and waiting with [[BOOT1_DELAY]] between steps.
+
+<<boot1 seek track>>=
+    ORG     $09C8
+BOOT1_SEEK_TRACK:
+    SUBROUTINE BOOT1_SEEK_TRACK
+
+    ASL                     ; double for half-track addressing
+    STA     $26             ; target half-track
+.compare:
+    LDA     BOOT1_TRACK
+    STA     $27             ; save current position
+    SEC
+    SBC     $26             ; current - target
+    BEQ     BOOT1_PHASE_ON_RTS ; already there → RTS at $0A04
+    BCS     .step_out
+    INC     BOOT1_TRACK     ; step inward
+    BCC     .do_step
+.step_out:
+    DEC     BOOT1_TRACK     ; step outward
+.do_step:
+    JSR     BOOT1_PHASE_ON  ; activate stepper phase
+    JSR     BOOT1_DELAY     ; wait for head to settle
+    LDA     $27             ; previous half-track
+    AND     #$03
+    ASL                     ; phase index × 2
+    ORA     #$60            ; $C0x0 slot offset
+    TAY
+    LDA     $C080,Y         ; deactivate previous phase
+    JSR     BOOT1_DELAY     ; wait
+    BEQ     .compare        ; always taken (delay returns Z=1)
+    JSR     BOOT1_DELAY     ; (unreachable)
+@ %def BOOT1_SEEK_TRACK
+
+@ [[BOOT1_PHASE_ON]] activates the stepper motor phase corresponding
+to the current half-track position.
+
+<<boot1 phase on>>=
+    ORG     $09F8
+BOOT1_PHASE_ON:
+    SUBROUTINE BOOT1_PHASE_ON
+
+    LDA     BOOT1_TRACK
+    AND     #$03            ; phase = track mod 4
+    ASL                     ; × 2 for IWM register spacing
+    ORA     #$60            ; slot offset $60 (slot 6)
+    TAY
+    LDA     $C081,Y         ; activate phase (odd address = on)
+BOOT1_PHASE_ON_RTS:
+    RTS
+@ %def BOOT1_PHASE_ON BOOT1_PHASE_ON_RTS
+
+@ [[BOOT1_DELAY]] is a nested delay loop providing approximately
+40$\times$256$\times$5 = 51,200 cycles of delay, giving the drive
+head time to settle after a step.
+
+<<boot1 delay>>=
+    ORG     $0A05
+BOOT1_DELAY:
+    SUBROUTINE BOOT1_DELAY
+
+    LDA     #$28            ; outer counter = 40
+    SEC
+.outer:
+    PHA
+.inner:
+    SBC     #$01
+    BNE     .inner          ; inner loop: 256 iterations
+    PLA
+    SBC     #$01
+    BNE     .outer          ; outer loop: 40 iterations
+    RTS
+@ %def BOOT1_DELAY
+
+@ [[BOOT1_ADDR_ERROR]] is the address-field error return.
+
+<<boot1 addr error>>=
+    ORG     $0A13
+BOOT1_ADDR_ERROR:
+    SEC
+    RTS
+@ %def BOOT1_ADDR_ERROR
+
+@ [[BOOT1_FIND_SECTOR]] searches for an address field prologue
+([[D5 AA 96]]) and reads the four two-bit-encoded header bytes:
+volume, track, sector, and checksum.  The decoded sector number
+is stored in [[$2D]].  Returns with carry clear on success.
+
+<<boot1 find sector>>=
+    ORG     $0A15
+BOOT1_FIND_SECTOR:
+    SUBROUTINE BOOT1_FIND_SECTOR
+
+    ; Timeout counter
+    LDY     #$FC
+    STY     $26             ; outer counter (high byte)
+.retry:
+    INY
+    BNE     .wait_d5
+    INC     $26
+    BEQ     BOOT1_ADDR_ERROR ; timeout
+
+    ; Search for D5 AA 96 address prologue
+.wait_d5:
+    LDA     $C0EC
+    BPL     .wait_d5
+.check_d5:
+    CMP     #$D5
+    BNE     .retry
+    NOP
+.wait_aa:
+    LDA     $C0EC
+    BPL     .wait_aa
+    CMP     #$AA
+    BNE     .check_d5       ; not AA → re-check D5
+    LDY     #$03            ; 4 header fields to read
+.wait_96:
+    LDA     $C0EC
+    BPL     .wait_96
+    CMP     #$96
+    BNE     .check_d5       ; not 96 → re-check D5
+
+    ; Read 4 encoded header bytes (volume, track, sector, checksum)
+    LDA     #$00
+.read_header:
+    STA     $27             ; running checksum
+.wait_odd:
+    LDA     $C0EC           ; \
+    BPL     .wait_odd       ;  | read odd-bits byte
+    ROL                     ;  |
+    STA     $26             ; /  save shifted value
+.wait_even:
+    LDA     $C0EC           ; \
+    BPL     .wait_even      ;  | read even-bits byte
+    AND     $26             ;  | combine with odd bits
+    STA     $2C,Y           ;  | store at $2F,$2E,$2D,$2C (Y=3..0)
+    EOR     $27             ;  | update checksum
+    DEY                     ;  |
+    BPL     .read_header    ; /  loop for all 4 fields
+
+    ; Verify checksum
+    TAY
+    BNE     BOOT1_ADDR_ERROR ; checksum must be zero
+
+    ; Read address epilogue: DE AA
+.wait_de:
+    LDA     $C0EC
+    BPL     .wait_de
+    CMP     #$DE
+    BNE     BOOT1_ADDR_ERROR
+    NOP
+.wait_aa2:
+    LDA     $C0EC
+    BPL     .wait_aa2
+    CMP     #$AA
+    BNE     BOOT1_ADDR_ERROR
+    CLC                     ; success
+@ %def BOOT1_FIND_SECTOR
+
+@ The nibble translation tables at [[$0A70]]--[[$0AFF]] and [[$0B00]]--[[$0BFF]]
+are used by [[BOOT1_READ_SECTOR]] to decode the 6-and-2 encoded disk nibbles
+back into data bytes.  The primary table at [[$0A00]] maps raw disk nibbles
+(high-bit set values in the range [[$96]]--[[$FF]]) to 6-bit values.
+The secondary table at [[$0B00]] provides the pair-decode lookup.
+
+<<boot1 nibble tables>>=
+    ORG     $0A70
+BOOT1_NIBBLE_TABLE_A:
+    ; $0A70-$0A97: secondary nibble decode + ASCII text fragment (40 bytes)
+    HEX     60 20 6D 6F 64 69 66 79 20 74 68 65 20 73 6F 75
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 04
+    ; $0A98-$0AFF: primary 6-and-2 decode table (104 bytes)
+    HEX     98 99 08 0C 9C 10 14 18
+    HEX     A0 A1 A2 A3 A4 A5 1C 20
+    HEX     A8 A9 AA 24 28 2C 30 34
+    HEX     B0 B1 38 3C 40 44 48 4C
+    HEX     B8 50 54 58 5C 60 64 68
+    HEX     C0 C1 C2 C3 C4 C5 C6 C7
+    HEX     C8 C9 CA 6C CC 70 74 78
+    HEX     D0 D1 D2 7C D4 D5 80 84
+    HEX     D8 88 8C 90 94 98 9C A0
+    HEX     E0 E1 E2 E3 E4 A4 A8 AC
+    HEX     E8 B0 B4 B8 BC C0 C4 C8
+    HEX     F0 F1 CC D0 D4 D8 DC E0
+    HEX     F8 E4 E8 EC F0 F4 F8 FC
+@ %def BOOT1_NIBBLE_TABLE_A
+
+<<boot1 nibble tables b>>=
+    ORG     $0B00
+BOOT1_NIBBLE_TABLE_B:
+    ; 256-byte secondary decode table
+    HEX     00 00 00 96 02 00 00 97 01 00 00 9A 03 00 00 9B
+    HEX     00 02 00 9D 02 02 00 9E 01 02 00 9F 03 02 00 A6
+    HEX     00 01 00 A7 02 01 00 AB 01 01 00 AC 03 01 00 AD
+    HEX     00 03 00 AE 02 03 00 AF 01 03 00 B2 03 03 00 B3
+    HEX     00 00 02 B4 02 00 02 B5 01 00 02 B6 03 00 02 B7
+    HEX     00 02 02 B9 02 02 02 BA 01 02 02 BB 03 02 02 BC
+    HEX     00 01 02 BD 02 01 02 BE 01 01 02 BF 03 01 02 CB
+    HEX     00 03 02 CD 02 03 02 CE 01 03 02 CF 03 03 02 D3
+    HEX     00 00 01 D6 02 00 01 D7 01 00 01 D9 03 00 01 DA
+    HEX     00 02 01 DB 02 02 01 DC 01 02 01 DD 03 02 01 DE
+    HEX     00 01 01 DF 02 01 01 E5 01 01 01 E6 03 01 01 E7
+    HEX     00 03 01 E9 02 03 01 EA 01 03 01 EB 03 03 01 EC
+    HEX     00 00 03 ED 02 00 03 EE 01 00 03 EF 03 00 03 F2
+    HEX     00 02 03 F3 02 02 03 F4 01 02 03 F5 03 02 03 F6
+    HEX     00 01 03 F7 02 01 03 F9 01 01 03 FA 03 01 03 FB
+    HEX     00 03 03 FC 02 03 03 FD 01 03 03 FE 03 03 03 FF
+@ %def BOOT1_NIBBLE_TABLE_B
+
+@ [[BOOT1_LOAD_TRACK]] is the sector loader.  It seeks to the
+track in~A, builds the destination page table by adding the base page
+([[$3E]]) to each entry of the interleave table at [[$0C48]], then
+reads sectors one at a time.  For each sector found by
+[[BOOT1_FIND_SECTOR]], it looks up the destination page in the table
+and calls [[BOOT1_READ_SECTOR]] to decode the data.  After
+successfully reading a sector, it zeros the table entry so it will
+be skipped on subsequent passes.  The routine loops until all 16
+entries are zero (all sectors read).  A retry counter at [[$40]]
+prevents infinite loops on persistent errors.
+
+<<boot1 load track>>=
+    ORG     $0C00
+BOOT1_LOAD_TRACK:
+    SUBROUTINE BOOT1_LOAD_TRACK
+
+    JSR     BOOT1_SEEK_TRACK ; seek to track in A
+
+    ; Build destination page table: interleave[i] + base page
+    LDY     #$0F
+.build_table:
+    LDA     BOOT1_INTERLEAVE,Y
+    CLC
+    ADC     $3E             ; add base page
+    STA     BOOT1_DEST_PAGES,Y
+    DEY
+    BPL     .build_table
+
+    LDX     $2B             ; slot index
+    LDA     #$60            ; retry counter
+    STA     $40
+.retry:
+    DEC     $40
+    BEQ     .timeout
+    JSR     BOOT1_FIND_SECTOR ; find address field → sector in $2D
+    BCS     .retry          ; error → retry
+
+    LDY     $2D             ; sector number
+    LDA     BOOT1_DEST_PAGES,Y ; destination page for this sector
+    BEQ     .retry          ; zero = already read, skip
+    STA     $45             ; destination page
+    LDA     #$00
+    STA     $44             ; destination = $xx00
+    JSR     BOOT1_READ_SECTOR ; read and decode data field
+    BCS     .retry          ; error → retry
+
+    ; Mark sector as done
+    LDY     $2D
+    LDA     #$00
+    STA     BOOT1_DEST_PAGES,Y ; zero = done
+
+    ; Check if all sectors read
+    LDY     #$0F
+.check_done:
+    LDA     BOOT1_DEST_PAGES,Y
+    BNE     .retry          ; still have sectors to read
+    DEY
+    BPL     .check_done
+    RTS                     ; all 16 sectors read
+
+.timeout:
+    INC     BOOT1_ERROR_FLAG ; signal error
+    RTS
+@ %def BOOT1_LOAD_TRACK
+
+@ The interleave table maps physical sector numbers to page offsets
+within the target region.  The destination page table is computed at
+runtime by adding the base page to each interleave entry.
+
+<<boot1 interleave table>>=
+    ORG     $0C48
+BOOT1_INTERLEAVE:
+    HEX     0F 08 01 09 02 0A 03 0B 04 0C 05 0D 06 0E 07 00
+@ %def BOOT1_INTERLEAVE
+
+<<boot1 dest pages>>=
+    ORG     $0C58
+BOOT1_DEST_PAGES:
+    DS      16,$00          ; filled at runtime by BOOT1_LOAD_TRACK
+@ %def BOOT1_DEST_PAGES
+
+@ The remainder of page [[$0C]] contains text inserted by the 4am crack.
+
+<<boot1 crack text>>=
+    ORG     $0C68
+BOOT1_CRACK_TEXT:
+    HEX     6C 6C 20 6F 66 20 74 68 65 20 61 62 6F 76 65 2E
+    HEX     0D 10 20 0D 10 20 54 68 65 20 61 75 74 68 6F 72
+    HEX     73 20 61 6C 6C 20 72 65 63 65 69 76 65 20 61 20
+    HEX     70 72 6F 67 72 61 6D 20 63 61 6C 6C 65 64 20 4C
+    HEX     4F 41 44 45 52 2E 4F 2C 20 77 68 69 63 68 20 77
+    HEX     72 69 74 65 73 20 74 68 65 20 6C 6F 61 64 65 72
+    HEX     0D 10 20 74 6F 20 64 69 73 6B 2E 20 20 54 6F 20
+    HEX     63 72 65 61 74 65 20 61 20 6E 65 77 20 4C 4F 41
+    HEX     44 45 52 2E 4F 20 61 66 74 65 72 20 6D 6F 64 69
+    HEX     66 79 69 6E 0C 0C 61 6E
+@ %def BOOT1_CRACK_TEXT
+
+\chapter{EALDR: The Electronic Arts Loader}
 \label{sec:ealdr}
 
 [[EALDR]] is a mini virtual machine with 18 opcodes. It occupies [[$A000]]--[[$BFFF]],
 with the entry point at [[$A806]].
 
-\subsection{VM architecture}
+\section{VM architecture}
 
 The VM has the following state:
 
@@ -699,7 +1356,7 @@ The VM has the following state:
   \item The 6502 hardware stack is used for VM subroutine return addresses.
 \end{itemize}
 
-\subsubsection{Entry point}
+\subsection{Entry point}
 
 The entry code at [[$A806]] fills the hi-res HGR1 screen ([[$2000--$3FFF]]) and beyond
 ([[$4000--$7FFF]]) with [[$FF]], copies the EA splash screen data from [[$B000]]+ to
@@ -773,7 +1430,7 @@ loop is never executed; it could serve as a retry mechanism, if [[X]] were actua
 saved and restored, but would then just crash if retries run out, by trying to execute
 VM bytecode as 6502 code.
 
-\subsubsection{Opcode dispatch}
+\subsection{Opcode dispatch}
 
 The interpreter reads one byte from the bytecode stream as an opcode index.
 It looks up the index in a dispatch table at [[$AA60]] and computes the handler
@@ -791,7 +1448,7 @@ After a handler executes, control flow takes one of two paths:
         [[BNE]], [[CALL]], and [[RET]].
 \end{itemize}
 
-\subsubsection{Bytecode encryption}
+\subsection{Bytecode encryption}
 
 Arguments in the bytecode stream are XOR-encrypted:
 \begin{itemize}
@@ -800,7 +1457,7 @@ Arguments in the bytecode stream are XOR-encrypted:
   \item Immediate values (1 byte): XOR [[$4C]]. Decoded inline by the handler.
 \end{itemize}
 
-\subsubsection{Opcode table}
+\subsection{Opcode table}
 
 \begin{table}[h]
 \begin{tabular}{clllp{7.5cm}}
@@ -833,7 +1490,7 @@ XOR \$03/\$D9 address argument.}
 \label{table:ealoadervm}
 \end{table}
 
-\subsubsection{VM interpreter}
+\subsection{VM interpreter}
 
 The interpreter at [[$AA35]] saves the accumulator and [[Y]], uses the
 RTS trick to obtain the bytecode pointer from the caller's return
@@ -920,7 +1577,7 @@ ealdr_vm_init:
     JMP      ($0042)   ; jump to instruction after JSR
 @ %def ealdr_vm_init
 
-\subsubsection{Dispatch table}
+\subsection{Dispatch table}
 
 The dispatch table at [[$AA60]] holds 18 one-byte offsets.  The
 handler address is [[$AA72]] + offset.  Opcodes [[0C]]--[[11]] point
@@ -952,7 +1609,7 @@ ealdr_vm_goto:                  ; $AA75 - entry when addr already in $42/$43
     JMP      ealdr_dispatch   ; read next opcode
 @ %def ealdr_vm_loop ealdr_vm_goto
 
-\subsubsection{Opcode handlers}
+\subsection{Opcode handlers}
 
 Each handler is reached via the self-modifying [[JMP]] at [[$AA5D]].
 After execution, handlers jump to either [[$AA45]] (linear: next
@@ -1167,7 +1824,7 @@ ealdr_op_copy:
 @ %def ealdr_op_inc ealdr_op_add ealdr_op_sub ealdr_op_copy
 @ %def ealdr_jmp_ind
 
-\subsubsection{Machine language subroutines}
+\subsection{Machine language subroutines}
 
 These are 6502 routines called by [[CALL1]] or [[CALL0]] from the VM:
 
@@ -1230,7 +1887,7 @@ ealdr_funny_inc:
     RTS
 @ %def ealdr_funny_inc
 
-\subsubsection{DXR decryption step}
+\subsection{DXR decryption step}
 
 The [[DXR]] opcode (0E) XORs a single byte at the source pointer with the
 accumulator, stores the result back, advances the pointer by 2 (processing
@@ -1255,7 +1912,7 @@ ealdr_dxr_step:
     JMP      ealdr_vm_dispatch ; linear continuation
 @ %def ealdr_dxr_step
 
-\subsection{Disk I/O routines}
+\section{Disk I/O routines}
 
 The EALDR disk code occupies [[$ABBF]]--[[$BFFF]].  Four entry points
 at [[$BC00]] are JMP trampolines:
@@ -1291,7 +1948,7 @@ ealdr_read_data:                ; $BC09
     JMP      $BD14
 @ %def ealdr_move_arm ealdr_read_track ealdr_search_addr ealdr_read_data
 
-\subsection{VM program}
+\section{VM program}
 
 Here is the decoded VM program. Addresses and values shown are after
 decryption.  The arrows show branch/jump targets within the listing.
@@ -15578,6 +16235,27 @@ ealdr_vm_dispatch   EQU     $AA45   ; dispatch loop entry (linear continuation)
 ealdr_bot           EQU     $AC60   ; funny-increment low counter
 ealdr_top           EQU     $AC61   ; funny-increment high counter
 @ %def ealdr_ptr EALDR_psuedoacc ealdr_src ealdr_dest ealdr_vm_dispatch ealdr_bot ealdr_top
+
+<<boot1.asm>>=
+    PROCESSOR 6502
+<<boot1 defines>>
+<<boot1 entry>>
+<<boot1 crack>>
+<<boot1 read error>>
+<<boot1 read sector>>
+<<boot1 track vars>>
+<<boot1 seek track>>
+<<boot1 phase on>>
+<<boot1 delay>>
+<<boot1 addr error>>
+<<boot1 find sector>>
+<<boot1 nibble tables>>
+<<boot1 nibble tables b>>
+<<boot1 load track>>
+<<boot1 interleave table>>
+<<boot1 dest pages>>
+<<boot1 crack text>>
+@
 
 <<ealdr.asm>>=
     PROCESSOR 6502
