@@ -1361,6 +1361,14 @@ The entry code at [[$A806]] fills the hi-res HGR1 screen ([[$2000--$3FFF]]) and 
 ([[$4000--$7FFF]]) with [[$FF]], copies the EA splash screen data from [[$B000]]+ to
 [[$202C]]+, then jumps to the VM execution loop at [[$A849]].
 
+@ [[EALDR_SRC]] ([[$4C/$4D]]) is a 2-byte zero-page pointer used by the
+VM as a general-purpose source address.  The entry code uses it to iterate
+through the hi-res screen pages during the fill loop.
+
+<<ealdr defines>>=
+EALDR_SRC           EQU     $4C     ; VM source pointer (2 bytes)
+@ %def EALDR_SRC
+
 <<EALDR entry>>=
     ORG     $A806
 EALDR_ENTRY:
@@ -1505,7 +1513,16 @@ XOR \$03/\$D9 address argument.}
 
 The interpreter at [[$AA35]] saves the accumulator and [[Y]], uses the
 RTS trick to obtain the bytecode pointer from the caller's return
-address, then enters the dispatch loop:
+address, then enters the dispatch loop.
+
+@ [[EALDR_PTR]] ([[$46/$47]]) is the VM instruction pointer---the current
+position in the bytecode stream.  [[EALDR_PSUEDOACC]] ([[$48]]) is the VM's
+single-byte accumulator register.
+
+<<ealdr defines>>=
+EALDR_PTR           EQU     $46     ; VM instruction pointer (2 bytes)
+EALDR_PSUEDOACC     EQU     $48     ; VM accumulator
+@ %def EALDR_PTR EALDR_PSUEDOACC
 
 <<EALDR VM interpreter>>=
     ORG     $AA35
@@ -1626,6 +1643,16 @@ Each handler is reached via the self-modifying [[JMP]] at [[$AA5D]].
 After execution, handlers jump to either [[$AA45]] (linear: next
 opcode from current stream position) or [[$AA75]] (goto: set IP from
 [[$42]]/[[$43]] and dispatch).
+
+@ [[EALDR_VM_DISPATCH]] ([[$AA45]]) is the dispatch loop entry point.
+Opcode handlers jump here to continue with the next bytecode instruction.
+[[EALDR_DEST]] ([[$4E/$4F]]) is the VM's destination pointer, used by the
+[[COPY]] opcode to write bytes.
+
+<<ealdr defines>>=
+EALDR_VM_DISPATCH   EQU     $AA45   ; dispatch loop entry (linear continuation)
+EALDR_DEST          EQU     $4E     ; VM dest pointer (2 bytes)
+@ %def EALDR_VM_DISPATCH EALDR_DEST
 
 <<EALDR opcode handlers>>=
     ORG     $AAAE
@@ -1880,9 +1907,14 @@ EALDR_REBOOT:
 @ %def EALDR_REBOOT
 
 The ``funny increment'' routine manages the DXR key schedule.
-[[$AC60]] holds the low counter (``bot'') and [[$AC61]] holds the
-high counter (``top''). Bot increments each call; when it reaches top,
-it resets to 1 and top increments:
+[[EALDR_BOT]] ([[$AC60]]) holds the low counter and [[EALDR_TOP]]
+([[$AC61]]) holds the high counter.  Bot increments each call; when it
+reaches top, it resets to~1 and top increments:
+
+<<ealdr defines>>=
+EALDR_BOT           EQU     $AC60   ; funny-increment low counter
+EALDR_TOP           EQU     $AC61   ; funny-increment high counter
+@ %def EALDR_BOT EALDR_TOP
 
 <<EALDR funny increment>>=
     ORG     $A970
@@ -16248,16 +16280,6 @@ The following root chunks produce the assembly files when tangled.
     HEX     08 08 08 08 08 08 08 08 0E 18 18 30 18 18 0E 00
     HEX     2C 1A 00 00 00 00 00 00 7F 7F 7F 7F 7F 7F 7F 7F
 @
-
-<<ealdr defines>>=
-EALDR_PTR           EQU     $46     ; VM instruction pointer (2 bytes)
-EALDR_PSUEDOACC     EQU     $48     ; VM accumulator
-EALDR_SRC           EQU     $4C     ; VM source pointer (2 bytes)
-EALDR_DEST          EQU     $4E     ; VM dest pointer (2 bytes)
-EALDR_VM_DISPATCH   EQU     $AA45   ; dispatch loop entry (linear continuation)
-EALDR_BOT           EQU     $AC60   ; funny-increment low counter
-EALDR_TOP           EQU     $AC61   ; funny-increment high counter
-@ %def EALDR_PTR EALDR_PSUEDOACC EALDR_SRC EALDR_DEST EALDR_VM_DISPATCH EALDR_BOT EALDR_TOP
 
 <<boot1.asm>>=
     PROCESSOR 6502
