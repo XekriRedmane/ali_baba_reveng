@@ -696,12 +696,17 @@ After the disk card reads [[BOOT1]], the zero-page location [[$3E]] is
 left as the pointer to the page just after [[BOOT1]], so that [[BOOT1]] knows
 where it ends.  The location [[$2B]] is the disk card's slot index (slot$\times$16).
 
-@ [[BOOT1_ENTRY]] sets the reset vector to [[$C600]] (reboot), turns on the
-drive motor, then loads [[EALDR]] from tracks 1--2 using [[BOOT1_LOAD_TRACK]]:
-first track 2 into [[$B000]]--[[$BFFF]] (base page [[$B0]]),
-then track 1 into [[$A000]]--[[$AFFF]] (base page [[$A0]]).
-It pushes [[$A805]] onto the stack as a return address and, after
-a delay loop, executes [[RTS]] to enter [[EALDR]] at [[$A806]].
+@ [[BOOT1_ENTRY]] performs the following steps:
+\begin{enumerate}
+  \item Sets the reset vector to [[$C600]] (reboot).
+  \item Turns on the drive motor.
+  \item Loads track~2 into [[$B000]]--[[$BFFF]] (base page [[$B0]]) via [[BOOT1_LOAD_TRACK]].
+  \item Pushes [[$A8]] (high byte of return address) onto the stack.
+  \item Loads track~1 into [[$A000]]--[[$AFFF]] (base page [[$A0]]) via [[BOOT1_LOAD_TRACK]].
+  \item Pushes [[$05]] (low byte), completing the return address [[$A805]].
+  \item Seeks back to track~0 via [[BOOT1_SEEK_TRACK]].
+  \item Executes [[RTS]] to enter [[EALDR]] at [[$A806]].
+\end{enumerate}
 
 @ [[SOFTEV]] ([[$03F2]]) and [[PWREDUP]] ([[$03F4]]) are the Apple~II reset
 vector and its complement byte.  [[IWM_MOTORON]] ([[$C0E9]]) turns on the
@@ -1239,16 +1244,16 @@ BOOT1_NIBBLE_TABLE_B:
     HEX     00 03 03 FC 02 03 03 FD 01 03 03 FE 03 03 03 FF
 @ %def BOOT1_NIBBLE_TABLE_B
 
-@ [[BOOT1_LOAD_TRACK]] is the sector loader.  It seeks to the
-track in~A, builds the destination page table by adding the base page
-([[$3E]]) to each entry of the interleave table at [[$0C48]], then
-reads sectors one at a time.  For each sector found by
-[[BOOT1_FIND_SECTOR]], it looks up the destination page in the table
-and calls [[BOOT1_READ_SECTOR]] to decode the data.  After
-successfully reading a sector, it zeros the table entry so it will
-be skipped on subsequent passes.  The routine loops until all 16
-entries are zero (all sectors read).  A retry counter at [[$40]]
-prevents infinite loops on persistent errors.
+@ [[BOOT1_LOAD_TRACK]] is the sector loader.  It takes a track number
+in~A and reads all 16 sectors:
+\begin{enumerate}
+  \item Seeks to the target track via [[BOOT1_SEEK_TRACK]].
+  \item Builds the destination page table by adding the base page ([[$3E]]) to each entry of the interleave table at [[$0C48]].
+  \item For each sector found by [[BOOT1_FIND_SECTOR]], looks up the destination page in the table and calls [[BOOT1_READ_SECTOR]] to decode the data.
+  \item Zeros the table entry after a successful read so it will be skipped on subsequent passes.
+  \item Loops until all 16 entries are zero (all sectors read).
+\end{enumerate}
+A retry counter at [[$40]] prevents infinite loops on persistent errors.
 
 <<boot1 load track>>=
     ORG     $0C00
@@ -4011,10 +4016,15 @@ HRCG_RTS:
 [[HRCG_ENTRY2]], one of the secondary entry points in the jump table---which
 the game patches to a simple [[RTS]].
 
-Ctrl-Z is the full reset.  It clears the entire parameter block (19~bytes),
-resets the text window, selects the standard font, sets replace video mode,
-and patches both secondary entry points to [[RTS]].  This brings the HRCG
-back to its power-on state.  The shifted variant jumps to [[HRCG_ENTRY3]]
+Ctrl-Z is the full reset:
+\begin{enumerate}
+  \item Clears the entire parameter block (19~bytes).
+  \item Resets the text window.
+  \item Selects the standard font.
+  \item Sets replace video mode.
+  \item Patches both secondary entry points to [[RTS]].
+\end{enumerate}
+This brings the HRCG back to its power-on state.  The shifted variant jumps to [[HRCG_ENTRY3]]
 (also patched to [[RTS]]).
 
 <<hrcg ctrl yz>>=
@@ -4727,11 +4737,12 @@ index in~A.  The message table base address is stored at
 walks the table to find the Xth entry, then displays up to three lines
 in the status window.
 
-For the first line ([[MSG_LINE_COUNT]]~=~0), it calls
-[[PRINT_BOTTOM_CENTERED]] then scrolls.  For the second line
-([[MSG_LINE_COUNT]]~=~1), it scrolls first, then prints.  For the
-third and subsequent lines, it scrolls, prints, then calls [[$0D10]]
-(delay) and [[$774E]] ([[PRINT_CTRL_AB]]) before looping back.
+The display behavior depends on the line number:
+\begin{itemize}
+  \item Line~1 ([[MSG_LINE_COUNT]]~=~0): calls [[PRINT_BOTTOM_CENTERED]], then scrolls.
+  \item Line~2 ([[MSG_LINE_COUNT]]~=~1): scrolls first, then prints.
+  \item Line~3+: scrolls, prints, then calls [[$0D10]] (delay) and [[$774E]] ([[PRINT_CTRL_AB]]) before looping back.
+\end{itemize}
 
 An entry with a zero length byte terminates the message.  If exactly
 two lines were printed, a final scroll is performed on exit.
@@ -6991,11 +7002,15 @@ PLOT_CHAR:
 
 \chapter{Map and Scene}
 
-Initializes a scene for display.  Loads the character record for index
-[[ACTIVE_CHAR]], reads the character's bounding box from bytes~3--4 of the
-record at [[\CHAR_REC]], converts to column/row ranges, picks a random
-position within those bounds, sets the font cursor there, and performs
-additional character-record bookkeeping.
+Initializes a scene for display:
+\begin{enumerate}
+  \item Loads the character record for index [[ACTIVE_CHAR]].
+  \item Reads the character's bounding box from bytes~3--4 of the record at [[\CHAR_REC]].
+  \item Converts to column/row ranges.
+  \item Picks a random position within those bounds.
+  \item Sets the font cursor there.
+  \item Performs additional character-record bookkeeping.
+\end{enumerate}
 
 The bounding box bytes are packed map positions decoded by
 [[POS_TO_COLROW]].  The routine increments the minimums (so the range
@@ -7255,11 +7270,12 @@ Temporarily replaces [[BLINK_CHAR]] with the alternate character from
 the original [[BLINK_CHAR]].  Called by [[TICK_ANIM_COUNTER]] when
 the animation frame counter reaches zero.
 
-Renders a custom font character at the current font position.  Converts
-[[FONT_CHARNUM]] and [[FONT_CHARSET]] into four block-character indices
-(upper-left, upper-right, lower-left, lower-right) for a $2\times2$
-character cell, patches the [[s_PRINT_FONT_CHAR]] control string, and
-calls [[PRINT_STRING]] to output it.
+Renders a custom font character at the current font position:
+\begin{enumerate}
+  \item Converts [[FONT_CHARNUM]] and [[FONT_CHARSET]] into four block-character indices (upper-left, upper-right, lower-left, lower-right) for a $2\times2$ character cell.
+  \item Patches the [[s_PRINT_FONT_CHAR]] control string with the glyph indices.
+  \item Calls [[PRINT_STRING]] to output the character.
+\end{enumerate}
 
 Each charset holds 24~characters (\$18).  Characters beyond~\$18 bump the
 charset index.  The four glyph indices are consecutive starting at
@@ -7305,18 +7321,16 @@ SETUP_SCENE_DISPLAY:
 @ %def SETUP_SCENE_DISPLAY
 Called from [[SCENE_LOOP]] to set up the viewport when the player
 enters a new location.  Compares [[$FA]] with [[LOCATION_POS]]; if
-unchanged, returns immediately.  Otherwise stores the new position,
-calls [[GET_MOB_DATA]] and [[SET_TEXT_WINDOW]] / [[CLEAR_MAP]],
-computes the event position via [[MANHATTAN_DISTANCE]], and
-extracts the location style from record field~5.  If the style
-changed, reloads the map tile set.
-
-The routine then reads fields~3 and~4 of the location record (via
-[[$FA]] indirect) to obtain the viewport bounds (min/max column and
-row).  It iterates a nested loop: for each row, for each column,
-it calls [[DRAW_MAP_COL]] to render that cell.  Finally, if bit~7
-of field~5 is clear, it calls [[DRAW_MAP_ENTITIES]] to overlay
-entity icons on the map.
+unchanged, returns immediately.  Otherwise:
+\begin{enumerate}
+  \item Stores the new position.
+  \item Calls [[GET_MOB_DATA]] and [[SET_TEXT_WINDOW]] / [[CLEAR_MAP]].
+  \item Computes the event position via [[MANHATTAN_DISTANCE]].
+  \item Extracts the location style from record field~5; if changed, reloads the map tile set.
+  \item Reads fields~3 and~4 of the location record (via [[$FA]] indirect) to obtain the viewport bounds (min/max column and row).
+  \item Iterates a nested loop: for each row, for each column, calls [[DRAW_MAP_COL]] to render that cell.
+  \item If bit~7 of field~5 is clear, calls [[DRAW_MAP_ENTITIES]] to overlay entity icons on the map.
+\end{enumerate}
 
 @ [[EVENT_POS]] stores the event position computed by [[MANHATTAN_DISTANCE]].
 [[VIEW_MIN_COL]], [[VIEW_MIN_ROW]], [[VIEW_MAX_COL]], and [[VIEW_MAX_ROW]]
@@ -7447,13 +7461,14 @@ bottom-right to top-left), re-printing the same string at each position
 via [[PRINT_STRING]].
 
 @ [[FILL_MAP]] fills the entire 20$\times$10 map grid with a single tile
-character.  It starts at column~19, row~9 (bottom-right corner), renders the
-fill character once via [[RENDER_FONT_CHAR]] to build the HRCG control string,
-then loops through all 200 positions by decrementing the column and wrapping
-to the next row up when it goes negative.  For each position after the first,
-it simply calls [[FONT_POS_TO_TEXT_POS]] and [[PRINT_STRING]] to repeat the
-same pre-built glyph---an efficient approach that avoids recalculating the
-font data 199 additional times.
+character:
+\begin{enumerate}
+  \item Starts at column~19, row~9 (bottom-right corner).
+  \item Renders the fill character once via [[RENDER_FONT_CHAR]] to build the HRCG control string.
+  \item Loops through all 200 positions by decrementing the column and wrapping to the next row up when it goes negative.
+  \item For each position after the first, calls [[FONT_POS_TO_TEXT_POS]] and [[PRINT_STRING]] to repeat the same pre-built glyph.
+\end{enumerate}
+This avoids recalculating the font data 199 additional times.
 
 <<fill map>>=
     ORG     $743B
@@ -8303,17 +8318,20 @@ The linked-list ``next'' pointer is byte~2 of each character record.
 [[GET_MOB_DATA]] (\$0C32) resolves a byte-2 value into a record pointer
 at [[\MOB_DATA_PTR/\MOB_DATA_PTR+1]].
 
-Phase~1 (removal): walks the chain from [[SOURCE_CHAR]]'s record, following
-byte-2 links via [[GET_MOB_DATA]] until [[\MOB_DATA_PTR/\MOB_DATA_PTR+1]] equals
-[[\TARGET_REC/\TARGET_REC+1]] (found the predecessor).  Then patches the predecessor's
-byte~2 to skip the removed node.  Decrements the source group's
-member count via [[DECR_GROUP_COUNT]].
+Phase~1 (removal):
+\begin{enumerate}
+  \item Walks the chain from [[SOURCE_CHAR]]'s record, following byte-2 links via [[GET_MOB_DATA]] until [[\MOB_DATA_PTR/\MOB_DATA_PTR+1]] equals [[\TARGET_REC/\TARGET_REC+1]] (found the predecessor).
+  \item Patches the predecessor's byte~2 to skip the removed node.
+  \item Decrements the source group's member count via [[DECR_GROUP_COUNT]].
+\end{enumerate}
 
-Phase~2 (insertion): walks the chain from [[ACTIVE_CHAR]]'s record, comparing
-byte~11 (level) values.  Inserts the removed character before the first
-node with a lower level, or at the end if none found.  Increments the
-destination group's member count via [[INCR_GROUP_COUNT]].  Adjusts the
-[[TOTAL_MOB_COUNT]] to track list membership changes.
+Phase~2 (insertion):
+\begin{enumerate}
+  \item Walks the chain from [[ACTIVE_CHAR]]'s record, comparing byte~11 (level) values.
+  \item Inserts the removed character before the first node with a lower level, or at the end if none found.
+  \item Increments the destination group's member count via [[INCR_GROUP_COUNT]].
+  \item Adjusts [[TOTAL_MOB_COUNT]] to track list membership changes.
+\end{enumerate}
 
 When [[ACTIVE_CHAR]] is zero, a random decision (via [[STEP_PRNG]]) determines
 the insertion point instead of the level comparison.
@@ -8879,16 +8897,12 @@ the \emph{attract screen}---the title sequence that cycles through story scenes
 until the player presses a key.
 
 The entry point at [[$0800]] is where the EALDR transfers control after loading
-and decrypting the game data.  The first action is to call [[GAME_INIT]], which
-initializes the Apple II hardware, sets up hi-res graphics mode, and relocates
-the HRCG library and disk I/O routines to their runtime addresses.
-
-After initialization, the code sets [[CHAR_PTR]] ([[$FA/$FB]]) to [[$4009]],
-the base of the character record array.  It then inspects
-[[TOTAL_MOB_COUNT]]---a count of all active mob groups in the game world.  On
-the very first run this count is zero, so the code branches into
-[[ATTRACT_SCREEN]], the title sequence that plays until the player presses a
-key.
+and decrypting the game data.  On entry:
+\begin{enumerate}
+  \item Calls [[GAME_INIT]], which initializes the Apple~II hardware, sets up hi-res graphics mode, and relocates the HRCG library and disk I/O routines to their runtime addresses.
+  \item Sets [[CHAR_PTR]] ([[$FA/$FB]]) to [[$4009]], the base of the character record array.
+  \item Inspects [[TOTAL_MOB_COUNT]]---a count of all active mob groups in the game world.  On the very first run this count is zero, so the code branches into [[ATTRACT_SCREEN]], the title sequence that plays until the player presses a key.
+\end{enumerate}
 
 Once the attract screen exits (or is skipped on subsequent rounds), the main
 loop begins.  It iterates through each character record in sequence, nine
@@ -9538,16 +9552,21 @@ TURN_DISPATCH:
 .no_combat:
     JMP     TEARDOWN_INPUT
 @ %def TURN_DISPATCH
-@ [[COMMIT_MOVE]] finalizes a character's movement on the map.  It writes
-[[CURRENT_COL]] and [[CURRENT_ROW]] into the font and blink-cursor
-parameters, packs them into a single byte with [[COLROW_TO_POS]], and stores
-the result in the entity's position field (byte~3 of [[ENTITY_PTR]]).  It
-then draws the character's sprite at the new location via [[RENDER_FONT_CHAR]]
-and sets [[TURN_SCRIPT_GUARD]] to~\$16.  Execution falls through into
-[[RESET_TURN_POS]], which converts the turn's starting position back into a
-packed byte, calls [[DRAW_CHAR_AT_POS]] to restore whatever was underneath the
-character's old location, and updates the starting position to the new current
-position.  If [[TURN_SCRIPT_GUARD]] is exactly~\$16---meaning this is the
+@ [[COMMIT_MOVE]] finalizes a character's movement on the map:
+\begin{enumerate}
+  \item Writes [[CURRENT_COL]] and [[CURRENT_ROW]] into the font and blink-cursor parameters.
+  \item Packs them into a single byte with [[COLROW_TO_POS]].
+  \item Stores the result in the entity's position field (byte~3 of [[ENTITY_PTR]]).
+  \item Draws the character's sprite at the new location via [[RENDER_FONT_CHAR]].
+  \item Sets [[TURN_SCRIPT_GUARD]] to~\$16.
+\end{enumerate}
+Execution falls through into [[RESET_TURN_POS]], which:
+\begin{enumerate}
+  \item Converts the turn's starting position back into a packed byte.
+  \item Calls [[DRAW_CHAR_AT_POS]] to restore whatever was underneath the character's old location.
+  \item Updates the starting position to the new current position.
+\end{enumerate}
+If [[TURN_SCRIPT_GUARD]] is exactly~\$16---meaning this is the
 first call since [[COMMIT_MOVE]] set it---the guard is decremented and the
 [[SCRIPT_ENGINE]] is invoked to process any movement-triggered scripts.
 
@@ -9597,14 +9616,12 @@ RESET_TURN_POS:
     DEC     TURN_SCRIPT_GUARD
     JMP     SCRIPT_ENGINE
 @ %def COMMIT_MOVE RESET_TURN_POS
-@ [[END_TURN]] wraps up a character's turn.  It clears [[TURN_ACTIVE]], calls
-[[CHECK_AND_RESTRICT]] to update the restricted flag based on the encounter at
-the character's final position, then checks whether the character has enough
-steps remaining for another action.  If [[STEPS_TAKEN]] is zero, it
-immediately loops back to [[TURN_DISPATCH]]; otherwise it compares the
-character's level (field~\$0C, bits~2--0 after ROR) against [[STEPS_TAKEN]],
-and if the level is high enough, the character gets another turn via
-[[TURN_DISPATCH]].
+@ [[END_TURN]] wraps up a character's turn:
+\begin{enumerate}
+  \item Clears [[TURN_ACTIVE]].
+  \item Calls [[CHECK_AND_RESTRICT]] to update the restricted flag based on the encounter at the character's final position.
+  \item Checks whether the character has enough steps remaining for another action: if [[STEPS_TAKEN]] is zero, loops back to [[TURN_DISPATCH]]; otherwise compares the character's level (field~\$0C, bits~2--0 after ROR) against [[STEPS_TAKEN]], and if the level is high enough, the character gets another turn via [[TURN_DISPATCH]].
+\end{enumerate}
 
 <<end turn>>=
     ORG     $1BA7
