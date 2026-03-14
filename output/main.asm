@@ -170,85 +170,70 @@
         CPY     {1}
         BNE     {2}
     ENDM
-RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
+ENTITY_PTR              EQU     $F8     ; entity record pointer (2 bytes, $F8/$F9)
+TEXT_ROW                EQU     $25
+TEXT_COL                EQU     $24     ; Cursor position
+COPY_SRC                EQU     $BC     ; block copy source pointer (2 bytes)
+COPY_DEST               EQU     $BA     ; block copy destination pointer (2 bytes)
+DISPATCH_VEC            EQU     $F6     ; script action dispatch vector (2 bytes, $F6/$F7)
 TEXT_STREAM_PTR         EQU     $06     ; text stream pointer for TEXT_RENDERER (2 bytes)
+PRINT_STRING_ADDR       EQU     $BC     ; print string source pointer (2 bytes)
+RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
+CHAR_PTR                EQU     $FA     ; character record pointer (2 bytes, $FA/$FB)
+DECIMAL_OUT_PTR         EQU     $BA     ; num-to-decimal output buffer pointer (2 bytes)
+NUM_VALUE               EQU     $BC     ; 16-bit numeric value for division (2 bytes)
 SOUND_FREQ              EQU     $E1     ; sound frequency / script modified action
 SOUND_DURATION          EQU     $E2     ; sound duration / script parameter byte
 NOISE_SHIFT             EQU     $E3     ; noise generator shift register
-SCRIPT_PC               EQU     $E4     ; script instruction pointer (2 bytes, $E4/$E5)
-MOB_PTR                 EQU     $F4     ; mob data pointer (2 bytes, $F4/$F5)
-DISPATCH_VEC            EQU     $F6     ; script action dispatch vector (2 bytes, $F6/$F7)
-EFFECT_REC              EQU     $F6     ; target entity record for damage/stats (2 bytes)
-CHAR_INDEX              EQU     $F6     ; selected character/player index
-FACTION_MASK            EQU     $F7     ; faction match value for FIND_MOB_BY_FACTION
-ENTITY_PTR              EQU     $F8     ; entity record pointer (2 bytes, $F8/$F9)
-CHAR_PTR                EQU     $FA     ; character record pointer (2 bytes, $FA/$FB)
 MOB_DATA_PTR            EQU     $BA     ; mob data record pointer (2 bytes, $BA/$BB)
-COPY_DEST               EQU     $BA     ; block copy destination pointer (2 bytes)
-DECIMAL_OUT_PTR         EQU     $BA     ; num-to-decimal output buffer pointer (2 bytes)
-PRINT_STRING_ADDR       EQU     $BC     ; print string source pointer (2 bytes)
-HANDLER_PTR             EQU     $BC     ; entity type handler address (2 bytes)
-NUM_VALUE               EQU     $BC     ; 16-bit numeric value for division (2 bytes)
-COPY_SRC                EQU     $BC     ; block copy source pointer (2 bytes)
-TARGET_REC              EQU     $BC     ; secondary entity record pointer in combat/reorder (2 bytes)
+MOB_PTR                 EQU     $F4     ; mob data pointer (2 bytes, $F4/$F5)
 CHAR_REC                EQU     $BE     ; character record pointer from GET_CHAR_RECORD (2 bytes)
-EVENT_PTR               EQU     $BE     ; event list entry pointer (2 bytes)
+TARGET_REC              EQU     $BC     ; secondary entity record pointer in combat/reorder (2 bytes)
 ENTITY_REC              EQU     $BE     ; entity lookup result from FIND_ENTITY_AT_POS (2 bytes)
+DATA_PTR                EQU     $BE     ; general data pointer / return value (2 bytes)
+HANDLER_PTR             EQU     $BC     ; entity type handler address (2 bytes)
+EFFECT_REC              EQU     $F6     ; target entity record for damage/stats (2 bytes)
+EVENT_PTR               EQU     $BE     ; event list entry pointer (2 bytes)
 AI_BEST_STR             EQU     $BF     ; best hostile strength in ai_choose_target
 AI_BEST_POS             EQU     $BE     ; best hostile position in ai_choose_target
-DATA_PTR                EQU     $BE     ; general data pointer / return value (2 bytes)
-TEXT_COL                EQU     $24     ; Cursor position
-TEXT_ROW                EQU     $25
-DISK_DATA_REG           EQU     $C0EC   ; disk controller data register (active slot)
+CHAR_INDEX              EQU     $F6     ; selected character/player index
+FACTION_MASK            EQU     $F7     ; faction match value for FIND_MOB_BY_FACTION
+SCRIPT_PC               EQU     $E4     ; script instruction pointer (2 bytes, $E4/$E5)
+BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
+LOCATION_POS        EQU     $5A55   ; current location position (triggers redraw when changed)
+LOCATION_STYLE      EQU     $5A56   ; current map style (from record field 5, bits 0-6)
+CURRENT_PLAYER      EQU     $5A02   ; current player index (1-based)
 GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
-READ_KEYBOARD                EQU     $A44C   ; resident: read keyboard input
 UI_TEXT_STREAM          EQU     $5E55   ; text stream data for game UI background
 BORDER_POS_HORIZ       EQU     $5E7B   ; 6 col/row pairs for horizontal border labels
 BORDER_POS_VERT_L      EQU     $5E87   ; 10 col/row pairs for vertical border labels (left)
-BORDER_POS_VERT_R      EQU     $5E9B   ; 10 col/row pairs for vertical border labels (right)
 BORDER_STR_HORIZ       EQU     $5EAF   ; horizontal border pattern string
 BORDER_STR_VERT_L      EQU     $5EC1   ; vertical border pattern string (left)
-BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
 s_COPYRIGHT            EQU     $5EC7   ; "COPYRIGHT 1982 STUART SMITH"
 s_PRESS_SPACE          EQU     $5EE3   ; "PRESS SPACE BAR TO CONTINUE"
 s_DECOR_ROW1           EQU     $5EFF   ; decorative right-side row 1
 s_DECOR_ROW2           EQU     $5F07   ; decorative right-side row 2
 s_DECOR_ROW3           EQU     $5F10   ; decorative right-side row 3
 BORDER_LOOP_CTR        EQU     $5DC3   ; loop counter for border label drawing
+ROM_COUT1            EQU     $FDED   ; Apple II ROM COUT1 (character output)
+FONT_CHARNUM        EQU     $5A0E
+FONT_CHARSET        EQU     $5A0F
+BORDER_POS_VERT_R      EQU     $5E9B   ; 10 col/row pairs for vertical border labels (right)
+BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
 WORLD_INIT_DATA         EQU     $62B9   ; world initialization data table
 RWTS_IOB                EQU     $B7E8   ; RWTS Input/Output Block (14 bytes)
 INPUT_MODE          EQU     $5A00   ; 0 = keyboard, 1 = joystick
 TOTAL_MOB_COUNT     EQU     $5A01   ; total mobs across all groups (excl. group 0)
-CURRENT_PLAYER      EQU     $5A02   ; current player index (1-based)
-CURRENT_ROOM        EQU     $5A03   ; current room/location being processed
-CHAR_SPRITE         EQU     $5A04   ; character's font char number for display
-DAMAGE_AMOUNT       EQU     $5A10   ; damage to apply / new HP after subtraction
-ACTIVE_CHAR         EQU     $5A29   ; character index being processed
-SOURCE_CHAR         EQU     $5A28   ; source character for reorder
-REORDER_LINK        EQU     $5A2A   ; temp: saved next-link during reorder
-REORDER_SORT_KEY    EQU     $5A2B   ; temp: byte 11 of node for sorted insert
-BOUNDS_MIN_COL      EQU     $5A51   ; scene setup: left column boundary
-BOUNDS_MAX_COL      EQU     $5A52   ; scene setup: right column boundary
-BOUNDS_MIN_ROW      EQU     $5A53   ; scene setup: top row boundary
-BOUNDS_MAX_ROW      EQU     $5A54   ; scene setup: bottom row boundary
-LOCATION_POS        EQU     $5A55   ; current location position (triggers redraw when changed)
-NEAREST_DIST        EQU     $5A14   ; find nearest event: current minimum distance
-HEAL_NOTIFIED       EQU     $5A16   ; auto heal: nonzero = already printed heal message
-LOCATION_STYLE      EQU     $5A56   ; current map style (from record field 5, bits 0-6)
-TRAP_TYPE           EQU     $5A58   ; treasure trap: random trap type (0-3)
-AI_PREV_DIR         EQU     $5A5D   ; NPC AI: previous move direction (bias avoidance)
-EVENT_DEST_POS      EQU     $5A5F   ; event handler: destination position
-EVENT_POS           EQU     $5A5E   ; event position (from MANHATTAN_DISTANCE)
-SHOP_ITEM_MASK      EQU     $5A80   ; shop: bitmask for current item ($80 rotating right)
-SHOP_PRICE          EQU     $5A81   ; shop: accumulated price low byte
-SHOP_PRICE_HI       EQU     $5A82   ; shop: accumulated price high byte
-SCENE_NUMBER        EQU     $5A99   ; current scene number
-TURN_SCRIPT_GUARD   EQU     $5AA9   ; turn reset: guards one-shot script execution
-SCENE_TEXT_DATA     EQU     $5C00   ; base address of scene text data (loaded by LOAD_SCENE_DATA)
-SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene number)
-ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
+NUM_LEADING         EQU     $5A1E   ; leading-zero suppress flag (0=suppress, 1=print)
+NUM_DIVISOR         EQU     $5A1C   ; 16-bit divisor for decimal conversion (2 bytes)
+NUM_DIGIT           EQU     $5A1B   ; current digit accumulator (ASCII $B0-$B9)
 MSG_TABLE_PTR           EQU     $4005   ; message table base (2 bytes)
 MSG_LINE_COUNT          EQU     $5A57   ; lines printed so far
+SCRIPT_LOOP_ADDR    EQU     $5A8E   ; script loop address (2 bytes)
+SCRIPT_GOSUB_ADDR   EQU     $5A90   ; script gosub return address (2 bytes)
+PRNG_STATE          EQU     $5A19   ; PRNG full state: val = 69*val + $53 (mod 256)
+PRNG_TEMP           EQU     $5A1A   ; PRNG temporary for multiplication
+PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random tests
 RNG_LIMIT           EQU     $5A11   ; random\_in\_range temporary (limit/shift count)
 RNG_MASK            EQU     $5A12   ; random\_in\_range bit mask
 DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
@@ -258,107 +243,122 @@ ANIM_WAIT_TABLE         EQU     $7AB0   ; per-frame wait counts (indexed)
 ANIM_FRAME_TABLE        EQU     $7AB6   ; per-frame frame counts (indexed)
 WAIT_LOOP_COUNT         EQU     $5A8C   ; inner wait loop counter
 WAIT_DURATION           EQU     $7AAD   ; ROM WAIT duration parameter
-BLINK_DELAY             EQU     $7AAC   ; delay value loaded into WAIT_LOOP_COUNT by DRAW_MAP_ICON_B
-MAP_REDRAW_FLAG         EQU     $7AC4   ; non-zero = full map redraw needed
 ROM_WAIT                EQU     $FCA8   ; Apple II ROM WAIT routine
 SAVED_BC            EQU     $5A9A   ; saved TARGET_REC/PRINT_STRING_ADDR (2 bytes)
 SAVED_F8            EQU     $5A9C   ; saved ENTITY_PTR pointer (2 bytes)
 SAVED_BE            EQU     $5A9E   ; saved CHAR_REC/ENTITY_REC (2 bytes)
 SAVED_F4            EQU     $5AA0   ; saved MOB_PTR pointer (2 bytes)
-ROM_COUT1            EQU     $FDED   ; Apple II ROM COUT1 (character output)
-DAT_5a17_pos        EQU     $5A17   ; saved position for room search
-PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random tests
-PRNG_STATE          EQU     $5A19   ; PRNG full state: val = 69*val + $53 (mod 256)
-PRNG_TEMP           EQU     $5A1A   ; PRNG temporary for multiplication
-NUM_DIGIT           EQU     $5A1B   ; current digit accumulator (ASCII $B0-$B9)
-NUM_DIVISOR         EQU     $5A1C   ; 16-bit divisor for decimal conversion (2 bytes)
-NUM_LEADING         EQU     $5A1E   ; leading-zero suppress flag (0=suppress, 1=print)
-GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
+ACTIVE_CHAR         EQU     $5A29   ; character index being processed
+CHAR_LOWER_LEFT     EQU     $80AB
+CHAR_LOWER_RIGHT    EQU     $80AC
+CHAR_UPPER_RIGHT    EQU     $80A9
+CHAR_CHARSET        EQU     $80A6
+CHAR_UPPER_LEFT     EQU     $80A8
+SOURCE_CHAR         EQU     $5A28   ; source character for reorder
+BOUNDS_MAX_COL      EQU     $5A52   ; scene setup: right column boundary
+BOUNDS_MAX_ROW      EQU     $5A54   ; scene setup: bottom row boundary
+BOUNDS_MIN_COL      EQU     $5A51   ; scene setup: left column boundary
+BOUNDS_MIN_ROW      EQU     $5A53   ; scene setup: top row boundary
+FONT_COL        EQU     $5A0C
+SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene number)
+SCENE_TEXT_DATA     EQU     $5C00   ; base address of scene text data (loaded by LOAD_SCENE_DATA)
+SCENE_NUMBER        EQU     $5A99   ; current scene number
+BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
+DEFAULT_CHAR            EQU     $7AC2   ; default entity character ($2C)
+MAP_FILL_CHAR           EQU     $7AC1   ; character used to fill the map grid
 TILE_DEFAULT_TAB        EQU     $7AD0   ; 4-byte table: default char per style
 TILE_FILL_TAB           EQU     $7AD4   ; 4-byte table: fill char per style
 TILE_BLINK_TAB          EQU     $7AD8   ; 4-byte table: blink alt char per style
-FONT_CHARNUM        EQU     $5A0E
-FONT_CHARSET        EQU     $5A0F
-s_PRINT_FONT_CHAR   EQU     $80A4   ; 10 bytes
-CHAR_CHARSET        EQU     $80A6
-CHAR_UPPER_LEFT     EQU     $80A8
-CHAR_UPPER_RIGHT    EQU     $80A9
-CHAR_LOWER_LEFT     EQU     $80AB
-CHAR_LOWER_RIGHT    EQU     $80AC
-BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
-BLINK_ROW       EQU     $5AA3   ; font row
-BLINK_CHAR      EQU     $5AA4   ; font character number
-MAP_FILL_CHAR           EQU     $7AC1   ; character used to fill the map grid
-DEFAULT_CHAR            EQU     $7AC2   ; default entity character ($2C)
-AI_WAIT_FLAG    EQU     $5A06   ; wait delay for AI moves (0 or $0A)
-VIEW_MAX_COL    EQU     $5A08   ; viewport max column (from location field 4)
-VIEW_MAX_ROW    EQU     $5A09   ; viewport max row
-VIEW_MIN_COL    EQU     $5A0A   ; viewport min column (from location field 3)
-VIEW_MIN_ROW    EQU     $5A0B   ; viewport min row
-FONT_COL        EQU     $5A0C
+CHAR_AI_MODE    EQU     $5A05   ; 0 = player, 2-5 = AI behavior modes
 FONT_ROW        EQU     $5A0D
-LOCATION_ID     EQU     $5A17   ; current location/position index
+AI_WAIT_FLAG    EQU     $5A06   ; wait delay for AI moves (0 or $0A)
+s_PRINT_FONT_CHAR   EQU     $80A4   ; 10 bytes
+BLINK_CHAR      EQU     $5AA4   ; font character number
 SET_TEXT_WINDOW EQU     $76C2   ; set text window parameters
-BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
+EVENT_POS           EQU     $5A5E   ; event position (from MANHATTAN_DISTANCE)
+VIEW_MIN_ROW    EQU     $5A0B   ; viewport min row
+VIEW_MIN_COL    EQU     $5A0A   ; viewport min column (from location field 3)
+VIEW_MAX_ROW    EQU     $5A09   ; viewport max row
+VIEW_MAX_COL    EQU     $5A08   ; viewport max column (from location field 4)
+LOCATION_ID     EQU     $5A17   ; current location/position index
+MAP_REDRAW_FLAG         EQU     $7AC4   ; non-zero = full map redraw needed
+BLINK_DELAY             EQU     $7AAC   ; delay value loaded into WAIT_LOOP_COUNT by DRAW_MAP_ICON_B
+BLINK_ROW       EQU     $5AA3   ; font row
+RWTS_ENTRY              EQU     $B7B5   ; RWTS entry: PHP/SEI, JSR RWTS_CORE, CLC/SEC
+DAT_5a17_pos        EQU     $5A17   ; saved position for room search
+CURRENT_ROW     EQU     $5A64   ; current row during turn
+CURRENT_COL     EQU     $5A63   ; current column during turn
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
+REORDER_SORT_KEY    EQU     $5A2B   ; temp: byte 11 of node for sorted insert
+CURRENT_ROOM        EQU     $5A03   ; current room/location being processed
+REORDER_LINK        EQU     $5A2A   ; temp: saved next-link during reorder
+GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
+CHAR_SPRITE         EQU     $5A04   ; character's font char number for display
 TEXT_RIGHT_MARGIN        EQU     $5A96   ; right margin column for text wrap
 TEXT_LEFT_MARGIN         EQU     $5A97   ; left margin column for text wrap
 TEXT_STREAM_IDX          EQU     $5A98   ; saved Y index into byte stream
-CHAR_AI_MODE    EQU     $5A05   ; 0 = player, 2-5 = AI behavior modes
+ADJACENT_THREAT         EQU     $5A26   ; accumulated adjacent threat level
+ENCOUNTER_RESULT        EQU     $5A1F   ; 0/1/2 from CHECK_ENCOUNTER
 TURN_START_COL  EQU     $5A61   ; column at start of turn
 TURN_START_ROW  EQU     $5A62   ; row at start of turn
-CURRENT_COL     EQU     $5A63   ; current column during turn
-CURRENT_ROW     EQU     $5A64   ; current row during turn
 MOVE_POINTS     EQU     $5A65   ; movement points remaining
 STEPS_TAKEN     EQU     $5A66   ; steps taken this turn
 INPUT_DIR       EQU     $5A67   ; direction/command from input (1-9)
-COMBAT_WILLINGNESS EQU  $5A76   ; accumulated willingness-to-fight score
-COMBAT_STRENGTH EQU     $5A78   ; result of CALC_COMBAT_STRENGTH
-TARGET_PTR_LO   EQU     $5A86   ; selected combat target pointer (low byte)
-TARGET_PTR_HI   EQU     $5A87   ; selected combat target pointer (high byte)
-BEST_THREAT     EQU     $5A88   ; best threat level during target selection
-EVENT_SLOT_BYTE EQU     $5A59   ; saved byte 2 of event slot (type+value)
-EVENT_SUB_VALUE EQU     $5A5A   ; lower 5 bits of event slot byte 2
-DIR_SCORES      EQU     $5A6A   ; array of 5 direction scores (indexed 0-4)
-AI_DIRECTION    EQU     $5A6F   ; current direction being evaluated / random range
-AI_TEST_POS     EQU     $5A70   ; position being tested for direction evaluation
-AI_TARGET_POS   EQU     $5A71   ; AI target position (set by AI_CHOOSE_TARGET)
-AI_TARGET_COL   EQU     $5A72   ; AI target column / min distance temp
-STAT_LEVEL_BITS EQU     $5A7F   ; level bits during stat modification
-MOB_DEFENSE     EQU     $5A79   ; mob defense value (low 4 bits of mob byte 8)
-SHOP_ITEM_OFFSET EQU    $5A85   ; offset into shop item table (5 per item)
-INPUT_OPTION_COUNT EQU  $5AAA   ; number of input options to draw
-CURRENT_SELECTION EQU   $5AAB   ; current menu selection index
-INPUT_BUFFER    EQU     $5AAC   ; 120-byte input text display buffer
-INPUT_JMP_VEC   EQU     $5F5E   ; indirect jump vector for input callbacks
-UNDER_LEVEL     EQU     $5B25   ; 1 if char level < steps taken
-SAFE_TO_REST    EQU     $5B26   ; 1 if no adjacent threats or encounters
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
-ENCOUNTER_RESULT        EQU     $5A1F   ; 0/1/2 from CHECK_ENCOUNTER
+TURN_SCRIPT_GUARD   EQU     $5AA9   ; turn reset: guards one-shot script execution
+READ_KEYBOARD                EQU     $A44C   ; resident: read keyboard input
+INPUT_JMP_VEC   EQU     $5F5E   ; indirect jump vector for input callbacks
+CURRENT_SELECTION EQU   $5AAB   ; current menu selection index
+INPUT_OPTION_COUNT EQU  $5AAA   ; number of input options to draw
+INPUT_BUFFER    EQU     $5AAC   ; 120-byte input text display buffer
+SAFE_TO_REST    EQU     $5B26   ; 1 if no adjacent threats or encounters
+UNDER_LEVEL     EQU     $5B25   ; 1 if char level < steps taken
 COLOCATE_POS            EQU     $5A21   ; saved position for co-location search
 COLOCATE_LINK           EQU     $5A20   ; saved next-link (stop condition)
 COLOCATE_WRAPPED        EQU     $5A22   ; 1 if wrapped, 2 if ahead
 HOSTILE_APP             EQU     $5A23   ; saved appearance for hostility check
 HOSTILE_A               EQU     $5A24   ; saved A from first GET_HOSTILITY
 HOSTILE_Y               EQU     $5A25   ; saved Y from first GET_HOSTILITY
-ADJACENT_THREAT         EQU     $5A26   ; accumulated adjacent threat level
 ADJACENT_POS            EQU     $5A27   ; saved position for adjacency check
+COMBAT_STRENGTH EQU     $5A78   ; result of CALC_COMBAT_STRENGTH
+TARGET_PTR_LO   EQU     $5A86   ; selected combat target pointer (low byte)
+TARGET_PTR_HI   EQU     $5A87   ; selected combat target pointer (high byte)
+COMBAT_WILLINGNESS EQU  $5A76   ; accumulated willingness-to-fight score
+SCENE_COMBAT_FLAG       EQU     $423A   ; nonzero = combat pending
+MOB_DEFENSE     EQU     $5A79   ; mob defense value (low 4 bits of mob byte 8)
+DAMAGE_AMOUNT       EQU     $5A10   ; damage to apply / new HP after subtraction
+EVENT_DEST_POS      EQU     $5A5F   ; event handler: destination position
+EVENT_SUB_VALUE EQU     $5A5A   ; lower 5 bits of event slot byte 2
+EVENT_SLOT_BYTE EQU     $5A59   ; saved byte 2 of event slot (type+value)
+BEST_THREAT     EQU     $5A88   ; best threat level during target selection
+HEAL_NOTIFIED       EQU     $5A16   ; auto heal: nonzero = already printed heal message
+STAT_LEVEL_BITS EQU     $5A7F   ; level bits during stat modification
+AI_PREV_DIR         EQU     $5A5D   ; NPC AI: previous move direction (bias avoidance)
+AI_TARGET_COL   EQU     $5A72   ; AI target column / min distance temp
+AI_TARGET_POS   EQU     $5A71   ; AI target position (set by AI_CHOOSE_TARGET)
+AI_TEST_POS     EQU     $5A70   ; position being tested for direction evaluation
+AI_DIRECTION    EQU     $5A6F   ; current direction being evaluated / random range
+DIR_SCORES      EQU     $5A6A   ; array of 5 direction scores (indexed 0-4)
+NEAREST_DIST        EQU     $5A14   ; find nearest event: current minimum distance
+SHOP_PRICE          EQU     $5A81   ; shop: accumulated price low byte
+SHOP_PRICE_HI       EQU     $5A82   ; shop: accumulated price high byte
+SHOP_ITEM_MASK      EQU     $5A80   ; shop: bitmask for current item ($80 rotating right)
+SHOP_ITEM_OFFSET EQU    $5A85   ; offset into shop item table (5 per item)
 EVENT_THRESHOLD         EQU     $4239   ; random event probability threshold (~7%)
 SCENE_FOUND_FLAG        EQU     $5A89   ; scan result: 1 = matching group found
 SCENE_HOSTILE_FLAG      EQU     $5A8A   ; scan result: nonzero = hostile encountered
 SCENE_GROUP_IDX         EQU     $5A8B   ; current group index for scanning
-SCENE_COMBAT_FLAG       EQU     $423A   ; nonzero = combat pending
 SCENE_P3_DONE           EQU     $423B   ; nonzero = player 3 scene processed
 SCENE_P1_DONE           EQU     $423C   ; nonzero = player 1 scene processed
 SCENE_HOSTILE_DONE      EQU     $423D   ; nonzero = hostile encounter processed
 SCENE_EVENT_RESULT      EQU     $423E   ; nonzero = event fully handled
+TRAP_TYPE           EQU     $5A58   ; treasure trap: random trap type (0-3)
+ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
 SCRIPT_LOOP_CTR     EQU     $5A8D   ; script loop iteration counter
-SCRIPT_LOOP_ADDR    EQU     $5A8E   ; script loop address (2 bytes)
-SCRIPT_GOSUB_ADDR   EQU     $5A90   ; script gosub return address (2 bytes)
 SCRIPT_PRNG_MASK    EQU     $5A92   ; PRNG mask for action randomization
 SCRIPT_ACTION_VEC   EQU     $5A93   ; action handler vector (2 bytes)
-RWTS_ENTRY              EQU     $B7B5   ; RWTS entry: PHP/SEI, JSR RWTS_CORE, CLC/SEC
 RWTS_CORE               EQU     $BD00   ; RWTS core dispatcher
+DISK_DATA_REG           EQU     $C0EC   ; disk controller data register (active slot)
     ORG     $0500
 STUB_ENTRY:
     JMP     ATTRACT_LOOP

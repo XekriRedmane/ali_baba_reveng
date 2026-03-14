@@ -179,90 +179,90 @@ ealdr_bot           EQU     $AC60   ; funny-increment low counter
 ealdr_top           EQU     $AC61   ; funny-increment high counter
     ORG     $A806
 ealdr_entry:
-    LDY      #$00              ; Fill $2000-$7FFF with $FF
-    STY      ealdr_src         ; ($4C) = pointer low
+    LDY      #$00            ; Fill $2000-$7FFF with $FF
+    STY      ealdr_src       ; ($4C) = pointer low
     LDA      #$20
-    STA      ealdr_src+1       ; ($4D) = $20 (start page)
+    STA      ealdr_src+1     ; ($4D) = $20 (start page)
     LDA      #$FF
 .fill:
     STA      (ealdr_src),Y
     INY
     BNE      .fill
     INC      ealdr_src+1
-    BPL      .fill             ; loop until page $80 (sign bit set)
+    BPL      .fill           ; loop until page $80 (sign bit set)
 
 _ealdr.copy_lo:
-    LDX      #$00              ; Copy splash screen from $B000+
+    LDX      #$00            ; Copy splash screen from $B000+
 _ealdr.copy_next:
-    JSR      ealdr_copy_byte   ; copy byte, advance source
+    JSR      ealdr_copy_byte ; copy byte, advance source
     INX
-    BXNE     #$20,_ealdr.copy_next   ; X = $00..$1F (first 32 bytes)
+    BXNE     #$20,_ealdr.copy_next ; X = $00..$1F (first 32 bytes)
     LDX      #$80
 _ealdr.copy_hi:
-    JSR      ealdr_copy_byte   ; X = $80..$9F (next 32 bytes)
+    JSR      ealdr_copy_byte ; X = $80..$9F (next 32 bytes)
     INX
     BXNE     #$A0,_ealdr.copy_hi
-    INC      ealdr_copy_dst    ; self-modify: advance dest page
+    INC      ealdr_copy_dst  ; self-modify: advance dest page
     LDA      ealdr_copy_dst
     BANE    #$40,_ealdr.copy_lo    ; done when dest page reaches $40
-    JMP      ealdr_vm_exec     ; enter VM
+    JMP      ealdr_vm_exec   ; enter VM
     ORG     $A83A
 ealdr_copy_byte:
 ealdr_copy_src = *+1
-    LDA      $B000             ; self-modified source address
+    LDA      $B000            ; self-modified source address
 ealdr_copy_dst = *+2
-    STA      $202C,X           ; dest = HGR page + offset
-    INC      ealdr_copy_src    ; advance source (low byte)
+    STA      $202C,X          ; dest = HGR page + offset
+    INC      ealdr_copy_src   ; advance source (low byte)
     BNE      .done
-    INC      ealdr_copy_src+1  ; carry to high byte
+    INC      ealdr_copy_src+1 ; carry to high byte
 .done:
     RTS
     ORG     $A849
 ealdr_vm_exec:
-    LDX      #$30              ; filler (skipped by Y=4)
-    JSR      ealdr_vm_interp   ; call interpreter
-    DEX                        ; \  these 3 bytes are skipped;
-    BPL      ealdr_vm_exec     ; /  the VM never returns here
+    LDX      #$30            ; filler (skipped by Y=4)
+    JSR      ealdr_vm_interp ; call interpreter
+    DEX                      ; \  these 3 bytes are skipped;
+    BPL      ealdr_vm_exec   ; /  the VM never returns here
                                 ; VM bytecodes begin at $A851
     ORG     $A898
 ealdr_clear_text:
     LDA      #$00
-    STA      ealdr_src         ; $4C = 0
+    STA      ealdr_src     ; $4C = 0
     LDA      #$04
-    STA      ealdr_src+1       ; $4D = 4 -> pointer = $0400
+    STA      ealdr_src+1   ; $4D = 4 -> pointer = $0400
     LDY      #$00
 _ealdr.loop:
     LDA      #$00
-    STA      (ealdr_src),Y     ; zero out
+    STA      (ealdr_src),Y ; zero out
     INY
     BNE      _ealdr.loop
     INC      ealdr_src+1
     LDA      ealdr_src+1
-    BANE    #$08,_ealdr.loop    ; done at $0800
+    BANE    #$08,_ealdr.loop     ; done at $0800
     RTS
     ORG     $A948
 ealdr_reboot:
-    JSR      $FC58             ; HOME (clear screen)
+    JSR      $FC58 ; HOME (clear screen)
     LDA      #$FF
 .delay:
     LDX      #$A0
 .inner:
     DEX
     BNE      .inner
-    BIT      $C030             ; click speaker
+    BIT      $C030 ; click speaker
     SEC
     SBC      #$01
     BNE      .delay
-    LDA      #$C5              ; 'E'
+    LDA      #$C5  ; 'E'
     STA      $0400
-    LDA      #$C1              ; 'A'
+    LDA      #$C1  ; 'A'
     STA      $0401
-    JMP      $C600             ; reboot from Disk II
+    JMP      $C600 ; reboot from Disk II
     ORG     $A970
 ealdr_funny_inc:
-    INC      ealdr_bot         ; $AC60
+    INC      ealdr_bot      ; $AC60
     LDA      ealdr_bot
-    BAEQ    ealdr_top,_ealdr.wrap    ; $AC61
+    BAEQ    ealdr_top,_ealdr.wrap ; $AC61
     RTS
 _ealdr.wrap:
     LDA      #$01
@@ -282,36 +282,36 @@ EALDR_tracks:
     ORG     $AA35
     SUBROUTINE ealdr_vm_interp
 ealdr_vm_interp:
-    LDA      EALDR_psuedoacc   ; save VM accumulator
+    LDA      EALDR_psuedoacc        ; save VM accumulator
     PHA
-    TYA                        ; save Y
+    TYA                             ; save Y
     PHA
-    JSR      ealdr_vm_init     ; RTS trick: pull return addr -> $46/$47
+    JSR      ealdr_vm_init          ; RTS trick: pull return addr -> $46/$47
 
     ; --- After RTS trick, execution resumes here ---
-    PLA                        ; pull saved Y -> $46 (low byte of return addr)
+    PLA                             ; pull saved Y -> $46 (low byte of return addr)
     STA      ealdr_ptr
-    PLA                        ; pull saved acc -> $47 (high byte)
+    PLA                             ; pull saved acc -> $47 (high byte)
     STA      ealdr_ptr+1
 
     ; Dispatch loop
-    LDY      #$04              ; skip 4 bytes (DEX/BPL/offset + JSR addr byte)
+    LDY      #$04                   ; skip 4 bytes (DEX/BPL/offset + JSR addr byte)
 ealdr_dispatch:                 ; $AA45
-    LDA      (ealdr_ptr),Y     ; read opcode byte
+    LDA      (ealdr_ptr),Y          ; read opcode byte
     INY
     BNE      .no_carry
     INC      ealdr_ptr+1
 .no_carry:
-    TAX                        ; opcode -> X
-    LDA      ealdr_dispatch_table,X  ; handler offset
+    TAX                             ; opcode -> X
+    LDA      ealdr_dispatch_table,X ; handler offset
     CLC
-    ADC      #<ealdr_vm_loop   ; handler = $AA72 + offset
-    STA      ealdr_vm_jmp+1    ; self-modify JMP low byte
+    ADC      #<ealdr_vm_loop        ; handler = $AA72 + offset
+    STA      ealdr_vm_jmp+1         ; self-modify JMP low byte
     LDA      #>ealdr_vm_loop
-    ADC      #$00              ; carry
-    STA      ealdr_vm_jmp+2    ; self-modify JMP high byte
+    ADC      #$00                   ; carry
+    STA      ealdr_vm_jmp+2         ; self-modify JMP high byte
 ealdr_vm_jmp:
-    JMP      ealdr_vm_loop     ; self-modified: jump to handler
+    JMP      ealdr_vm_loop          ; self-modified: jump to handler
     ORG     $AA60
 ealdr_dispatch_table:
     HEX  00 3C 53 5D 6B 88 AB BC 4D A0 77 B7
@@ -320,47 +320,47 @@ ealdr_dispatch_table:
     ;    INC  ADD  DXR  BNE  SUB  COPY (trampolines)
     ORG     $AA72
 ealdr_vm_loop:
-    JSR      ealdr_read_arg16  ; read 2-byte encoded address -> $42/$43
+    JSR      ealdr_read_arg16 ; read 2-byte encoded address -> $42/$43
 ealdr_vm_goto:                  ; $AA75 - entry when addr already in $42/$43
     LDA      $42
-    STA      ealdr_ptr         ; update bytecode pointer
+    STA      ealdr_ptr        ; update bytecode pointer
     LDA      $43
     STA      ealdr_ptr+1
     LDY      #$00
-    JMP      ealdr_dispatch    ; read next opcode
+    JMP      ealdr_dispatch   ; read next opcode
     ORG     $AA82
 ealdr_read_arg16:
-    LDA      (ealdr_ptr),Y     ; read low byte
-    EOR      #$03              ; decrypt
+    LDA      (ealdr_ptr),Y ; read low byte
+    EOR      #$03          ; decrypt
     INY
     BNE      .no_carry1
     INC      ealdr_ptr+1
 .no_carry1:
-    STA      $42               ; decoded low byte
-    LDA      (ealdr_ptr),Y     ; read high byte
+    STA      $42           ; decoded low byte
+    LDA      (ealdr_ptr),Y ; read high byte
     INY
     BNE      .no_carry2
     INC      ealdr_ptr+1
 .no_carry2:
-    EOR      #$D9              ; decrypt
-    STA      $43               ; decoded high byte
+    EOR      #$D9          ; decrypt
+    STA      $43           ; decoded high byte
     RTS
     ORG     $AA99
     SUBROUTINE ealdr_vm_init
 ealdr_vm_init:
     PLA
-    STA      $42               ; return addr low
+    STA      $42       ; return addr low
     PLA
-    STA      $43               ; return addr high
+    STA      $43       ; return addr high
     PLA
-    STA      ealdr_ptr         ; saved Y -> $46 (overwritten later)
+    STA      ealdr_ptr ; saved Y -> $46 (overwritten later)
     PLA
-    STA      ealdr_ptr         ; saved acc -> $46 (overwrites Y)
-    INC      $42               ; return addr + 1
+    STA      ealdr_ptr ; saved acc -> $46 (overwrites Y)
+    INC      $42       ; return addr + 1
     BNE      .no_carry
     INC      $43
 .no_carry:
-    JMP      ($0042)           ; jump to instruction after JSR
+    JMP      ($0042)   ; jump to instruction after JSR
     ORG     $AAAE
     SUBROUTINE ealdr_op_call1
 ; --- Opcode 01: CALL1 addr ---
@@ -397,12 +397,12 @@ ealdr_op_beq:
 ; --- Opcode 03: LDI val ---
 ; Load 1-byte immediate (XOR $4C) into VM acc.  Handler at $AACF.
 ealdr_op_ldi:
-    LDA      (ealdr_ptr),Y    ; read encoded byte
+    LDA      (ealdr_ptr),Y     ; read encoded byte
     INY
     BNE      .nc
     INC      ealdr_ptr+1
 .nc:
-    EOR      #$4C             ; decrypt
+    EOR      #$4C              ; decrypt
     STA      EALDR_psuedoacc
     JMP      ealdr_vm_dispatch
 
@@ -421,14 +421,14 @@ ealdr_op_ld_do:                 ; $AAE0 (shared by LDX)
 ; Indexed load: A <- (addr + A).  Handler at $AAE9.
 ealdr_op_ldx:
     JSR      ealdr_read_arg16
-    LDA      EALDR_psuedoacc  ; add VM acc to address
+    LDA      EALDR_psuedoacc   ; add VM acc to address
     CLC
     ADC      $42
     STA      $42
     BCC      .nc
     INC      $43
 .nc:
-    JMP      ealdr_op_ld_do   ; fall into LD handler
+    JMP      ealdr_op_ld_do    ; fall into LD handler
 
     SUBROUTINE ealdr_op_call
 ; --- Opcode 05: CALL addr ---
@@ -472,16 +472,16 @@ ealdr_op_asl:
 ; --- Opcode 07: SUBI val ---
 ; Subtract 1-byte immediate (XOR $4C) from VM acc.  Handler at $AB2E.
 ealdr_op_subi:
-    LDA      (ealdr_ptr),Y    ; read encoded byte
+    LDA      (ealdr_ptr),Y     ; read encoded byte
     INY
     BNE      .nc
     INC      ealdr_ptr+1
 .nc:
-    EOR      #$4C             ; decrypt
-    STA      $42              ; temp
+    EOR      #$4C              ; decrypt
+    STA      $42               ; temp
     LDA      EALDR_psuedoacc
     SEC
-    SBC      $42              ; acc - immediate
+    SBC      $42               ; acc - immediate
     STA      EALDR_psuedoacc
     JMP      ealdr_vm_dispatch
 
@@ -566,13 +566,13 @@ ealdr_op_sub:
 ; Copy one byte: (dest++) <- (src++).  Handler at $ABAA.
 ealdr_op_copy:
     LDX      #$00
-    LDA      (ealdr_src,X)    ; read from src
-    STA      (ealdr_dest,X)   ; write to dest
-    INC      ealdr_src        ; src++
+    LDA      (ealdr_src,X)     ; read from src
+    STA      (ealdr_dest,X)    ; write to dest
+    INC      ealdr_src         ; src++
     BNE      .nc1
     INC      ealdr_src+1
 .nc1:
-    INC      ealdr_dest       ; dest++
+    INC      ealdr_dest        ; dest++
     BNE      .nc2
     INC      ealdr_dest+1
 .nc2:
