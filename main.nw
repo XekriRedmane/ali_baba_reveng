@@ -2220,22 +2220,153 @@ EALDR_DXR_STEP:
   \item [[$B800]]--[[$BBFF]]: Residual EA development source code---assembly comments documenting the VM opcode set, left over from the EALDR build tools.
 \end{enumerate}
 
+@ [[EALDR_DISK_IO]] is part of the copy-protection system.  It performs
+half-track reads across multiple tracks, scanning for address fields
+and recording the range of sector numbers found.  If the range
+(max$-$min) is at least [[$22]] (34), the disk passes the check;
+otherwise it aborts to the caller's caller.  This exploits the fact
+that a legitimately-pressed disk has slight track alignment
+variations that produce a wider range of sector numbers when reading
+between tracks, whereas a copied disk has uniform alignment.
+
+The routine uses zero-page variables:
+\begin{itemize}
+  \item [[$00]]: sector search timeout counter.
+  \item [[$01]]: flag (set by caller; zero = abort).
+  \item [[$02]]: temporary for address field decode.
+  \item [[$03]]: maximum sector number seen.
+  \item [[$04]]: minimum sector number seen.
+  \item [[$06]]: current half-track number.
+\end{itemize}
+
 <<EALDR disk io>>=
     ORG     $ABBF
 EALDR_DISK_IO:
-    ; Disk I/O code: $ABBF-$AC67 (169 bytes)
-    HEX     AD E9 C0 A2 FF 86 04 E8 86 01 86 03 A9 18 85 06
-    HEX     20 00 BC E6 06 20 06 BC B0 FB A5 2D D0 F7 A5 06
-    HEX     20 00 BC E6 06 A9 19 20 09 BC A9 00 85 00 E6 00
-    HEX     F0 36 AD EC C0 10 FB C9 D5 D0 F3 48 68 AD EC C0
-    HEX     10 FB C9 AA D0 F1 EA A0 02 AD EC C0 10 FB C9 96
-    HEX     D0 E5 AD EC C0 10 FB 2A 85 02 AD EC C0 10 FB 25
-    HEX     02 88 10 EE C9 02 F0 01 60 A5 00 C5 03 90 02 85
-    HEX     03 C5 04 B0 02 85 04 A5 06 C9 1F F0 03 4C D4 AB
-    HEX     A5 03 38 E5 04 C9 22 90 04 60 68 68 60 A5 01 D0
-    HEX     03 4C 49 AC 60 20 BF AB 20 35 AA CA 10 FA 00 D7
-    HEX     70 00 00 00 00 00 00 00 00
+    SUBROUTINE EALDR_DISK_IO
+
+    LDA     $C0E9              ; IWM: motor on
+    LDX     #$FF               ; \
+    STX     $04                ;  | min = $FF
+    INX                        ;  | X = 0
+    STX     $01                ;  | flag = 0
+    STX     $03                ; /  max = 0
+    LDA     #$18               ; \
+    STA     $06                ; /  start at half-track $18
+    JSR     EALDR_MOVE_ARM     ; seek to half-track $18
+.next_track:
+    INC     $06                ; advance to next half-track
+.search_sector:
+    JSR     EALDR_SEARCH_ADDR  ; search for address field
+    BCS     .search_sector     ; error -> retry
+    LDA     $2D                ; sector number from address field
+    BNE     .search_sector     ; not sector 0 -> keep searching
+    ; Found sector 0: read a data field as verification
+    LDA     $06                ; \
+    JSR     EALDR_MOVE_ARM     ;  | seek to current half-track
+    INC     $06                ;  | advance half-track
+    LDA     #$19               ;  |
+    JSR     EALDR_READ_DATA    ; /  read data field (page $19)
+    ; Scan for address field headers on this half-track
+    LDA     #$00               ; \
+    STA     $00                ; /  timeout counter = 0
+.scan_loop:
+    INC     $00                ; increment timeout
+    BEQ     .scan_done         ; wrapped to 0 -> done scanning
+    ; Search for D5 AA 96 prologue
+.wait_d5:
+    LDA     $C0EC              ; \
+    BPL     .wait_d5           ;  | wait for nibble
+.check_d5:
+    CMP     #$D5               ;  |
+    BNE     .scan_loop         ; /  not D5 -> restart
+    PHA                        ; \
+    PLA                        ; /  timing delay
+.wait_aa:
+    LDA     $C0EC              ; \
+    BPL     .wait_aa           ;  |
+    CMP     #$AA               ;  |
+    BNE     .check_d5          ; /  not AA -> re-check D5
+    NOP                        ; timing
+    LDY     #$02               ; read 3 header fields (track, sector, ?)
+.wait_96:
+    LDA     $C0EC              ; \
+    BPL     .wait_96           ;  |
+    CMP     #$96               ;  |
+    BNE     .check_d5          ; /  not 96 -> re-check D5
+    ; Decode header fields (odd/even encoding)
+.read_field:
+    LDA     $C0EC              ; \
+    BPL     .read_field        ;  | read odd-bits byte
+    ROL                        ;  |
+    STA     $02                ; /  save shifted
+.wait_even:
+    LDA     $C0EC              ; \
+    BPL     .wait_even         ;  | read even-bits byte
+    AND     $02                ; /  combine
+    DEY                        ; \
+    BPL     .read_field        ; /  loop for 3 fields
+    ; A now holds the last decoded field (sector number from this half-track)
+    CMP     #$02               ; \
+    BEQ     .update_range      ;  | sector 2 -> update range
+.scan_done:
+    RTS                        ; /  otherwise return (also timeout exit)
+.update_range:
+    LDA     $00                ; \  update max
+    CMP     $03                ;  |
+    BCC     .check_min         ;  |
+    STA     $03                ; /  max = counter if counter > max
+.check_min:
+    CMP     $04                ; \  update min
+    BCS     .check_done        ;  |
+    STA     $04                ; /  min = counter if counter < min
+.check_done:
+    LDA     $06                ; \
+    CMP     #$1F               ;  | scanned all half-tracks up to $1F?
+    BEQ     .verify_range      ;  |
+    JMP     .search_sector     ; /  no -> continue scanning
+.verify_range:
+    LDA     $03                ; \
+    SEC                        ;  | range = max - min
+    SBC     $04                ;  |
+    CMP     #$22               ;  | range >= $22 (34)?
+    BCC     EALDR_CHECK_FLAG   ;  |
+    RTS                        ; /  yes -> pass (return normally)
+EALDR_ABORT:                   ;     range too small -> fail
+    PLA                        ; \
+    PLA                        ;  | discard return address
+    RTS                        ; /  abort to caller's caller
 @ %def EALDR_DISK_IO
+
+@ [[EALDR_CHECK_FLAG]] checks the flag at [[$01]].  If zero,
+it aborts via [[PLA; PLA; RTS]].  Called by the VM bytecode
+program's read\_tracks subroutine.
+
+<<EALDR check flag>>=
+    ORG     $AC4C
+EALDR_CHECK_FLAG:
+    LDA     $01                ; \
+    BNE     .ok                ;  | if flag is zero,
+    JMP     EALDR_ABORT        ;  | abort (PLA; PLA; RTS at $AC49)
+.ok:
+    RTS
+@ %def EALDR_CHECK_FLAG
+
+@ [[EALDR_PROT_ENTRY]] calls [[EALDR_DISK_IO]] then enters the
+VM interpreter.  The VM bytecodes following the [[DEX]]/[[BPL]]
+loop are a [[VMGOTO]] to [[VM_ERROR_DISPLAY]], executed if the
+protection check fails and the VM takes over.
+
+<<EALDR prot entry>>=
+    ORG     $AC54
+EALDR_PROT_ENTRY:
+    JSR     EALDR_DISK_IO      ; run half-track protection check
+    JSR     EALDR_VM_INTERP    ; enter VM interpreter
+    DEX                        ; \  these bytes are skipped;
+    BPL     EALDR_PROT_ENTRY+3 ; /  the VM never returns here
+    ; VM bytecodes: goto error display if reached
+    VMGOTO  VM_ERROR_DISPLAY
+    DS      8,$00              ; padding
+@ %def EALDR_PROT_ENTRY EALDR_ABORT
 
 @ The splash screen data occupies [[$AC68]]--[[$B7FF]].  The first
 152~bytes at [[$AC68]] are residual EA loader documentation (the same
@@ -2477,19 +2608,22 @@ The EA mnemonics reveal the original naming conventions:
 \end{tabular}
 \end{center}
 
-Following the opcode definitions is an [[ICODE]] dispatch table that maps
-each opcode to its handler label (e.g., [[IJMP]], [[IJSRA]], [[IBEQ]]).
+Following the opcode definitions is a fragment of documentation,
+[[EALDR_SOURCE_COMMENTS]], that maps
+opcodes (starting from [[5]]) to their handler labels
+(e.g., [[IJMP]], [[IJSRA]], [[IBEQ]]).
 The [[$E5]] bytes (high-bit [['e']]) are likely an assembler pseudo-op
-(equate or entry directive).
+(equate or entry directive). This could be a leftover table for
+a VM code disassembler.
 
 @ [[EACR]] emits a [[$0D]] line separator followed by a length byte.
-[[EASEP]] emits the [[$D9]] field separator.
+[[EASEP]] emits the [[$D9]] record separator.
 
 <<EALDR VM macros>>=
     MACRO EACR    ; line separator: $0D
         DC.B $0D
     ENDM
-    MACRO EASEP   ; field separator: $D9 (high-bit 'Y')
+    MACRO EASEP   ; record separator: $D9 (high-bit 'Y')
         DC.B $D9
     ENDM
     MACRO SLEN    ; string length byte
@@ -2750,10 +2884,6 @@ EALDR_SEARCH_ADDR:              ; $BC06
 EALDR_READ_DATA:                ; $BC09
     JMP      $BD14
 @ %def EALDR_MOVE_ARM EALDR_READ_TRACK EALDR_SEARCH_ADDR EALDR_READ_DATA
-
-@ The [[EALDR Program]] chunk has been superseded by the
-[[EALDR_VM_BYTECODE]] chunks, which use the [[VM]] macros to emit
-the encrypted bytecodes from readable operands with named branch targets.
 
 <<EALDR track pages>>=
     ORG     $A9F3
@@ -16912,6 +17042,8 @@ The following root chunks produce the assembly files when tangled.
 <<EALDR VM init>>
 <<EALDR opcode handlers>>
 <<EALDR disk io>>
+<<EALDR check flag>>
+<<EALDR prot entry>>
 <<EALDR splash data>>
 <<EALDR source comments>>
 <<EALDR disk entry points>>
