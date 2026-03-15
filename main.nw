@@ -1537,7 +1537,18 @@ XOR \$03/\$D9 address argument.}
     ENDM
 @
 
-@ The bytecode program sets [[SOFTEV]] to [[$A948]] (the address of
+@ Bytecode part~1 begins immediately after the [[EALDR_VM_EXEC]]
+entry point.  It performs the initial display setup:
+\begin{enumerate}
+  \item Switches the Apple~II to hi-res graphics mode (full screen, no text window).
+  \item Sets the reset vector to [[EALDR_REBOOT]] ([[$A948]]) via [[SOFTEV]]/[[PWREDUP]].
+  \item Runs a splash screen delay loop (8~iterations of [[WAIT]]).
+  \item Optionally loads Group~1 (tracks [[$03]], [[$04]], [[$21]], [[$22]]) if the flag at [[$A805]] is nonzero.
+  \item Loads Group~2 (tracks [[$07]]--[[$0C]]) into [[$4000]]--[[$95FF]] via [[VM_READ_TRACKS]].
+  \item Clears the text screen via [[EALDR_CLEAR_TEXT]].
+\end{enumerate}
+
+The bytecode program sets [[SOFTEV]] to [[$A948]] (the address of
 [[EALDR_REBOOT]] minus one, per the RTS convention) and [[PWREDUP]]
 to [[$0C]].  The Apple~II reset check validates [[PWREDUP]] against
 [[SOFTEV]] low~EOR~high~EOR~[[$A5]]; the correct value would be
@@ -1563,6 +1574,7 @@ EALDR_VM_BYTECODE:
     VMST    SOFTEV+1           ; /  SOFTEV hi = $A9 -> reset = EALDR_REBOOT
     VMLDI   $0C                ; \
     VMST    PWREDUP            ; /  PWREDUP = $A9 EOR $A5 = $0C
+
     ; --- Splash screen delay ---
 VM_SPLASH_DELAY:
     VMLDI   $FF                ; \
@@ -1570,6 +1582,7 @@ VM_SPLASH_DELAY:
     VMINC   EALDR_SRC          ;  | EALDR_SRC++
     VMBEQ   VM_LOAD_GROUP1     ;  | done when wraps to 0
     VMGOTO  VM_SPLASH_DELAY    ; /  loop
+
     ; --- Group 1: optional tracks $03,$04,$21,$22 ---
 VM_LOAD_GROUP1:
     VMLD    $A805              ; flag byte (0 = skip Group 1)
@@ -1578,6 +1591,7 @@ VM_LOAD_GROUP1:
     VMCALL  VM_READ_TRACKS     ;  | read_tracks(0) -> Group 1
     VMLD    $C0E8              ;  | IWM: motor off
     VMCALL1 $0000              ; /  ???
+
     ; --- Group 2: tracks $07-$0C -> $4000-$95FF ---
 VM_LOAD_GROUP2:
     VMLDI   $05                ; \
@@ -1585,6 +1599,192 @@ VM_LOAD_GROUP2:
     VMCALL1 EALDR_CLEAR_TEXT   ; /  clear text screen
     VMGOTO  VM_LOAD_GROUP3     ; continue at bytecode part 2
 @ %def EALDR_VM_BYTECODE VM_SPLASH_DELAY VM_LOAD_GROUP1 VM_LOAD_GROUP2
+
+@ Bytecode part~2 continues after the native [[EALDR_CLEAR_TEXT]]
+subroutine.  It performs the remaining loading, verification, and
+decryption steps:
+\begin{enumerate}
+  \item Loads Group~3 (tracks [[$0D]]--[[$10]]) into [[$0800]]--[[$3FFF]] via [[VM_READ_TRACKS]].
+  \item Checksums [[$A000]]--[[$A2DF]] to verify the EALDR's own code; if the result is not [[$60]], branches to [[VM_ERROR_SPLASH]].
+  \item Seeks to track~5 and turns off the drive motor.
+  \item Decrypts [[$4000]]--[[$67FF]] using the [[VMDXR]] opcode with the ``funny increment'' key schedule ([[EALDR_FUNNY_INC]]).
+  \item Copies [[$A300]]--[[$A5FF]] to [[$0500]]--[[$07FF]] (the resident routines).
+  \item Transfers control to the main program at [[$0800]] via [[VMCALL0]] (never returns).
+\end{enumerate}
+
+<<EALDR VM bytecode 2>>=
+    ORG     $A8B2
+    ; --- Group 3: tracks $0D-$10 -> $0800-$3FFF ---
+VM_LOAD_GROUP3:
+    VMLD    $A800              ; flag byte (nonzero = show lo-res)
+    VMBEQ   VM_DO_GROUP3       ; skip if zero
+    VMLD    $C056              ; LORES (lo-res mode)
+VM_DO_GROUP3:
+    VMLDI   $0C                ; \
+    VMCALL  VM_READ_TRACKS     ;  | read_tracks(12) -> Group 3
+    VMLDI   $00                ; \
+    VMST    EALDR_SRC          ;  | EALDR_SRC = 0
+    VMST    EALDR_TMP1         ; /  checksum accumulator = 0
+
+    ; --- Checksum verification ($A000-$A2E0) ---
+VM_CHECKSUM_LOOP:
+    VMLD    EALDR_SRC          ; A = index
+    VMLDX   $A000              ; \
+    VMSUB   EALDR_TMP1         ;  | checksum -= mem[$A000 + index]
+    VMST    EALDR_TMP1         ; /
+    VMLD    EALDR_SRC          ; \
+    VMLDX   $A100              ;  | checksum -= mem[$A100 + index]
+    VMSUB   EALDR_TMP1         ;  |
+    VMST    EALDR_TMP1         ; /
+    VMINC   EALDR_SRC          ; index++
+    VMBNE   VM_CHECKSUM_LOOP   ; loop until index wraps
+VM_CHECKSUM_A200:
+    VMLD    EALDR_SRC          ; \
+    VMLDX   $A200              ;  | checksum -= mem[$A200 + index]
+    VMSUB   EALDR_TMP1         ;  |
+    VMST    EALDR_TMP1         ; /
+    VMINC   EALDR_SRC          ; index++
+    VMSUBI  $E0                ; \
+    VMBNE   VM_CHECKSUM_A200   ; /  loop until index = $E0
+    VMLD    EALDR_TMP1         ; checksum result
+    VMSUBI  $60                ; \
+    VMBNE   VM_ERROR_SPLASH    ; /  if checksum != $60 -> error
+
+    ; --- DXR decryption ($4000-$67FF) ---
+    VMLDI   $05                ; \
+    VMCALL1 EALDR_MOVE_ARM_TRAMPOLINE     ; /  move arm to track 5
+    VMLD    $A000              ; (read value, discard)
+    VMLDI   $00                ; \
+    VMLD    $C0E8              ; /  IWM: motor off
+    VMLDI   $00                ; \
+    VMST    EALDR_SRC          ;  | src = $4000
+    VMLDI   $40                ;  |
+    VMST    EALDR_SRC+1        ; /
+    VMLDI   $02                ; \
+    VMST    EALDR_BOT          ;  | funny-inc counters: bot=2, top=3
+    VMLDI   $03                ;  |
+    VMST    EALDR_TOP          ; /
+VM_DXR_LOOP:
+    VMCALL1 EALDR_FUNNY_INC   ; advance key schedule
+    VMDXR                      ; decrypt one byte
+    VMBNE   VM_DXR_LOOP        ; loop until acc = 0 (src high = $68)
+
+    ; --- Copy $A300-$A5FF -> $0500-$07FF ---
+    VMLDI   $00                ; \
+    VMST    EALDR_SRC          ;  | src = $A300
+    VMST    EALDR_DEST         ;  | dest = $0500
+    VMLDI   $A3                ;  |
+    VMST    EALDR_SRC+1        ;  |
+    VMLDI   $05                ;  |
+    VMST    EALDR_DEST+1       ; /
+VM_COPY_LOOP:
+    VMCOPY                     ; copy one byte
+    VMLD    EALDR_DEST+1       ; check if dest page reached $08
+    VMSUBI  $08                ; \
+    VMBNE   VM_COPY_LOOP       ; /  loop until done (3 pages)
+
+    ; --- Enter main program ---
+    VMCALL0 $0800              ; jump to main program (never returns)
+@ %def VM_LOAD_GROUP3
+
+@ Bytecode part~3 is the entry point of the [[VM_READ_TRACKS]]
+subroutine, located between the native [[EALDR_REBOOT]] and
+[[EALDR_FUNNY_INC]] routines:
+\begin{enumerate}
+  \item Saves the table index (passed in the VM accumulator) to [[EALDR_TMP0]].
+  \item Turns on the drive motor.
+  \item Jumps to the subroutine body in part~4.
+\end{enumerate}
+
+<<EALDR VM bytecode 3>>=
+    ORG     $A967
+    ; --- read_tracks subroutine (entry) ---
+VM_READ_TRACKS:
+    VMST    EALDR_TMP0         ; save table index
+    VMLD    $C0E9              ; IWM: motor on
+    VMGOTO  VM_READ_LOOP       ; continue at bytecode part 4
+@ %def VM_READ_TRACKS
+
+@ Bytecode part~4 is the body of the [[VM_READ_TRACKS]] subroutine,
+located after the native [[EALDR_FUNNY_INC]] routine.  The track-loading
+loop works as follows:
+\begin{enumerate}
+  \item Reads [[EALDR_TRACK_PAGES]] at the current index to get the destination page; a zero byte terminates the loop ([[VM_READ_DONE]]).
+  \item Stores the destination page in [[$3E]].
+  \item Reads [[EALDR_TRACKS]] at the same index to get the track number.
+  \item Calls [[EALDR_READ_TRACK_TRAMPOLINE]] to load the track; on failure, jumps to [[VM_ERROR_DISPLAY]].
+  \item Increments the index and loops.
+\end{enumerate}
+
+This chunk also contains two error handlers and two data bytes:
+\begin{itemize}
+  \item [[VM_ERROR_SPLASH]]: displays a~`?' and loops with beeping (entered on checksum failure).
+  \item [[VM_ERROR_DISPLAY]]: shows ``ERR'' and halts (entered on disk read failure).
+  \item [[EALDR_TMP0]] and [[EALDR_TMP1]]: runtime variables (table index and checksum accumulator), not bytecodes.
+\end{itemize}
+
+<<EALDR VM bytecode 4>>=
+    ORG     $A985
+    ; --- read_tracks subroutine (body) ---
+VM_READ_LOOP:
+    VMLD    EALDR_TMP0         ; A = table index
+    VMLDX   EALDR_TRACK_PAGES  ; A = track_pages[index]
+    VMBEQ   VM_READ_DONE       ; zero terminator -> return
+    VMST    $003E              ; base page = track_pages[index]
+    VMLD    EALDR_TMP0                    ; \
+    VMLDX   EALDR_TRACKS                  ;  | A = tracks[index]
+    VMCALL1 EALDR_READ_TRACK_TRAMPOLINE   ; /  read track
+    VMBEQ   VM_READ_NEXT                  ; success -> advance index
+    VMGOTO  VM_ERROR_DISPLAY              ; error -> error handler
+
+    ; --- advance to next track ---
+VM_READ_NEXT:
+    VMLD    EALDR_TMP0         ; \
+    VMSUBI  $FF                ;  | index++ (subtract $FF = add 1 mod 256)
+    VMST    EALDR_TMP0         ;  |
+    VMGOTO  VM_READ_LOOP       ; /  loop
+
+    ; --- error: splash screen loop ---
+VM_ERROR_SPLASH:
+    VMLD    $C0E9              ; IWM: motor on
+    VMCALL1 $FC58              ; HOME (clear screen)
+    VMLD    $C051              ; TXTSET (show text)
+    VMLDI   $BF                ; \
+    VMST    $0400              ; /  '?' on screen
+    VMLDI   $40                ; \
+    VMCALL1 $FCA8              ; /  WAIT ($40)
+    VMLD    $C0E8              ; IWM: motor off
+VM_ERROR_BEEP:
+    VMLDI   $60                ; \
+    VMCALL1 $FCA8              ;  | WAIT ($60)
+    VMLDI   $08                ;  | WAIT ($08)
+    VMCALL1 $FCA8              ;  |
+    VMINC   EALDR_TMP1         ;  | increment counter
+    VMBNE   VM_ERROR_BEEP      ; /  loop (beep pattern)
+    VMGOTO  VM_ERROR_SPLASH    ; restart splash loop
+
+    ; --- error: display "EA" and reboot ---
+VM_ERROR_DISPLAY:
+    VMCALL1 $FC58              ; HOME
+    VMCALL1 $FBDD              ; BELL (beep)
+    VMLD    $C051              ; TXTSET
+    VMLDI   $C5                ; \
+    VMST    $0400              ;  | 'E' on screen
+    VMLDI   $D2                ;  |
+    VMST    $0401              ;  | 'R' on screen (error code)
+    VMST    $0402              ; /  'R' again
+    VMLD    $C0E8              ; IWM: motor off
+VM_ERROR_HALT:
+    VMGOTO  VM_ERROR_HALT      ; infinite loop
+
+    ; --- data ---
+VM_READ_DONE:
+    VMRET                      ; return from read_tracks
+EALDR_TMP0:
+    DC.B    $00                ; table index (runtime)
+EALDR_TMP1:
+    DC.B    $00                ; checksum accumulator (runtime)
+@ %def EALDR_TMP0 EALDR_TMP1 VM_READ_TRACKS VM_READ_LOOP VM_READ_NEXT VM_READ_DONE VM_LOAD_GROUP3 VM_DO_GROUP3 VM_CHECKSUM_LOOP VM_CHECKSUM_A200 VM_DXR_LOOP VM_COPY_LOOP VM_ERROR_SPLASH VM_ERROR_BEEP VM_ERROR_DISPLAY VM_ERROR_HALT
 
 \section{VM architecture}
 
@@ -2010,76 +2210,6 @@ EALDR_CLEAR_TEXT:
     RTS
 @ %def EALDR_CLEAR_TEXT
 
-<<EALDR VM bytecode 2>>=
-    ORG     $A8B2
-    ; --- Group 3: tracks $0D-$10 -> $0800-$3FFF ---
-VM_LOAD_GROUP3:
-    VMLD    $A800              ; flag byte (nonzero = show lo-res)
-    VMBEQ   VM_DO_GROUP3       ; skip if zero
-    VMLD    $C056              ; LORES (lo-res mode)
-VM_DO_GROUP3:
-    VMLDI   $0C                ; \
-    VMCALL  VM_READ_TRACKS     ;  | read_tracks(12) -> Group 3
-    VMLDI   $00                ; \
-    VMST    EALDR_SRC          ;  | EALDR_SRC = 0
-    VMST    EALDR_TMP1         ; /  checksum accumulator = 0
-    ; --- Checksum verification ($A000-$A2E0) ---
-VM_CHECKSUM_LOOP:
-    VMLD    EALDR_SRC          ; A = index
-    VMLDX   $A000              ; \
-    VMSUB   EALDR_TMP1         ;  | checksum -= mem[$A000 + index]
-    VMST    EALDR_TMP1         ; /
-    VMLD    EALDR_SRC          ; \
-    VMLDX   $A100              ;  | checksum -= mem[$A100 + index]
-    VMSUB   EALDR_TMP1         ;  |
-    VMST    EALDR_TMP1         ; /
-    VMINC   EALDR_SRC          ; index++
-    VMBNE   VM_CHECKSUM_LOOP   ; loop until index wraps
-VM_CHECKSUM_A200:
-    VMLD    EALDR_SRC          ; \
-    VMLDX   $A200              ;  | checksum -= mem[$A200 + index]
-    VMSUB   EALDR_TMP1         ;  |
-    VMST    EALDR_TMP1         ; /
-    VMINC   EALDR_SRC          ; index++
-    VMSUBI  $E0                ; \
-    VMBNE   VM_CHECKSUM_A200   ; /  loop until index = $E0
-    VMLD    EALDR_TMP1         ; checksum result
-    VMSUBI  $60                ; \
-    VMBNE   VM_ERROR_SPLASH    ; /  if checksum != $60 -> error
-    ; --- DXR decryption ($4000-$67FF) ---
-    VMLDI   $05                ; \
-    VMCALL1 EALDR_MOVE_ARM_TRAMPOLINE     ; /  move arm to track 5
-    VMLD    $A000              ; (read value, discard)
-    VMLDI   $00                ; \
-    VMLD    $C0E8              ; /  IWM: motor off
-    VMLDI   $00                ; \
-    VMST    EALDR_SRC          ;  | src = $4000
-    VMLDI   $40                ;  |
-    VMST    EALDR_SRC+1        ; /
-    VMLDI   $02                ; \
-    VMST    EALDR_BOT          ;  | funny-inc counters: bot=2, top=3
-    VMLDI   $03                ;  |
-    VMST    EALDR_TOP          ; /
-VM_DXR_LOOP:
-    VMCALL1 EALDR_FUNNY_INC   ; advance key schedule
-    VMDXR                      ; decrypt one byte
-    VMBNE   VM_DXR_LOOP        ; loop until acc = 0 (src high = $68)
-    ; --- Copy $A300-$A5FF -> $0500-$07FF ---
-    VMLDI   $00                ; \
-    VMST    EALDR_SRC          ;  | src = $A300
-    VMST    EALDR_DEST         ;  | dest = $0500
-    VMLDI   $A3                ;  |
-    VMST    EALDR_SRC+1        ;  |
-    VMLDI   $05                ;  |
-    VMST    EALDR_DEST+1       ; /
-VM_COPY_LOOP:
-    VMCOPY                     ; copy one byte
-    VMLD    EALDR_DEST+1       ; check if dest page reached $08
-    VMSUBI  $08                ; \
-    VMBNE   VM_COPY_LOOP       ; /  loop until done (3 pages)
-    ; --- Enter main program ---
-    VMCALL0 $0800              ; jump to main program (never returns)
-@
 
 <<EALDR reboot handler>>=
     ORG     $A948
@@ -2102,14 +2232,6 @@ EALDR_REBOOT:
     JMP      $C600 ; reboot from Disk II
 @ %def EALDR_REBOOT
 
-<<EALDR VM bytecode 3>>=
-    ORG     $A967
-    ; --- read_tracks subroutine (entry) ---
-VM_READ_TRACKS:
-    VMST    EALDR_TMP0         ; save table index
-    VMLD    $C0E9              ; IWM: motor on
-    VMGOTO  VM_READ_LOOP       ; continue at bytecode part 4
-@
 
 The ``funny increment'' routine manages the DXR key schedule.
 [[EALDR_BOT]] ([[$AC60]]) holds the low counter and [[EALDR_TOP]]
@@ -2135,64 +2257,6 @@ EALDR_FUNNY_INC:
     RTS
 @ %def EALDR_FUNNY_INC
 
-<<EALDR VM bytecode 4>>=
-    ORG     $A985
-    ; --- read_tracks subroutine (body) ---
-VM_READ_LOOP:
-    VMLD    EALDR_TMP0         ; A = table index
-    VMLDX   EALDR_TRACK_PAGES  ; A = track_pages[index]
-    VMBEQ   VM_READ_DONE       ; zero terminator -> return
-    VMST    $003E              ; base page = track_pages[index]
-    VMLD    EALDR_TMP0         ; \
-    VMLDX   EALDR_TRACKS       ;  | A = tracks[index]
-    VMCALL1 EALDR_READ_TRACK_TRAMPOLINE   ; /  read track
-    VMBEQ   VM_READ_NEXT       ; success -> advance index
-    VMGOTO  VM_ERROR_DISPLAY   ; error -> error handler
-    ; --- advance to next track ---
-VM_READ_NEXT:
-    VMLD    EALDR_TMP0         ; \
-    VMSUBI  $FF                ;  | index++ (subtract $FF = add 1 mod 256)
-    VMST    EALDR_TMP0         ;  |
-    VMGOTO  VM_READ_LOOP       ; /  loop
-    ; --- error: splash screen loop ---
-VM_ERROR_SPLASH:
-    VMLD    $C0E9              ; IWM: motor on
-    VMCALL1 $FC58              ; HOME (clear screen)
-    VMLD    $C051              ; TXTSET (show text)
-    VMLDI   $BF                ; \
-    VMST    $0400              ; /  '?' on screen
-    VMLDI   $40                ; \
-    VMCALL1 $FCA8              ; /  WAIT ($40)
-    VMLD    $C0E8              ; IWM: motor off
-VM_ERROR_BEEP:
-    VMLDI   $60                ; \
-    VMCALL1 $FCA8              ;  | WAIT ($60)
-    VMLDI   $08                ;  | WAIT ($08)
-    VMCALL1 $FCA8              ;  |
-    VMINC   EALDR_TMP1         ;  | increment counter
-    VMBNE   VM_ERROR_BEEP      ; /  loop (beep pattern)
-    VMGOTO  VM_ERROR_SPLASH    ; restart splash loop
-    ; --- error: display "EA" and reboot ---
-VM_ERROR_DISPLAY:
-    VMCALL1 $FC58              ; HOME
-    VMCALL1 $FBDD              ; BELL (beep)
-    VMLD    $C051              ; TXTSET
-    VMLDI   $C5                ; \
-    VMST    $0400              ;  | 'E' on screen
-    VMLDI   $D2                ;  |
-    VMST    $0401              ;  | 'R' on screen (error code)
-    VMST    $0402              ; /  'R' again
-    VMLD    $C0E8              ; IWM: motor off
-VM_ERROR_HALT:
-    VMGOTO  VM_ERROR_HALT      ; infinite loop
-    ; --- data ---
-VM_READ_DONE:
-    VMRET                      ; return from read_tracks
-EALDR_TMP0:
-    DC.B    $00                ; table index (runtime)
-EALDR_TMP1:
-    DC.B    $00                ; checksum accumulator (runtime)
-@ %def EALDR_TMP0 EALDR_TMP1 VM_READ_TRACKS VM_READ_LOOP VM_READ_NEXT VM_READ_DONE VM_LOAD_GROUP3 VM_DO_GROUP3 VM_CHECKSUM_LOOP VM_CHECKSUM_A200 VM_DXR_LOOP VM_COPY_LOOP VM_ERROR_SPLASH VM_ERROR_BEEP VM_ERROR_DISPLAY VM_ERROR_HALT
 
 \subsection{DXR decryption step}
 
@@ -3487,11 +3551,10 @@ When EALDR finishes, it transfers control to [[$0800]] via [[CALL0 0800]].
 \section{Memory map at entry}
 
 The VM program loads three groups of tracks using the track tables at
-[[$A9F3]]/[[$AA04]].  Each track is 16~sectors of 256~bytes, placed
+[[EALDR_TRACK_PAGES]]/[[EALDR_TRACKS]].  Each track is 16~sectors of 256~bytes, placed
 into memory by the sector loader using the custom interleave table
-(see~\S\ref{sec:boot1}).  The base page for each track determines the
-starting address: track data fills base\_page*256 through
-base\_page*256+\$0FFF.
+(see~\S\ref{sec:boot1}).  The base page [[XX]] for each track determines the
+starting address, [[$XX00]].
 
 \subsection{Group 1 (conditional, skipped in this image)}
 
