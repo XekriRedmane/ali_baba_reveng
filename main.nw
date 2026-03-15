@@ -522,14 +522,34 @@ and convert them to raw [[HEX]] data.
 
 \chapter{The boot process}
 
-Although the 4am crack of the disk is copyable and deployable as a standard
-[[DOS 3.3]] image, so there's no funny business about custom sector layouts and
-custom prologues and epilogues, nevertheless everything else about [[BOOT1]]
-and [[EALDR]] has been left intact. This includes any decryption routines and
-other such protection schemes that do not involve the disk.
+This disk image is credited to ``4am and san~inc.''  These are two
+separate efforts:
 
-In this case, the game was distributed by Electronic Arts.
-Thus, it is important to understand what [[EALDR]] does during the boot process.
+\begin{itemize}
+  \item \textbf{4am / Passport:} The automatic cracking tool
+    \href{https://github.com/a2-4am/passport}{Passport} identified the
+    Electronic Arts bootloader and applied three single-byte patches to
+    the EALDR bytecode and resident code (documented in
+    \S\ref{sec:boot1}).  These patches disable the copy-protection
+    checks while leaving all other code intact.
+  \item \textbf{san~inc} (Peter Ferrie, also known as ``qkumba''):
+    A ``san~inc crack'' is a conversion from a floppy disk image into
+    files suitable for running from a hard disk.  This involves
+    rewriting the disk access routines entirely, removing ``insert
+    disk'' prompts, and compressing content to save space and decrease
+    load times---but removing nothing else.  The code at
+    [[$0840]]--[[$08FF]] in [[BOOT1]] is san~inc's work: it checks for
+    a language card, BLOADs a two-part overlay into language card RAM,
+    and enters Applesoft.
+\end{itemize}
+
+The result is a [[DOS 3.3]] image with standard sector layout---no
+custom prologues or epilogues---while the EALDR's decryption routines
+and VM architecture remain intact.
+
+The game was distributed by Electronic Arts using their custom loader
+([[EALDR]]).  Understanding what [[EALDR]] does during the boot process
+is essential for extracting the main program.
 
 \section{The booting of a disk}
 
@@ -666,9 +686,9 @@ Address & Size & Contents \\
 [[$0800]]         &   1 & Sector count byte ([[$05]]) \\
 [[$0801]]--[[$0803]] &   3 & [[JMP \$0804]] \\
 [[$0804]]--[[$083F]] &  60 & [[BOOT1_ENTRY]]: set reset vector, load EALDR, enter it \\
-[[$0840]]--[[$086D]] &  46 & 4am crack: language card check, BLOAD crack code \\
-[[$086E]]--[[$0880]] &  19 & 4am crack: no-language-card path (print error, JMP \$03D0) \\
-[[$0881]]--[[$08DD]] &  93 & 4am crack: high-bit ASCII strings \\
+[[$0840]]--[[$086D]] &  46 & san~inc crack: language card check, BLOAD overlay \\
+[[$086E]]--[[$0880]] &  19 & san~inc crack: no-language-card path (print error, JMP \$03D0) \\
+[[$0881]]--[[$08DD]] &  93 & san~inc crack: high-bit ASCII strings \\
 [[$08DE]]--[[$08E3]] &   6 & Zero padding \\
 [[$08E4]]--[[$08E7]] &   4 & [[BOOT1_PRINT_CR]]: [[JSR ROM_CRDO]]; [[RTS]] \\
 [[$08E8]]--[[$08FD]] &  22 & Zero padding \\
@@ -769,24 +789,36 @@ BOOT1_ENTRY:
     JMP     BOOT1_DELAY     ; delay, then RTS -> $A806
 @ %def BOOT1_ENTRY
 
-@ The region at [[$0840]]--[[$08FF]] contains the 4am crack code that
-replaced the original protection check.  On entry it checks for a
-language card, loads the crack's two-part ASM.CODE overlay, and
-enters the Applesoft interpreter.  If no language card is present,
-it prints an error message via [[ROM_COUT1]] and jumps to the
-monitor warm-start at [[$03D0]].  [[ROM_COUT1]] ([[$FDED]]) is the
-standard Apple~II character output routine.  [[ROM_CRDO]] ([[$FDDA]])
-outputs a carriage return.
+@ The region at [[$0840]]--[[$08FF]] was inserted by the ``san~inc''
+cracker (credited alongside 4am on this disk image).  It is \emph{not}
+part of the Passport automatic crack, which only applies three
+single-byte patches to the EALDR (see below).  This code checks for
+a language card, BLOADs a two-part overlay ([[ASM.CODE.1]] and
+[[ASM.CODE.2]]) into language card RAM at [[$D000]], and enters the
+Applesoft interpreter.  If no language card is present, it prints an
+error message via [[ROM_COUT1]] and jumps to the monitor warm-start
+at [[$03D0]].
+
+The Passport automatic crack (logged in the accompanying [[.txt]] file)
+makes three byte patches to the EALDR on track~1:
+\begin{enumerate}
+  \item [[$A907]]: [[VMCALL1]] ([[$01]]) $\rightarrow$ [[VMLD]] ([[$04]]).  The original calls native 6502 code at [[$A000]] as a copy-protection subroutine; the crack changes it to a harmless load-and-discard.
+  \item [[$A55B]] ([[$075B]] in resident code): [[BNE]] offset [[$A7]] $\rightarrow$ [[$00]].  Disables a backward branch in a secondary protection check.
+  \item [[$A3CC]] ([[$05CC]] in resident code): [[$E1]] $\rightarrow$ [[$E0]].  Modifies a byte in what appears to be a second VM bytecode program embedded in the resident code area---Passport's source calls this ``p-code madness.''
+\end{enumerate}
+
+[[ROM_COUT1]] ([[$FDED]]) is the standard Apple~II character output
+routine.  [[ROM_CRDO]] ([[$FDDA]]) outputs a carriage return.
 
 <<boot1 defines>>=
 ROM_COUT1       EQU     $FDED   ; character output
 ROM_CRDO        EQU     $FDDA   ; output carriage return
 @
 
-<<boot1 crack>>=
+<<boot1 saninc>>=
     ORG     $0840
-BOOT1_CRACK:
-    SUBROUTINE BOOT1_CRACK
+BOOT1_SANINC:
+    SUBROUTINE BOOT1_SANINC
     ; --- Language card present path ---
     HEX     89 C0           ; BIT #$C0 (65C02) -- no-op on NMOS 6502
     LDA     $C089           ; read RAM bank 2 (two accesses to enable)
@@ -812,7 +844,7 @@ BOOT1_CRACK:
     JMP     $E000           ; enter Applesoft interpreter
 
     ; --- No language card path ---
-BOOT1_CRACK_NOLC:
+BOOT1_SANINC_NOLC:
     LDX     #$00
 .print_err:
     LDA     .s_no_langcard,X ; \
@@ -859,7 +891,7 @@ BOOT1_PRINT_CR:
 
     DS      22,$00          ; zero padding
     HEX     B7 FF           ; reset vector complement
-@ %def BOOT1_CRACK BOOT1_CRACK_NOLC BOOT1_PRINT_CR
+@ %def BOOT1_CRACK BOOT1_SANINC_NOLC BOOT1_PRINT_CR
 
 @ [[BOOT1_READ_ERROR]] and [[BOOT1_ADDR_ERROR]] are the two error-return
 entry points: both set carry and return.  Code branches here when
@@ -2664,12 +2696,17 @@ The EA mnemonics reveal the original naming conventions:
 \toprule
 \thead{Op} & \thead{EA mnemonic} & \thead{Our name} & \thead{EA description} \\
 \midrule
- 5 & JSR  & VMCALL  & (before \$B800) \\
+ 0 & JMP  & VMGOTO  & ? \\
+ 1 & JSRA & VMCALL1 & ? \\
+ 2 & BEQ  & VMBEQ   & ? \\
+ 3 & LDI  & VMLDI   & ? \\
+ 4 & LDA  & VMLD    & ? \\
+ 5 & JSR  & VMCALL  & ? \\
  6 & STA  & VMST    & Store acc. absolute \\
  7 & SUB  & VMSUBI  & Subtract acc. immediate \\
  8 & JMPA & VMCALL0 & Jump to assembly \\
  9 & RTS  & VMRET   & M-code return from subroutine \\
-10 & LDX  & VMLDX   & Load acc. indexed by Acc. \\
+10 & LDX  & VMLDX   & Load acc. a99. indexed by Acc. \\
 11 & ASL  & VMASL   & Shift acc. left \\
 12 & INC  & VMINC   & Increment absolute \\
 13 & ADD  & VMADD   & Add immediate \\
@@ -17633,7 +17670,7 @@ The following root chunks produce the assembly files when tangled.
     PROCESSOR 6502
 <<boot1 defines>>
 <<boot1 entry>>
-<<boot1 crack>>
+<<boot1 saninc>>
 <<boot1 read error>>
 <<boot1 read sector>>
 <<boot1 track vars>>
