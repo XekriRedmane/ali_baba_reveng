@@ -51,7 +51,7 @@
 \title{%
   Ali Baba and the Forty Thieves \\
   \large Reverse engineered from the Apple II version}
-\author{Robert Baruch}
+\author{Xekri Redmane}
 \date{}
 
 \begin{document}
@@ -105,7 +105,7 @@ Return of Heracles on the same day.
 
 \section{About this document}
 
-All files can be found on \href{https://github.com/RobertBaruch/ali_baba_reveng}{Github}.
+All files can be found on \href{https://github.com/XekriRedmane/ali_baba_reveng}{Github}.
 
 The source for this document, [[main.nw]], is a literate programming document. This means the explanatory text is
 interspersed with source code. The assembly code and [[LaTeX]] file can be extracted from the document and compiled.
@@ -115,10 +115,10 @@ identical to the images extracted from the disk.
 
 The code was reverse-engineered using Ghidra.
 
-The assembly code was assembled using [[dasm]] using this command line:
+The assembly code can then be assembled with [[dasm]] using this command line:
 
 \begin{verbatim}
-    dasm main.asm -Lmain.lst -omain.bin -f3 -v4
+    dasm main.asm -omain.bin -f3 -v4
 \end{verbatim}
 
 The document is written in \LaTeX.
@@ -1361,6 +1361,10 @@ The entry code at [[$A806]] fills the hi-res HGR1 screen ([[$2000--$3FFF]]) and 
 ([[$4000--$7FFF]]) with [[$FF]], copies the EA splash screen data from [[$B000]]+ to
 [[$202C]]+, then jumps to the VM execution loop at [[$A849]].
 
+\begin{center}
+\includegraphics[width=\columnwidth]{images/ea_splash.png}
+\end{center}
+
 @ [[EALDR_SRC]] ([[$4C/$4D]]) is a 2-byte zero-page pointer used by the
 VM as a general-purpose source address.  The entry code uses it to iterate
 through the hi-res screen pages during the fill loop.
@@ -2044,7 +2048,7 @@ VM_CHECKSUM_A200:
     VMBNE   VM_ERROR_SPLASH    ; /  if checksum != $60 -> error
     ; --- DXR decryption ($4000-$67FF) ---
     VMLDI   $05                ; \
-    VMCALL1 EALDR_MOVE_ARM     ; /  move arm to track 5
+    VMCALL1 EALDR_MOVE_ARM_TRAMPOLINE     ; /  move arm to track 5
     VMLD    $A000              ; (read value, discard)
     VMLDI   $00                ; \
     VMLD    $C0E8              ; /  IWM: motor off
@@ -2141,7 +2145,7 @@ VM_READ_LOOP:
     VMST    $003E              ; base page = track_pages[index]
     VMLD    EALDR_TMP0         ; \
     VMLDX   EALDR_TRACKS       ;  | A = tracks[index]
-    VMCALL1 EALDR_READ_TRACK   ; /  read track
+    VMCALL1 EALDR_READ_TRACK_TRAMPOLINE   ; /  read track
     VMBEQ   VM_READ_NEXT       ; success -> advance index
     VMGOTO  VM_ERROR_DISPLAY   ; error -> error handler
     ; --- advance to next track ---
@@ -2220,7 +2224,10 @@ EALDR_DXR_STEP:
   \item [[$B800]]--[[$BBFF]]: Residual EA development source code---assembly comments documenting the VM opcode set, left over from the EALDR build tools.
 \end{enumerate}
 
-@ [[EALDR_DISK_IO]] is part of the copy-protection system.  It performs
+\subsection{Copy protection}
+
+@ [[EALDR_DISK_IO]] is apparently part of the copy-protection system,
+although it is bypassed by the crack.  It performs
 half-track reads across multiple tracks, scanning for address fields
 and recording the range of sector numbers found.  If the range
 (max$-$min) is at least [[$22]] (34), the disk passes the check;
@@ -2252,20 +2259,20 @@ EALDR_DISK_IO:
     STX     $03                ; /  max = 0
     LDA     #$18               ; \
     STA     $06                ; /  start at half-track $18
-    JSR     EALDR_MOVE_ARM     ; seek to half-track $18
+    JSR     EALDR_MOVE_ARM_TRAMPOLINE     ; seek to half-track $18
 .next_track:
     INC     $06                ; advance to next half-track
 .search_sector:
-    JSR     EALDR_SEARCH_ADDR  ; search for address field
+    JSR     EALDR_SEARCH_ADDR_TRAMPOLINE  ; search for address field
     BCS     .search_sector     ; error -> retry
     LDA     $2D                ; sector number from address field
     BNE     .search_sector     ; not sector 0 -> keep searching
     ; Found sector 0: read a data field as verification
     LDA     $06                ; \
-    JSR     EALDR_MOVE_ARM     ;  | seek to current half-track
+    JSR     EALDR_MOVE_ARM_TRAMPOLINE     ;  | seek to current half-track
     INC     $06                ;  | advance half-track
     LDA     #$19               ;  |
-    JSR     EALDR_READ_DATA    ; /  read data field (page $19)
+    JSR     EALDR_READ_DATA_TRAMPOLINE    ; /  read data field (page $19)
     ; Scan for address field headers on this half-track
     LDA     #$00               ; \
     STA     $00                ; /  timeout counter = 0
@@ -2339,7 +2346,7 @@ EALDR_ABORT:                   ;     range too small -> fail
 
 @ [[EALDR_CHECK_FLAG]] checks the flag at [[$01]].  If zero,
 it aborts via [[PLA; PLA; RTS]].  Called by the VM bytecode
-program's read\_tracks subroutine.
+program's [[read_tracks]] subroutine.
 
 <<EALDR check flag>>=
     ORG     $AC4C
@@ -2367,6 +2374,8 @@ EALDR_PROT_ENTRY:
     VMGOTO  VM_ERROR_DISPLAY
     DS      8,$00              ; padding
 @ %def EALDR_PROT_ENTRY EALDR_ABORT
+
+\section{EA splash screen}
 
 @ The splash screen data occupies [[$AC68]]--[[$B7FF]].  The first
 152~bytes at [[$AC68]] are residual EA loader documentation (the same
@@ -2851,39 +2860,599 @@ EALDR_SOURCE_COMMENTS:
 
 \section{Disk I/O routines}
 
-The EALDR disk code occupies [[$ABBF]]--[[$BFFF]].  Four entry points
-at [[$BC00]] are JMP trampolines:
+@ The EALDR RWTS (Read/Write Track/Sector) occupies [[$BC00]]--[[$BFFF]]
+and provides the disk routines used by the EALDR~VM to load game data.
+These routines are structurally identical to the [[BOOT1]] disk routines
+at [[$0900]]--[[$0CFF]] (see~\S\ref{sec:boot1}), relocated to different
+addresses and using different zero-page locations:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\thead{Purpose} & \thead{BOOT1} & \thead{EALDR RWTS} \\
+\midrule
+Scratch variables      & [[$26]]/[[$27]] & [[$4A]]/[[$4B]] \\
+Address header fields  & [[$2C]]--[[$2F]] & [[$38]]--[[$3B]] \\
+Slot index             & [[$2B]] (variable) & [[$60]] (hardcoded) \\
+Current track          & [[$09C6]]  & [[$BC0C]] \\
+Error flag             & [[$09C7]]  & [[$BC0D]] \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Four entry points at [[$BC00]] are JMP trampolines used by the EALDR~VM:
 
 \begin{center}
 \begin{tabular}{lll}
 \toprule
 \thead{Entry} & \thead{Target} & \thead{Function} \\
 \midrule
-[[$BC00]] & [[$BCD4]] & Move disk arm to half-track in [[A]] \\
-[[$BC03]] & [[$BF00]] & Read one track (16 sectors) to memory at page [[$3E]] \\
+[[$BC00]] & [[$BCD4]] & Move disk arm to half-track in~[[A]] \\
+[[$BC03]] & [[$BF00]] & Read one track (16 sectors) to memory at page~[[$3E]] \\
 [[$BC06]] & [[$BD21]] & Search for next address field \\
-[[$BC09]] & [[$BD14]] & Read and verify sector data field \\
+[[$BC09]] & [[$BD14]] & Delay (enters [[EALDR_RWTS_DELAY]] inner loop) \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The sector search code at [[$ABBF]] is entered by [[CALL1 BC03]] (via [[$BF00]]).
-It looks for the standard DOS~3.3 address field prologue ([[D5 AA 96]]),
-reads the track/sector/volume/checksum nibbles, then calls the data field
-reader.  The custom interleave table at [[$BF64]] maps physical sectors to
-page offsets (see~\S\ref{sec:boot1} for the interleave mapping).
+The sector loader at [[$BF1F]] builds a destination page table from the
+interleave table at [[$BF64]] and reads all~16 sectors using
+[[EALDR_RWTS_SEARCH_ADDR]] and [[EALDR_RWTS_READ_SECTOR]].
 
 <<EALDR disk entry points>>=
     ORG     $BC00
-EALDR_MOVE_ARM:
-    JMP      $BCD4
-EALDR_READ_TRACK:               ; $BC03
-    JMP      $BF00
-EALDR_SEARCH_ADDR:              ; $BC06
-    JMP      $BD21
-EALDR_READ_DATA:                ; $BC09
-    JMP      $BD14
-@ %def EALDR_MOVE_ARM EALDR_READ_TRACK EALDR_SEARCH_ADDR EALDR_READ_DATA
+EALDR_MOVE_ARM_TRAMPOLINE:
+    JMP     EALDR_RWTS_MOVE_ARM
+EALDR_READ_TRACK_TRAMPOLINE:               ; $BC03
+    JMP     EALDR_RWTS_READ_TRACK
+EALDR_SEARCH_ADDR_TRAMPOLINE:              ; $BC06
+    JMP     EALDR_RWTS_SEARCH_ADDR
+EALDR_READ_DATA_TRAMPOLINE:                ; $BC09
+    JMP     EALDR_RWTS_DELAY_INNER
+@ %def EALDR_MOVE_ARM_TRAMPOLINE EALDR_READ_TRACK_TRAMPOLINE EALDR_SEARCH_ADDR_TRAMPOLINE EALDR_READ_DATA_TRAMPOLINE
+
+@ [[EALDR_RWTS_TRACK]] at [[$BC0C]] holds the current track number
+(modified by [[EALDR_RWTS_MOVE_ARM]]).  [[EALDR_RWTS_ERROR_FLAG]] at
+[[$BC0D]] is set by [[EALDR_RWTS_READ_TRACK]] when a timeout occurs.
+[[EALDR_RWTS_READ_ERROR]] at [[$BC0E]] is the error-return entry point:
+it sets carry and returns.
+
+<<EALDR RWTS track vars>>=
+    ORG     $BC0C
+EALDR_RWTS_TRACK:
+    HEX     00              ; current track number
+EALDR_RWTS_ERROR_FLAG:
+    HEX     00              ; nonzero = error occurred
+EALDR_RWTS_READ_ERROR:
+    SEC
+    RTS
+@ %def EALDR_RWTS_TRACK EALDR_RWTS_ERROR_FLAG EALDR_RWTS_READ_ERROR
+
+@ [[EALDR_RWTS_READ_SECTOR]] reads and decodes one sector's data field
+from the disk.  It searches for the [[D5 AA AD]] data prologue, then
+reads the 6-and-2 encoded nibbles, decodes them through the translation
+tables at [[$BD98]] and [[$BE00]], and stores 256~bytes at the address
+in [[$44]]/[[$45]].  Returns with carry clear on success, carry set on
+error.
+
+The routine uses self-modifying code: the [[STA]] instructions at
+[[$BC6E]], [[$BC95]], and [[$BCAD]] have their high byte patched by
+[[EALDR_RWTS_READ_SECTOR]] itself (at [[$BC14]]/[[$BC17]],
+[[$BC21]]/[[$BC24]], and [[$BC2C]]/[[$BC2F]]) to set up three different
+destination regions within the 256-byte output page.
+
+This is structurally identical to [[BOOT1_READ_SECTOR]] at [[$0902]],
+with zero-page [[$4A]] used instead of [[$26]] for the running checksum,
+[[$44]]/[[$45]] for the destination pointer (same as BOOT1), and the
+slot index hardcoded to [[$60]] instead of read from [[$2B]].
+
+<<EALDR RWTS read sector>>=
+    ORG     $BC10
+EALDR_RWTS_READ_SECTOR:
+    SUBROUTINE EALDR_RWTS_READ_SECTOR
+
+    ; Self-modify STA targets based on destination address ($44/$45)
+    LDA     #$00
+    LDY     $45             ; destination page
+    STA     .sta_1+1        ; \  patch STA $xx00,Y low byte
+    STY     .sta_1+2        ;  | patch STA $xx00,Y high byte
+    SEC
+    SBC     #$54            ; \
+    BCS     .no_borrow1     ;  | subtract $54, borrow from page
+    DEY                     ;  |
+    SEC                     ; /
+.no_borrow1:
+    STA     .sta_2+1        ; \  patch second STA target
+    STY     .sta_2+2        ; /
+    SBC     #$57            ; \
+    BCS     .no_borrow2     ;  | subtract $57, borrow from page
+    DEY                     ; /
+.no_borrow2:
+    STA     .sta_3+1        ; \  patch third STA target
+    STY     .sta_3+2        ; /
+
+    ; Search for data prologue: D5 AA AD
+    LDY     #$20            ; timeout counter
+.search:
+    DEY
+    BEQ     EALDR_RWTS_READ_ERROR ; timeout
+.wait1:
+    LDA     $C0EC           ; read nibble
+    BPL     .wait1
+.check_d5:
+    EOR     #$D5
+    BNE     .search
+    NOP
+.wait2:
+    LDA     $C0EC
+    BPL     .wait2
+    CMP     #$AA
+    BNE     .check_d5       ; not AA -> re-check for D5
+    NOP
+.wait3:
+    LDA     $C0EC
+    BPL     .wait3
+    CMP     #$AD
+    BNE     .check_d5       ; not AD -> re-check for D5
+
+    ; Read 86 bytes of secondary data ($AA-$FF range of page)
+    LDY     #$AA
+    LDA     #$00
+.read_secondary:
+    STA     $4A             ; running checksum
+.read_secondary_wait:
+    LDX     $C0EC
+    BPL     .read_secondary_wait
+    LDA     $BD00,X         ; decode via primary nibble table
+    STA     $0200,Y         ; store in buffer
+    EOR     $4A             ; update checksum
+    INY
+    BNE     .read_secondary ; loop $AA..$FF (86 bytes)
+
+    ; Read and decode primary data (86 bytes -> page+$00..$55)
+    LDY     #$AA
+    BNE     .read_primary_start
+.sta_3:
+    STA     $FFFF,Y         ; self-modified: page+$AC..$FF
+.read_primary_start:
+    LDX     $C0EC
+    BPL     .read_primary_start
+    EOR     $BD00,X         ; decode nibble
+    LDX     $0200,Y         ; secondary data
+    EOR     EALDR_RWTS_NIBBLE_B,X ; pair-decode table
+    INY
+    BNE     .sta_3          ; loop $AA..$FF (86 bytes)
+    PHA                     ; save last decoded value
+    AND     #$FC
+
+    ; Read and decode middle data (86 bytes -> page+$56..$AB)
+    LDY     #$AA
+.read_mid:
+    LDX     $C0EC
+    BPL     .read_mid
+    EOR     $BD00,X
+    LDX     $0200,Y
+    EOR     EALDR_RWTS_NIBBLE_B+1,X ; offset +1 in pair-decode table
+.sta_2:
+    STA     $FFFF,Y         ; self-modified: page+$56..$AB
+    INY
+    BNE     .read_mid
+
+    ; Read and decode final data (84 bytes -> page+$00..$53)
+.wait_final1:
+    LDX     $C0EC
+    BPL     .wait_final1
+    AND     #$FC
+    LDY     #$AC
+.read_final:
+    EOR     $BD00,X
+    LDX     $01FE,Y         ; secondary data (offset -2)
+    EOR     EALDR_RWTS_NIBBLE_B+2,X ; offset +2 in pair-decode table
+.sta_1:
+    STA     $FFFF,Y         ; self-modified: page+$00..$55
+.wait_final2:
+    LDX     $C0EC
+    BPL     .wait_final2
+    INY
+    BNE     .read_final
+
+    ; Verify checksum byte
+    AND     #$FC
+    EOR     $BD00,X         ; decode final nibble
+    LDX     #$60            ; slot index (hardcoded slot 6)
+    TAY
+    BNE     .checksum_bad   ; checksum must be zero
+
+    ; Read epilogue byte (expect $DE)
+.wait_epilogue:
+    LDA     $C0EC
+    BPL     .wait_epilogue
+    CMP     #$DE
+    BEQ     .ok
+.checksum_bad:
+    SEC                     ; error: carry set
+    HEX     24              ; BIT $zp opcode -- hides next CLC byte
+.ok:
+    CLC                     ; success: carry clear
+    PLA                     ; discard saved byte
+    LDY     #$55
+    STA     ($44),Y         ; store final byte
+    RTS
+@ %def EALDR_RWTS_READ_SECTOR
+
+@ [[EALDR_RWTS_MOVE_ARM]] moves the drive head to the half-track in~A.
+The target track (doubled for half-track stepping) is compared against
+the current position in [[EALDR_RWTS_TRACK]].  It steps inward or
+outward one half-track at a time, activating the stepper phases via
+[[EALDR_RWTS_PHASE_ON]] and waiting with [[EALDR_RWTS_DELAY]] between
+steps.  Zero-page [[$4A]] holds the target half-track, [[$4B]] saves
+the previous position.
+
+This is structurally identical to [[BOOT1_SEEK_TRACK]] at [[$09C8]],
+using [[$4A]]/[[$4B]] instead of [[$26]]/[[$27]] and the slot index
+hardcoded to [[$60]].
+
+<<EALDR RWTS move arm>>=
+    ORG     $BCD4
+EALDR_RWTS_MOVE_ARM:
+    SUBROUTINE EALDR_RWTS_MOVE_ARM
+
+    ASL                     ; double for half-track addressing
+    STA     $4A             ; target half-track
+.compare:
+    LDA     EALDR_RWTS_TRACK
+    STA     $4B             ; save current position
+    SEC
+    SBC     $4A             ; current - target
+    BEQ     EALDR_RWTS_PHASE_ON_RTS ; already there -> RTS at $BD10
+    BCS     .step_out
+    INC     EALDR_RWTS_TRACK ; step inward
+    BCC     .do_step
+.step_out:
+    DEC     EALDR_RWTS_TRACK ; step outward
+.do_step:
+    JSR     EALDR_RWTS_PHASE_ON ; activate stepper phase
+    JSR     EALDR_RWTS_DELAY ; wait for head to settle
+    LDA     $4B             ; previous half-track
+    AND     #$03
+    ASL                     ; phase index x 2
+    ORA     #$60            ; $C0x0 slot offset
+    TAY
+    LDA     $C080,Y         ; deactivate previous phase
+    JSR     EALDR_RWTS_DELAY ; wait
+    BEQ     .compare        ; always taken (delay returns Z=1)
+    JSR     EALDR_RWTS_DELAY ; (unreachable)
+@ %def EALDR_RWTS_MOVE_ARM
+
+@ [[EALDR_RWTS_PHASE_ON]] activates the stepper motor phase
+corresponding to the current half-track position.  The slot index
+is hardcoded to [[$60]] (slot~6).
+
+<<EALDR RWTS phase on>>=
+    ORG     $BD04
+EALDR_RWTS_PHASE_ON:
+    SUBROUTINE EALDR_RWTS_PHASE_ON
+
+    LDA     EALDR_RWTS_TRACK
+    AND     #$03            ; phase = track mod 4
+    ASL                     ; x 2 for IWM register spacing
+    ORA     #$60            ; slot offset $60 (slot 6)
+    TAY
+    LDA     $C081,Y         ; activate phase (odd address = on)
+EALDR_RWTS_PHASE_ON_RTS:
+    RTS
+@ %def EALDR_RWTS_PHASE_ON EALDR_RWTS_PHASE_ON_RTS
+
+@ [[EALDR_RWTS_DELAY]] is a nested delay loop providing approximately
+40$\times$256$\times$5 = 51,200 cycles, giving the drive head time to
+settle after a step.  [[EALDR_RWTS_DELAY_INNER]] at [[$BD14]] is the
+inner entry point used by [[EALDR_READ_DATA_TRAMPOLINE]]: entering here
+skips the initial [[LDA #\$28]] and [[SEC]], running the delay with
+whatever count and carry the caller has set in~A.
+
+<<EALDR RWTS delay>>=
+    ORG     $BD11
+EALDR_RWTS_DELAY:
+    SUBROUTINE EALDR_RWTS_DELAY
+
+    LDA     #$28            ; outer counter = 40
+    SEC
+EALDR_RWTS_DELAY_INNER:                    ; $BD14
+.outer:
+    PHA
+.inner:
+    SBC     #$01
+    BNE     .inner          ; inner loop: 256 iterations
+    PLA
+    SBC     #$01
+    BNE     .outer          ; outer loop: 40 iterations
+    RTS
+@ %def EALDR_RWTS_DELAY EALDR_RWTS_DELAY_INNER
+
+@ [[EALDR_RWTS_ADDR_ERROR]] is the address-field error return.
+
+<<EALDR RWTS addr error>>=
+    ORG     $BD1F
+EALDR_RWTS_ADDR_ERROR:
+    SEC
+    RTS
+@ %def EALDR_RWTS_ADDR_ERROR
+
+@ [[EALDR_RWTS_SEARCH_ADDR]] searches for an address field prologue
+([[D5 AA 96]]) and reads the four two-bit-encoded header bytes:
+volume, track, sector, and checksum.  The decoded sector number is
+stored in [[$39]].  Returns with carry clear on success.
+
+This is structurally identical to [[BOOT1_FIND_SECTOR]] at [[$0A15]],
+using [[$4A]]/[[$4B]] instead of [[$26]]/[[$27]] for the timeout
+counter and scratch, and [[$38]]--[[$3B]] instead of
+[[$2C]]--[[$2F]] for the header fields.
+
+<<EALDR RWTS search addr>>=
+    ORG     $BD21
+EALDR_RWTS_SEARCH_ADDR:
+    SUBROUTINE EALDR_RWTS_SEARCH_ADDR
+
+    ; Timeout counter
+    LDY     #$FC
+    STY     $4A             ; outer counter (high byte)
+.retry:
+    INY
+    BNE     .wait_d5
+    INC     $4A
+    BEQ     EALDR_RWTS_ADDR_ERROR ; timeout
+
+    ; Search for D5 AA 96 address prologue
+.wait_d5:
+    LDA     $C0EC
+    BPL     .wait_d5
+.check_d5:
+    CMP     #$D5
+    BNE     .retry
+    NOP
+.wait_aa:
+    LDA     $C0EC
+    BPL     .wait_aa
+    CMP     #$AA
+    BNE     .check_d5       ; not AA -> re-check D5
+    LDY     #$03            ; 4 header fields to read
+.wait_96:
+    LDA     $C0EC
+    BPL     .wait_96
+    CMP     #$96
+    BNE     .check_d5       ; not 96 -> re-check D5
+
+    ; Read 4 encoded header bytes (volume, track, sector, checksum)
+    LDA     #$00
+.read_header:
+    STA     $4B             ; running checksum
+.wait_odd:
+    LDA     $C0EC           ; \
+    BPL     .wait_odd       ;  | read odd-bits byte
+    ROL                     ;  |
+    STA     $4A             ; /  save shifted value
+.wait_even:
+    LDA     $C0EC           ; \
+    BPL     .wait_even      ;  | read even-bits byte
+    AND     $4A             ;  | combine with odd bits
+    STA     $38,Y           ;  | store at $3B,$3A,$39,$38 (Y=3..0)
+    EOR     $4B             ;  | update checksum
+    DEY                     ;  |
+    BPL     .read_header    ; /  loop for all 4 fields
+
+    ; Verify checksum
+    TAY
+    BNE     EALDR_RWTS_ADDR_ERROR ; checksum must be zero
+
+    ; Read address epilogue: DE AA
+.wait_de:
+    LDA     $C0EC
+    BPL     .wait_de
+    CMP     #$DE
+    BNE     EALDR_RWTS_ADDR_ERROR
+    NOP
+.wait_aa2:
+    LDA     $C0EC
+    BPL     .wait_aa2
+    CMP     #$AA
+    BNE     EALDR_RWTS_ADDR_ERROR
+    CLC                     ; success
+    RTS
+@ %def EALDR_RWTS_SEARCH_ADDR
+
+@ The region at [[$BD7D]]--[[$BD97]] is unused padding between
+[[EALDR_RWTS_SEARCH_ADDR]] and the nibble translation table.  It
+contains a residual [[CLC]]; [[RTS]] pair at [[$BD7D]] (dead code) and
+a [[$04]] byte at [[$BD97]] that is the last entry of the secondary
+nibble decode region (matching the [[$04]] at [[$0A97]] in [[BOOT1]]).
+
+<<EALDR RWTS padding>>=
+    ORG     $BD7D
+EALDR_RWTS_PADDING:
+    HEX     18 60           ; residual CLC; RTS (dead code)
+    DS      24,$00          ; zero padding
+    HEX     04              ; secondary nibble table tail byte
+@ %def EALDR_RWTS_PADDING
+
+@ The nibble translation tables at [[$BD98]]--[[$BDFF]] and
+[[$BE00]]--[[$BEFF]] are used by [[EALDR_RWTS_READ_SECTOR]] to decode
+the 6-and-2 encoded disk nibbles back into data bytes.  These are
+byte-identical to the BOOT1 tables at [[$0A98]]--[[$0AFF]] and
+[[$0B00]]--[[$0BFF]].  The primary table at [[$BD98]] maps raw disk
+nibbles (high-bit set values in the range [[$96]]--[[$FF]]) to 6-bit
+values.  The secondary table at [[$BE00]] provides the pair-decode
+lookup.
+
+<<EALDR RWTS nibble tables>>=
+    ORG     $BD98
+EALDR_RWTS_NIBBLE_A:
+    ; $BD98-$BDFF: primary 6-and-2 decode table (104 bytes)
+    HEX     98 99 08 0C 9C 10 14 18
+    HEX     A0 A1 A2 A3 A4 A5 1C 20
+    HEX     A8 A9 AA 24 28 2C 30 34
+    HEX     B0 B1 38 3C 40 44 48 4C
+    HEX     B8 50 54 58 5C 60 64 68
+    HEX     C0 C1 C2 C3 C4 C5 C6 C7
+    HEX     C8 C9 CA 6C CC 70 74 78
+    HEX     D0 D1 D2 7C D4 D5 80 84
+    HEX     D8 88 8C 90 94 98 9C A0
+    HEX     E0 E1 E2 E3 E4 A4 A8 AC
+    HEX     E8 B0 B4 B8 BC C0 C4 C8
+    HEX     F0 F1 CC D0 D4 D8 DC E0
+    HEX     F8 E4 E8 EC F0 F4 F8 FC
+@ %def EALDR_RWTS_NIBBLE_A
+
+<<EALDR RWTS nibble table B>>=
+    ORG     $BE00
+EALDR_RWTS_NIBBLE_B:
+    ; 256-byte secondary decode table
+    HEX     00 00 00 96 02 00 00 97 01 00 00 9A 03 00 00 9B
+    HEX     00 02 00 9D 02 02 00 9E 01 02 00 9F 03 02 00 A6
+    HEX     00 01 00 A7 02 01 00 AB 01 01 00 AC 03 01 00 AD
+    HEX     00 03 00 AE 02 03 00 AF 01 03 00 B2 03 03 00 B3
+    HEX     00 00 02 B4 02 00 02 B5 01 00 02 B6 03 00 02 B7
+    HEX     00 02 02 B9 02 02 02 BA 01 02 02 BB 03 02 02 BC
+    HEX     00 01 02 BD 02 01 02 BE 01 01 02 BF 03 01 02 CB
+    HEX     00 03 02 CD 02 03 02 CE 01 03 02 CF 03 03 02 D3
+    HEX     00 00 01 D6 02 00 01 D7 01 00 01 D9 03 00 01 DA
+    HEX     00 02 01 DB 02 02 01 DC 01 02 01 DD 03 02 01 DE
+    HEX     00 01 01 DF 02 01 01 E5 01 01 01 E6 03 01 01 E7
+    HEX     00 03 01 E9 02 03 01 EA 01 03 01 EB 03 03 01 EC
+    HEX     00 00 03 ED 02 00 03 EE 01 00 03 EF 03 00 03 F2
+    HEX     00 02 03 F3 02 02 03 F4 01 02 03 F5 03 02 03 F6
+    HEX     00 01 03 F7 02 01 03 F9 01 01 03 FA 03 01 03 FB
+    HEX     00 03 03 FC 02 03 03 FD 01 03 03 FE 03 03 03 FF
+@ %def EALDR_RWTS_NIBBLE_B
+
+@ [[EALDR_RWTS_READ_TRACK]] reads all 16~sectors of a track into
+memory.  It takes a track number in~A, seeks to it, and loops until
+every sector has been read or a timeout occurs.  On entry, the track
+number is saved and [[EALDR_RWTS_ERROR_FLAG]] is cleared.  If the first
+attempt encounters errors, the error flag is cleared and a second
+attempt is made.
+
+The inner routine at [[$BF1F]] builds the destination page table by
+adding the base page ([[$3E]]) to each entry of the interleave table at
+[[$BF64]], then iterates: [[EALDR_RWTS_SEARCH_ADDR]] finds each
+sector's address field, the sector number in~[[$39]] indexes the
+destination page table, and [[EALDR_RWTS_READ_SECTOR]] decodes the
+data.  Table entries are zeroed after successful reads; the loop ends
+when all~16 are zero.  A retry counter at~[[$40]] prevents infinite
+loops.
+
+This is structurally identical to [[BOOT1_LOAD_TRACK]] at [[$0C00]],
+using [[$39]] instead of [[$2D]] for the sector number and [[$BF64]]
+instead of [[$0C48]] for the interleave table.
+
+<<EALDR RWTS read track>>=
+    ORG     $BF00
+EALDR_RWTS_READ_TRACK:
+    SUBROUTINE EALDR_RWTS_READ_TRACK
+
+    ; First attempt: clear error flag, seek, load
+    PHA
+    LDA     #$00
+    STA     EALDR_RWTS_ERROR_FLAG
+    PLA
+    JSR     .seek_and_load  ; seek + load all sectors
+    LDA     EALDR_RWTS_ERROR_FLAG
+    BNE     .retry
+    RTS                     ; success
+
+.retry:
+    ; Second attempt on error
+    LDA     #$00
+    STA     EALDR_RWTS_ERROR_FLAG
+    JSR     .load_sectors   ; try again (already on track)
+    LDA     EALDR_RWTS_ERROR_FLAG
+    RTS                     ; return with error flag in A
+
+.seek_and_load:
+    JSR     EALDR_RWTS_MOVE_ARM ; seek to track in A
+    ; Fall through to .load_sectors
+
+.load_sectors:
+    ; Build destination page table: interleave[i] + base page
+    LDY     #$0F
+.build_table:
+    LDA     EALDR_RWTS_INTERLEAVE,Y
+    CLC
+    ADC     $3E             ; add base page
+    STA     EALDR_RWTS_DEST_PAGES,Y
+    DEY
+    BPL     .build_table
+
+    LDX     #$60            ; slot index (hardcoded slot 6)
+    LDA     #$60            ; retry counter
+    STA     $40
+.retry_sector:
+    DEC     $40
+    BEQ     .timeout
+    JSR     EALDR_RWTS_SEARCH_ADDR ; find address field -> sector in $39
+    BCS     .retry_sector   ; error -> retry
+
+    LDY     $39             ; sector number
+    LDA     EALDR_RWTS_DEST_PAGES,Y ; destination page for this sector
+    BEQ     .retry_sector   ; zero = already read, skip
+    STA     $45             ; destination page
+    LDA     #$00
+    STA     $44             ; destination = $xx00
+    JSR     EALDR_RWTS_READ_SECTOR ; read and decode data field
+    BCS     .retry_sector   ; error -> retry
+
+    ; Mark sector as done
+    LDY     $39
+    LDA     #$00
+    STA     EALDR_RWTS_DEST_PAGES,Y ; zero = done
+
+    ; Check if all sectors read
+    LDY     #$0F
+.check_done:
+    LDA     EALDR_RWTS_DEST_PAGES,Y
+    BNE     .retry_sector   ; still have sectors to read
+    DEY
+    BPL     .check_done
+    RTS                     ; all 16 sectors read
+
+.timeout:
+    INC     EALDR_RWTS_ERROR_FLAG ; signal error
+    RTS
+@ %def EALDR_RWTS_READ_TRACK
+
+@ The interleave table maps physical sector numbers to page offsets
+within the target region.  This is identical to [[BOOT1_INTERLEAVE]]
+at [[$0C48]].  The destination page table at [[$BF74]] is computed at
+runtime by adding the base page to each interleave entry.
+
+<<EALDR RWTS interleave table>>=
+    ORG     $BF64
+EALDR_RWTS_INTERLEAVE:
+    HEX     0F 08 01 09 02 0A 03 0B 04 0C 05 0D 06 0E 07 00
+@ %def EALDR_RWTS_INTERLEAVE
+
+<<EALDR RWTS dest pages>>=
+    ORG     $BF74
+EALDR_RWTS_DEST_PAGES:
+    DS      16,$00          ; filled at runtime by EALDR_RWTS_READ_TRACK
+@ %def EALDR_RWTS_DEST_PAGES
+
+@ The remainder of the EALDR RWTS area ([[$BF84]]--[[$BFFF]]) is unused
+padding filled with an alternating [[$FF $00]] pattern, except for the
+final byte at [[$BFFF]] which is [[$0F]].
+
+<<EALDR RWTS tail padding>>=
+    ORG     $BF84
+EALDR_RWTS_TAIL_PADDING:
+    HEX     FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00
+    HEX     FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00
+    HEX     FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00
+    HEX     FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00
+    HEX     FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00
+    HEX     FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00
+    HEX     FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00
+    HEX     FF 00 FF 00 FF 00 FF 00 FF 00 FF 0F
+@ %def EALDR_RWTS_TAIL_PADDING
+
 
 <<EALDR track pages>>=
     ORG     $A9F3
@@ -17047,6 +17616,20 @@ The following root chunks produce the assembly files when tangled.
 <<EALDR splash data>>
 <<EALDR source comments>>
 <<EALDR disk entry points>>
+<<EALDR RWTS track vars>>
+<<EALDR RWTS read sector>>
+<<EALDR RWTS move arm>>
+<<EALDR RWTS phase on>>
+<<EALDR RWTS delay>>
+<<EALDR RWTS addr error>>
+<<EALDR RWTS search addr>>
+<<EALDR RWTS padding>>
+<<EALDR RWTS nibble tables>>
+<<EALDR RWTS nibble table B>>
+<<EALDR RWTS read track>>
+<<EALDR RWTS interleave table>>
+<<EALDR RWTS dest pages>>
+<<EALDR RWTS tail padding>>
 @
 
 \chapter{Index}\par\noindent
