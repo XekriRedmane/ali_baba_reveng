@@ -1451,24 +1451,24 @@ opcodes.
 \toprule
 \thead{Byte} & \thead{Opcode} & \thead{Arg} & \thead{Handler} & \thead{Operation} \\
 \midrule
-00 & [[GOTO]]  & addr & \$AA72 & [[IP $\leftarrow$ addr]] \\
-01 & [[CALL1]] & addr & \$AAAE & Call 6502 subroutine at addr; [[A $\leftarrow$ result]] \\
-02 & [[BEQ]]   & addr & \$AAC5 & If [[A = 0]]: [[IP $\leftarrow$ addr]], else linear \\
-03 & [[LDI]]   & val  & \$AACF & [[A $\leftarrow$ val]] (1-byte immediate) \\
-04 & [[LD]]    & addr & \$AADD & [[A $\leftarrow$ (addr)]] \\
-05 & [[CALL]]  & addr & \$AAFA & Push return address; [[IP $\leftarrow$ addr]] \\
-06 & [[ST]]    & addr & \$AB1D & [[(addr) $\leftarrow$ A]] \\
-07 & [[SUBI]]  & val  & \$AB2E & [[A $\leftarrow$ A $-$ val]] (1-byte immediate) \\
-08 & [[CALL0]] & addr & \$AABF & Jump to 6502 code at addr (terminal, no return) \\
-09 & [[RET]]   & none & \$AB12 & Pop return address from stack; [[IP $\leftarrow$ addr]] \\
-0A & [[LDX]]   & addr & \$AAE9 & [[A $\leftarrow$ (addr + A)]] (indexed load) \\
-0B & [[ASL]]   & none & \$AB29 & [[A $\leftarrow$ A $\times$ 2]] \\
-0C & [[INC]]   & addr & \$AB7B & [[A $\leftarrow$ ++(addr)]] (increment memory, result to A) \\
-0D & [[ADD]]   & addr & \$AB8C & [[A $\leftarrow$ A + (addr)]] (add memory to A) \\
-0E & [[DXR]]   & none & \$AB55 & XOR byte at [[src]] with [[A]], store back; [[src += 2]]; [[A $\leftarrow$ src$_H$ $\oplus$ $68]] \\
-0F & [[BNE]]   & addr & \$AB6E & If [[A $\neq$ 0]]: [[IP $\leftarrow$ addr]], else linear \\
-10 & [[SUB]]   & addr & \$AB9B & [[A $\leftarrow$ A $-$ (addr)]] \\
-11 & [[COPY]]  & none & \$ABAA & [[(dest++) $\leftarrow$ (src++)]] \\
+00 & [[GOTO]]  & addr & \$AA72 & [[IP]] $\leftarrow$ [[addr]] \\
+01 & [[CALL1]] & addr & \$AAAE & Call 6502 subroutine at [[addr]]; [[A]] $\leftarrow$ result \\
+02 & [[BEQ]]   & addr & \$AAC5 & If [[A]] $= 0$: [[IP]] $\leftarrow$ [[addr]], else linear \\
+03 & [[LDI]]   & val  & \$AACF & [[A]] $\leftarrow$ [[val]] (1-byte immediate) \\
+04 & [[LD]]    & addr & \$AADD & [[A]] $\leftarrow$ ([[addr]]) \\
+05 & [[CALL]]  & addr & \$AAFA & Push return address; [[IP]] $\leftarrow$ [[addr]] \\
+06 & [[ST]]    & addr & \$AB1D & ([[addr]]) $\leftarrow$ [[A]] \\
+07 & [[SUBI]]  & val  & \$AB2E & [[A]] $\leftarrow$ [[A]] $-$ [[val]] (1-byte immediate) \\
+08 & [[CALL0]] & addr & \$AABF & Jump to 6502 code at [[addr]] (terminal, no return) \\
+09 & [[RET]]   & none & \$AB12 & Pop return address; [[IP]] $\leftarrow$ saved address \\
+0A & [[LDX]]   & addr & \$AAE9 & [[A]] $\leftarrow$ ([[addr]] $+$ [[A]]) (indexed load) \\
+0B & [[ASL]]   & none & \$AB29 & [[A]] $\leftarrow$ [[A]] $\times 2$ \\
+0C & [[INC]]   & addr & \$AB7B & [[A]] $\leftarrow$ $++$([[addr]]) (increment memory, result to~[[A]]) \\
+0D & [[ADD]]   & addr & \$AB8C & [[A]] $\leftarrow$ [[A]] $+$ ([[addr]]) \\
+0E & [[DXR]]   & none & \$AB55 & ([[src]]) $\leftarrow$ ([[src]]) $\oplus$ [[A]]; [[src]] $+= 2$; [[A]] $\leftarrow$ [[src]]$_H$ $\oplus$ \$68 \\
+0F & [[BNE]]   & addr & \$AB6E & If [[A]] $\neq 0$: [[IP]] $\leftarrow$ [[addr]], else linear \\
+10 & [[SUB]]   & addr & \$AB9B & [[A]] $\leftarrow$ [[A]] $-$ ([[addr]]) \\
+11 & [[COPY]]  & none & \$ABAA & ([[dest]]$++$) $\leftarrow$ ([[src]]$++$) \\
 \bottomrule
 \end{tabular}
 \caption{EALDR VM opcodes. Opcodes 03 and 07 take a 1-byte XOR \$4C argument;
@@ -1784,7 +1784,7 @@ EALDR_TMP0:
     DC.B    $00                ; table index (runtime)
 EALDR_TMP1:
     DC.B    $00                ; checksum accumulator (runtime)
-@ %def EALDR_TMP0 EALDR_TMP1 VM_READ_TRACKS VM_READ_LOOP VM_READ_NEXT VM_READ_DONE VM_LOAD_GROUP3 VM_DO_GROUP3 VM_CHECKSUM_LOOP VM_CHECKSUM_A200 VM_DXR_LOOP VM_COPY_LOOP VM_ERROR_SPLASH VM_ERROR_BEEP VM_ERROR_DISPLAY VM_ERROR_HALT
+@ %def EALDR_TMP0 EALDR_TMP1 VM_READ_TRACKS VM_READ_LOOP VM_READ_NEXT VM_READ_DONE VM_DO_GROUP3 VM_CHECKSUM_LOOP VM_CHECKSUM_A200 VM_DXR_LOOP VM_COPY_LOOP VM_ERROR_SPLASH VM_ERROR_BEEP VM_ERROR_DISPLAY VM_ERROR_HALT
 
 \section{VM architecture}
 
