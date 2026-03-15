@@ -2598,21 +2598,21 @@ The EA mnemonics reveal the original naming conventions:
 \begin{center}
 \begin{tabular}{clll}
 \toprule
-\thead{Op} & \thead{EA mnemonic} & \thead{Our name} & \thead{EA description} \
+\thead{Op} & \thead{EA mnemonic} & \thead{Our name} & \thead{EA description} \\
 \midrule
- 5 & JSR  & VMCALL  & (before \$B800) \
- 6 & STA  & VMST    & Store acc. absolute \
- 7 & SUB  & VMSUBI  & Subtract acc. immediate \
- 8 & JMPA & VMCALL0 & Jump to assembly \
- 9 & RTS  & VMRET   & M-code return from subroutine \
-10 & LDX  & VMLDX   & Load acc. indexed by Acc. \
-11 & ASL  & VMASL   & Shift acc. left \
-12 & INC  & VMINC   & Increment absolute \
-13 & ADD  & VMADD   & Add immediate \
-14 & EOR  & VMDXR   & EOR encryption bytes \
-15 & BNE  & VMBNE   & Jump if acc. non-zero \
-16 & SBA  & VMSUB   & Subtract absolute \
-17 & COP  & VMCOPY  & Copy byte from (PTR) to (PTR2) \
+ 5 & JSR  & VMCALL  & (before \$B800) \\
+ 6 & STA  & VMST    & Store acc. absolute \\
+ 7 & SUB  & VMSUBI  & Subtract acc. immediate \\
+ 8 & JMPA & VMCALL0 & Jump to assembly \\
+ 9 & RTS  & VMRET   & M-code return from subroutine \\
+10 & LDX  & VMLDX   & Load acc. indexed by Acc. \\
+11 & ASL  & VMASL   & Shift acc. left \\
+12 & INC  & VMINC   & Increment absolute \\
+13 & ADD  & VMADD   & Add immediate \\
+14 & EOR  & VMDXR   & EOR encryption bytes \\
+15 & BNE  & VMBNE   & Jump if acc. non-zero \\
+16 & SBA  & VMSUB   & Subtract absolute \\
+17 & COP  & VMCOPY  & Copy byte from (PTR) to (PTR2) \\
 \bottomrule
 \end{tabular}
 \end{center}
