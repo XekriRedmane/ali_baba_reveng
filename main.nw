@@ -548,8 +548,13 @@ custom prologues or epilogues---while the EALDR's decryption routines
 and VM architecture remain intact.
 
 The game was distributed by Electronic Arts using their custom loader
-([[EALDR]]).  Understanding what [[EALDR]] does during the boot process
-is essential for extracting the main program.
+([[EALDR]]).  The EA copy-protection system---including the VM bytecode
+interpreter, the DXR decryption, and the half-track verification---may
+have been developed by Rich Hilleman, who described writing EA's early
+copy protection in an
+\href{https://archive.computerhistory.org/resources/access/text/2013/04/102746575-05-01-acc.pdf}{oral history interview with the Computer History Museum} (2013).
+Understanding what [[EALDR]] does during the boot process is essential
+for extracting the main program.
 
 \section{The booting of a disk}
 
@@ -794,9 +799,8 @@ conversion.  As described in the introduction
 (\S\ref{sec:boot1}), a ``san~inc crack'' rewrites the disk access
 routines to run from a hard disk rather than floppy.  This code
 replaces whatever originally occupied [[$0840]]--[[$08FF]] in the EA
-bootloader (likely a portion of the copy-protection check, since
-[[EALDR_DISK_IO]] at [[$ABBF]] performs half-track reads that would
-have been invoked from this region).
+bootloader (likely a portion of the copy-protection check, which would
+probably have called the now-unused [[EALDR_PROT_ENTRY]] routine).
 
 The san~inc code performs the following:
 \begin{enumerate}
@@ -2338,7 +2342,7 @@ EALDR_DXR_STEP:
   \item [[$B800]]--[[$BBFF]]: Residual EA development source code---assembly comments documenting the VM opcode set, left over from the EALDR build tools.
 \end{enumerate}
 
-\subsection{Copy protection}
+\subsection{Copy protection (unused)}
 
 @ [[EALDR_DISK_IO]] is apparently part of the copy-protection system,
 although it is bypassed by the crack.  It performs
@@ -2491,27 +2495,44 @@ EALDR_PROT_ENTRY:
 
 \section{EA splash screen}
 
-@ The splash screen data occupies [[$AC68]]--[[$B7FF]].  The first
-152~bytes at [[$AC68]] are residual EA loader documentation (the same
-fragment that appears in [[BOOT1_LOADER_DOC]]).  Pages [[$AD]]--[[$AF]]
-contain checksum and protection tables.  Pages [[$B0]]--[[$B7]] hold the
-hi-res bitmap of the EA splash screen logo, rendered by the entry code
-at [[EALDR_ENTRY]].
+@ The splash screen data occupies [[$AC68]]--[[$B7FF]] in three parts:
+\begin{enumerate}
+  \item [[$AC68]]--[[$ACFF]] (152~bytes): Residual EA loader documentation,
+    the same text fragment that appears in [[BOOT1_LOADER_DOC]].
+  \item [[$AD00]]--[[$AFFF]] (768~bytes): Unused residual data from the EA
+    build process.  Page~[[$AD]] is almost entirely [[$FF]] (with two [[$0D]]
+    bytes at [[$ADFE--$ADFF]] that may be trailing CRs from the loader
+    documentation).  Page~[[$AE]] is mostly zero with a few scattered
+    non-zero bytes.  Page~[[$AF]] is mostly [[$FF]] with five non-[[$FF]]
+    bytes at the boundaries.  None of these pages are referenced by any
+    code in the EALDR.
+  \item [[$B000]]--[[$B7FF]] (2048~bytes): The hi-res bitmap of the EA
+    splash screen logo.  The [[EALDR_ENTRY]] code copies this data to
+    [[$202C]]+ via [[EALDR_COPY_BYTE]], painting the logo over the
+    [[$FF]]-filled hi-res screen.
+\end{enumerate}
 
-<<EALDR splash data>>=
+<<EALDR residual docs>>=
     ORG     $AC68
-EALDR_SPLASH_DATA:
-    ; Splash screen + checksum data: $AC68-$B7FF (2968 bytes)
-    HEX     6C 6C 20 6F 66 20 74 68 65 20 61 62 6F 76 65 2E
-    HEX     0D 10 20 0D 10 20 54 68 65 20 61 75 74 68 6F 72
-    HEX     73 20 61 6C 6C 20 72 65 63 65 69 76 65 20 61 20
-    HEX     70 72 6F 67 72 61 6D 20 63 61 6C 6C 65 64 20 4C
-    HEX     4F 41 44 45 52 2E 4F 2C 20 77 68 69 63 68 20 77
-    HEX     72 69 74 65 73 20 74 68 65 20 6C 6F 61 64 65 72
-    HEX     0D 10 20 74 6F 20 64 69 73 6B 2E 20 20 54 6F 20
-    HEX     63 72 65 61 74 65 20 61 20 6E 65 77 20 4C 4F 41
-    HEX     44 45 52 2E 4F 20 61 66 74 65 72 20 6D 6F 64 69
-    HEX     66 79 69 6E 0C 0C 61 6E FF FF FF FF FF FF FF FF
+EALDR_RESIDUAL_DOCS:
+    ; Residual EA loader documentation: $AC68-$ACFF (152 bytes)
+    ; Same text as BOOT1_LOADER_DOC
+    DC      "ll of the above."
+    HEX     0D 10 20 0D 10 20
+    DC      "The authors all receive a program called LOADER.O, which writes the loader"
+    HEX     0D 10 20
+    DC      "to disk.  To create a new LOADER.O after modifyin"
+    HEX     0C 0C
+    DC      "an"
+@ %def EALDR_RESIDUAL_DOCS
+
+@ Pages [[$AD]]--[[$AF]] are unused residual data, not referenced
+by any EALDR code.
+
+<<EALDR padding>>=
+    ORG     $AD00
+EALDR_PADDING:
+    ; Unused residual data: $AD00-$AFFF (768 bytes)
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
@@ -2527,23 +2548,24 @@ EALDR_SPLASH_DATA:
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF 0D 0D FF D3 00 00 00 00 00 00 00
+    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF 0D 0D FF
+    HEX     D3 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 FF 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     BF 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 FF 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     FF 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 BF 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     FF 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 0E 0E 0F FF FF FF FF FF FF FF
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 0E 0E
+    HEX     0F FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
@@ -2558,137 +2580,21 @@ EALDR_SPLASH_DATA:
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF 35 35 5E 56 45 FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF EF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF FF FF AA D5 FF FF FF FF FF FF FF FF FF FF FF
-    HEX     D7 EA FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA FD BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA F5 FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF D5 EA FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA F5 FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA F5 FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF EF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 EA D5 AA D5 AA D5 AA D5 FA FF FF D7 AA
-    HEX     D5 FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 FE FF FF FF FF FF FF DF AA D5 AA
-    HEX     D5 AA D5 FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 FA FF FF
-    HEX     FF BF D5 AA D5 FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 EA FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF FF FF BF D5 AA D5 EA FF AB D5 FA FF FF FF FF
-    HEX     FF FF DF AA D5 AA D5 FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF AF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF FF FF FF D5 AA F5 FF FF FF FF FF FF FF FF FF
-    HEX     D5 FE FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF FF D5 AA D5 FE FF FF FF FF FF FF DF EA FF FF
-    HEX     FF AA D5 FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 EA FF BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA FF FF FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF BF D5 AA D5 AA FF FF FF FF FF AA D5 FE FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF AF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF BF D5 EA FF FF FF FF FF FF FF FF FF FF
-    HEX     D5 FE FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA F5 BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF D5 AA FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 AA D5 EA D5 AA F5 FF FF FF
-    HEX     FF FF D7 AA D5 AA FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 EA DF AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 EA FF FF D7 AA D5 FA FF FF FF FF FF AA
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF AF D5 FA FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 FE FF FF FF FF FF FF FF FE FF FF
-    HEX     DF AA FD FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF BF D5 AA D5 EA FF FF FF FF FF AF D5 EA FF FF
-    HEX     FF AF D5 AA FD FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA FD BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 FE FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF FF FF AB D5 AA D5 EA FF BF D5 AA FD FF FF FF
-    HEX     FF FF D7 AA D5 AA FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 EA FF AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 FE D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 EA FF BF D5 AA D5 AA FF FF FF FF FF BF
-    HEX     FD FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF FF D7 AA FD FF FF FF FF FF FF FF FF FA FF FF
-    HEX     DF AA FD FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 EA FF BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 FE FF FF FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 FE FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FB FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 EA FF AF D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 FE FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF AB D5 FF FF FF FF FF FF FF FF BF
-    HEX     FD FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 BA D5 AA D5 AA D5 AA D5 AA F5 BF D5 AA
-    HEX     D5 FA FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF D7 AA FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 FE FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 FA FF FF DF AA D5 FE FF FF
-    HEX     FF FF D5 AA D5 FA FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA F5 FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 EA FF BF D5 AA D5 EA FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF DF AA FF FF FF FF FF FF FF FF FF BF
-    HEX     F5 FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA FF FF FF FF FF FF FF BF D5 AA
-    HEX     D5 EA FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF BF D5 AA D5 FA FF FF FF FF FF FF D5 EA FF FF
-    HEX     FF AB D5 FA FF FF FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 EA FF BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA F5 FF FF FF D7 AA D5 FA FF FF FF FF
-    HEX     FF FF D5 AA D5 AA FD FF FF FF D7 AA D5 FF FF FF
-    HEX     FF FF D5 AA D5 FA FF FF D7 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
-    HEX     D5 AA D5 AA D5 AA F5 FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF D7 AA D5 FE FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF
-@ %def EALDR_SPLASH_DATA
+    HEX     FF FF FF FF FF FF FF FF FF FF FF 35 35 5E 56 45
+@ %def EALDR_PADDING
+
+@ The splash screen bitmap at [[$B000]]--[[$B7FF]] is included from
+[[ea_splash_screen.asm]].
+
+<<EALDR splash bitmap>>=
+    ORG     $B000
+EALDR_SPLASH_BITMAP:
+    INCLUDE "ea_splash_screen.asm"
+@ %def EALDR_SPLASH_BITMAP
+
+\begin{center}
+\includegraphics[width=\columnwidth]{images/ea_splash.png}
+\end{center}
 
 @ The region [[$B800]]--[[$BBFF]] contains residual assembler source code
 from the EA development environment, preserved because it fell within the
@@ -17731,7 +17637,9 @@ The following root chunks produce the assembly files when tangled.
 <<EALDR disk io>>
 <<EALDR check flag>>
 <<EALDR prot entry>>
-<<EALDR splash data>>
+<<EALDR residual docs>>
+<<EALDR padding>>
+<<EALDR splash bitmap>>
 <<EALDR source comments>>
 <<EALDR disk entry points>>
 <<EALDR RWTS track vars>>
