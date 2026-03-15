@@ -789,22 +789,40 @@ BOOT1_ENTRY:
     JMP     BOOT1_DELAY     ; delay, then RTS -> $A806
 @ %def BOOT1_ENTRY
 
-@ The region at [[$0840]]--[[$08FF]] was inserted by the ``san~inc''
-cracker (credited alongside 4am on this disk image).  It is \emph{not}
-part of the Passport automatic crack, which only applies three
-single-byte patches to the EALDR (see below).  This code checks for
-a language card, BLOADs a two-part overlay ([[ASM.CODE.1]] and
-[[ASM.CODE.2]]) into language card RAM at [[$D000]], and enters the
-Applesoft interpreter.  If no language card is present, it prints an
-error message via [[ROM_COUT1]] and jumps to the monitor warm-start
-at [[$03D0]].
+@ The region at [[$0840]]--[[$08FF]] is part of the san~inc hard-disk
+conversion.  As described in the introduction
+(\S\ref{sec:boot1}), a ``san~inc crack'' rewrites the disk access
+routines to run from a hard disk rather than floppy.  This code
+replaces whatever originally occupied [[$0840]]--[[$08FF]] in the EA
+bootloader (likely a portion of the copy-protection check, since
+[[EALDR_DISK_IO]] at [[$ABBF]] performs half-track reads that would
+have been invoked from this region).
 
-The Passport automatic crack (logged in the accompanying [[.txt]] file)
-makes three byte patches to the EALDR on track~1:
+The san~inc code performs the following:
 \begin{enumerate}
-  \item [[$A907]]: [[VMCALL1]] ([[$01]]) $\rightarrow$ [[VMLD]] ([[$04]]).  The original calls native 6502 code at [[$A000]] as a copy-protection subroutine; the crack changes it to a harmless load-and-discard.
-  \item [[$A55B]] ([[$075B]] in resident code): [[BNE]] offset [[$A7]] $\rightarrow$ [[$00]].  Disables a backward branch in a secondary protection check.
-  \item [[$A3CC]] ([[$05CC]] in resident code): [[$E1]] $\rightarrow$ [[$E0]].  Modifies a byte in what appears to be a second VM bytecode program embedded in the resident code area---Passport's source calls this ``p-code madness.''
+  \item Checks for a language card by accessing [[$C089]] twice.
+  \item If present: BLOADs [[ASM.CODE.1]] and [[ASM.CODE.2]] into
+    language card RAM at [[$D000]], then enters the Applesoft
+    interpreter at [[$E000]].
+  \item If absent: prints ``NO LANGUAGE CARD INSTALLED'' via
+    [[ROM_COUT1]] and jumps to the monitor warm-start at [[$03D0]].
+\end{enumerate}
+
+Separately, the Passport automatic crack (logged in the accompanying
+[[.txt]] file) applies three single-byte patches to the EALDR on
+track~1:
+\begin{enumerate}
+  \item [[$A907]]: [[VMCALL1]] ([[$01]]) $\rightarrow$ [[VMLD]] ([[$04]]).
+    The original calls native 6502 code at [[$A000]] as a
+    copy-protection subroutine; the patch changes it to a harmless
+    load-and-discard.
+  \item [[$A55B]] ([[$075B]] in resident code): [[BNE]] offset
+    [[$A7]] $\rightarrow$ [[$00]].  Disables a backward branch in a
+    secondary protection check.
+  \item [[$A3CC]] ([[$05CC]] in resident code):
+    [[$E1]] $\rightarrow$ [[$E0]].  Modifies a byte in what appears to
+    be a second VM bytecode program embedded in the resident code
+    area---Passport's source calls this ``p-code madness.''
 \end{enumerate}
 
 [[ROM_COUT1]] ([[$FDED]]) is the standard Apple~II character output
