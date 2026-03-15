@@ -731,7 +731,7 @@ BOOT1_ENTRY:
     STA     SOFTEV          ;  | reset vector = $C600 (reboot)
     LDA     #$C6            ;  |
     STA     SOFTEV+1        ; /
-    EOR     #$A5            ;  PWREDUP = $C6 EOR $A5 = $63
+    EOR     #$A5            ;  PWREDUP = $00 EOR $C6 EOR $A5 = $63
     STA     PWREDUP
     LDA     #$00
     STA     BOOT1_ERROR_FLAG ; clear error flag
@@ -2213,14 +2213,17 @@ EALDR_DXR_STEP:
     EOR      #$68
     STA      EALDR_PSUEDOACC
     JMP      EALDR_VM_DISPATCH ; linear continuation
-@ The region [[$ABBF]]--[[$BBFF]] contains the EALDR's disk I/O routines,
-splash screen graphics data, checksum tables, and residual EA development
-documentation.  This data is not yet disassembled and is included as raw bytes.
+@ The region [[$ABBF]]--[[$BBFF]] contains three distinct areas:
+\begin{enumerate}
+  \item [[$ABBF]]--[[$AC67]]: Disk I/O code used by the EALDR to read sectors during boot.
+  \item [[$AC68]]--[[$B7FF]]: Splash screen bitmap data (the EA logo displayed during loading), interspersed with residual EA loader documentation and checksum/protection tables.
+  \item [[$B800]]--[[$BBFF]]: Residual EA development source code---assembly comments documenting the VM opcode set, left over from the EALDR build tools.
+\end{enumerate}
 
-<<EALDR disk data>>=
+<<EALDR disk io>>=
     ORG     $ABBF
-EALDR_DISK_DATA:
-    ; Disk I/O + splash screen + RWTS data: $ABBF-$BBFF (4161 bytes)
+EALDR_DISK_IO:
+    ; Disk I/O code: $ABBF-$AC67 (169 bytes)
     HEX     AD E9 C0 A2 FF 86 04 E8 86 01 86 03 A9 18 85 06
     HEX     20 00 BC E6 06 20 06 BC B0 FB A5 2D D0 F7 A5 06
     HEX     20 00 BC E6 06 A9 19 20 09 BC A9 00 85 00 E6 00
@@ -2231,17 +2234,30 @@ EALDR_DISK_DATA:
     HEX     03 C5 04 B0 02 85 04 A5 06 C9 1F F0 03 4C D4 AB
     HEX     A5 03 38 E5 04 C9 22 90 04 60 68 68 60 A5 01 D0
     HEX     03 4C 49 AC 60 20 BF AB 20 35 AA CA 10 FA 00 D7
-    HEX     70 00 00 00 00 00 00 00 00 6C 6C 20 6F 66 20 74
-    HEX     68 65 20 61 62 6F 76 65 2E 0D 10 20 0D 10 20 54
-    HEX     68 65 20 61 75 74 68 6F 72 73 20 61 6C 6C 20 72
-    HEX     65 63 65 69 76 65 20 61 20 70 72 6F 67 72 61 6D
-    HEX     20 63 61 6C 6C 65 64 20 4C 4F 41 44 45 52 2E 4F
-    HEX     2C 20 77 68 69 63 68 20 77 72 69 74 65 73 20 74
-    HEX     68 65 20 6C 6F 61 64 65 72 0D 10 20 74 6F 20 64
-    HEX     69 73 6B 2E 20 20 54 6F 20 63 72 65 61 74 65 20
-    HEX     61 20 6E 65 77 20 4C 4F 41 44 45 52 2E 4F 20 61
-    HEX     66 74 65 72 20 6D 6F 64 69 66 79 69 6E 0C 0C 61
-    HEX     6E FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     70 00 00 00 00 00 00 00 00
+@ %def EALDR_DISK_IO
+
+@ The splash screen data occupies [[$AC68]]--[[$B7FF]].  The first
+152~bytes at [[$AC68]] are residual EA loader documentation (the same
+fragment that appears in [[BOOT1_LOADER_DOC]]).  Pages [[$AD]]--[[$AF]]
+contain checksum and protection tables.  Pages [[$B0]]--[[$B7]] hold the
+hi-res bitmap of the EA splash screen logo, rendered by the entry code
+at [[EALDR_ENTRY]].
+
+<<EALDR splash data>>=
+    ORG     $AC68
+EALDR_SPLASH_DATA:
+    ; Splash screen + checksum data: $AC68-$B7FF (2968 bytes)
+    HEX     6C 6C 20 6F 66 20 74 68 65 20 61 62 6F 76 65 2E
+    HEX     0D 10 20 0D 10 20 54 68 65 20 61 75 74 68 6F 72
+    HEX     73 20 61 6C 6C 20 72 65 63 65 69 76 65 20 61 20
+    HEX     70 72 6F 67 72 61 6D 20 63 61 6C 6C 65 64 20 4C
+    HEX     4F 41 44 45 52 2E 4F 2C 20 77 68 69 63 68 20 77
+    HEX     72 69 74 65 73 20 74 68 65 20 6C 6F 61 64 65 72
+    HEX     0D 10 20 74 6F 20 64 69 73 6B 2E 20 20 54 6F 20
+    HEX     63 72 65 61 74 65 20 61 20 6E 65 77 20 4C 4F 41
+    HEX     44 45 52 2E 4F 20 61 66 74 65 72 20 6D 6F 64 69
+    HEX     66 79 69 6E 0C 0C 61 6E FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
@@ -2256,24 +2272,24 @@ EALDR_DISK_DATA:
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF 0D 0D
-    HEX     FF D3 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF 0D 0D FF D3 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 FF 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 BF 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 FF 00 00 00 00 00 00
+    HEX     FF 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 BF 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     FF 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0E
-    HEX     0E 0F FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    HEX     00 00 00 00 00 00 0E 0E 0F FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
@@ -2288,201 +2304,414 @@ EALDR_DISK_DATA:
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF 35 35 5E 56
-    HEX     45 FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF EF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF 35 35 5E 56 45 FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF EF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF FF FF AA D5 FF FF
-    HEX     FF FF FF FF FF FF FF FF FF D7 EA FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA FD BF D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA F5 FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
+    HEX     FF FF FF AA D5 FF FF FF FF FF FF FF FF FF FF FF
+    HEX     D7 EA FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA FD BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA F5 FF FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF FF FF FF FF D5 EA FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA F5 FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF D5 EA FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA F5 FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA F5 FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF EF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 EA D5 AA D5 AA D5 AA D5 FA FF FF D7 AA
+    HEX     D5 FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 FE FF FF FF FF FF FF DF AA D5 AA
+    HEX     D5 AA D5 FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA F5
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
+    HEX     FF BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 FA FF FF
+    HEX     FF BF D5 AA D5 FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 EA FF FF D7 AA D5 FA FF FF FF FF
+    HEX     FF FF FF BF D5 AA D5 EA FF AB D5 FA FF FF FF FF
+    HEX     FF FF DF AA D5 AA D5 FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF AF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
+    HEX     FF FF FF FF D5 AA F5 FF FF FF FF FF FF FF FF FF
+    HEX     D5 FE FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF EF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 EA D5 AA D5
-    HEX     AA D5 AA D5 FA FF FF D7 AA D5 FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 FE FF
-    HEX     FF FF FF FF FF DF AA D5 AA D5 AA D5 FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF BF D5 AA D5 AA D5
-    HEX     AA D5 AA D5 AA D5 FA FF FF FF BF D5 AA D5 FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 BF D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 EA FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF FF FF BF D5 AA D5
-    HEX     EA FF AB D5 FA FF FF FF FF FF FF DF AA D5 AA D5
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF AF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF FF FF FF D5 AA F5
-    HEX     FF FF FF FF FF FF FF FF FF D5 FE FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF FF D5 AA D5 FE FF
-    HEX     FF FF FF FF FF DF EA FF FF FF AA D5 FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 EA FF BF D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA FF FF FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF BF D5 AA D5 AA FF
-    HEX     FF FF FF FF AA D5 FE FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF AF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF BF D5 EA FF
-    HEX     FF FF FF FF FF FF FF FF FF D5 FE FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA F5 BF D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF D5 AA FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
+    HEX     FF FF D5 AA D5 FE FF FF FF FF FF FF DF EA FF FF
+    HEX     FF AA D5 FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 EA FF BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA FF FF FF FF D7 AA D5 FA FF FF FF FF
+    HEX     FF BF D5 AA D5 AA FF FF FF FF FF AA D5 FE FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     AA D5 EA D5 AA F5 FF FF FF FF FF D7 AA D5 AA FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 EA DF AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 EA FF FF D7
-    HEX     AA D5 FA FF FF FF FF FF AA FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF AF D5 FA FF
+    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF AF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 FE FF
-    HEX     FF FF FF FF FF FF FE FF FF DF AA FD FF FF FF FF
+    HEX     FF FF FF BF D5 EA FF FF FF FF FF FF FF FF FF FF
+    HEX     D5 FE FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA F5 BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF D5 AA FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 AA D5 EA D5 AA F5 FF FF FF
+    HEX     FF FF D7 AA D5 AA FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 EA DF AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 EA FF FF D7 AA D5 FA FF FF FF FF FF AA
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF BF D5 AA D5 EA FF
-    HEX     FF FF FF FF AF D5 EA FF FF FF AF D5 AA FD FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA FD BF D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 FE FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF FF FF AB D5 AA D5
-    HEX     EA FF BF D5 AA FD FF FF FF FF FF D7 AA D5 AA FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 EA FF AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     FE D7 AA D5 AA D5 AA D5 AA D5 AA D5 EA FF BF D5
-    HEX     AA D5 AA FF FF FF FF FF BF FD FF FF FF FF FF FF
+    HEX     FF FF FF AF D5 FA FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 FE FF FF FF FF FF FF FF FE FF FF
+    HEX     DF AA FD FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
+    HEX     FF BF D5 AA D5 EA FF FF FF FF FF AF D5 EA FF FF
+    HEX     FF AF D5 AA FD FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA FD BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 FE FF FF D7 AA D5 FA FF FF FF FF
+    HEX     FF FF FF AB D5 AA D5 EA FF BF D5 AA FD FF FF FF
+    HEX     FF FF D7 AA D5 AA FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 EA FF AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 FE D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 EA FF BF D5 AA D5 AA FF FF FF FF FF BF
+    HEX     FD FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF FF D7 AA FD FF FF
-    HEX     FF FF FF FF FF FF FA FF FF DF AA FD FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 EA FF BF D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 FE FF FF FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
+    HEX     FF FF D7 AA FD FF FF FF FF FF FF FF FF FA FF FF
+    HEX     DF AA FD FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 EA FF BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 FE FF FF FF FF D7 AA D5 FA FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 FE FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FB FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 FE FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FB FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 EA FF AF D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 FE FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF AB D5 FF FF FF FF FF FF FF FF BF
+    HEX     FD FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 BA D5 AA D5 AA D5 AA D5 AA F5 BF D5 AA
+    HEX     D5 FA FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF D7 AA FF FF FF FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 FE FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 EA FF AF D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     FE FF FF FF FF FF FF FF FF FF FF FF FF FF AB D5
-    HEX     FF FF FF FF FF FF FF FF BF FD FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 BA D5 AA D5
-    HEX     AA D5 AA D5 AA F5 BF D5 AA D5 FA FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF D7 AA FF FF FF
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 FA FF FF DF AA D5 FE FF FF
+    HEX     FF FF D5 AA D5 FA FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA F5 FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 EA FF BF D5 AA D5 EA FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 FE FF FF FF
+    HEX     FF FF FF FF DF AA FF FF FF FF FF FF FF FF FF BF
+    HEX     F5 FF FF FF FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA FF FF FF FF FF FF FF BF D5 AA
+    HEX     D5 EA FF FF FF FF FF FF FF FF FF FF FF FF FF FF
     HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     FA FF FF DF AA D5 FE FF FF FF FF D5 AA D5 FA FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA F5
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 EA FF BF D5
-    HEX     AA D5 EA FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF DF AA FF
-    HEX     FF FF FF FF FF FF FF FF BF F5 FF FF FF FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA FF
-    HEX     FF FF FF FF FF FF BF D5 AA D5 EA FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF BF D5 AA D5 FA FF
-    HEX     FF FF FF FF FF D5 EA FF FF FF AB D5 FA FF FF FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 EA FF BF D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA F5 FF FF
-    HEX     FF D7 AA D5 FA FF FF FF FF FF FF D5 AA D5 AA FD
-    HEX     FF FF FF D7 AA D5 FF FF FF FF FF D5 AA D5 FA FF
-    HEX     FF D7 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5
-    HEX     AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA F5
-    HEX     FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF D7
-    HEX     AA D5 FE FF FF FF FF FF FF FF FF FF FF FF FF FF
-    HEX     FF 52 20 20 20 20 20 D9 20 35 0D 16 3B 20 53 74
-    HEX     6F 72 65 20 61 63 63 2E 20 61 62 73 6F 6C 75 74
-    HEX     65 0D 0C 53 54 41 20 20 20 38 38 D9 20 36 0D 1A
-    HEX     3B 20 53 75 62 74 72 61 63 74 20 61 63 63 2E 20
-    HEX     69 6D 6D 65 64 69 61 74 65 0D 0C 53 55 42 20 20
-    HEX     20 20 20 D9 20 37 0D 22 3B 20 4A 75 6D 70 20 74
-    HEX     6F 20 61 73 73 65 6D 62 6C 79 20 28 75 73 65 64
-    HEX     20 66 6F 72 20 65 78 69 74 0D 1F 3B 20 66 72 6F
-    HEX     6D 20 69 6E 74 65 72 70 72 65 74 65 72 2C 20 36
-    HEX     35 30 32 20 73 74 61 63 6B 0D 1E 3B 20 73 68 6F
-    HEX     75 6C 64 20 62 65 20 62 61 6C 61 6E 63 65 64 20
-    HEX     70 72 6F 70 65 72 6C 79 0D 20 3B 20 75 6E 6C 65
-    HEX     73 73 20 4D 2D 63 6F 64 65 20 64 69 64 20 4A 53
-    HEX     52 20 77 69 74 68 6F 75 74 0D 06 3B 20 52 54 53
-    HEX     0D 0C 4A 4D 50 41 20 20 20 20 D9 20 38 0D 20 3B
-    HEX     20 4D 2D 63 6F 64 65 20 72 65 74 75 72 6E 20 66
-    HEX     72 6F 6D 20 73 75 62 72 6F 75 74 69 6E 65 0D 0C
-    HEX     52 54 53 20 20 20 20 20 D9 20 39 0D 21 3B 20 4C
-    HEX     6F 61 64 20 61 63 63 2E 20 61 39 39 2E 20 69 6E
-    HEX     64 65 78 65 64 20 62 79 20 41 63 63 2E 0D 0D 4C
-    HEX     44 58 20 20 20 20 20 D9 20 31 30 0D 12 3B 20 53
-    HEX     68 69 66 74 20 61 63 63 2E 20 6C 65 66 74 0D 0D
-    HEX     41 53 4C 20 20 20 20 20 D9 20 31 31 0D 15 3B 20
-    HEX     49 6E 63 72 65 6D 65 6E 74 20 61 62 73 6F 6C 75
-    HEX     74 65 0D 0D 49 4E 43 20 20 20 20 20 D9 20 31 32
-    HEX     0D 10 3B 20 41 64 64 20 69 6D 6D 65 64 69 61 74
-    HEX     65 0D 0D 41 44 44 20 20 20 20 20 D9 20 31 33 0D
-    HEX     20 3B 20 45 4F 52 20 65 6E 63 72 79 70 74 69 6F
-    HEX     6E 20 62 79 74 65 73 3A 20 73 65 65 20 74 68 65
-    HEX     0D 22 3B 20 63 6F 64 65 20 62 65 6C 6F 77 20 66
-    HEX     6F 72 20 49 45 4F 52 31 20 74 6F 20 67 65 74 20
-    HEX     74 68 65 0D 1E 3B 20 61 6C 67 6F 72 69 74 68 6D
-    HEX     2E 20 20 41 63 63 2E 20 68 6F 6C 64 73 20 30 20
-    HEX     69 66 0D 1F 3B 20 68 69 20 6F 72 64 65 72 20 70
-    HEX     6F 69 6E 74 65 72 20 67 65 74 73 3A 3A 6F 20 24
-    HEX     36 38 0D 1E 3B 20 28 65 6E 64 20 6F 66 20 65 6E
-    HEX     63 72 79 70 74 65 64 20 52 41 4D 20 61 72 65 61
-    HEX     29 0D 0D 45 4F 52 20 20 20 20 20 D9 20 31 34 0D
-    HEX     18 3B 20 4A 75 6D 70 20 69 66 20 61 63 63 2E 20
-    HEX     6E 6F 6E 2D 7A 65 72 6F 0D 0D 42 4E 45 20 20 20
-    HEX     20 20 D9 20 31 35 0D 14 3B 20 53 75 62 74 72 61
-    HEX     63 74 20 61 62 73 6F 6C 75 74 65 0D 0D 53 42 41
-    HEX     20 20 20 20 20 D9 20 31 36 0D 22 3B 20 43 6F 70
-    HEX     79 20 61 20 62 79 74 65 20 66 72 6F 6D 20 28 50
-    HEX     54 52 29 20 2D 20 28 50 54 52 32 29 0D 1F 3B 20
-    HEX     74 68 65 6E 20 69 6E 63 72 65 6D 65 6E 74 20 62
-    HEX     6F 74 68 20 70 6F 69 6E 74 65 72 73 0D 0D 43 4F
-    HEX     50 20 20 20 20 20 D9 20 31 37 0D 14 49 43 4F 44
-    HEX     45 20 20 20 E5 20 49 4A 4D 50 2D 49 4A 4D 50 0D
-    HEX     0D E5 20 49 4A 53 52 41 2D 49 4A 4D 50 0D 0C E5
-    HEX     20 49 42 45 51 2D 49 4A 4D 50 0D 0C 3B 3B 49 4C
-    HEX     44 49 2D 49 4A 4D 50 0D 0C E5 20 49 4C 44 41 2D
-    HEX     49 4A 4D 50 0D 0C E5 20 49 4A 53 52 2D 49 4A 4D
-    HEX     50 0D 0C E5 20 49 53 54 41 2D 49 4A 4D 50 0D 0C
-    HEX     E5 20 49 53 55 42 2D 49 4A 4D 50 0D 0D E5 20 49
-    HEX     4A 4D 50 41 2D 49 4A 4D 50 0D 0C E5 20 49 52 54
-    HEX     53 2D 49 4A 4D 50 0D 0C E5 20 49 4C 44 58 2D 49
-    HEX     4A 4D 50 0D 0C E5 20 49 41 53 4C 2D 49 4A 4D 50
-    HEX     0D 0C E5 20 49 49 4E 43 2D 49 4A 4D 50 0D 0C E5
-    HEX     20 49 41 44 44 2D 49 4A 4D 50 0D 0C E5 20 49 45
-    HEX     4F 52 2D 49 4A 4D 50 0D 03 E2 20 0D 0C E5 20 49
-    HEX     42 4E 45 2D 49 4A 4D 50 0D 0C E5 20 49 53 42 41
-    HEX     2D 49 4A 4D 50 0D 0C E5 20 49 43 4F 50 2D 49 4A
-    HEX     4D 50 0D 03 E3 20 0D 11 49 4A 4D 50 20 20 20 20
-    HEX     CB
-@ %def EALDR_DISK_DATA
+    HEX     FF FF FF FF FF FF FF FF D7 AA D5 FA FF FF FF FF
+    HEX     FF BF D5 AA D5 FA FF FF FF FF FF FF D5 EA FF FF
+    HEX     FF AB D5 FA FF FF FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 EA FF BF D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA F5 FF FF FF D7 AA D5 FA FF FF FF FF
+    HEX     FF FF D5 AA D5 AA FD FF FF FF D7 AA D5 FF FF FF
+    HEX     FF FF D5 AA D5 FA FF FF D7 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA D5 AA
+    HEX     D5 AA D5 AA D5 AA F5 FF FF FF FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF D7 AA D5 FE FF FF FF FF FF FF
+    HEX     FF FF FF FF FF FF FF FF
+@ %def EALDR_SPLASH_DATA
+
+@ The region [[$B800]]--[[$BBFF]] contains residual assembler source code
+from the EA development environment, preserved because it fell within the
+EALDR's 2-track footprint.  This is a remarkable piece of digital
+archaeology: the original EA source for the VM opcode definitions.
+
+The data is structured as length-prefixed lines (each preceded by [[$0D]]
+and a length byte).  Each opcode entry consists of a description line
+(a semicolon comment) followed by a definition line containing the
+8-character mnemonic, a [[$D9]] field separator, and the opcode number
+in decimal.  The fragment begins mid-entry at opcode~5 (opcodes 0--4
+were in memory before [[$B800]] and have been overwritten by the splash
+screen data).
+
+The [[$D9]] field separator is notable: it is the same byte used as the
+XOR key for encrypting the high byte of 16-bit address arguments in the
+VM bytecode (see~\S\ref{sec:ealdr}).  This may not be a coincidence---the
+encryption key may have been chosen from the source code format.
+
+The EA mnemonics reveal the original naming conventions:
+\begin{center}
+\begin{tabular}{clll}
+\toprule
+\thead{Op} & \thead{EA mnemonic} & \thead{Our name} & \thead{EA description} \
+\midrule
+ 5 & JSR  & VMCALL  & (before \$B800) \
+ 6 & STA  & VMST    & Store acc. absolute \
+ 7 & SUB  & VMSUBI  & Subtract acc. immediate \
+ 8 & JMPA & VMCALL0 & Jump to assembly \
+ 9 & RTS  & VMRET   & M-code return from subroutine \
+10 & LDX  & VMLDX   & Load acc. indexed by Acc. \
+11 & ASL  & VMASL   & Shift acc. left \
+12 & INC  & VMINC   & Increment absolute \
+13 & ADD  & VMADD   & Add immediate \
+14 & EOR  & VMDXR   & EOR encryption bytes \
+15 & BNE  & VMBNE   & Jump if acc. non-zero \
+16 & SBA  & VMSUB   & Subtract absolute \
+17 & COP  & VMCOPY  & Copy byte from (PTR) to (PTR2) \
+\bottomrule
+\end{tabular}
+\end{center}
+
+Following the opcode definitions is an [[ICODE]] dispatch table that maps
+each opcode to its handler label (e.g., [[IJMP]], [[IJSRA]], [[IBEQ]]).
+The [[$E5]] bytes (high-bit [['e']]) are likely an assembler pseudo-op
+(equate or entry directive).
+
+@ [[EACR]] emits a [[$0D]] line separator followed by a length byte.
+[[EASEP]] emits the [[$D9]] field separator.
+
+<<EALDR VM macros>>=
+    MACRO EACR    ; line separator: $0D
+        DC.B $0D
+    ENDM
+    MACRO EASEP   ; field separator: $D9 (high-bit 'Y')
+        DC.B $D9
+    ENDM
+    MACRO SLEN    ; string length byte
+        DC.B {1}
+    ENDM
+@
+
+<<EALDR source comments>>=
+    ORG     $B800
+EALDR_SOURCE_COMMENTS:
+    ; --- EA VM opcode documentation (opcodes 5-17) ---
+    DC      "R     "
+    EASEP
+    DC      " 5"
+    EACR
+    SLEN    $16
+    DC      "; Store acc. absolute"
+    EACR
+    SLEN    $0C
+    DC      "STA   88"
+    EASEP
+    DC      " 6"
+    EACR
+    SLEN    $1A
+    DC      "; Subtract acc. immediate"
+    EACR
+    SLEN    $0C
+    DC      "SUB     "
+    EASEP
+    DC      " 7"
+    EACR
+    SLEN    $22
+    DC      "; Jump to assembly (used for exit"
+    EACR
+    SLEN    $1F
+    DC      "; from interpreter, 6502 stack"
+    EACR
+    SLEN    $1E
+    DC      "; should be balanced properly"
+    EACR
+    SLEN    $20
+    DC      "; unless M-code did JSR without"
+    EACR
+    SLEN    $06
+    DC      "; RTS"
+    EACR
+    SLEN    $0C
+    DC      "JMPA    "
+    EASEP
+    DC      " 8"
+    EACR
+    SLEN    $20
+    DC      "; M-code return from subroutine"
+    EACR
+    SLEN    $0C
+    DC      "RTS     "
+    EASEP
+    DC      " 9"
+    EACR
+    SLEN    $21
+    DC      "; Load acc. a99. indexed by Acc."
+    EACR
+    SLEN    $0D
+    DC      "LDX     "
+    EASEP
+    DC      " 10"
+    EACR
+    SLEN    $12
+    DC      "; Shift acc. left"
+    EACR
+    SLEN    $0D
+    DC      "ASL     "
+    EASEP
+    DC      " 11"
+    EACR
+    SLEN    $15
+    DC      "; Increment absolute"
+    EACR
+    SLEN    $0D
+    DC      "INC     "
+    EASEP
+    DC      " 12"
+    EACR
+    SLEN    $10
+    DC      "; Add immediate"
+    EACR
+    SLEN    $0D
+    DC      "ADD     "
+    EASEP
+    DC      " 13"
+    EACR
+    SLEN    $20
+    DC      "; EOR encryption bytes: see the"
+    EACR
+    SLEN    $22
+    DC      "; code below for IEOR1 to get the"
+    EACR
+    SLEN    $1E
+    DC      "; algorithm.  Acc. holds 0 if"
+    EACR
+    SLEN    $1F
+    DC      "; hi order pointer gets::o $68"
+    EACR
+    SLEN    $1E
+    DC      "; (end of encrypted RAM area)"
+    EACR
+    SLEN    $0D
+    DC      "EOR     "
+    EASEP
+    DC      " 14"
+    EACR
+    SLEN    $18
+    DC      "; Jump if acc. non-zero"
+    EACR
+    SLEN    $0D
+    DC      "BNE     "
+    EASEP
+    DC      " 15"
+    EACR
+    SLEN    $14
+    DC      "; Subtract absolute"
+    EACR
+    SLEN    $0D
+    DC      "SBA     "
+    EASEP
+    DC      " 16"
+    EACR
+    SLEN    $22
+    DC      "; Copy a byte from (PTR) - (PTR2)"
+    EACR
+    SLEN    $1F
+    DC      "; then increment both pointers"
+    EACR
+    SLEN    $0D
+    DC      "COP     "
+    EASEP
+    DC      " 17"
+    EACR
+    SLEN    $14
+    DC      "ICODE   "
+    HEX     E5                   ; high-bit 'e'
+    DC      " IJMP-IJMP"
+    EACR
+    SLEN    $0D
+    HEX     E5                   ; high-bit 'e'
+    DC      " IJSRA-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " IBEQ-IJMP"
+    EACR
+    SLEN    $0C
+    DC      ";;ILDI-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " ILDA-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " IJSR-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " ISTA-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " ISUB-IJMP"
+    EACR
+    SLEN    $0D
+    HEX     E5                   ; high-bit 'e'
+    DC      " IJMPA-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " IRTS-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " ILDX-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " IASL-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " IINC-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " IADD-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " IEOR-IJMP"
+    EACR
+    SLEN    $03
+    HEX     E2                   ; high-bit 'b'
+    DC      " "
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " IBNE-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " ISBA-IJMP"
+    EACR
+    SLEN    $0C
+    HEX     E5                   ; high-bit 'e'
+    DC      " ICOP-IJMP"
+    EACR
+    SLEN    $03
+    HEX     E3                   ; high-bit 'c'
+    DC      " "
+    EACR
+    SLEN    $11
+    DC      "IJMP    "
+    HEX     CB                   ; high-bit 'K'
+@ %def EALDR_SOURCE_COMMENTS
 
 @ %def EALDR_DXR_STEP
 
@@ -2522,197 +2751,9 @@ EALDR_READ_DATA:                ; $BC09
     JMP      $BD14
 @ %def EALDR_MOVE_ARM EALDR_READ_TRACK EALDR_SEARCH_ADDR EALDR_READ_DATA
 
-\section{VM program}
-
-Here is the decoded VM program. Addresses and values shown are after
-decryption.  The arrows show branch/jump targets within the listing.
-
-@ The EALDR program uses zero-page location [[$F8]] as a temporary
-(labeled [[EALDR_SRC]] in the VM listing).  In the main game this
-address becomes [[ENTITY_PTR]], the 2-byte pointer to the entity
-record currently being processed.  We define it here so the symbolic
-name is available when reading the VM program.
-
-<<zero page defines>>=
-ENTITY_PTR              EQU     $F8     ; entity record pointer (2 bytes, $F8/$F9)
-@ %def ENTITY_PTR
-
-<<EALDR Program>>=
-; --- Display setup ---
-A851:   LD      C050    ; TXTCLR (show graphics)
-        LD      C052   ; MIXCLR (full screen, no text window)
-        LD      C057   ; HIRES (hi-res mode)
-        LDI     F8
-        ST      004C   ; EALDR_SRC = ENTITY_PTR (delay counter)
-        LDI     48
-        ST      03F2   ; SOFTEV lo = $48
-        LDI     A9
-        ST      03F3   ; SOFTEV hi = $A9 -> reset handler = EALDR_REBOOT
-        LDI     0C
-        ST      03F4   ; PWREDUP = $0C (EOR of $A9^$48^$A5 complement)
-
-; --- Splash screen delay ---
-A86E:   LDI     FF
-        CALL1   FCA8   ; WAIT ($FF iterations)
-        INC     004C   ; EALDR_SRC++
-        BEQ     A87C v ; done when wraps to 0 ($F8..$FF->$00 = 8 waits)
-        GOTO    A86E ^
-
-; --- Group 1: optional tracks $03,$04,$21,$22 ---
-A87C:   LD      A805    ; flag byte (0 = skip Group 1)
-        BEQ     A88D v
-        LDI     00
-        CALL    A967 v ; read_tracks_by_index(0) -> Group 1
-        LD      C0E8   ; IWM: motor off
-        CALL1   0000   ; ???
-
-; --- Group 2: tracks $07-$0C -> $4000-$95FF ---
-A88D:   LDI     05
-        CALL    A967 v ; read_tracks_by_index(5) -> Group 2
-        CALL1   A898   ; EALDR_CLEAR_TEXT: zero $0400-$07FF
-        GOTO    A8B2 v
-
-A898:   ; [native] EALDR_CLEAR_TEXT
-
-; --- Group 3: tracks $0D-$10 -> $0800-$3FFF ---
-A8B2:   LD      A800    ; flag byte (nonzero = show lo-res)
-        BEQ     A8BB v
-A8B8:   LD      C056    ; LORES (lo-res mode)
-
-        ; Tracks loaded:
-        ;   $0D -> $0800-$17FF
-        ;   $0E -> $1000-$1FFF (overwrites upper half of $0D)
-        ;   $0F -> $2000-$2FFF
-        ;   $10 -> $3000-$3FFF
-A8BB:   LDI     0C
-        CALL    A967 v ; read_tracks_by_index($0C) -> Group 3
-
-; --- Checksum $A000-$A2DF ---
-        LDI     00
-        ST      004C   ; index = 0
-        ST      A9F2   ; EALDR_TMP1 = 0 (checksum accumulator)
-
-A8C8:   LD      004C    ; A = index
-        LDX     A000   ; A = mem[$A000 + index]
-        SUB     A9F2
-        ST      A9F2   ; checksum -= mem[$A000 + index]
-        LD      004C
-        LDX     A100   ; A = mem[$A100 + index]
-        SUB     A9F2
-        ST      A9F2   ; checksum -= mem[$A100 + index]
-        INC     004C   ; index++
-        BNE     A8C8 ^ ; loop 256 times (pages $A0-$A1)
-
-A8E6:   LD      004C
-        LDX     A200   ; A = mem[$A200 + index]
-        SUB     A9F2
-        ST      A9F2   ; checksum -= mem[$A200 + index]
-        INC     004C
-        SUBI    E0     ; index - $E0
-        BNE     A8E6 ^ ; loop $E0 times (page $A2, bytes $00-$DF)
-
-        LD      A9F2
-        SUBI    60     ; checksum - $60
-        BNE     A9AB v ; mismatch -> error_flash (noreturn)
-
-; --- Seek to track 5 and turn off motor ---
-        LDI     05
-        CALL1   BC00   ; EALDR_MOVE_ARM(5)
-        LD      A000   ; (discard)
-        LDI     00
-        LD      C0E8   ; IWM: motor off
-
-; --- DXR: decrypt $4000-$67FF ---
-        LDI     00
-        ST      004C
-        LDI     40
-        ST      004D   ; EALDR_SRC = $4000
-
-        LDI     02
-        ST      AC60   ; EALDR_BOT = 2
-        LDI     03
-        ST      AC61   ; EALDR_TOP = 3
-
-A923:   CALL1   A970    ; EALDR_FUNNY_INC
-        DXR            ; XOR byte at src with acc; src += 2
-        BNE     A923 ^ ; loop until acc = 0
-
-; --- Copy $A300-$A5FF to $0500-$07FF ---
-        LDI     00
-        ST      004C
-        ST      004E
-        LDI     A3
-        ST      004D   ; EALDR_SRC = $A300
-        LDI     05
-        ST      004F   ; EALDR_DEST = $0500
-
-A93C:   COPY            ; (dest++) <- (src++)
-        LD      004F   ; dest high byte
-        SUBI    08     ; - $08
-        BNE     A93C ^ ; loop until dest reaches $0800
-
-; --- Enter main program ---
-        CALL0   0800   ; jump to main (no return)
-
-; =============================================
-; Native 6502 subroutines
-; =============================================
-
-A948:   ; [native] EALDR_REBOOT
-
-; --- read_tracks_by_index: read a group of tracks from the table ---
-A967:   ST      A9F1    ; EALDR_TMP0 = table index
-        LD      C0E9   ; IWM: motor on
-        GOTO    A985 v
-
-A970:   ; [native] EALDR_FUNNY_INC
-
-A985:   LD      A9F1    ; index
-        LDX     A9F3   ; EALDR_TRACK_PAGES[index]
-        BEQ     A9F0 v ; 0 = end sentinel -> return
-        ST      003E   ; EALDR_TRACK_PAGE = page
-        LD      A9F1   ; index
-        LDX     AA04   ; EALDR_TRACKS[index]
-        CALL1   BC03   ; EALDR_READ_TRACK
-        BEQ     A9A0 v ; success?
-        GOTO    A9D4 v ; error_halt (noreturn)
-
-A9A0:   LD      A9F1    ; index++
-        SUBI    FF     ; A = index - $FF = index + 1 (mod 256)
-        ST      A9F1
-        GOTO    A985 ^
-
-; --- error_flash: print '?' and toggle motor in a loop ---
-A9AB:   LD      C0E9    ; IWM: motor on
-        CALL1   FC58   ; HOME
-        LD      C051   ; TXTSET
-        LDI     BF     ; '?'
-        ST      0400
-        LDI     40
-        CALL1   FCA8   ; WAIT
-        LD      C0E8   ; IWM: motor off
-A9C1:   LDI     60
-        CALL1   FCA8   ; WAIT
-        LDI     08
-        CALL1   FCA8   ; WAIT
-        INC     A9F2   ; counter++
-        BNE     A9C1 ^ ; inner loop
-        GOTO    A9AB ^ ; outer loop (restart with motor on)
-
-; --- error_halt: print "ERR" and hang ---
-A9D4:   CALL1   FC58    ; HOME
-        CALL1   FBDD   ; BELL
-        LD      C051   ; TXTSET
-        LDI     C5     ; 'E'
-        ST      0400
-        LDI     D2     ; 'R'
-        ST      0401
-        ST      0402
-        LD      C0E8   ; IWM: motor off
-A9ED:   GOTO    A9ED -  ; infinite loop
-
-A9F0:   RET
-@
+@ The [[EALDR Program]] chunk has been superseded by the
+[[EALDR_VM_BYTECODE]] chunks, which use the [[VM]] macros to emit
+the encrypted bytecodes from readable operands with named branch targets.
 
 <<EALDR track pages>>=
     ORG     $A9F3
@@ -3063,13 +3104,16 @@ before the main loop or attract screen.  The steps, in order:
 [[BLINK_COL]] is the cursor blink column; storing [[$14]] disables the
 blink.  [[LOCATION_POS]], [[LOCATION_STYLE]], and [[CURRENT_PLAYER]] are
 the three variables cleared to zero during step~13/17 (described above).
+[[ENTITY_PTR]] ([[$F8/$F9]]) is the 2-byte pointer to the entity record
+currently being processed.
 
 <<defines>>=
 BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
 LOCATION_POS        EQU     $5A55   ; current location position (triggers redraw when changed)
 LOCATION_STYLE      EQU     $5A56   ; current map style (from record field 5, bits 0-6)
 CURRENT_PLAYER      EQU     $5A02   ; current player index (1-based)
-@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER
+ENTITY_PTR          EQU     $F8     ; entity record pointer (2 bytes, $F8/$F9)
+@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR
 
 <<game init>>=
     ORG     $78C7
@@ -16867,7 +16911,9 @@ The following root chunks produce the assembly files when tangled.
 <<EALDR VM arg reader>>
 <<EALDR VM init>>
 <<EALDR opcode handlers>>
-<<EALDR disk data>>
+<<EALDR disk io>>
+<<EALDR splash data>>
+<<EALDR source comments>>
 <<EALDR disk entry points>>
 @
 
