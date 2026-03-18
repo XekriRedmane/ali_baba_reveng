@@ -170,7 +170,6 @@
         CPY     {1}
         BNE     {2}
     ENDM
-ENTITY_PTR              EQU     $F8     ; entity record pointer (2 bytes, $F8/$F9)
 COPY_SRC                EQU     $BC     ; block copy source pointer (2 bytes)
 COPY_DEST               EQU     $BA     ; block copy destination pointer (2 bytes)
 DISPATCH_VEC            EQU     $F6     ; script action dispatch vector (2 bytes, $F6/$F7)
@@ -203,6 +202,7 @@ BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
 LOCATION_POS        EQU     $5A55   ; current location position (triggers redraw when changed)
 LOCATION_STYLE      EQU     $5A56   ; current map style (from record field 5, bits 0-6)
 CURRENT_PLAYER      EQU     $5A02   ; current player index (1-based)
+ENTITY_PTR          EQU     $F8     ; entity record pointer (2 bytes, $F8/$F9)
 GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
 UI_TEXT_STREAM          EQU     $5E55   ; text stream data for game UI background
 s_COPYRIGHT            EQU     $5EC7   ; "COPYRIGHT 1982 STUART SMITH"
@@ -282,7 +282,6 @@ BLINK_CHAR      EQU     $5AA4   ; font character number
 BLINK_DELAY             EQU     $7AAC   ; delay value loaded into WAIT_LOOP_COUNT by DRAW_MAP_ICON_B
 BLINK_ROW       EQU     $5AA3   ; font row
 RWTS_ENTRY              EQU     $B7B5   ; RWTS entry: PHP/SEI, JSR RWTS_CORE, CLC/SEC
-s_PRINT_FONT_CHAR   EQU     $80A4   ; 10 bytes
 DAT_5a17_pos        EQU     $5A17   ; saved position for room search
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
 CURRENT_ROW     EQU     $5A64   ; current row during turn
@@ -375,9 +374,9 @@ ATTRACT_LOOP:
 ; Bytecode encryption: low XOR $03, high XOR $D9, immediate XOR $4C
 ;
 ; Native routines within this region:
-;   $05FD  SEARCH_ADDR_FIELD — scan for D5 AA 96 address prologue
-;   $064B  READ_AND_VERIFY — read data with phase toggling
-;   $0681  DELAY_LOOP — nested countdown for motor timing
+;   $05FD  SEARCH_ADDR_FIELD -- scan for D5 AA 96 address prologue
+;   $064B  READ_AND_VERIFY -- read data with phase toggling
+;   $0681  DELAY_LOOP -- nested countdown for motor timing
 ;
 ; $0572-$06A5: VM bytecodes (output as raw data)
     HEX 0463dc0774028fdf0462dc072c028fdf ; $0572
@@ -438,11 +437,11 @@ RESIDENT_DISPATCH_FETCH:
     BNE     .no_carry
     INC     $53
 .no_carry:
-    TAX                              ; opcode → X (also saves position)
+    TAX                              ; opcode -> X (also saves position)
     LDA     RESIDENT_DISPATCH_TABLE,X
     STA     resident_jmp+1           ; self-modify: JMP low byte
 resident_jmp:
-    JMP     RESIDENT_DECODE_DISPATCH ; self-modified → $07xx
+    JMP     RESIDENT_DECODE_DISPATCH ; self-modified -> $07xx
     ORG     $06D3
 RESIDENT_DISPATCH_TABLE:
     HEX     00 27 55 5F 6D 8A AD B9
@@ -457,9 +456,9 @@ CONTEXT_SWAP:
     LDA     $50,X  ; load ZP byte
     PHA            ; save on stack
     LDA     $7E5,X ; load shadow byte
-    STA     $50,X  ; → ZP
+    STA     $50,X  ; -> ZP
     PLA            ; recover old ZP byte
-    STA     $7E5,X ; → shadow
+    STA     $7E5,X ; -> shadow
     DEX
     BPL     .loop
     RTS
@@ -470,7 +469,7 @@ CONTEXT_SWAP:
 RESIDENT_DECODE_DISPATCH:
     SUBROUTINE RESIDENT_DECODE_DISPATCH
 
-    JSR     DECODE_ENCRYPTED_ADDR   ; → $54/$55
+    JSR     DECODE_ENCRYPTED_ADDR   ; -> $54/$55
     LDA     $54                     ; \
     STA     $52                     ;  | $52/$53 = decoded address
     LDA     $55                     ;  |
@@ -561,7 +560,7 @@ _MAIN_ENTRY.process_mobs:
 .no_carry:
     LDY     #$01
     LDA     (CHAR_PTR),Y       ; byte 1 of next record
-    BANE    #$FF,_MAIN_ENTRY.char_loop    ; more characters → loop
+    BANE    #$FF,_MAIN_ENTRY.char_loop    ; more characters -> loop
     JSR     RANDOM_EVENTS      ; between-round random event dispatch
     JMP     .restart           ; restart the game loop
     ORG     $084E
@@ -577,14 +576,14 @@ SELECT_INPUT_MODE:
     STA     $C010          ; clear keyboard strobe
 .poll:
     LDX     $C000          ; read keyboard
-    BMI     .key           ; key pressed → check it
+    BMI     .key           ; key pressed -> check it
     LDA     $C061          ; re-read paddle button
     EOR     $BA            ; compare with initial state
-    BMI     .joystick      ; button state changed → joystick
+    BMI     .joystick      ; button state changed -> joystick
     BPL     .poll          ; keep polling
 .key:
-    BXEQ    #$A0,_SELECT_INPUT_MODE.keyboard ; yes → keyboard mode
-    BNE     .clear         ; other key → ignore, clear strobe
+    BXEQ    #$A0,_SELECT_INPUT_MODE.keyboard ; yes -> keyboard mode
+    BNE     .clear         ; other key -> ignore, clear strobe
 _SELECT_INPUT_MODE.keyboard:
     LDA     #$00
     STA     INPUT_MODE     ; 0 = keyboard
@@ -599,8 +598,8 @@ _SELECT_INPUT_MODE.keyboard:
 PROCESS_MOB_GROUPS:
     SUBROUTINE PROCESS_MOB_GROUPS
     ; Walk the mob linked list for the current character.
-    ; For each group: inactive (type < 3) → display message + auto-heal;
-    ; active (type >= 3) → set up scene and enter GAME_TURN_LOOP.
+    ; For each group: inactive (type < 3) -> display message + auto-heal;
+    ; active (type >= 3) -> set up scene and enter GAME_TURN_LOOP.
     LDY     #$02
     LDA     (CHAR_PTR),Y     ; char record byte 2 = first group link
     STA     CURRENT_ROOM     ; save as current link
@@ -615,7 +614,7 @@ PROCESS_MOB_GROUPS:
     BNE     .has_mob
     RTS                      ; zero = end of list
 .has_mob:
-    JSR     GET_MOB_DATA     ; resolve link → MOB_DATA_PTR/MOB_DATA_PTR+1
+    JSR     GET_MOB_DATA     ; resolve link -> MOB_DATA_PTR/MOB_DATA_PTR+1
     LDA     MOB_DATA_PTR     ; \
     STA     ENTITY_PTR       ;  | ENTITY_PTR/ENTITY_PTR+1 = mob data pointer
     LDA     MOB_DATA_PTR+1   ;  |
@@ -654,7 +653,7 @@ START_MOB_TURN:
     LDA     (ENTITY_PTR),Y       ; mob data byte 4 = appearance
     JSR     APPEARANCE_TO_FONTCHAR
     STA     CHAR_SPRITE          ; save font character
-    STY     CHAR_AI_MODE         ; Y = font group → AI behavior mode
+    STY     CHAR_AI_MODE         ; Y = font group -> AI behavior mode
     JSR     CHECK_MOB_NEEDS_TURN ; carry set = needs a turn
     BCS     .enter_turn
     RTS                          ; carry clear = skip this mob
@@ -721,18 +720,18 @@ CHECK_MOB_NEEDS_TURN:
     LDY     #$0C
     LDA     (ENTITY_PTR),Y   ; mob data byte 12
     AND     #$0F             ; low nibble
-    BNE     .needs_turn      ; nonzero = pending action → turn
+    BNE     .needs_turn      ; nonzero = pending action -> turn
     LDY     #$03
     LDA     (ENTITY_PTR),Y   ; mob data byte 3 = position
     JSR     CHECK_ENCOUNTER  ; check for encounter at this position
     LDA     ENCOUNTER_RESULT
-    BNE     .needs_turn      ; encounter found → turn
+    BNE     .needs_turn      ; encounter found -> turn
     LDY     #$03
     LDA     (ENTITY_PTR),Y   ; position again
     JSR     CHECK_ADJACENT_THREATS
     LDA     ADJACENT_THREAT
-    BNE     .needs_turn      ; threats nearby → turn
-    JSR     CLEAR_RESTRICTED ; no action needed → clear restricted flag
+    BNE     .needs_turn      ; threats nearby -> turn
+    JSR     CLEAR_RESTRICTED ; no action needed -> clear restricted flag
     CLC                      ; carry clear = skip
     RTS
 .needs_turn:
@@ -745,7 +744,7 @@ ATTRACT_SCREEN:
     LDA     #$01
     STA     ACTIVE_CHAR        ; scene/character index = 1
     STA     SCENE_EVENT_RESULT ; mark event as handled
-    JSR     COMPUTE_SCENE_PTR  ; scene 1 pointer → MOB_DATA_PTR/MOB_DATA_PTR+1
+    JSR     GET_MOB_DATA  ; scene 1 pointer -> MOB_DATA_PTR/MOB_DATA_PTR+1
     LDA     MOB_DATA_PTR       ; \
     STA     MOB_PTR            ;  | MOB_PTR/MOB_PTR+1 = MOB_DATA_PTR/MOB_DATA_PTR+1 (save pointer)
     LDA     MOB_DATA_PTR+1     ;  |
@@ -761,15 +760,15 @@ SCENE_SETUP:
     SUBROUTINE SCENE_SETUP
 
     LDA     ACTIVE_CHAR       ; character/scene index
-    JSR     GET_CHAR_RECORD   ; index → CHAR_REC = char record
+    JSR     GET_CHAR_RECORD   ; index -> CHAR_REC = char record
     LDY     #$03
     LDA     (CHAR_REC),Y      ; byte 3: min position (packed)
-    JSR     POS_TO_COLROW     ; → A=min_col, Y=min_row
+    JSR     POS_TO_COLROW     ; -> A=min_col, Y=min_row
     STA     BOUNDS_MIN_COL    ; min_col
     STY     BOUNDS_MIN_ROW    ; min_row
     LDY     #$04
     LDA     (CHAR_REC),Y      ; byte 4: max position (packed)
-    JSR     POS_TO_COLROW     ; → A=max_col, Y=max_row
+    JSR     POS_TO_COLROW     ; -> A=max_col, Y=max_row
     STA     BOUNDS_MAX_COL    ; max_col
     STY     BOUNDS_MAX_ROW    ; max_row
     INC     BOUNDS_MIN_COL    ; min_col++ (exclusive border)
@@ -789,7 +788,7 @@ SCENE_SETUP:
     ADC     BOUNDS_MIN_ROW    ; / row = min_row + offset
     TAY                       ; Y = row
     LDA     FONT_COL          ; A = col
-    JSR     COLROW_TO_POS     ; → A = linear position
+    JSR     COLROW_TO_POS     ; -> A = linear position
     LDY     #$03
     STA     (MOB_PTR),Y       ; store position in record byte 3
     LDA     MOB_PTR           ; \
@@ -806,7 +805,7 @@ SCENE_SETUP:
     STA     (MOB_PTR),Y       ; /
     JSR     CLAMP_CHAR_FIELD  ; ensure byte 6 >= byte 5 minimum
     LDA     CURRENT_PLAYER    ; current player index
-    BANE    ACTIVE_CHAR,_SCENE_SETUP.done ; not current player → skip
+    BANE    ACTIVE_CHAR,_SCENE_SETUP.done ; not current player -> skip
     LDY     #$03
     LDA     (MOB_PTR),Y       ; load position from record
     JSR     DRAW_CHAR_AT_POS  ; draw character at position
@@ -824,8 +823,8 @@ CLAMP_CHAR_FIELD:
     LDA     (MOB_PTR),Y ; byte 6 of record
     AND     #$3F        ; low 6 bits = current value
     CMP     $BA
-    BCC     .clamp      ; current < minimum → clamp
-    RTS                 ; current >= minimum → done
+    BCC     .clamp      ; current < minimum -> clamp
+    RTS                 ; current >= minimum -> done
 .clamp:
     LDA     (MOB_PTR),Y ; reload byte 6
     AND     #$C0        ; preserve top 2 bits
@@ -850,7 +849,7 @@ _FIND_ENTITY_AT_POS.player_search:
     LDX     #$06                       ; copy bytes 6-7 of record
 _FIND_ENTITY_AT_POS.load3:
     LDA     $0B7B,X                    ; (self-modified base address)
-    STA     .load4-5,X                 ; patch .load4 operand (+6→low, +7→high)
+    STA     .load4-5,X                 ; patch .load4 operand (+6->low, +7->high)
     INX
     BXNE    #$08,_FIND_ENTITY_AT_POS.load3
 .load4:
@@ -883,8 +882,8 @@ _FIND_ENTITY_AT_POS.found_player:
     LDX     #$02                       ; byte 2 = mob index
 .load2:
     LDA     $0BBD,X                    ; (self-modified base address)
-    BAEQ    #$00,_FIND_ENTITY_AT_POS.player_search        ; zero → no more mobs, try players
-    JSR     .get_mob                   ; get mob data → patch .load1
+    BAEQ    #$00,_FIND_ENTITY_AT_POS.player_search        ; zero -> no more mobs, try players
+    JSR     .get_mob                   ; get mob data -> patch .load1
     LDX     #$03                       ; byte 3 = position
 .load1:
     LDY     $0BC9,X                    ; (self-modified: read from mob record)
@@ -904,7 +903,7 @@ _FIND_ENTITY_AT_POS.found_mob:
 
     ; --- Helper: get mob data and patch .load1 ---
 .get_mob:
-    JSR     GET_MOB_DATA               ; A = mob index → MOB_DATA_PTR/MOB_DATA_PTR+1 = data ptr
+    JSR     GET_MOB_DATA               ; A = mob index -> MOB_DATA_PTR/MOB_DATA_PTR+1 = data ptr
     LDA     MOB_DATA_PTR               ; \
     STA     .load1+1                   ;  | patch .load1 operand
     LDA     MOB_DATA_PTR+1             ;  |
@@ -939,14 +938,13 @@ POS_TO_COLROW:
 .loop:
     CLC
     ADC      #$EC  ; A -= 20 (unsigned)
-    BCC      .done ; underflow → remainder is negative
+    BCC      .done ; underflow -> remainder is negative
     INY            ; row++
     BCS      .loop ; always taken (carry set)
 .done:
-    ADC      #$14  ; add 20 back → A = column (remainder)
+    ADC      #$14  ; add 20 back -> A = column (remainder)
     RTS            ; A = column (0-19), Y = row (0-9)
     ORG     $0C32
-COMPUTE_SCENE_PTR:
 GET_MOB_DATA:
     SUBROUTINE GET_MOB_DATA
 
@@ -958,12 +956,12 @@ GET_MOB_DATA:
     ROL                    ; /
     TAY                    ; save intermediate
     ROL                    ; one more rotate
-    AND     #$0F           ; high nybble → page offset
+    AND     #$0F           ; high nybble -> page offset
     CLC
     ADC     $4001          ; add base page
     STA     MOB_DATA_PTR+1 ; high byte
     TYA
-    AND     #$F0           ; low nybble → byte offset
+    AND     #$F0           ; low nybble -> byte offset
     CLC
     ADC     $4000          ; add base offset
     STA     MOB_DATA_PTR   ; low byte
@@ -1005,28 +1003,28 @@ GET_ENTITY_FONTCHAR:
     LDA     #$01
     STA     FONT_CHARSET             ; custom font
     LDA     #$00
-    BANE    ENTITY_REC+1,_GET_ENTITY_FONTCHAR.has_entity ; non-zero → entity exists
-    BANE    ENTITY_REC,_GET_ENTITY_FONTCHAR.low_only     ; low ≠ 0 → partial pointer
+    BANE    ENTITY_REC+1,_GET_ENTITY_FONTCHAR.has_entity ; non-zero -> entity exists
+    BANE    ENTITY_REC,_GET_ENTITY_FONTCHAR.low_only     ; low != 0 -> partial pointer
 .empty:
     LDA     BLINK_ALT_CHAR           ; \
-    STA     FONT_CHARNUM             ;  | empty cell → blink char
+    STA     FONT_CHARNUM             ;  | empty cell -> blink char
     RTS                              ; /
 _GET_ENTITY_FONTCHAR.low_only:
     LDA     DEFAULT_CHAR             ; \
-    STA     FONT_CHARNUM             ;  | $BE≠0, ENTITY_REC+1=0 → default char
+    STA     FONT_CHARNUM             ;  | $BE!=0, ENTITY_REC+1=0 -> default char
     RTS                              ; /
 _GET_ENTITY_FONTCHAR.has_entity:
     LDA     ENTITY_REC+1
     CMP     #$80                     ; bit 7 set?
-    BPL     .mob                     ; yes → mob record
+    BPL     .mob                     ; yes -> mob record
     ; --- character record ---
     LDY     #$01
     LDA     (ENTITY_REC),Y           ; byte 1 of character record
     AND     #$C0                     ; top 2 bits
-    BAEQ    #$C0,_GET_ENTITY_FONTCHAR.both_bits          ; → detailed check
-    BAEQ    #$40,_GET_ENTITY_FONTCHAR.bit6               ; bit 6 only → char $1C
-    BPL     .empty                   ; bit 7 only → blink alt char
-    LDA     #$1B                     ; neither bit → char $1B
+    BAEQ    #$C0,_GET_ENTITY_FONTCHAR.both_bits          ; -> detailed check
+    BAEQ    #$40,_GET_ENTITY_FONTCHAR.bit6               ; bit 6 only -> char $1C
+    BPL     .empty                   ; bit 7 only -> blink alt char
+    LDA     #$1B                     ; neither bit -> char $1B
     BNE     .store
 _GET_ENTITY_FONTCHAR.bit6:
     LDA     #$1C
@@ -1035,25 +1033,25 @@ _GET_ENTITY_FONTCHAR.bit6:
     RTS
 _GET_ENTITY_FONTCHAR.both_bits:
     LDA     (ENTITY_REC),Y           ; reload byte 1
-    BAEQ    #$FE,_GET_ENTITY_FONTCHAR.check_byte2        ; $FE → check byte 2
+    BAEQ    #$FE,_GET_ENTITY_FONTCHAR.check_byte2        ; $FE -> check byte 2
     CMP     #$D5
     BMI     .lt_d5
-    LDA     #$1D                     ; >= $D5 → char $1D
+    LDA     #$1D                     ; >= $D5 -> char $1D
     JMP     .store
 .lt_d5:
     CMP     #$D2
     BMI     .lt_d2
-    LDA     #$18                     ; $D2-$D4 → char $18
+    LDA     #$18                     ; $D2-$D4 -> char $18
     JMP     .store
 .lt_d2:
-    LDA     #$1A                     ; < $D2 → char $1A
+    LDA     #$1A                     ; < $D2 -> char $1A
     JMP     .store
 _GET_ENTITY_FONTCHAR.check_byte2:
     LDY     #$02
     LDA     (ENTITY_REC),Y           ; byte 2
     AND     #$1F                     ; low 5 bits
-    BEQ     .empty                   ; zero → blink alt char
-    JMP     .store                   ; non-zero → use as charnum
+    BEQ     .empty                   ; zero -> blink alt char
+    JMP     .store                   ; non-zero -> use as charnum
 .mob:
     LDA     ENTITY_REC               ; \
     STA     MOB_DATA_PTR             ;  | MOB_DATA_PTR = ENTITY_REC with bit 7 cleared
@@ -1072,18 +1070,18 @@ APPEARANCE_TO_FONTCHAR:
 .loop:
     CLC
     ADC      #$EB     ; A -= 21 (unsigned: $EB = 256-21)
-    BCC      .done    ; underflow → done dividing
+    BCC      .done    ; underflow -> done dividing
     INY               ; group++
     BCS      .loop    ; always taken
 .done:
     ADC      #$16     ; restore remainder+1 (carry clear, so +22)
     CMP      #$05     ; remainder >= 5?
-    BCC      .low     ; no → check group
-    RTS               ; yes → return as-is (chars 5-21)
+    BCC      .low     ; no -> check group
+    RTS               ; yes -> return as-is (chars 5-21)
 .low:
-    BYEQ    #$00,_APPEARANCE_TO_FONTCHAR.ret ; yes → return as-is (chars 1-4)
+    BYEQ    #$00,_APPEARANCE_TO_FONTCHAR.ret ; yes -> return as-is (chars 1-4)
     CLC
-    ADC      #$20     ; add 32 → next font group (chars 33-36)
+    ADC      #$20     ; add 32 -> next font group (chars 33-36)
 _APPEARANCE_TO_FONTCHAR.ret:
     RTS
     ORG     $0D10
@@ -1105,8 +1103,8 @@ TICK_ANIM_COUNTER:
     SUBROUTINE TICK_ANIM_COUNTER
 
     DEC     ANIM_FRAME_CTR    ; tick frame counter
-    BNE     .reload           ; not zero → just reload wait count
-    JSR     DRAW_BLINK_ALT    ; counter hit zero → draw alt char
+    BNE     .reload           ; not zero -> just reload wait count
+    JSR     DRAW_BLINK_ALT    ; counter hit zero -> draw alt char
 .reload:
     LDX     ANIM_INDEX        ; current animation index
     LDA     ANIM_WAIT_TABLE,X ; look up wait count for this frame
@@ -1119,8 +1117,8 @@ ANIM_TICK_AND_WAIT:
     JSR     TICK_ANIM_COUNTER  ; tick counter, reload wait count
     JSR     TIMED_WAIT         ; burn time
     LDA     ANIM_FRAME_CTR     ; did frame counter expire?
-    BEQ     .advance           ; yes → advance animation
-    RTS                        ; no → return
+    BEQ     .advance           ; yes -> advance animation
+    RTS                        ; no -> return
 
 .advance:
     JSR     DRAW_BLINK_NORMAL  ; redraw blink char in normal video
@@ -1133,8 +1131,8 @@ TIMED_WAIT:
     SUBROUTINE TIMED_WAIT
 
     LDA     WAIT_LOOP_COUNT ; anything to wait for?
-    BNE     .wait           ; yes → enter wait loop
-    RTS                     ; no → return immediately
+    BNE     .wait           ; yes -> enter wait loop
+    RTS                     ; no -> return immediately
 
 .wait:
     JSR     CALL_ROM_WAIT   ; delay one unit
@@ -1165,12 +1163,12 @@ COLROW_TO_POS:
     CLC
 .loop:
     DEY           ; row--
-    BPL     .add  ; still >= 0 → add another 20
+    BPL     .add  ; still >= 0 -> add another 20
     RTS           ; Y exhausted, A = result
 .add:
     ADC     #$14  ; A += 20
-    BCC     .loop ; no overflow → continue
-                                ; carry set → return (overflow)
+    BCC     .loop ; no overflow -> continue
+                                ; carry set -> return (overflow)
     ORG     $0DA1
 NUM_TO_DECIMAL:
     SUBROUTINE NUM_TO_DECIMAL
@@ -1245,11 +1243,11 @@ _NUM_TO_DECIMAL.skip:
 CHECK_ENCOUNTER:
     SUBROUTINE CHECK_ENCOUNTER
 
-    JSR     FIND_ENTITY_AT_POS   ; look up char → ENTITY_REC/ENTITY_REC+1
+    JSR     FIND_ENTITY_AT_POS   ; look up char -> ENTITY_REC/ENTITY_REC+1
     LDA     ENTITY_REC+1
-    BAEQ    #$00,_CHECK_ENCOUNTER.none           ; null pointer → return 0
+    BAEQ    #$00,_CHECK_ENCOUNTER.none           ; null pointer -> return 0
     CMP     #$80
-    BMI     _CHECK_ENCOUNTER.none                ; not a mob (bit 7 clear) → return 0
+    BMI     _CHECK_ENCOUNTER.none                ; not a mob (bit 7 clear) -> return 0
     AND     #$7F                 ; clear mob flag
     STA     MOB_PTR+1            ; \ MOB_PTR/MOB_PTR+1 = mob data pointer
     LDA     ENTITY_REC           ;  |
@@ -1261,16 +1259,16 @@ _CHECK_ENCOUNTER.search:
     STA     TARGET_REC+1         ; /
     JSR     FIND_MOB_AT_SAME_POS ; find next mob at same position
     CMP     #$01
-    BMI     _CHECK_ENCOUNTER.none                ; 0 = no co-located mob → return 0
-    BEQ     .friendly            ; 1 = found (wrapped) → return 1
+    BMI     _CHECK_ENCOUNTER.none                ; 0 = no co-located mob -> return 0
+    BEQ     .friendly            ; 1 = found (wrapped) -> return 1
     LDY     #$06                 ; result >= 2: found ahead
     LDA     (MOB_PTR),Y          ; byte 6 of found mob
     AND     #$3F                 ; bits 5-0
     CMP     #$03                 ; active mob type?
-    BCC     _CHECK_ENCOUNTER.search              ; no → skip, keep searching
+    BCC     _CHECK_ENCOUNTER.search              ; no -> skip, keep searching
     JSR     CHECK_HOSTILE        ; compare factions
-    BAEQ    #$00,_CHECK_ENCOUNTER.search         ; same faction → skip
-    LDA     #$02                 ; enemy found → return 2
+    BAEQ    #$00,_CHECK_ENCOUNTER.search         ; same faction -> skip
+    LDA     #$02                 ; enemy found -> return 2
     STA     ENCOUNTER_RESULT
     RTS
 _CHECK_ENCOUNTER.none:
@@ -1293,17 +1291,17 @@ FIND_MOB_AT_SAME_POS:
     STA     COLOCATE_LINK
     STY     COLOCATE_WRAPPED        ; $5A22 = 2 (found ahead)
 .check_link:
-    BANE    #$00,_FIND_MOB_AT_SAME_POS.resolve           ; has next → follow it
+    BANE    #$00,_FIND_MOB_AT_SAME_POS.resolve           ; has next -> follow it
     LDY     #$01
     STY     COLOCATE_WRAPPED        ; wrapped to start
     INY                             ; Y = 2
     LDA     (CHAR_PTR),Y            ; byte 2 of group head = first mob
 _FIND_MOB_AT_SAME_POS.resolve:
-    JSR     GET_MOB_DATA            ; A = mob index → MOB_DATA_PTR/MOB_DATA_PTR+1
+    JSR     GET_MOB_DATA            ; A = mob index -> MOB_DATA_PTR/MOB_DATA_PTR+1
     LDY     #$02
     LDA     (MOB_DATA_PTR),Y        ; byte 2 of resolved mob
     BANE    COLOCATE_LINK,_FIND_MOB_AT_SAME_POS.not_self ; same next-link as original?
-    LDA     #$00                    ; full circle → not found
+    LDA     #$00                    ; full circle -> not found
     RTS
 _FIND_MOB_AT_SAME_POS.not_self:
     INY                             ; Y = 3
@@ -1327,16 +1325,16 @@ CHECK_HOSTILE:
     LDA     (MOB_PTR),Y            ; byte 4 of found mob (appearance)
     STA     HOSTILE_APP
     LDA     (TARGET_REC),Y         ; byte 4 of original mob (appearance)
-    JSR     APPEARANCE_TO_FONTCHAR ; → A=remainder, Y=group
-    JSR     GET_HOSTILITY          ; → Y=0 (friendly) or 1 (hostile)
+    JSR     APPEARANCE_TO_FONTCHAR ; -> A=remainder, Y=group
+    JSR     GET_HOSTILITY          ; -> Y=0 (friendly) or 1 (hostile)
     STA     HOSTILE_A
     STY     HOSTILE_Y
     LDA     HOSTILE_APP            ; appearance of found mob
     JSR     APPEARANCE_TO_FONTCHAR
     JSR     GET_HOSTILITY
-    BYNE    HOSTILE_Y,_CHECK_HOSTILE.different   ; different sides → hostile
-    BYEQ    #$00,_CHECK_HOSTILE.same             ; both friendly → same side
-    BANE    HOSTILE_A,_CHECK_HOSTILE.different   ; different → hostile to each other
+    BYNE    HOSTILE_Y,_CHECK_HOSTILE.different   ; different sides -> hostile
+    BYEQ    #$00,_CHECK_HOSTILE.same             ; both friendly -> same side
+    BANE    HOSTILE_A,_CHECK_HOSTILE.different   ; different -> hostile to each other
 _CHECK_HOSTILE.same:
     LDA     #$00
     RTS
@@ -1367,30 +1365,30 @@ CHECK_ADJACENT_THREATS:
     LDA     ENTITY_PTR+1       ;  |
     STA     TARGET_REC+1       ; /
     LDA     ADJACENT_POS       ; reload position
-    BEQ     .skip_left         ; position 0 → no left neighbor
+    BEQ     .skip_left         ; position 0 -> no left neighbor
     SEC
     SBC     #$01               ; position - 1
     JSR     SUM_HOSTILE_AT_POS ; check left
 .skip_left:
     LDA     ADJACENT_POS
-    BAEQ    #$C7,_CHECK_ADJACENT_THREATS.skip_right   ; → no right neighbor
+    BAEQ    #$C7,_CHECK_ADJACENT_THREATS.skip_right   ; -> no right neighbor
     CLC
     ADC     #$01               ; position + 1
     JSR     SUM_HOSTILE_AT_POS ; check right
 _CHECK_ADJACENT_THREATS.skip_right:
     LDA     ADJACENT_POS
-    BMI     .do_up             ; >= 128 → always has up neighbor
+    BMI     .do_up             ; >= 128 -> always has up neighbor
     CMP     #$14               ; < 20?
-    BMI     .skip_up           ; → no up neighbor
+    BMI     .skip_up           ; -> no up neighbor
 .do_up:
     SEC
     SBC     #$14               ; position - 20
     JSR     SUM_HOSTILE_AT_POS ; check up
 .skip_up:
     LDA     ADJACENT_POS
-    BPL     .do_down           ; < 128 → always has down neighbor
+    BPL     .do_down           ; < 128 -> always has down neighbor
     CMP     #$B4               ; >= 180?
-    BPL     .skip_down         ; → no down neighbor
+    BPL     .skip_down         ; -> no down neighbor
 .do_down:
     CLC
     ADC     #$14               ; position + 20
@@ -1398,10 +1396,10 @@ _CHECK_ADJACENT_THREATS.skip_right:
 .skip_down:
     LDY     #$05
     LDA     (ENTITY_PTR),Y     ; byte 5 of character record
-    ROR                        ; \ bits 4-1 → defense value
+    ROR                        ; \ bits 4-1 -> defense value
     AND     #$0F               ; /
     CMP     ADJACENT_THREAT    ; compare with threat total
-    BPL     .safe              ; defense >= threat → safe
+    BPL     .safe              ; defense >= threat -> safe
     LDA     #$00
     RTS                        ; return 0 = overwhelmed
 .safe:
@@ -1411,22 +1409,22 @@ _CHECK_ADJACENT_THREATS.skip_right:
 SUM_HOSTILE_AT_POS:
     SUBROUTINE SUM_HOSTILE_AT_POS
 
-    JSR     FIND_ENTITY_AT_POS   ; A = position → ENTITY_REC/ENTITY_REC+1
+    JSR     FIND_ENTITY_AT_POS   ; A = position -> ENTITY_REC/ENTITY_REC+1
     LDA     ENTITY_REC+1
-    BEQ     .done                ; null → nothing here
+    BEQ     .done                ; null -> nothing here
     CMP     #$80
-    BMI     .done                ; not a mob → skip
+    BMI     .done                ; not a mob -> skip
     AND     #$7F                 ; clear mob flag
     STA     MOB_PTR+1            ; \ MOB_PTR/MOB_PTR+1 = mob data pointer
     LDA     ENTITY_REC           ;  |
     STA     MOB_PTR              ; /
 _SUM_HOSTILE_AT_POS.check_mob:
     JSR     CHECK_HOSTILE        ; is this mob hostile to (TARGET_REC)?
-    BAEQ    #$00,_SUM_HOSTILE_AT_POS.next           ; not hostile → skip
+    BAEQ    #$00,_SUM_HOSTILE_AT_POS.next           ; not hostile -> skip
     LDY     #$0F
     LDA     (MOB_PTR),Y          ; byte $0F of mob
     AND     #$04                 ; bit 2 = combat engaged flag
-    BNE     _SUM_HOSTILE_AT_POS.next                ; already in combat → skip
+    BNE     _SUM_HOSTILE_AT_POS.next                ; already in combat -> skip
     LDY     #$05
     LDA     (MOB_PTR),Y          ; byte 5 of mob
     AND     #$1F                 ; bits 4-0 = strength
@@ -1438,7 +1436,7 @@ _SUM_HOSTILE_AT_POS.check_mob:
     STA     ADJACENT_THREAT
 _SUM_HOSTILE_AT_POS.next:
     JSR     FIND_MOB_AT_SAME_POS ; find next mob at same position
-    BAEQ    #$02,_SUM_HOSTILE_AT_POS.check_mob      ; more mobs → check them too
+    BAEQ    #$02,_SUM_HOSTILE_AT_POS.check_mob      ; more mobs -> check them too
 .done:
     RTS
     ORG     $0F84
@@ -1591,7 +1589,7 @@ APPLY_DAMAGE:
     INX
     CLC
     ROR
-    BNE     .ror_loop         ; count leading zeros → message index
+    BNE     .ror_loop         ; count leading zeros -> message index
     TXA
     JSR     DISPLAY_MESSAGE   ; show damage message
     LDY     DAMAGE_AMOUNT
@@ -1603,8 +1601,8 @@ APPLY_DAMAGE:
     AND     #$3F              ; HP only
     SEC
     SBC     DAMAGE_AMOUNT     ; HP - damage
-    BCC     .dead             ; underflow → dead
-    BEQ     .dead             ; zero → dead
+    BCC     .dead             ; underflow -> dead
+    BEQ     .dead             ; zero -> dead
     STA     DAMAGE_AMOUNT     ; new HP
     TXA
     AND     #$C0              ; preserve high bits
@@ -1681,7 +1679,7 @@ _APPLY_DAMAGE.rand0:
     LDA     (EFFECT_REC),Y    ; gold high
     STA     TARGET_REC+1
     LDY     #$00
-    JSR     MODIFY_CHAR_STATS ; subtract gold (Y=0 → subtract)
+    JSR     MODIFY_CHAR_STATS ; subtract gold (Y=0 -> subtract)
     LDY     #$03
     LDA     (EFFECT_REC),Y
     JSR     UPDATE_EVENT_LIST ; handle death at position
@@ -1701,16 +1699,16 @@ PRINT_ENTITY_NAME:
     LDA     (EFFECT_REC),Y ; name pointer high
     STA     PRINT_STRING_ADDR+1
     JSR     PRINT_BOTTOM_CENTERED
-    JMP     RESET_TEXT_WINDOW
+    JMP     SCROLL_STATUS_LINE
     ORG     $1156
 DRAW_CHAR_AT_POS:
     SUBROUTINE DRAW_CHAR_AT_POS
 
-    JSR     POS_TO_COLROW       ; A=pos → A=col, Y=row
+    JSR     POS_TO_COLROW       ; A=pos -> A=col, Y=row
     STA     FONT_COL            ; set font column
     STY     FONT_ROW            ; set font row
     JSR     COLROW_TO_POS       ; re-linearize (A = col + row*20)
-    JSR     FIND_ENTITY_AT_POS  ; look up entity at position → ENTITY_REC
+    JSR     FIND_ENTITY_AT_POS  ; look up entity at position -> ENTITY_REC
     JSR     GET_ENTITY_FONTCHAR ; determine font char from entity data
     JMP     RENDER_FONT_CHAR    ; render the font character
     ORG     $116B
@@ -1853,7 +1851,7 @@ CHECK_CAN_LEAVE:
 .pass:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$1C
     JSR     DISPLAY_MESSAGE
     LDA     #$01
@@ -1861,7 +1859,7 @@ CHECK_CAN_LEAVE:
 .fail:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$1D
     JSR     DISPLAY_MESSAGE
     LDA     #$00
@@ -1872,10 +1870,10 @@ UPDATE_EVENT_LIST:
     ; Update event list for position A with value NUM_VALUE/NUM_VALUE+1.
     ; If NUM_VALUE/NUM_VALUE+1 = 0, return immediately.
     ; Scans 3-byte event entries at ($FA)[6..7]:
-    ;   $FF = end of list → display message $2A
-    ;   $FE = empty slot → insert new entry
-    ;   matching pos + type $C0-$D0 → add to existing entry
-    ;   else → advance to next entry
+    ;   $FF = end of list -> display message $2A
+    ;   $FE = empty slot -> insert new entry
+    ;   matching pos + type $C0-$D0 -> add to existing entry
+    ;   else -> advance to next entry
     STA     $BA             ; save position
     LDA     #$00
     BANE    NUM_VALUE,_UPDATE_EVENT_LIST.has_value
@@ -1949,15 +1947,15 @@ _PICK_RANDOM_MEMBER.loop:
     LDA     (CHAR_PTR),Y    ; group size
     BEQ     .zero           ; empty group
     JSR     RANDOM_IN_RANGE ; random(size)
-    BAEQ    #$00,_PICK_RANDOM_MEMBER.loop      ; 0 → retry
+    BAEQ    #$00,_PICK_RANDOM_MEMBER.loop      ; 0 -> retry
     TAX                     ; X = count down to Nth member
     JSR     FIRST_GROUP_MEMBER
 .check:
     LDY     #$04
     LDA     (MOB_PTR),Y     ; member field 4
-    BMI     .next           ; negative → skip
+    BMI     .next           ; negative -> skip
     CMP     #$15
-    BPL     .next           ; >= $15 → skip
+    BPL     .next           ; >= $15 -> skip
     DEX
     BNE     .next           ; not Nth yet
     RTS                     ; found: MOB_PTR/MOB_PTR+1 points to member
@@ -1995,7 +1993,7 @@ RANDOM_IN_RANGE:
 
     STA     RNG_LIMIT         ; save range limit
     BANE    #$00,_RANDOM_IN_RANGE.nonzero
-    RTS                       ; range=0 → return 0
+    RTS                       ; range=0 -> return 0
 
 _RANDOM_IN_RANGE.nonzero:
     CMP     #$02              ; \
@@ -2055,8 +2053,8 @@ _RANDOM_IN_RANGE.nonzero:
     JSR     STEP_PRNG         ; get next random byte
     LDA     PRNG_OUTPUT
     AND     RNG_MASK          ; mask to relevant bits
-    BAEQ    RNG_LIMIT,_RANDOM_IN_RANGE.accept ; equal → accept
-    BPL     .sample           ; greater → reject, retry
+    BAEQ    RNG_LIMIT,_RANDOM_IN_RANGE.accept ; equal -> accept
+    BPL     .sample           ; greater -> reject, retry
 
 _RANDOM_IN_RANGE.accept:
     DEY                       ; \
@@ -2084,7 +2082,7 @@ _FIND_NEAREST_EVENT.eval:
     LDY     #$01
     LDA     (EVENT_PTR),Y      ; event byte 1 = type
     CMP     #$C0
-    BCS     _FIND_NEAREST_EVENT.advance           ; >= $C0 → activated, skip
+    BCS     _FIND_NEAREST_EVENT.advance           ; >= $C0 -> activated, skip
     LDY     #$00
     LDA     (EVENT_PTR),Y      ; event byte 0 = position
     STA     $5A15
@@ -2114,7 +2112,7 @@ MANHATTAN_DISTANCE:
     ; Manhattan distance: |col(A) - col(char)| + |row(A) - row(char)|
     ; Input: A = packed position to measure from
     ; Uses char's position from (ENTITY_PTR)[3]
-    JSR     POS_TO_COLROW  ; A → col in A, row in Y
+    JSR     POS_TO_COLROW  ; A -> col in A, row in Y
     STA     FONT_COL       ; save target col
     STY     FONT_ROW       ; save target row
     LDY     #$03
@@ -2140,7 +2138,7 @@ MANHATTAN_DISTANCE:
     ORG     $1406
 PRINT_MEMBER_NAME:
     SUBROUTINE PRINT_MEMBER_NAME
-    ; Copy (MOB_PTR)[0..1] → PRINT_STRING_ADDR/PRINT_STRING_ADDR+1, then JMP $7705
+    ; Copy (MOB_PTR)[0..1] -> PRINT_STRING_ADDR/PRINT_STRING_ADDR+1, then JMP $7705
     LDY     #$00
     LDA     (MOB_PTR),Y
     STA     PRINT_STRING_ADDR
@@ -2151,7 +2149,7 @@ PRINT_MEMBER_NAME:
     ORG     $1414
 REORDER_CURRENT_CHAR:
     SUBROUTINE REORDER_CURRENT_CHAR
-    ; Copy ENTITY_PTR/ENTITY_PTR+1 → TARGET_REC/TARGET_REC+1, store CURRENT_PLAYER → SOURCE_CHAR, JMP $0F84
+    ; Copy ENTITY_PTR/ENTITY_PTR+1 -> TARGET_REC/TARGET_REC+1, store CURRENT_PLAYER -> SOURCE_CHAR, JMP $0F84
     LDA     ENTITY_PTR
     STA     TARGET_REC
     LDA     ENTITY_PTR+1
@@ -2162,7 +2160,7 @@ REORDER_CURRENT_CHAR:
     ORG     $1425
 APPLY_DAMAGE_TO_CURRENT:
     SUBROUTINE APPLY_DAMAGE_TO_CURRENT
-    ; Apply effect: copy ENTITY_PTR/ENTITY_PTR+1 → EFFECT_REC/EFFECT_REC+1, JMP $106F with A
+    ; Apply effect: copy ENTITY_PTR/ENTITY_PTR+1 -> EFFECT_REC/EFFECT_REC+1, JMP $106F with A
     TAX
     LDA     ENTITY_PTR
     STA     EFFECT_REC
@@ -2218,7 +2216,7 @@ _AUTO_HEAL.start_heal:
     BNE     .done
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$21
     JMP     DISPLAY_MESSAGE
     ORG     $1482
@@ -2235,7 +2233,7 @@ INCREMENT_HP:
 _INCREMENT_HP.notify:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$22
     STA     HEAL_NOTIFIED
     JMP     DISPLAY_MESSAGE
@@ -2379,13 +2377,13 @@ _RESOLVE_ATTACK.state_done:
     BEQ     .attack
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$D2
     STA     TARGET_REC
     LDA     #$7C
     STA     TARGET_REC+1
     JSR     PRINT_BOTTOM_CENTERED
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$01
     BAEQ    IS_PLAYER_TURN,_RESOLVE_ATTACK.is_player
     JSR     PRINT_MEMBER_NAME
@@ -2420,7 +2418,7 @@ SET_BLINK_TARGET:
     STY     BLINK_ROW
     LDY     #$04
     LDA     (MOB_PTR),Y            ; mob data[4] = appearance
-    JSR     APPEARANCE_TO_FONTCHAR ; appearance → font char number
+    JSR     APPEARANCE_TO_FONTCHAR ; appearance -> font char number
     STA     BLINK_CHAR
     RTS
 
@@ -2431,7 +2429,7 @@ _SET_BLINK_TARGET.player:
     LDA     CURRENT_ROW            ; player font row
     STA     BLINK_ROW
     LDA     MOB_PTR                ; \
-    STA     ENTITY_REC             ;  | copy pointer MOB_PTR → ENTITY_REC
+    STA     ENTITY_REC             ;  | copy pointer MOB_PTR -> ENTITY_REC
     LDA     MOB_PTR+1              ;  |
     STA     ENTITY_REC+1           ; /
     JSR     GET_ENTITY_FONTCHAR    ; look up player's font char
@@ -2511,10 +2509,10 @@ PLAYER_ATTACK:
     JSR     CALC_COMBAT_STRENGTH
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     COMBAT_STRENGTH
     JSR     MAP_VALUE_TO_STRING
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     MOB_PTR
     STA     ENTITY_REC
     LDA     MOB_PTR+1
@@ -2531,7 +2529,7 @@ PLAYER_ATTACK:
     BCC     .roll_hit
 _PLAYER_ATTACK.immune:
     JSR     DISPATCH_ON_MODE
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$14
     JMP     DISPLAY_MESSAGE
 .roll_hit:
@@ -2638,10 +2636,10 @@ MOB_ATTACK:
     JSR     CALC_COMBAT_STRENGTH
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     COMBAT_STRENGTH
     JSR     MAP_VALUE_TO_STRING
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     JSR     PRINT_MEMBER_NAME
     LDY     COMBAT_STRENGTH
     LDX     #$02
@@ -2662,7 +2660,7 @@ MOB_ATTACK:
     LDA     COMBAT_STRENGTH
     JMP     COPY_F4_TO_F6_AND_SET
 _MOB_ATTACK.has_strength:
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDX     #$17
     LDA     MOB_DEFENSE
     BMI     .negative
@@ -2820,23 +2818,23 @@ _GAME_TURN_LOOP.enc_ok:
 
     ; --- adjust points based on threats ---
     LDA     ENCOUNTER_RESULT
-    BAEQ    #$02,_GAME_TURN_LOOP.chk_limit          ; hostile → check if enough to limit
+    BAEQ    #$02,_GAME_TURN_LOOP.chk_limit          ; hostile -> check if enough to limit
     JSR     CHECK_THREATS_HERE       ; check adjacent threats
-    BAEQ    #$01,_GAME_TURN_LOOP.move_loop          ; exactly 1 threat → keep full
+    BAEQ    #$01,_GAME_TURN_LOOP.move_loop          ; exactly 1 threat -> keep full
     LDA     MOVE_POINTS
     CMP     #$02
-    BCC     _GAME_TURN_LOOP.move_loop               ; < 2 points → keep as is
+    BCC     _GAME_TURN_LOOP.move_loop               ; < 2 points -> keep as is
     JSR     RANDOM_IN_RANGE          ; random(move_points)
-    BAEQ    #$00,_GAME_TURN_LOOP.do_limit           ; random == 0 → force limit
+    BAEQ    #$00,_GAME_TURN_LOOP.do_limit           ; random == 0 -> force limit
     STA     MOVE_POINTS              ; reduce randomly
     BNE     _GAME_TURN_LOOP.move_loop
 _GAME_TURN_LOOP.chk_limit:
     LDA     MOVE_POINTS
     CMP     #$02
-    BCC     _GAME_TURN_LOOP.move_loop               ; < 2 → use as is
+    BCC     _GAME_TURN_LOOP.move_loop               ; < 2 -> use as is
 _GAME_TURN_LOOP.do_limit:
     LDA     #$01
-    JSR     RANDOM_IN_RANGE          ; random(1) → 0 or 1
+    JSR     RANDOM_IN_RANGE          ; random(1) -> 0 or 1
     CLC
     ADC     #$01                     ; 1 or 2
     STA     MOVE_POINTS
@@ -2847,8 +2845,8 @@ MOVE_LOOP:                     ; $1A31 - external entry point
 _GAME_TURN_LOOP.move_loop:
     LDA     #$00
     BANE    MOVE_POINTS,_GAME_TURN_LOOP.has_points
-    BANE    STEPS_TAKEN,_GAME_TURN_LOOP.end_turn    ; out of points, took steps → done
-    BAEQ    CHAR_AI_MODE,_GAME_TURN_LOOP.has_points ; player with 0 points, 0 steps → still prompt
+    BANE    STEPS_TAKEN,_GAME_TURN_LOOP.end_turn    ; out of points, took steps -> done
+    BAEQ    CHAR_AI_MODE,_GAME_TURN_LOOP.has_points ; player with 0 points, 0 steps -> still prompt
 _GAME_TURN_LOOP.end_turn:
     JMP     END_TURN                 ; end turn
 
@@ -2862,7 +2860,7 @@ _GAME_TURN_LOOP.player_input:
     JSR     CONFIGURE_INPUT          ; set up input UI
     LDA     GAME_INPUT_TABLE+4       ; check if movement enabled
     BNE     .have_input
-    JMP     TEARDOWN_INPUT           ; no input → exit
+    JMP     TEARDOWN_INPUT           ; no input -> exit
 .have_input:
     JSR     GET_INPUT_TABLE_PTR
     JSR     SETUP_INPUT
@@ -2880,7 +2878,7 @@ _GAME_TURN_LOOP.player_input:
     JMP     _GAME_TURN_LOOP.move_loop               ; 5: pass
 .not_pass:
     BANE    #$09,_GAME_TURN_LOOP.not_fight
-    JSR     SET_RESTRICTED           ; 9: fight → set restricted
+    JSR     SET_RESTRICTED           ; 9: fight -> set restricted
     LDA     #$00
     JSR     SET_CHAR_STATE
     JMP     AUTO_HEAL
@@ -2903,7 +2901,7 @@ _GAME_TURN_LOOP.do_move:
     BMI     _GAME_TURN_LOOP.move_ok
     JSR     CHECK_CAN_LEAVE          ; can we leave hostile zone?
     BAEQ    #$01,_GAME_TURN_LOOP.move_ok
-    JMP     END_TURN                 ; blocked → end turn
+    JMP     END_TURN                 ; blocked -> end turn
 _GAME_TURN_LOOP.move_ok:
     LDA     #$00
     STA     ENCOUNTER_RESULT
@@ -2930,10 +2928,10 @@ _GAME_TURN_LOOP.go_east:
     LDA     CURRENT_COL
     LDY     CURRENT_ROW
     JSR     COLROW_TO_POS
-    JSR     FIND_ENTITY_AT_POS       ; → ENTITY_REC/ENTITY_REC+1
+    JSR     FIND_ENTITY_AT_POS       ; -> ENTITY_REC/ENTITY_REC+1
     LDA     #$00
-    BANE    ENTITY_REC+1,_GAME_TURN_LOOP.something  ; ENTITY_REC+1 != 0 → occupied
-    BAEQ    ENTITY_REC,_GAME_TURN_LOOP.empty        ; ENTITY_REC == 0 → empty cell
+    BANE    ENTITY_REC+1,_GAME_TURN_LOOP.something  ; ENTITY_REC+1 != 0 -> occupied
+    BAEQ    ENTITY_REC,_GAME_TURN_LOOP.empty        ; ENTITY_REC == 0 -> empty cell
     LDX     #$0E
     JSR     SCRIPT_ENGINE            ; display blocked message?
     JMP     SHOW_LOCKED_MSG
@@ -2941,8 +2939,8 @@ _GAME_TURN_LOOP.go_east:
 _GAME_TURN_LOOP.empty:
     JSR     COMMIT_MOVE              ; commit move (update pos, draw sprite)
     JSR     CHECK_THREATS_HERE       ; check adjacent threats
-    BANE    #$00,_GAME_TURN_LOOP.keep_moving        ; threats remain → continue
-    STA     MOVE_POINTS              ; no threats → stop
+    BANE    #$00,_GAME_TURN_LOOP.keep_moving        ; threats remain -> continue
+    STA     MOVE_POINTS              ; no threats -> stop
     STA     TURN_ACTIVE
 _GAME_TURN_LOOP.keep_moving:
     JMP     _GAME_TURN_LOOP.move_loop
@@ -2951,8 +2949,8 @@ _GAME_TURN_LOOP.keep_moving:
 _GAME_TURN_LOOP.something:
     LDA     ENTITY_REC+1
     CMP     #$80
-    BMI     .event                   ; ENTITY_REC+1 < $80 → event entry
-    JMP     HANDLE_MOB_ENCOUNTER     ; ENTITY_REC+1 >= $80 → mob encounter
+    BMI     .event                   ; ENTITY_REC+1 < $80 -> event entry
+    JMP     HANDLE_MOB_ENCOUNTER     ; ENTITY_REC+1 >= $80 -> mob encounter
 
 .event:
     LDY     #$01
@@ -2960,7 +2958,7 @@ _GAME_TURN_LOOP.something:
     TAX
     AND     #$C0
     BAEQ    #$C0,_GAME_TURN_LOOP.activated
-    JMP     HANDLE_ENCOUNTER         ; non-activated → encounter
+    JMP     HANDLE_ENCOUNTER         ; non-activated -> encounter
 
 _GAME_TURN_LOOP.activated:
     TXA
@@ -3012,7 +3010,7 @@ COMMIT_MOVE:
     ; falls through to RESET_TURN_POS
 RESET_TURN_POS:
     ; Reset to turn start: convert start col/row to packed pos,
-    ; call $1156, update current→start, conditionally run script
+    ; call $1156, update current->start, conditionally run script
     LDA     TURN_START_COL
     LDY     TURN_START_ROW
     JSR     COLROW_TO_POS
@@ -3105,7 +3103,7 @@ HANDLE_ENCOUNTER:
     LDY     #$01
     LDA     (EVENT_PTR),Y              ; event byte 1 = type
     CMP     #$40
-    BPL     .specific                  ; type >= $40 → specific encounter
+    BPL     .specific                  ; type >= $40 -> specific encounter
     LDA     #$14
     JSR     RANDOM_IN_RANGE            ; random(20)
     STA     PRNG_OUTPUT
@@ -3113,13 +3111,13 @@ HANDLE_ENCOUNTER:
     LDA     (ENTITY_PTR),Y             ; char field 5
     AND     #$1F                       ; low 5 bits = avoidance stat
     CMP     PRNG_OUTPUT
-    BMI     .roll_type                 ; stat < random → encounter happens
-    JMP     .avoided                   ; stat >= random → avoid encounter
+    BMI     .roll_type                 ; stat < random -> encounter happens
+    JMP     .avoided                   ; stat >= random -> avoid encounter
 .roll_type:
     JSR     STEP_PRNG
     LDA     #$74
     CMP     PRNG_OUTPUT
-    BPL     .normal                    ; $74 >= random → normal encounter
+    BPL     .normal                    ; $74 >= random -> normal encounter
     JMP     .special                   ; rare: special encounter
 .normal:
     JSR     SET_CURSOR_ROW21
@@ -3139,7 +3137,7 @@ HANDLE_ENCOUNTER:
     LDA     (EVENT_PTR),Y
     AND     #$3F                       ; low 6 bits = encounter ID
     BNE     .have_id
-    JSR     STEP_PRNG                  ; ID 0 → derive from PRNG
+    JSR     STEP_PRNG                  ; ID 0 -> derive from PRNG
     LDA     PRNG_OUTPUT
     ROR
     ROR
@@ -3172,7 +3170,7 @@ HANDLE_ENCOUNTER:
     STA     (ENTITY_PTR),Y             ; update char packed position
     LDA     ACTIVE_CHAR
     BAEQ    CURRENT_PLAYER,_HANDLE_ENCOUNTER.same_scene ; compare encounter ID with current scene
-    JMP     RESET_TURN_POS             ; different → reset position
+    JMP     RESET_TURN_POS             ; different -> reset position
 _HANDLE_ENCOUNTER.same_scene:
     LDA     EVENT_DEST_POS
     JSR     POS_TO_COLROW
@@ -3216,7 +3214,7 @@ SHOW_LOCKED_MSG:
     ; Display message $0C and set char state to 0.
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$0C
     JSR     DISPLAY_MESSAGE
     LDA     #$00
@@ -3306,7 +3304,7 @@ _HANDLE_EVENT_SLOT.not_active:
 .small_val:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$0D
     JSR     DISPLAY_MESSAGE
     LDA     #$01
@@ -3427,7 +3425,7 @@ HANDLE_MOB_ENCOUNTER:
     BPL     .no_flee
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$1E
     JSR     DISPLAY_MESSAGE
     LDA     TURN_START_COL
@@ -3464,7 +3462,7 @@ _HANDLE_MOB_ENCOUNTER.one_threat:
 .group_done:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     LDA     #$1F
     JSR     DISPLAY_MESSAGE
     JMP     END_TURN
@@ -3488,7 +3486,7 @@ _DISPATCH_ON_MODE.mode_60:
     ORG     $1F19
     SUBROUTINE orphaned_encounter_handler
 ; ---------------------------------------------------------------
-; DEAD CODE — orphaned encounter handler ($1F19-$1FFF)
+; DEAD CODE -- orphaned encounter handler ($1F19-$1FFF)
 ;
 ; Earlier version of HANDLE_MOB_ENCOUNTER.  Unreachable: no
 ; external reference to any address in $1F19-$1FFD.
@@ -3499,7 +3497,7 @@ _DISPATCH_ON_MODE.mode_60:
 ;   $764A -> STEP_PRNG (now $78A8)
 ;   $7444 -> SET_CURSOR_ROW21 (now $76BE)
 ;   $0DD1 -> PRINT_MOB_NAME (now $0D8A)
-;   $7421 -> RESET_TEXT_WINDOW (now $769B)
+;   $7421 -> SCROLL_STATUS_LINE (now $769B)
 ;   $739F -> DISPLAY_MESSAGE (now $761E)
 ;   $0E6C -> CHECK_ENCOUNTER (now $0E25)
 ;   $1C3C -> COMMIT_MOVE (now $1B52)
@@ -3574,12 +3572,12 @@ _DISPATCH_ON_MODE.mode_60:
     JSR     $764A           ; -> STEP_PRNG
     TXA
     CMP     PRNG_OUTPUT
-    BPL     .no_flee        ; survived — skip flee
+    BPL     .no_flee        ; survived -- skip flee
 
-    ; Entity overwhelmed — flee, restore position
+    ; Entity overwhelmed -- flee, restore position
     JSR     $7444           ; -> SET_CURSOR_ROW21
     JSR     $0DD1           ; -> PRINT_MOB_NAME
-    JSR     $7421           ; -> RESET_TEXT_WINDOW
+    JSR     $7421           ; -> SCROLL_STATUS_LINE
     LDA     #$1E            ; message: flee
     JSR     $739F           ; -> DISPLAY_MESSAGE
     LDA     TURN_START_COL
@@ -3619,7 +3617,7 @@ _orphaned_encounter_handler.one_threat:
 .group_done:                            ; $1FE5
     JSR     $7444           ; -> SET_CURSOR_ROW21
     JSR     $0DD1           ; -> PRINT_MOB_NAME
-    JSR     $7421           ; -> RESET_TEXT_WINDOW
+    JSR     $7421           ; -> SCROLL_STATUS_LINE
     LDA     #$1F            ; message: engage combat
     JSR     $739F           ; -> DISPLAY_MESSAGE
     JMP     $1C91           ; -> END_TURN
@@ -3629,7 +3627,7 @@ _orphaned_encounter_handler.one_threat:
     LDA     (MOB_PTR),Y     ; mob byte $0F
     ORA     #$04            ; set bit 2 = combat engaged
     STA     (MOB_PTR),Y
-; $1FFE: RTS — also serves as no-op stub for callers at $4A1F/$4BE4
+; $1FFE: RTS -- also serves as no-op stub for callers at $4A1F/$4BE4
     RTS
 
 ; Trailing orphan byte
@@ -4971,7 +4969,7 @@ SETUP_CURSOR:
     INY
     LDA     ($C2),Y
     STA     PRINT_STRING_ADDR+1
-    JSR     PRINT_FROM_PTR
+    JSR     PRINT_STRING
     JMP     PRINT_CTRL_N
     ORG     $5FBC
     SUBROUTINE SET_CURSOR_POS
@@ -5206,14 +5204,14 @@ PICKUP_TREASURE:
     LDA     #$00
     JSR     SET_CHAR_STATE          ; set char field 15 state to 0
     LDA     EVENT_PTR
-    STA     MOB_PTR                 ; copy event ptr → MOB_PTR/MOB_PTR+1
+    STA     MOB_PTR                 ; copy event ptr -> MOB_PTR/MOB_PTR+1
     LDA     EVENT_PTR+1
     STA     MOB_PTR+1
     JSR     COMMIT_MOVE             ; commit move
     LDY     #$01
     LDA     (MOB_PTR),Y             ; event byte 1 = treasure type
     CMP     #$C9
-    BPL     .trapped                ; >= $C9 → trapped chest or special
+    BPL     .trapped                ; >= $C9 -> trapped chest or special
     SEC
     SBC     #$C0                    ; $C0-$C8: treasure index 0-8
     STA     NUM_VALUE+1
@@ -5226,7 +5224,7 @@ PICKUP_TREASURE:
     LDY     #$04
     LDA     (ENTITY_PTR),Y          ; char field 4
     CMP     #$15
-    BCS     .mark_used              ; inventory full → skip pickup
+    BCS     .mark_used              ; inventory full -> skip pickup
     JSR     CLEAR_STATUS_SLOTS      ; add item to inventory
     LDA     #$AB
     STA     $BA
@@ -5453,7 +5451,7 @@ EVENT_FACTION_SCENE:
 EVENT_FACTION_SCENE_CONT:               ; alternate entry from RANDOM_EVENTS burst
     LDA     CHAR_PTR
     BANE    #$09,_EVENT_FACTION_SCENE_CONT.has_char      ; $FA still at base ($4009)?
-    RTS                         ; no character selected → skip
+    RTS                         ; no character selected -> skip
 _EVENT_FACTION_SCENE_CONT.has_char:
     LDY     #$05
     LDA     (CHAR_PTR),Y        ; char record byte 5
@@ -5465,7 +5463,7 @@ _EVENT_FACTION_SCENE_CONT.has_char:
     STA     CHAR_PTR+1          ; /
     JSR     FIND_MOB_BY_FACTION ; search mob list for matching faction
     BANE    #$00,_EVENT_FACTION_SCENE_CONT.found
-    JMP     EVENT_SPAWN_MOB     ; not found → try spawning instead
+    JMP     EVENT_SPAWN_MOB     ; not found -> try spawning instead
 _EVENT_FACTION_SCENE_CONT.found:
     LDA     #$00
     STA     SOURCE_CHAR         ; clear source char
@@ -5488,7 +5486,7 @@ EVENT_SPAWN_MOB:
     LDY     #$08
     LDA     (CHAR_PTR),Y
     BEQ     .inactive
-    RTS                      ; both active → give up
+    RTS                      ; both active -> give up
 .inactive:
     LDY     #$05
     LDA     (CHAR_PTR),Y     ; char record byte 5
@@ -5496,7 +5494,7 @@ EVENT_SPAWN_MOB:
     STA     FACTION_MASK
     JSR     FIND_MOB_BY_FACTION
     BANE    #$00,_EVENT_SPAWN_MOB.found
-    RTS                      ; no matching mob → skip
+    RTS                      ; no matching mob -> skip
 _EVENT_SPAWN_MOB.found:
     LDA     CHAR_INDEX
     STA     SOURCE_CHAR
@@ -5516,7 +5514,7 @@ PICK_RANDOM_MOB:
     ; subtracting group counts (byte 8) until the target is reached.
     ; Result: $FA/$FB points to the selected char record.
     LDA     TOTAL_MOB_COUNT
-    BEQ     PICK_RANDOM_CHAR     ; no mobs → fall through to pick char
+    BEQ     PICK_RANDOM_CHAR     ; no mobs -> fall through to pick char
     JSR     RANDOM_IN_RANGE      ; random 0..TOTAL_MOB_COUNT-1
     BAEQ    #$00,PICK_RANDOM_MOB ; zero = retry
     STA     MOB_PTR              ; remaining count
@@ -5531,7 +5529,7 @@ PICK_RANDOM_MOB:
     SBC     (DATA_PTR),Y         ; subtract group count (byte 8)
     STA     MOB_PTR
     BEQ     .found               ; exact match
-    BMI     .found               ; overshot → this is the one
+    BMI     .found               ; overshot -> this is the one
     INC     CHAR_INDEX
     BNE     .next_char           ; always branches
 .found:
@@ -5554,7 +5552,7 @@ PICK_RANDOM_CHAR:
     ADC     #$02            ; offset to player 2
     STA     CHAR_INDEX      ; save selected index
     JSR     GET_CHAR_RECORD ; load record for player A
-    JMP     COPY_BE_TO_FA   ; copy DATA_PTR/DATA_PTR+1 → $FA/$FB
+    JMP     COPY_BE_TO_FA   ; copy DATA_PTR/DATA_PTR+1 -> $FA/$FB
     ORG     $66CE
 PROCESS_CHAR_EVENTS:
     SUBROUTINE PROCESS_CHAR_EVENTS
@@ -5575,9 +5573,9 @@ PROCESS_CHAR_EVENTS:
 _PROCESS_CHAR_EVENTS.check:
     INY
     LDA     (EVENT_PTR),Y ; event byte 1
-    BMI     .advance      ; bit 7 set → skip
+    BMI     .advance      ; bit 7 set -> skip
     CMP     #$40          ; < $40?
-    BMI     .advance      ; yes → skip
+    BMI     .advance      ; yes -> skip
     SEC
     SBC     #$40          ; normalize to 0-based
     STA     (EVENT_PTR),Y ; write back
@@ -5603,19 +5601,19 @@ FIND_MOB_BY_FACTION:
     LDA     (CHAR_PTR),Y       ; char record byte 2 = first link
 .check_link:
     BNE     .resolve
-    RTS                        ; zero link → return A=0
+    RTS                        ; zero link -> return A=0
 .resolve:
-    JSR     GET_MOB_DATA       ; resolve link → MOB_DATA_PTR/MOB_DATA_PTR+1
+    JSR     GET_MOB_DATA       ; resolve link -> MOB_DATA_PTR/MOB_DATA_PTR+1
     LDA     MOB_DATA_PTR       ; \
     STA     MOB_PTR            ;  | MOB_PTR/MOB_PTR+1 = mob data pointer
     LDA     MOB_DATA_PTR+1     ;  |
     STA     MOB_PTR+1          ; /
     LDY     #$0F
     LDA     (MOB_PTR),Y        ; mob data byte $0F
-    BPL     _FIND_MOB_BY_FACTION.next              ; bit 7 clear → skip
+    BPL     _FIND_MOB_BY_FACTION.next              ; bit 7 clear -> skip
     AND     #$70               ; bits 6-4
     BANE    FACTION_MASK,_FIND_MOB_BY_FACTION.next ; match faction?
-    LDA     #$01               ; found → return 1
+    LDA     #$01               ; found -> return 1
     RTS
 _FIND_MOB_BY_FACTION.next:
     LDY     #$02
@@ -5835,12 +5833,12 @@ AI_CHOOSE_TARGET:
     ; --- mode 0/1: check if NPC should join party ---
     JSR     PICK_RANDOM_MEMBER
     LDA     MOB_PTR+1
-    BAEQ    #$00,_AI_CHOOSE_TARGET.simple_target ; no match → simple target
+    BAEQ    #$00,_AI_CHOOSE_TARGET.simple_target ; no match -> simple target
     JSR     SET_CURSOR_ROW21
     LDA     #$24
     JSR     DISPLAY_MESSAGE     ; "joins party" message
     JSR     PRINT_MEMBER_NAME
-    JSR     RESET_TEXT_WINDOW
+    JSR     SCROLL_STATUS_LINE
     JSR     DELAY_WITH_ANIMATION
     LDA     #$25
     JSR     DISPLAY_MESSAGE
@@ -5917,7 +5915,7 @@ _AI_CHOOSE_TARGET.skip3:
     BNE     .loop3
     LDA     AI_TARGET_COL
     BANE    #$3C,_AI_CHOOSE_TARGET.found3
-    LDA     EVENT_POS           ; no hostile found → use default
+    LDA     EVENT_POS           ; no hostile found -> use default
     STA     AI_TARGET_POS
 _AI_CHOOSE_TARGET.found3:
     JMP     .done
@@ -5960,7 +5958,7 @@ _AI_CHOOSE_TARGET.skip5:
     STA     AI_TARGET_POS       ; strongest mob's position
     JMP     .done
 .no_target5:
-    LDA     EVENT_POS           ; no hostile → use default
+    LDA     EVENT_POS           ; no hostile -> use default
     STA     AI_TARGET_POS
     JMP     .done
 
@@ -6019,7 +6017,7 @@ SCENE_LOOP:
     BCS     .exit                           ; carry set = user pressed key
 
     JSR     DISPLAY_STATUS_BAR
-    STOW    SCENE_TEXT_DATA,TEXT_STREAM_PTR ; scene text data → $06/$07
+    STOW    SCENE_TEXT_DATA,TEXT_STREAM_PTR ; scene text data -> $06/$07
     JSR     TEXT_RENDERER
 
     LDX     #$06                            ; script index 6
@@ -6059,7 +6057,7 @@ TEXT_RENDERER:
     ; --- Main byte-reading loop ---
 .fetch:
     LDA     (TEXT_STREAM_PTR),Y ; read byte from stream
-    BMI     .set_pos            ; bit 7 set → position command
+    BMI     .set_pos            ; bit 7 set -> position command
     BANE    #$7F,_TEXT_RENDERER.not_end
     RTS                         ; $7F = end of stream
 
@@ -6072,12 +6070,12 @@ _TEXT_RENDERER.not_end:
     STA     FONT_CHARNUM        ; character code
     LDA     #$02
     STA     FONT_CHARSET        ; character width = 2
-    JSR     PRINT_FONTCHAR      ; draw at current position
+    JSR     RENDER_FONT_CHAR    ; draw at current position
     INC     FONT_COL            ; advance column
     LDA     FONT_COL
     CMP     TEXT_RIGHT_MARGIN   ; past right margin?
-    BCC     .next               ; no → continue
-    INC     FONT_ROW            ; yes → next row
+    BCC     .next               ; no -> continue
+    INC     FONT_ROW            ; yes -> next row
     LDA     TEXT_LEFT_MARGIN    ;   reset column to left margin
     STA     FONT_COL
 .next:
@@ -6128,7 +6126,7 @@ DISPLAY_STATUS_BAR:
 
     LDA     #$90                               ; ctrl-P with high bit (toggle inverse)
     JSR     ROM_COUT1
-    STOW    STATUS_BORDER_DATA,TEXT_STREAM_PTR ; status bar border data → $06/$07
+    STOW    STATUS_BORDER_DATA,TEXT_STREAM_PTR ; status bar border data -> $06/$07
     JSR     TEXT_RENDERER                      ; draw border box
     JSR     PRINT_CTRL_AB                      ; Ctrl-A, '0'
     LDA     #$17
@@ -6146,7 +6144,7 @@ DISPLAY_STATUS_BAR:
 .set_margin:
     LDA     #$04
     STA     TEXT_COL                           ; WNDLFT = 4
-    JMP     PRINT_FROM_PTR                     ; print string, return
+    JMP     PRINT_STRING                       ; print string, return
 
 .joystick:
     LDA     #<S_PRESS_BUTTON
@@ -6257,22 +6255,22 @@ CHECK_SCENE_EVENTS:
     ; state and dispatches to SCENE_LOOP with mode 4-8 based on
     ; game state flags.  Called from MAIN_ENTRY's character loop.
     LDA     #$00
-    BANE    SCENE_HOSTILE_DONE,_CHECK_SCENE_EVENTS.done     ; yes → skip
+    BANE    SCENE_HOSTILE_DONE,_CHECK_SCENE_EVENTS.done     ; yes -> skip
     LDA     #$40
     STA     SCENE_GROUP_IDX              ; start scanning from group $40
     JSR     SCAN_FOR_HOSTILE             ; scan for hostile encounter
     LDA     #$01
-    BANE    SCENE_FOUND_FLAG,_CHECK_SCENE_EVENTS.done       ; no → skip
+    BANE    SCENE_FOUND_FLAG,_CHECK_SCENE_EVENTS.done       ; no -> skip
     BANE    CURRENT_PLAYER,_CHECK_SCENE_EVENTS.other_player ; is this player 1?
     BANE    SCENE_HOSTILE_FLAG,_CHECK_SCENE_EVENTS.hostile  ; hostile encounter found?
-    BAEQ    SCENE_P1_DONE,_CHECK_SCENE_EVENTS.done          ; yes → skip
+    BAEQ    SCENE_P1_DONE,_CHECK_SCENE_EVENTS.done          ; yes -> skip
     STA     SCENE_P1_DONE                ; mark as done
     LDA     #$04
     JMP     SCENE_LOOP                   ; mode 4: player 1 non-hostile scene
 _CHECK_SCENE_EVENTS.done:
     RTS
 _CHECK_SCENE_EVENTS.other_player:
-    BAEQ    SCENE_P3_DONE,_CHECK_SCENE_EVENTS.done          ; yes → skip
+    BAEQ    SCENE_P3_DONE,_CHECK_SCENE_EVENTS.done          ; yes -> skip
     STA     SCENE_P3_DONE                ; mark as done
     JSR     SET_CURSOR_ROW21
     LDA     #$05
@@ -6287,7 +6285,7 @@ _CHECK_SCENE_EVENTS.hostile:
     LDA     #$07
     JSR     SCENE_LOOP                   ; mode 7: post-encounter
     LDA     SCENE_COMBAT_FLAG
-    BEQ     _CHECK_SCENE_EVENTS.done                        ; no combat → done
+    BEQ     _CHECK_SCENE_EVENTS.done                        ; no combat -> done
     JSR     SCROLL_STATUS_LINE
     LDA     #$08
     JMP     SCENE_LOOP                   ; mode 8: combat resolution
@@ -6301,7 +6299,7 @@ SCAN_FOR_HOSTILE:
     STA     SCENE_FOUND_FLAG
     STA     SCENE_HOSTILE_FLAG
     LDA     SCENE_GROUP_IDX
-    JSR     GET_MOB_DATA                   ; resolve group → MOB_DATA_PTR/MOB_DATA_PTR+1
+    JSR     GET_MOB_DATA                   ; resolve group -> MOB_DATA_PTR/MOB_DATA_PTR+1
     LDA     MOB_DATA_PTR                   ; \
     STA     MOB_PTR                        ;  | MOB_PTR/MOB_PTR+1 = mob data pointer
     LDA     MOB_DATA_PTR+1                 ;  |
@@ -6320,13 +6318,13 @@ SCAN_FOR_HOSTILE:
     LDX     #$01
     STX     SCENE_FOUND_FLAG               ; mark as found
 _SCAN_FOR_HOSTILE.check_hostile:
-    JSR     GET_MOB_DATA                   ; resolve link → MOB_DATA_PTR/MOB_DATA_PTR+1
+    JSR     GET_MOB_DATA                   ; resolve link -> MOB_DATA_PTR/MOB_DATA_PTR+1
     LDA     MOB_DATA_PTR                   ; \
     STA     TARGET_REC                     ;  | TARGET_REC/TARGET_REC+1 = resolved mob data
     LDA     MOB_DATA_PTR+1                 ;  |
     STA     TARGET_REC+1                   ; /
     JSR     CHECK_HOSTILE                  ; check if hostile
-    BEQ     .walk                          ; not hostile → continue
+    BEQ     .walk                          ; not hostile -> continue
     STA     SCENE_HOSTILE_FLAG             ; hostile found
     BNE     .walk                          ; always branches, continue scan
     ORG     $6E9E
@@ -6342,7 +6340,7 @@ PROCESS_SCENE_GROUPS:
     LDA     #$3F
     STA     SCENE_GROUP_IDX
     JSR     SCAN_AND_REORDER ; group $3F
-    INC     SCENE_GROUP_IDX  ; $40 (skip — that's the player's group)
+    INC     SCENE_GROUP_IDX  ; $40 (skip -- that's the player's group)
     INC     SCENE_GROUP_IDX  ; $41
     JSR     SCAN_AND_REORDER ; group $41
     INC     SCENE_GROUP_IDX  ; $42
@@ -6353,7 +6351,7 @@ PROCESS_SCENE_GROUPS:
     ORG     $6EC9
 LOAD_CHAR_TO_FA:
     SUBROUTINE LOAD_CHAR_TO_FA
-    ; Wrapper: GET_CHAR_RECORD then copy CHAR_REC → $FA/$FB.
+    ; Wrapper: GET_CHAR_RECORD then copy CHAR_REC -> $FA/$FB.
     JSR     GET_CHAR_RECORD
     LDA     DATA_PTR
     STA     CHAR_PTR
@@ -6364,7 +6362,7 @@ LOAD_CHAR_TO_FA:
 SCAN_AND_REORDER:
     SUBROUTINE SCAN_AND_REORDER
     ; Call SCAN_FOR_HOSTILE for current SCENE_GROUP_IDX.
-    ; If a match is found, copy MOB_PTR/MOB_PTR+1 → TARGET_REC/TARGET_REC+1 and reorder.
+    ; If a match is found, copy MOB_PTR/MOB_PTR+1 -> TARGET_REC/TARGET_REC+1 and reorder.
     JSR     SCAN_FOR_HOSTILE
     LDA     SCENE_FOUND_FLAG
     BNE     .found
@@ -6380,7 +6378,7 @@ MODIFY_CHAR_STATS:
     SUBROUTINE MODIFY_CHAR_STATS
     ; Add or subtract gold from char record at (EFFECT_REC).
     ; Y=0: subtract NUM_VALUE/NUM_VALUE+1 from field 13/14
-    ; Y≠0: add NUM_VALUE/NUM_VALUE+1 to field 13/14
+    ; Y!=0: add NUM_VALUE/NUM_VALUE+1 to field 13/14
     ; Then recompute field 12 (level/XP encoding).
     BYEQ    #$00,_MODIFY_CHAR_STATS.subtract
     LDY     #$0D
@@ -6466,8 +6464,8 @@ _MODIFY_CHAR_STATS.store_final:
     RTS
     ORG     $70D4
 MODIFY_CURRENT_STATS:
-    SUBROUTINE RESET_TEXT_WINDOW
-    ; Copy ENTITY_PTR/ENTITY_PTR+1 → EFFECT_REC/EFFECT_REC+1, JMP $704D (treasure lookup)
+    SUBROUTINE SCROLL_STATUS_LINE
+    ; Copy ENTITY_PTR/ENTITY_PTR+1 -> EFFECT_REC/EFFECT_REC+1, JMP $704D (treasure lookup)
     LDA     ENTITY_PTR
     STA     EFFECT_REC
     LDA     ENTITY_PTR+1
@@ -6818,11 +6816,11 @@ FILL_MAP:
     JSR     RENDER_FONT_CHAR     ; render glyph once (builds control string)
 .loop:
     DEC     FONT_COL             ; next column left
-    BPL     .draw                ; still >= 0 → draw
+    BPL     .draw                ; still >= 0 -> draw
     LDA     #$13                 ; \ wrap to column 19
     STA     FONT_COL             ; /
     DEC     FONT_ROW             ; next row up
-    BPL     .draw                ; still >= 0 → draw
+    BPL     .draw                ; still >= 0 -> draw
     RTS                          ; all 200 positions filled
 .draw:
     JSR     FONT_POS_TO_TEXT_POS ; set text cursor to font position
@@ -6848,23 +6846,22 @@ LOAD_MAP_TILES:
     RTS
     ORG     $7489
 RENDER_FONT_CHAR:
-PRINT_FONTCHAR:
-    SUBROUTINE PRINT_FONTCHAR
+    SUBROUTINE RENDER_FONT_CHAR
 
     JSR     FONT_POS_TO_TEXT_POS ; set TEXT_COL/TEXT_ROW from font pos
 PRINT_FONTCHAR_AT_TEXT_POS:
     LDX     #$B1                 ; base charset page
     LDA     FONT_CHARSET
-    BANE    #$02,_PRINT_FONTCHAR.charset_ok
-    INX                          ; charset 2 → page $B3
+    BANE    #$02,_RENDER_FONT_CHAR.charset_ok
+    INX                          ; charset 2 -> page $B3
     INX
-_PRINT_FONTCHAR.charset_ok:
+_RENDER_FONT_CHAR.charset_ok:
     STX     CHAR_CHARSET         ; patch charset in control string
     LDA     FONT_CHARNUM
 .check_range:
     CMP     #$18                 ; fits in current charset page?
-    BCC     .compute_glyphs      ; yes → compute glyph indices
-    INX                          ; no → next charset page
+    BCC     .compute_glyphs      ; yes -> compute glyph indices
+    INX                          ; no -> next charset page
     STX     CHAR_CHARSET
     SEC
     SBC     #$18                 ; charnum -= 24
@@ -6883,10 +6880,10 @@ _PRINT_FONTCHAR.charset_ok:
     INY
     STY     CHAR_LOWER_RIGHT
     LDA     #<s_PRINT_FONT_CHAR  ; \
-    STA     PRINT_STRING_ADDR    ;  | $BC/$BD → control string
+    STA     PRINT_STRING_ADDR    ;  | $BC/$BD -> control string
     LDA     #>s_PRINT_FONT_CHAR  ;  |
     STA     PRINT_STRING_ADDR+1  ; /
-    JMP     PRINT_STRING         ; output the 2×2 character
+    JMP     PRINT_STRING         ; output the 2x2 character
     ORG     $74CB
 DRAW_BLINK_ALT:
     SUBROUTINE DRAW_BLINK_ALT
@@ -6901,7 +6898,7 @@ DRAW_BLINK_ALT:
     RTS
     ORG     $74DD
 DRAW_BLINK_NORMAL:
-    JSR     PRINT_CTRL_N      ; Ctrl-N → normal video
+    JSR     PRINT_CTRL_N      ; Ctrl-N -> normal video
 
 DRAW_BLINK_CHAR:
     SUBROUTINE DRAW_BLINK_CHAR
@@ -6909,7 +6906,7 @@ DRAW_BLINK_CHAR:
     LDA     BLINK_COL         ; load blink column
     CMP     #$14              ; >= 20? (disabled sentinel)
     BCC     .draw
-    RTS                       ; disabled — do nothing
+    RTS                       ; disabled -- do nothing
 
 .draw:
     STA     FONT_COL          ; copy blink state to font vars
@@ -6919,8 +6916,8 @@ DRAW_BLINK_CHAR:
     STA     FONT_CHARNUM
     LDA     #$01
     STA     FONT_CHARSET      ; charset 1
-    PSHW    PRINT_STRING_ADDR ; save PRINT_STRING_ADDR (used by PRINT_FONTCHAR)
-    JSR     PRINT_FONTCHAR    ; render the character
+    PSHW    PRINT_STRING_ADDR ; save PRINT_STRING_ADDR (used by RENDER_FONT_CHAR)
+    JSR     RENDER_FONT_CHAR  ; render the character
     PULW    PRINT_STRING_ADDR ; restore PRINT_STRING_ADDR
     RTS
     ORG     $750C
@@ -6988,7 +6985,7 @@ _DISPLAY_MESSAGE.skip_entry:
     LDA     PRINT_STRING_ADDR+1
     ADC     #$00
     STA     PRINT_STRING_ADDR+1
-    BYNE    #$00,_DISPLAY_MESSAGE.skip_entry      ; no — keep skipping within group
+    BYNE    #$00,_DISPLAY_MESSAGE.skip_entry      ; no -- keep skipping within group
 .next_index:
     DEX
 .check_index:
@@ -6998,9 +6995,9 @@ DISPLAY_MESSAGE_LOOP:
 .print_loop:
     LDY     #$00
     LDA     (PRINT_STRING_ADDR),Y ; get length of current string
-    BNE     .has_text             ; nonzero — print it
+    BNE     .has_text             ; nonzero -- print it
 
-    ; length is zero — message is done
+    ; length is zero -- message is done
     LDA     MSG_LINE_COUNT
     BAEQ    #$02,_DISPLAY_MESSAGE.final_scroll    ; printed exactly 2 lines?
     RTS                           ; otherwise just return
@@ -7035,17 +7032,16 @@ _DISPLAY_MESSAGE.final_scroll:
     STA     PRINT_STRING_ADDR+1
     LDA     #$01
     CMP     MSG_LINE_COUNT        ; printed <= 1 lines?
-    BCC     .pause                ; no — need to pause
+    BCC     .pause                ; no -- need to pause
     LDY     #$00
     LDA     (PRINT_STRING_ADDR),Y ; peek at next entry
-    BNE     .print_loop           ; more text — keep printing
+    BNE     .print_loop           ; more text -- keep printing
 
 .pause:
     JSR     DELAY_WITH_ANIMATION  ; delay
     JSR     PRINT_CTRL_AB         ; reset character set
     JMP     .print_loop           ; continue with next line
     ORG     $769B
-RESET_TEXT_WINDOW:
 SCROLL_STATUS_LINE:
     SUBROUTINE SCROLL_STATUS_LINE
     ; Text display: init HRCG, set window bottom, output char $83, reset
@@ -7061,10 +7057,10 @@ SCROLL_STATUS_LINE:
 CLEAR_MAP:
 
     LDY     #$00
-    LDA     (CHAR_PTR),Y ; record byte 0 → PRINT_STRING_ADDR low
+    LDA     (CHAR_PTR),Y ; record byte 0 -> PRINT_STRING_ADDR low
     STA     PRINT_STRING_ADDR
     INY
-    LDA     (CHAR_PTR),Y ; record byte 1 → PRINT_STRING_ADDR high
+    LDA     (CHAR_PTR),Y ; record byte 1 -> PRINT_STRING_ADDR high
     STA     PRINT_STRING_ADDR+1
     JMP     SETUP_TEXT_POS
     ORG     $76BE
@@ -7195,12 +7191,10 @@ PRINT_STRING_AT_ADDR:
     STX     PRINT_STRING_ADDR
     STY     PRINT_STRING_ADDR+1
 
-    ; falls through to PRINT_STRING / PRINT_FROM_PTR at $775C
+    ; falls through to PRINT_STRING at $775C
     ORG     $775C
-PRINT_STRING             ; same entry as PRINT_FROM_PTR
-    ORG     $775C
-PRINT_FROM_PTR:
-    SUBROUTINE PRINT_FROM_PTR
+PRINT_STRING:
+    SUBROUTINE PRINT_STRING
 
     LDY     #$00
     LDA     (PRINT_STRING_ADDR),Y ; first byte = length
@@ -7361,15 +7355,15 @@ SCRIPT_ENGINE_FETCH:
     LDY     #$00
     LDA     (SCRIPT_PC),Y    ; read script byte
     CMP     #$27
-    BCC     .control         ; < $27 → control command
-    JMP     .action          ; ≥ $27 → action dispatch
+    BCC     .control         ; < $27 -> control command
+    JMP     .action          ; >= $27 -> action dispatch
 
 .control:
     BAEQ    #$25,_SCRIPT_ENGINE.cmd_25              ; set PRNG mask = $0F
     BCS     .cmd_26                   ; $26: PRNG mask = $00
 
-    BAEQ    #$23,_SCRIPT_ENGINE.cmd_23              ; set action vector → PLAY_TONE
-    BCS     .cmd_24                   ; set action vector → PLAY_NOISE
+    BAEQ    #$23,_SCRIPT_ENGINE.cmd_23              ; set action vector -> PLAY_TONE
+    BCS     .cmd_24                   ; set action vector -> PLAY_NOISE
 
     BAEQ    #$21,_SCRIPT_ENGINE.cmd_21              ; gosub
     BCS     .cmd_22                   ; nop (return)
@@ -7403,11 +7397,11 @@ _SCRIPT_ENGINE.cmd_25:                            ; PRNG mask = $0F
     STA     SCRIPT_PRNG_MASK
     JMP     SCRIPT_ADVANCE
 
-_SCRIPT_ENGINE.cmd_23:                            ; action vector → PLAY_TONE
+_SCRIPT_ENGINE.cmd_23:                            ; action vector -> PLAY_TONE
     STOW    PLAY_TONE,SCRIPT_ACTION_VEC
     JMP     SCRIPT_ADVANCE
 
-.cmd_24:                            ; action vector → PLAY_NOISE
+.cmd_24:                            ; action vector -> PLAY_NOISE
     STOW    PLAY_NOISE,SCRIPT_ACTION_VEC
     JMP     SCRIPT_ADVANCE
 
@@ -7448,7 +7442,7 @@ _SCRIPT_ENGINE.cmd_1F:                            ; set loop address = current+1
     LDY     #$00
     LDA     (SCRIPT_PC),Y          ; read parameter byte
     STA     SOUND_DURATION
-    JSR     SCRIPT_ACTION_INDIRECT ; → JMP (SCRIPT_ACTION_VEC)
+    JSR     SCRIPT_ACTION_INDIRECT ; -> JMP (SCRIPT_ACTION_VEC)
     JMP     (DISPATCH_VEC)         ; dispatch via action vector
     ORG     $7A4C
 SCRIPT_ACTION_INDIRECT:
@@ -7459,25 +7453,25 @@ SCRIPT_ADVANCE:
 
     JSR     SCRIPT_INC_PC       ; advance script pointer
     LDA     ATTRACT_FLAG        ; attract_flag
-    BEQ     .continue           ; not attract mode → skip input check
+    BEQ     .continue           ; not attract mode -> skip input check
 
     ; Attract mode: check keyboard
     LDA     $C000               ; keyboard register
-    BPL     .check_joy          ; no key → check joystick
-    RTS                         ; key pressed → exit
+    BPL     .check_joy          ; no key -> check joystick
+    RTS                         ; key pressed -> exit
 
 .check_joy:
     LDA     INPUT_MODE          ; joystick flag
-    BEQ     .continue           ; no joystick → continue script
+    BEQ     .continue           ; no joystick -> continue script
     LDX     #$00
     LDA     $C061,X             ; button 0
     BPL     .btn1               ; not pressed
-    RTS                         ; pressed → exit
+    RTS                         ; pressed -> exit
 .btn1:
     INX
     LDA     $C061,X             ; button 1
-    BPL     .continue           ; not pressed → continue
-    RTS                         ; pressed → exit
+    BPL     .continue           ; not pressed -> continue
+    RTS                         ; pressed -> exit
 
 .continue:
     LSR     WAIT_LOOP_COUNT     ; shift timing flag
@@ -7561,6 +7555,7 @@ S_PRESS_SPACE:
 S_PRESS_BUTTON:
     HEX 20 A0 A0 D0 D2 C5 D3 D3 A0 D4 C8 C5 A0 C2 D5 D4 D4 CF CE A0 D4 CF A0 C3 CF CE D4 C9 CE D5 C5 A0 A0
     ORG     $80A4
+s_PRINT_FONT_CHAR:
     HEX     09 ; num chars in this string
     HEX     81 ; ctrl-A (set character set)
     HEX     B1 ; CHAR_CHARSET (self-modified)
@@ -7571,7 +7566,6 @@ S_PRESS_BUTTON:
     HEX     A0 ; CHAR_LOWER_LEFT (self-modified)
     HEX     A0 ; CHAR_LOWER_RIGHT (self-modified)
     HEX     84 ; ctrl-D (complete block data)
-
     ORG     $80AE
 SCRIPT_TABLE:
     DC.W    $80C6 ; script 0
@@ -8440,7 +8434,7 @@ _VERIFY_DATA_FIELD.check_d5:
     LDA     DISK_DATA_REG    ; read nibble
     BPL     *-3
     BIT     $C000            ; timing sync
-    BANE    #$AF,_VERIFY_DATA_FIELD.bad_nibble ; mismatch → error
+    BANE    #$AF,_VERIFY_DATA_FIELD.bad_nibble ; mismatch -> error
     DEY
     BNE     .read_secondary
 
@@ -8449,7 +8443,7 @@ _VERIFY_DATA_FIELD.check_d5:
     LDA     DISK_DATA_REG    ; read nibble
     BPL     *-3
     BIT     $C000            ; timing sync
-    BANE    #$AF,_VERIFY_DATA_FIELD.bad_nibble ; mismatch → error
+    BANE    #$AF,_VERIFY_DATA_FIELD.bad_nibble ; mismatch -> error
     DEY
     BNE     .read_primary
 
@@ -8496,12 +8490,12 @@ DISK_VM_BYTECODE:
 ; CALL $B3A8 (disk read sub); BNZ $B394 (retry on error)
     HEX     05 34 1e
 ; GOTO $B3A5 (exit OK path, skipping retry)
-    HEX     02 08 1e ;BNZ $B394 (if error → retry)
-    HEX     0c 39 1e ;GOTO $B3A5 (success → exit)
+    HEX     02 08 1e ;BNZ $B394 (if error -> retry)
+    HEX     0c 39 1e ;GOTO $B3A5 (success -> exit)
 ; --- Retry (second attempt, at $B394) ---
 ; CALL $B3A8; BNZ $B39D (error handler)
     HEX     05 34 1e
-    HEX     02 01 1e ;BNZ $B39D (if error → handler)
+    HEX     02 01 1e ;BNZ $B39D (if error -> handler)
 ; GOTO $B3A5 (exit OK)
     HEX     0c 39 1e
 ; --- Error handler at $B39D ---
@@ -8513,14 +8507,14 @@ DISK_VM_BYTECODE:
 ; --- Disk read subroutine at $B3A8 ---
 ; LDA_ABS $C0E9 (motor on)
     HEX     04 75 6d
-; LDA_IMM #$FF; CALL1 $FCA8 (ROM WAIT)  ×2  (motor spin-up delay)
+; LDA_IMM #$FF; CALL1 $FCA8 (ROM WAIT)  x2  (motor spin-up delay)
     HEX     03 85 01 34 51
     HEX     03 85 01 34 51
 ; LDA_ABS $C0EE (Q7L = read mode)
     HEX     04 72 6d
 ; LDA_IMM #$00; STA_ABS $B5E2 (clear error accumulator)
     HEX     03 7a 06 7e 18
-; CALL $B3D0 ×4 (half-track verification passes)
+; CALL $B3D0 x4 (half-track verification passes)
     HEX     05 4c 1e
     HEX     05 4c 1e
     HEX     05 4c 1e
@@ -8534,11 +8528,11 @@ DISK_VM_BYTECODE:
     HEX     03 79 06 d1 19
 ; CALL1 $B44E (READ_AND_VERIFY)
     HEX     01 d2 19
-; LDA_ABS $C0E7 (phase 3 on — half-track step)
+; LDA_ABS $C0E7 (phase 3 on -- half-track step)
     HEX     04 7b 6d
-; CALL1 $B44E ×2
+; CALL1 $B44E x2
     HEX     01 d2 19 01 d2 19
-; LDA_ABS $C0E1 (phase 0 on — half-track step)
+; LDA_ABS $C0E1 (phase 0 on -- half-track step)
     HEX     04 7d 6d
 ; CALL $B46B (PARK_STEPPER sub)
     HEX     05 f7 19
@@ -8548,9 +8542,9 @@ DISK_VM_BYTECODE:
     HEX     01 d2 19
 ; LDA_ABS $C0E7 (phase 3 on)
     HEX     04 7b 6d
-; CALL1 $B44E ×2
+; CALL1 $B44E x2
     HEX     01 d2 19 01 d2 19
-; LDA_ABS $C0E5 (phase 2 on — half-track step)
+; LDA_ABS $C0E5 (phase 2 on -- half-track step)
     HEX     04 79 6d
 ; CALL $B46B (PARK_STEPPER); RET
     HEX     05 f7 19 08
@@ -8603,7 +8597,7 @@ _VERIFY_DATA_FIELD.got_96:
     STA     $50                ; last decoded value (sector on final iter)
     DEY
     STX     SEARCH_RETRY_COUNT ; save remaining retry count
-    BPL     .decode_pair       ; Y: 2→1→0→FF (3 iterations)
+    BPL     .decode_pair       ; Y: 2->1->0->FF (3 iterations)
 
     CLC                        ; success
     LDX     #$01
@@ -8614,11 +8608,11 @@ SEARCH_RETRY_COUNT:
     ORG     $B44E
 READ_AND_VERIFY:
     JSR     SEARCH_ADDR_FIELD   ; find D5 AA 96 address prologue
-    BCS     .skip_verify        ; no address field → skip data verify
+    BCS     .skip_verify        ; no address field -> skip data verify
     JSR     VERIFY_DATA_FIELD   ; verify D5 AA AD data field
 .skip_verify:
     LDA     #$00
-    ADC     DISK_VM_ERROR_ACCUM ; carry → error count
+    ADC     DISK_VM_ERROR_ACCUM ; carry -> error count
     STA     DISK_VM_ERROR_ACCUM
 ; --- Turn off all stepper motor phases ---
     LDA     $C0E0               ; phase 0 off
@@ -8628,7 +8622,7 @@ READ_AND_VERIFY:
     RTS
     ORG     $B46B
 DISK_VM_SUB_PARK_STEPPER:
-; LDA_IMM #$70; CALL1 $B482 (DELAY_LOOP)  — long delay
+; LDA_IMM #$70; CALL1 $B482 (DELAY_LOOP)  -- long delay
     HEX     03 0a 01 1e 19
 ; LDA_ABS $C0E0 (phase 0 off)
     HEX     04 7c 6d
@@ -8638,7 +8632,7 @@ DISK_VM_SUB_PARK_STEPPER:
     HEX     04 78 6d
 ; LDA_ABS $C0E6 (phase 3 off)
     HEX     04 7a 6d
-; LDA_IMM #$28; CALL1 $B482 (DELAY_LOOP)  — short delay
+; LDA_IMM #$28; CALL1 $B482 (DELAY_LOOP)  -- short delay
     HEX     03 52 01 1e 19
 ; RET
     HEX     08
@@ -8679,7 +8673,7 @@ DISK_VM_DISPATCH:
     PHA                           ; save X
     TYA
     PHA                           ; save Y
-    JSR     DISK_VM_PULL_IP       ; pull IP from stack → $52/$53
+    JSR     DISK_VM_PULL_IP       ; pull IP from stack -> $52/$53
     PLA
     STA     $52                   ; \ restore as VM instruction pointer
     PLA                           ;  | (values set by DISK_VM_PULL_IP
@@ -8698,7 +8692,7 @@ DISK_VM_RESUME:
 
 ; --- VM opcode handler table ---
 ; Each byte is the low address of a handler in page $B5.
-; Opcode index → handler address ($B5xx).
+; Opcode index -> handler address ($B5xx).
 DISK_VM_HANDLER_TBL:
     HEX     79 27 55 5f 6d 8a ad b9 a2 4f ce 26 00
     ORG     $B4CC
@@ -8723,7 +8717,7 @@ DISK_VM_DATA_B4DE:
     HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     ORG     $B500
 DISK_VM_OP_GOTO:
-    JSR     DISK_VM_READ_ADDR ; read target → $54/$55
+    JSR     DISK_VM_READ_ADDR ; read target -> $54/$55
 DISK_VM_SET_IP:
     LDA     $54               ; \ set IP = operand
     STA     $52               ;  |
@@ -8751,12 +8745,12 @@ DISK_VM_READ_ADDR:
     ORG     $B527
 DISK_VM_OP_CALL1:
     SUBROUTINE DISK_VM_OP_CALL1
-    JSR     DISK_VM_READ_ADDR ; read native addr → $54/$55
+    JSR     DISK_VM_READ_ADDR ; read native addr -> $54/$55
     TYA
     PHA                       ; save Y (bytecode offset)
     LDA     $56               ; A = VM accumulator
     JSR     DISK_VM_JMP_IND   ; call native routine via JMP ($54)
-    STA     $56               ; capture return A → accumulator
+    STA     $56               ; capture return A -> accumulator
     PLA
     TAY                       ; restore Y
     JMP     DISK_VM_RESUME    ; dispatch next opcode
@@ -8784,15 +8778,15 @@ DISK_VM_PULL_IP:
     JMP     ($54)     ; resume at inner return + 1
     ORG     $B54F
 DISK_VM_OP_CALL0:
-    JSR     DISK_VM_READ_ADDR ; read native addr → $54/$55
+    JSR     DISK_VM_READ_ADDR ; read native addr -> $54/$55
 DISK_VM_JMP_IND:
     JMP     ($54)             ; indirect jump (no return to VM)
     ORG     $B555
 DISK_VM_OP_BNZ:
-    JSR     DISK_VM_READ_ADDR ; read branch target → $54/$55
+    JSR     DISK_VM_READ_ADDR ; read branch target -> $54/$55
     LDA     $56               ; test accumulator
-    BNE     DISK_VM_SET_IP    ; nonzero → branch (reuse GOTO tail)
-    JMP     DISK_VM_RESUME    ; zero → continue
+    BNE     DISK_VM_SET_IP    ; nonzero -> branch (reuse GOTO tail)
+    JMP     DISK_VM_RESUME    ; zero -> continue
     ORG     $B55F
 DISK_VM_OP_LDA_IMM:
     LDA     ($52),Y ; read encrypted byte
@@ -8805,7 +8799,7 @@ DISK_VM_OP_LDA_IMM:
     JMP     DISK_VM_RESUME
     ORG     $B56D
 DISK_VM_OP_LDA_ABS:
-    JSR     DISK_VM_READ_ADDR ; read address → $54/$55
+    JSR     DISK_VM_READ_ADDR ; read address -> $54/$55
 DISK_VM_LOAD_IND:
     LDX     #$00
     LDA     ($54,X)           ; ACC = *(address)
@@ -8814,7 +8808,7 @@ DISK_VM_LOAD_IND:
     ORG     $B579
 DISK_VM_OP_LDA_IDX:
     SUBROUTINE DISK_VM_OP_LDA_IDX
-    JSR     DISK_VM_READ_ADDR ; read base addr → $54/$55
+    JSR     DISK_VM_READ_ADDR ; read base addr -> $54/$55
     LDA     $56               ; index = old accumulator
     CLC
     ADC     $54               ; base_lo + index
@@ -8822,11 +8816,11 @@ DISK_VM_OP_LDA_IDX:
     BCC     .no_carry
     INC     $55               ; propagate carry
 .no_carry:
-    JMP     DISK_VM_LOAD_IND  ; load from ($54/$55) → ACC
+    JMP     DISK_VM_LOAD_IND  ; load from ($54/$55) -> ACC
     ORG     $B58A
 DISK_VM_OP_CALL:
     SUBROUTINE DISK_VM_OP_CALL
-    JSR     DISK_VM_READ_ADDR ; read target → $54/$55
+    JSR     DISK_VM_READ_ADDR ; read target -> $54/$55
     TYA
     CLC
     ADC     $52               ; \ resolve absolute IP
@@ -8850,7 +8844,7 @@ DISK_VM_OP_RET:
     JMP     DISK_VM_RESUME
     ORG     $B5AD
 DISK_VM_OP_STA_ABS:
-    JSR     DISK_VM_READ_ADDR ; read address → $54/$55
+    JSR     DISK_VM_READ_ADDR ; read address -> $54/$55
     LDA     $56               ; A = accumulator
     LDX     #$00
     STA     ($54,X)           ; *(address) = ACC
@@ -8871,7 +8865,7 @@ DISK_VM_OP_SUB_IMM:
     JMP     DISK_VM_RESUME
     ORG     $B5CE
 DISK_VM_OP_INC_LOAD:
-    JSR     DISK_VM_READ_ADDR ; read address → $54/$55
+    JSR     DISK_VM_READ_ADDR ; read address -> $54/$55
     LDX     #$00
     LDA     ($54,X)           ; read current value
     CLC

@@ -32,7 +32,7 @@ def read_track(dsk, track, base_page, mem):
         if 0 <= dest and dest + 256 <= SIZE:
             mem[dest:dest + 256] = dsk[file_pos:file_pos + 256]
 def funny_inc_gen(bot=2, top=3):
-    """Yield the ealdr_funny_inc key sequence: 1,2,3, 1,2,3,4, ..."""
+    """Yield the EALDR_FUNNY_INC key sequence: 1,2,3, 1,2,3,4, ..."""
     while True:
         bot += 1
         if bot == top:
@@ -73,9 +73,9 @@ def main():
     dxr_decrypt(mem)
 
     # Copy EALDR $A300-$A5FF -> $0500-$07FF
-    ealdr_src = 0xA300 - 0xA000  # offset in ealdr.bin
+    EALDR_SRC = 0xA300 - 0xA000  # offset in ealdr.bin
     mem_dest = 0x0500 - BASE_ADDR
-    mem[mem_dest:mem_dest + 0x300] = ealdr[ealdr_src:ealdr_src + 0x300]
+    mem[mem_dest:mem_dest + 0x300] = ealdr[EALDR_SRC:EALDR_SRC + 0x300]
 
     with open(OUTPUT_FILE, "wb") as f:
         f.write(mem)

@@ -4557,15 +4557,14 @@ Here is a screenshot of that character, cut from the splash screen:
 The violet line goes all the way across the character in that image because it is followed by another font
 character with that line, so the lines connect according to the pixel color rules.
 
+\chapter{The HRCG Text Engine}
+
 The Hi-Res Character Generator (HRCG) is a library provided by the Applesoft Toolkit
 which allows a developer to display a custom font. Applesoft Toolkit also
 contains Animatrix, which is a utility used to create fonts for the HRCG.
 
 The \href{https://archive.org/details/applesoft-toolkit}{manual for the Applesoft Toolkit}
 can be found on the Internet Archive.
-
-The new output handler installed by the HRCG is called whenever [[COUT]] is called.
-[[A]] contains the character to output.
 
 The HRCG defines 96 characters as a character set. These characters are the
 ``printing'' characters, which are ASCII 32 (space) through 127 (delete).
@@ -4588,19 +4587,14 @@ Thus, each character is 14x16.
 
 Here are the font characters. There are 120 defined: 96 for character set 1,
 and 24 for character set 2. Characters 114-119 (character set 2, characters 18-23)
-form the EA logo that is displayed on the splash screen.
+form the EA logo that is displayed on the splash screen. Then character set 0
+defines the fallback characters 32 through 127.
 
 <<font data>>=
     ORG     $83A5
 FONT_DATA:
     INCLUDE "fontdata.asm"
 @ %def FONT_DATA
-@ The standard Apple II character set is also needed for fallback rendering and
-for the text-mode status area.  The HRCG library stores this as 96 characters
-(ASCII [[$20]]--[[$7F]]), each 8~bytes tall and 7~pixels wide---the same
-format as the Apple II ROM character generator, but stored in RAM where the
-HRCG can access it directly.  This data lives at [[$97A5--$9AA4]], just above
-the HRCG code.
 
 <<std font data>>=
     ORG     $97A5
@@ -4608,12 +4602,9 @@ STD_FONT_DATA:
     INCLUDE "stdfontdata.asm"
 @ %def STD_FONT_DATA
 
-\chapter{The HRCG Text Engine}
-
 \input{font_data.tex}
 
-The Hi-Res Character Generator (HRCG) is a third-party Apple II library
-(``HI-RES CHAR GEN VERSION 1.0'') that hooks the character output (CSW)
+The HRCG hooks the character output (CSW)
 and keyboard input (KSW) vectors to render text on the hi-res graphics
 screen.  The library is self-contained at \$92A8--\$97A4 and provides:
 \begin{itemize}
@@ -8299,8 +8290,9 @@ S_PRESS_SPACE:
 S_PRESS_BUTTON:
     APSTR   "  PRESS THE BUTTON TO CONTINUE  "
 @ %def S_PRESS_SPACE S_PRESS_BUTTON
-@ The block-display control string at [[$80A4]] is the data that
-[[RENDER_FONT_CHAR]] passes to [[PRINT_STRING]].  It is a 9-byte
+@ [[s_PRINT_FONT_CHAR]] at [[$80A4]] is the 10-byte self-modifying HRCG
+control string that [[RENDER_FONT_CHAR]] patches with character-set and
+glyph codes before passing to [[PRINT_STRING]].  It is a 9-byte
 self-modifying string: the routine patches [[CHAR_CHARSET]],
 [[CHAR_UPPER_LEFT]], [[CHAR_UPPER_RIGHT]], [[CHAR_LOWER_LEFT]], and
 [[CHAR_LOWER_RIGHT]] in place before each call.  The HRCG control codes
@@ -8318,6 +8310,7 @@ CHAR_UPPER_LEFT     EQU     $80A8
 
 <<print font char data>>=
     ORG     $80A4
+s_PRINT_FONT_CHAR:
     HEX     09 ; num chars in this string
     HEX     81 ; ctrl-A (set character set)
     HEX     B1 ; CHAR_CHARSET (self-modified)
@@ -8328,8 +8321,7 @@ CHAR_UPPER_LEFT     EQU     $80A8
     HEX     A0 ; CHAR_LOWER_LEFT (self-modified)
     HEX     A0 ; CHAR_LOWER_RIGHT (self-modified)
     HEX     84 ; ctrl-D (complete block data)
-
-@ Duplicate code chunk removed — RENDER_FONT_CHAR at $7489 already defines this.
+@ %def s_PRINT_FONT_CHAR
 
 The [[PLOT_CHAR]] routine prints the character number in [[A]], at the text
 coordinate in [[X]] and [[Y]].
@@ -9343,16 +9335,9 @@ remainder.  These values are patched into a pre-built HRCG control string
 that sets block-display mode, selects the character set, and emits the four
 character codes.  [[PRINT_STRING]] then sends this string to HRCG, which
 renders the 2$\times$2 block at the cursor position.
+
 [[PRINT_FONTCHAR_AT_TEXT_POS]] is an alternate entry point that skips the
 position conversion, useful when the caller has already set [[$24/$25]].
-
-@ [[s_PRINT_FONT_CHAR]] at [[$80A4]] is the 10-byte self-modifying HRCG
-control string that [[RENDER_FONT_CHAR]] patches with character-set and
-glyph codes before passing to [[PRINT_STRING]].
-
-<<defines>>=
-s_PRINT_FONT_CHAR   EQU     $80A4   ; 10 bytes
-@ %def s_PRINT_FONT_CHAR
 
 <<render font char>>=
     ORG     $7489
@@ -15643,7 +15628,7 @@ SCRIPT_ENGINE_FETCH:
     LDA     (SCRIPT_PC),Y    ; read script byte
     CMP     #$27
     BCC     .control         ; < $27 -> control command
-    JMP     .action          ; ≥ $27 -> action dispatch
+    JMP     .action          ; >= $27 -> action dispatch
 @
 \subsubsection{Control commands (< \$27)}
 
