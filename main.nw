@@ -17288,9 +17288,6 @@ The following root chunks produce the assembly files when tangled.
 
 <<main.asm>>=
     PROCESSOR 6502
-<<Macros>>
-<<zero page defines>>
-<<defines>>
 <<stub entry>>
 <<attract loop>>
 <<resident data and bytecodes>>
@@ -17567,6 +17564,9 @@ The following root chunks produce the assembly files when tangled.
 <<disk vm error accum>>
 <<disk vm saved state>>
 <<dos33 rwts>>
+<<Macros>>
+<<zero page defines>>
+<<defines>>
 @
 
 <<fontdata.asm>>=
