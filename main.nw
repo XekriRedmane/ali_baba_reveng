@@ -7801,8 +7801,8 @@ FIND_PREV_PC:
 @ [[INIT_CHAR_SELECT]] is a scene event handler entry point.  It marks
 the event as handled ([[SCENE_EVENT_RESULT]]~=~1), calls [[SCENE_SETUP]]
 to initialize the scene, then searches for the first player character.
-If found (carry clear), it jumps to the character selection menu display
-at \$63E8.  If no player characters exist (carry set), it falls back to
+If found (carry clear), it jumps to [[ENTER_CHAR_SELECT]].
+If no player characters exist (carry set), it falls back to
 [[MOVE_LOOP]].
 
 <<find first pc>>=
@@ -7814,7 +7814,7 @@ INIT_CHAR_SELECT:
     BCC     .found             ; carry clear -> found
     JMP     MOVE_LOOP          ; carry set -> no PCs, back to main loop
 .found:
-    JMP     $63E8              ; -> character selection menu display
+    JMP     ENTER_CHAR_SELECT  ; -> character selection menu
 @ %def INIT_CHAR_SELECT
 The scene loop calls [[$A478]] (a resident routine from EALDR, still in
 memory at [[$A000]]--[[$BFFF]]) each iteration to check for user input.
@@ -12320,7 +12320,10 @@ OTHER_OPTIONS_TABLE:
     HEX     01 55 02 01 05 06 DC 7A E9 6E
     HEX     01 15 06 05 01 02 45 7D F1 61
     HEX     01 3D 04 06 02 03 E7 7A E7 09
-    HEX     01 65 05 04 03 01 EE 7A EF 63
+    ; rec5: ADD SOMEONE
+    HEX     01 65 05 04 03 01
+    DC.W    $7AEE              ; "ADD SOMEONE"
+    DC.W    CHAR_SELECT_INIT
 @ %def OTHER_OPTIONS_TABLE
 
 <<other options entry>>=
@@ -12358,7 +12361,10 @@ GAME_SETTINGS_TABLE:
     HEX     01 66 00 00 00 00 1B 7B 6B 62
     HEX     01 73 03 03 05 08 60 7B 2D 62
     HEX     01 75 04 04 07 01 62 7B 36 62
-    HEX     01 2B 01 05 04 05 11 7B 6C 63
+    ; rec8: SAVE GAME
+    HEX     01 2B 01 05 04 05
+    DC.W    $7B11              ; "SAVE GAME"
+    DC.W    ENTER_SAVE_GAME_SLOT
 @ %def GAME_SETTINGS_TABLE
 
 <<game settings entry>>=
@@ -12478,26 +12484,379 @@ MENU_DROP_DEC:
 <<save load table>>=
     ORG     $62B9
 SAVE_LOAD_TABLE:
-    ; 4 options, max_range=1, init=$62EC
-    HEX     04 01 EC 62
-    ; rec0: NEW GAME   rec1: CONTINUE   rec2: # (up)   rec3: @ (down)
-    HEX     01 05 02 02 00 00 F3 7B 6B 62
-    HEX     01 55 01 01 04 03 DB 7B C8 69
-    HEX     01 6F 01 01 02 04 60 7B 0F 63
-    HEX     01 71 01 01 03 02 62 7B 15 63
+    ; 4 options, max_range=1, init=SAVE_LOAD_INIT
+    DC.B    $04,$01
+    DC.W    SAVE_LOAD_INIT
+    ; rec0: NEW GAME
+    HEX     01 05 02 02 00 00
+    DC.W    $7BF3              ; "BEGIN NEW GAME"
+    DC.W    $626B              ; no-op init
+    ; rec1: CONTINUE GAME NUMBER NN
+    HEX     01 55 01 01 04 03
+    DC.W    $7BDB              ; "CONTINUE GAME NUMBER NN"
+    DC.W    $69C8              ; continue game handler
+    ; rec2: # (increment slot)
+    HEX     01 6F 01 01 02 04
+    DC.W    $7B60              ; "#"
+    DC.W    SLOT_INC_ENTER
+    ; rec3: @ (decrement slot)
+    HEX     01 71 01 01 03 02
+    DC.W    $7B62              ; "@"
+    DC.W    SLOT_DEC_ENTER
 @ %def SAVE_LOAD_TABLE
 
+@ \subsection{Save/load slot routines (\$62EC--\$633F)}
+
+[[SAVE_LOAD_INIT]] is the initialization callback for the save/load menu
+([[SAVE_LOAD_TABLE]]).  It calls [[FORMAT_SLOT_NUMBER]] to display the
+current slot number, then returns.
+
+<<defines>>=
+SLOT_NUMBER         EQU     $7AC0   ; current save/load slot number
+MAX_SLOT_NUMBER     EQU     $7AC6   ; maximum slot number
+S_CONTINUE_TENS     EQU     $7BF1   ; tens digit in "CONTINUE GAME NUMBER NN"
+S_CONTINUE_ONES     EQU     $7BF2   ; ones digit in "CONTINUE GAME NUMBER NN"
+S_SAVE_SLOT_TENS    EQU     $7D81   ; tens digit in "SAVE GAME IN SLOT NUMBER 00"
+S_SAVE_SLOT_ONES    EQU     $7D82   ; ones digit in "SAVE GAME IN SLOT NUMBER 00"
+@ %def SLOT_NUMBER MAX_SLOT_NUMBER S_CONTINUE_TENS S_CONTINUE_ONES S_SAVE_SLOT_TENS S_SAVE_SLOT_ONES
+
+<<save load init>>=
+    ORG     $62EC
+SAVE_LOAD_INIT:
+    JSR     FORMAT_SLOT_NUMBER ; format current slot number into strings
+    RTS
+@ %def SAVE_LOAD_INIT
+
+@ [[SLOT_INC]] increments [[SLOT_NUMBER]].  If the result exceeds
+[[MAX_SLOT_NUMBER]], it clamps back.  Either way, it patches the menu
+record via [[$6071]] and reformats the display.
+
+[[SLOT_DEC]] decrements [[SLOT_NUMBER]].  If it reaches zero, it wraps
+back to~1.
+
+[[SLOT_UPDATE]] patches the current menu record via [[$6071]], then
+jumps to [[FORMAT_SLOT_NUMBER]] to redisplay the number.
+
+[[SLOT_INC_ENTER]] and [[SLOT_DEC_ENTER]] are the menu handlers for the
+\# and @ arrow keys in the save/load menu.  They adjust the slot number
+and re-enter [[INIT_WORLD]] (which presents the save/load menu).
+
+[[FORMAT_SLOT_NUMBER]] converts [[SLOT_NUMBER]] (1--19) into two
+high-ASCII decimal digits and writes them into both the ``CONTINUE GAME
+NUMBER'' and ``SAVE GAME IN SLOT NUMBER'' display strings.  Values below
+10 get a leading space; values 10--19 get a ``1'' tens digit.
+
+<<slot number routines>>=
+    ORG     $62F0
+SLOT_INC:
+    INC     SLOT_NUMBER
+    LDA     SLOT_NUMBER
+    CMP     MAX_SLOT_NUMBER
+    BCC     SLOT_UPDATE        ; still below max -> update display
+    DEC     SLOT_NUMBER        ; undo: clamp to max
+    JMP     SLOT_UPDATE
+
+SLOT_DEC:
+    DEC     SLOT_NUMBER
+    BNE     SLOT_UPDATE        ; nonzero -> update display
+    INC     SLOT_NUMBER        ; undo: wrap 0 -> 1
+
+SLOT_UPDATE:
+    JSR     $6071              ; patch menu record
+    JMP     FORMAT_SLOT_NUMBER
+
+SLOT_INC_ENTER:
+    JSR     SLOT_INC
+    JMP     INIT_WORLD
+
+SLOT_DEC_ENTER:
+    JSR     SLOT_DEC
+    JMP     INIT_WORLD
+
+FORMAT_SLOT_NUMBER:
+    LDA     #$A0               ; space (high ASCII)
+    STA     S_CONTINUE_TENS    ; default tens digit to space
+    STA     S_SAVE_SLOT_TENS
+    LDA     SLOT_NUMBER
+    CMP     #$0A               ; >= 10?
+    BCC     .ones              ; no -> skip tens
+    SEC
+    SBC     #$0A               ; remainder
+    PHA
+    LDA     #$B1               ; "1" (high ASCII)
+    STA     S_CONTINUE_TENS
+    STA     S_SAVE_SLOT_TENS
+    PLA
+.ones:
+    ORA     #$B0               ; convert 0-9 to high ASCII digit
+    STA     S_CONTINUE_ONES
+    STA     S_SAVE_SLOT_ONES
+    RTS
+@ %def SLOT_INC SLOT_DEC SLOT_UPDATE SLOT_INC_ENTER SLOT_DEC_ENTER FORMAT_SLOT_NUMBER
+
+@ \subsection{Save game slot menu (\$6340--\$637E)}
+
+The save game slot menu is entered from the ``SAVE GAME'' option in the
+game settings menu.  It presents four options:
+\begin{itemize}
+\item MOVE --- return to the game ([[MOVE_LOOP]])
+\item SAVE GAME IN SLOT NUMBER NN --- save to the current slot (handler at \$6A47)
+\item \# --- increment slot number ([[SLOT_INC_REENTER]])
+\item @ --- decrement slot number ([[SLOT_DEC_REENTER]])
+\end{itemize}
+
+<<save game slot table>>=
+    ORG     $6340
+SAVE_GAME_SLOT_TABLE:
+    ; 4 options, max_range=2, init=FORMAT_SLOT_NUMBER
+    DC.B    $04,$02
+    DC.W    FORMAT_SLOT_NUMBER
+    ; rec0: MOVE
+    HEX     01 04 02 02 02 02
+    DC.W    $7D53              ; "MOVE"
+    DC.W    MOVE_LOOP
+    ; rec1: SAVE GAME IN SLOT NUMBER NN
+    HEX     01 2C 01 01 04 03
+    DC.W    $7D67              ; "SAVE GAME IN SLOT NUMBER 00"
+    DC.W    $6A47              ; disk save handler
+    ; rec2: # (increment)
+    HEX     01 49 01 01 02 04
+    DC.W    $7B60              ; "#"
+    DC.W    SLOT_INC_REENTER
+    ; rec3: @ (decrement)
+    HEX     01 4B 01 01 03 02
+    DC.W    $7B62              ; "@"
+    DC.W    SLOT_DEC_REENTER
+@ %def SAVE_GAME_SLOT_TABLE
+
+@ [[ENTER_SAVE_GAME_SLOT]] is the entry point for the save game slot menu,
+called from the ``SAVE GAME'' handler in the game settings menu.
+[[SLOT_DEC_REENTER]] and [[SLOT_INC_REENTER]] adjust the slot number and
+re-enter the save game slot menu.
+
+<<save game slot entry>>=
+    ORG     $636C
+ENTER_SAVE_GAME_SLOT:
+    LDX     #>SAVE_GAME_SLOT_TABLE
+    LDY     #<SAVE_GAME_SLOT_TABLE
+    JMP     INPUT_LOOP
+
+SLOT_DEC_REENTER:
+    JSR     SLOT_DEC
+    JMP     ENTER_SAVE_GAME_SLOT
+
+SLOT_INC_REENTER:
+    JSR     SLOT_INC
+    JMP     ENTER_SAVE_GAME_SLOT
+@ %def ENTER_SAVE_GAME_SLOT SLOT_DEC_REENTER SLOT_INC_REENTER
+
+@ \subsection{Scenario disk menu (\$637F--\$63A7)}
+
+The scenario disk menu presents three options for managing save game
+disks.  It is invoked from event script~59 (ROY G.~BIV):
+\begin{itemize}
+\item USE PREVIOUSLY FORMATTED SCENARIO DISK (handler at \$6AA1)
+\item FORMAT AND USE NEW SCENARIO DISK (handler at \$6A7F)
+\item CANCEL REQUEST (handler at \$6A6E)
+\end{itemize}
+
+<<scenario disk table>>=
+    ORG     $637F
+SCENARIO_DISK_TABLE:
+    ; 3 options, max_range=1, init=$626B (RTS = no-op)
+    DC.B    $03,$01
+    DC.W    $626B
+    ; rec0: USE PREVIOUSLY FORMATTED SCENARIO DISK
+    HEX     01 00 03 02 00 00
+    DC.W    $7C02              ; "USE PREVIOUSLY FORMATTED SCENARIO DISK"
+    DC.W    $6AA1              ; use existing disk handler
+    ; rec1: FORMAT AND USE NEW SCENARIO DISK
+    HEX     01 28 01 03 00 00
+    DC.W    $7C29              ; "FORMAT AND USE NEW SCENARIO DISK"
+    DC.W    $6A7F              ; format new disk handler
+    ; rec2: CANCEL REQUEST
+    HEX     01 50 02 01 00 00
+    DC.W    $7C4A              ; "CANCEL REQUEST"
+    DC.W    $6A6E              ; cancel handler
+@ %def SCENARIO_DISK_TABLE
+
+@ [[ENTER_SCENARIO_DISK]] is the entry point called from event scripts.
+
+<<scenario disk entry>>=
+    ORG     $63A1
+ENTER_SCENARIO_DISK:
+    LDX     #>SCENARIO_DISK_TABLE
+    LDY     #<SCENARIO_DISK_TABLE
+    JMP     INPUT_LOOP
+@ %def ENTER_SCENARIO_DISK
+
+@ \subsection{Character selection menu (\$63A8--\$6457)}
+
+The character selection menu is used when the player is asked to choose
+a character---for example, when an NPC offers to join the party (``ADD
+SOMEONE'') or when the game needs a specific character selected.  Six
+options are available:
+\begin{itemize}
+\item MOVE --- return to the game ([[MOVE_LOOP]])
+\item ADD [name] --- add the currently displayed character ([[INIT_CHAR_SELECT]])
+\item \# --- browse to the next PC ([[CHAR_SELECT_NEXT]])
+\item @ --- browse to the previous PC ([[CHAR_SELECT_PREV]])
+\item TO THIS ROOM --- transport character here ([[CHAR_SELECT_HERE]])
+\item TO ALI BABA'S HOME --- send character home ([[CHAR_SELECT_HOME]])
+\end{itemize}
+
+Records~4 and~5 are dynamically enabled by [[CHAR_SELECT_INIT]] based on
+whether [[CURRENT_PLAYER]] equals~9.  The table's [[max\_range]] is also
+patched at runtime.
+
+<<char select table>>=
+    ORG     $63A8
+CHAR_SELECT_TABLE:
+    ; 6 options, max_range=2, init=$626B (patched at runtime)
+    DC.B    $06,$02
+    DC.W    $626B
+    ; rec0: MOVE
+    HEX     01 05 06 02 06 02
+    DC.W    $7D53              ; "MOVE"
+    DC.W    MOVE_LOOP
+    ; rec1: ADD [character name]
+    HEX     01 2D 01 05 01 03
+    DC.W    $7B47              ; "ADD" + CHAR_SELECT_NAME buffer
+    DC.W    INIT_CHAR_SELECT   ; add character handler
+    ; rec2: # (next PC)
+    HEX     01 49 01 05 02 04
+    DC.W    $7B60              ; "#"
+    DC.W    CHAR_SELECT_NEXT
+    ; rec3: @ (previous PC)
+    HEX     01 4B 01 05 03 05
+    DC.W    $7B62              ; "@"
+    DC.W    CHAR_SELECT_PREV
+    ; rec4: TO THIS ROOM (dynamically enabled)
+    HEX     01 55 02 06 04 06
+    DC.W    $7B27              ; "TO THIS ROOM"
+    DC.W    CHAR_SELECT_HERE
+    ; rec5: TO ALI BABA'S HOME (dynamically enabled)
+    HEX     00 55 05 01 05 01
+    DC.W    $7B34              ; "TO ALI BABA'S HOME"
+    DC.W    CHAR_SELECT_HOME
+@ %def CHAR_SELECT_TABLE
+
+@ [[ENTER_CHAR_SELECT]] loads the character selection table and enters
+[[INPUT_LOOP]].  This is the jump target from [[INIT_CHAR_SELECT]] at
+\$0B4F.
+
+[[CHAR_SELECT_INIT]] is called when the ``Add Someone'' option is
+selected from the ``Other Options'' menu.  It calls [[FIND_FIRST_PC]]
+to locate a player character.  If none found (carry set), it displays
+message~\$35 (``YOU SAVED ME FROM MY IMPRISONMENT,'') and returns to
+[[MOVE_LOOP]].
+
+If a PC is found, it checks [[CURRENT_PLAYER]].  If equal to~9, records~4
+and~5 (TO THIS ROOM / TO ALI BABA'S HOME) are both enabled, and
+[[ACTIVE_CHAR]] is set to~1.  Otherwise, record~4 is enabled (with
+[[CURRENT_PLAYER]] stored in [[ACTIVE_CHAR]]), record~5 is disabled,
+and the table's [[max\_range]] is set to~2.  Control then jumps to
+[[ENTER_CHAR_SELECT]].
+
+[[CHAR_SELECT_NEXT]] and [[CHAR_SELECT_PREV]] browse through player
+characters.  They patch the current menu record via [[$6071]], advance
+or retreat in the PC list, then re-enter the character selection menu.
+
+[[CHAR_SELECT_HERE]] and [[CHAR_SELECT_HOME]] are the handlers for
+the ``TO THIS ROOM'' and ``TO ALI BABA'S HOME'' options.  They patch
+the table's enable flags based on [[CURRENT_PLAYER]] and re-enter the
+menu.
+
+<<char select handlers>>=
+    ORG     $63E8
+ENTER_CHAR_SELECT:
+    LDX     #>CHAR_SELECT_TABLE
+    LDY     #<CHAR_SELECT_TABLE
+    JMP     INPUT_LOOP
+
+CHAR_SELECT_INIT:
+    SUBROUTINE CHAR_SELECT_INIT
+    JSR     FIND_FIRST_PC      ; find first player character
+    BCC     CHAR_SELECT_HOME   ; carry clear -> found, enter init path
+    JSR     SET_CURSOR_ROW21   ; no PCs: position cursor
+    LDA     #$35               ; message $35: "YOU SAVED ME..."
+    JSR     DISPLAY_MESSAGE
+    JMP     MOVE_LOOP          ; back to main loop
+
+CHAR_SELECT_NEXT:
+    JSR     $6071              ; patch menu record
+    JSR     FIND_NEXT_PC_WRAP  ; advance to next PC
+    JMP     ENTER_CHAR_SELECT
+
+CHAR_SELECT_PREV:
+    JSR     $6071              ; patch menu record
+    JSR     FIND_PREV_PC       ; retreat to previous PC
+    JMP     ENTER_CHAR_SELECT
+
+; "TO THIS ROOM" handler: set ACTIVE_CHAR=1, disable rec4, -> .patch
+CHAR_SELECT_HERE:
+    LDA     #$01
+    STA     ACTIVE_CHAR
+    LDX     #$00
+    BEQ     .patch             ; always taken
+
+; "TO ALI BABA'S HOME" handler AND .found target from CHAR_SELECT_INIT.
+; If CURRENT_PLAYER==9 -> CHAR_SELECT_HERE (enable rec5, disable rec4).
+; Otherwise store CURRENT_PLAYER in ACTIVE_CHAR, disable rec5, enable rec4.
+CHAR_SELECT_HOME:
+    LDA     CURRENT_PLAYER
+    CMP     #$09
+    BEQ     CHAR_SELECT_HERE
+    STA     ACTIVE_CHAR
+    LDA     #$00               ; disable rec5
+    LDX     #$01               ; enable rec4
+
+.patch:
+    STA     CHAR_SELECT_TABLE+54 ; rec5 byte 0 (enable/disable)
+    STX     CHAR_SELECT_TABLE+44 ; rec4 byte 0 (enable/disable)
+    LDY     #$02
+    STY     CHAR_SELECT_TABLE+1  ; max_range = 2
+    JMP     ENTER_CHAR_SELECT
+@ %def ENTER_CHAR_SELECT CHAR_SELECT_INIT CHAR_SELECT_NEXT CHAR_SELECT_PREV CHAR_SELECT_HERE CHAR_SELECT_HOME
+
+@ \subsection{Alternative input table (\$6436--\$6457)}
+
+The alternative input table is used by [[START_GAME_INPUT]] for shop
+interactions and special scenes.  It has three options: ``PAY [amount]
+FOR [item]'' (handler at \$71AC), ``BUY SOMETHING ELSE'' (handler at
+\$7194), and ``NO SALE'' (return to no-op init at \$626B).
+
+<<alt input table>>=
+    ORG     $6436
+ALT_INPUT_TABLE:
+    ; 3 options, max_range=2, init=$626B (RTS = no-op)
+    DC.B    $03,$02
+    DC.W    $626B
+    ; rec0: PAY [amount] FOR [item]
+    HEX     01 05 03 02 00 00
+    DC.W    $7CFF              ; "PAY 000000 FOR ..."
+    DC.W    $71AC              ; buy handler
+    ; rec1: BUY SOMETHING ELSE
+    HEX     01 2D 01 03 00 00
+    DC.W    $7D23              ; "BUY SOMETHING ELSE"
+    DC.W    $7194              ; browse handler
+    ; rec2: NO SALE
+    HEX     01 55 02 01 00 00
+    DC.W    $7D36              ; "NO SALE"
+    DC.W    $626B              ; no-op (return)
+@ %def ALT_INPUT_TABLE
+
 @ [[START_GAME_INPUT]] enters the input loop with a pointer to the alternative
-input table at~\$6436 (X=\$64, Y=\$36).  This is used when the game needs to
-present a different set of options than the standard action menu---for example,
-during shop interactions or special scenes.
+input table at [[ALT_INPUT_TABLE]] (X=\$64, Y=\$36).  This is used when the
+game needs to present a different set of options than the standard action
+menu---for example, during shop interactions or special scenes.
 
 <<start game input>>=
     ORG     $6458
 START_GAME_INPUT:
     SUBROUTINE START_GAME_INPUT
-    LDX     #$64
-    LDY     #$36
+    LDX     #>ALT_INPUT_TABLE
+    LDY     #<ALT_INPUT_TABLE
     JMP     INPUT_LOOP
 @ %def START_GAME_INPUT
 @ [[CHECK_COMBAT_ELIGIBILITY]] determines which turn options are available to
@@ -18589,6 +18948,15 @@ The following root chunks produce the assembly files when tangled.
 <<drop gold table>>
 <<save load table>>
 <<init world>>
+<<save load init>>
+<<slot number routines>>
+<<save game slot table>>
+<<save game slot entry>>
+<<scenario disk table>>
+<<scenario disk entry>>
+<<char select table>>
+<<char select handlers>>
+<<alt input table>>
 <<start game input>>
 <<check threats here>>
 <<pickup treasure>>

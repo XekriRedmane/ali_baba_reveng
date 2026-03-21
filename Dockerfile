@@ -41,6 +41,7 @@ RUN git clone https://github.com/bethington/ghidra-mcp.git /tmp/ghidra-mcp \
     && ./ghidra-mcp-setup.sh --preflight --ghidra-path /opt/ghidra_12.0.3_PUBLIC \
     && ./ghidra-mcp-setup.sh --deploy --ghidra-path /opt/ghidra_12.0.3_PUBLIC \
     && pip3 install --break-system-packages -r /opt/ghidra_12.0.3_PUBLIC/requirements.txt \
+    && sed -i 's/if parsed.hostname in \["localhost", "127.0.0.1", "::1"\]/if parsed.hostname in ["localhost", "127.0.0.1", "::1", "host.docker.internal"]/' /opt/ghidra_12.0.3_PUBLIC/bridge_mcp_ghidra.py \
     && rm -rf /tmp/ghidra-mcp
 
 # Build dasm from source
@@ -60,7 +61,8 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Create non-root user for Claude Code --dangerously-skip-permissions
 RUN useradd -m -s /bin/bash robertbaruch \
     && mkdir -p /home/robertbaruch/.claude \
-    && chown -R robertbaruch:robertbaruch /home/robertbaruch/.claude
+    && chown -R robertbaruch:robertbaruch /home/robertbaruch/.claude \
+    && echo 'alias yolo="claude --dangerously-skip-permissions"' >> /home/robertbaruch/.bashrc
 USER robertbaruch
 
 WORKDIR /project

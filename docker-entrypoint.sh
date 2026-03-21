@@ -24,10 +24,11 @@ if 'ghidra-server' not in mcp:
     mcp['ghidra-server'] = {
         'type': 'stdio',
         'command': 'python3',
-        'args': ['/opt/ghidra_12.0.3_PUBLIC/bridge_mcp_ghidra.py'],
-        'env': {
-            'GHIDRA_SERVER_URL': 'http://host.docker.internal:8089'
-        }
+        'args': [
+            '/opt/ghidra_12.0.3_PUBLIC/bridge_mcp_ghidra.py',
+            '--ghidra-server', 'http://host.docker.internal:8089'
+        ],
+        'env': {}
     }
     proj['mcpServers'] = mcp
     with open(path, 'w') as f:

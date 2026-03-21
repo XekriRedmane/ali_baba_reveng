@@ -67,7 +67,9 @@
       "mcp__ghidra-server__search_byte_patterns",
       "Bash(pdflatex:*)",
       "Bash(curl:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "WebFetch(domain:github.com)",
+      "Bash(docker compose:*)"
     ]
   }
 }
