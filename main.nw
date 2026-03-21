@@ -7625,6 +7625,197 @@ CLAMP_CHAR_FIELD:
     STA     (MOB_PTR),Y
     RTS
 @ %def CLAMP_CHAR_FIELD
+
+\subsection{Character selection browsing (\$0AAE--\$0B61)}
+
+These routines implement character selection browsing for the scene event
+menu.  They walk the mob linked list (starting from the head pointer at
+[[$4002]]) looking for player characters (byte~4 of the mob data record
+$<$~\$15).
+
+\begin{itemize}
+\item [[FIND_FIRST_PC]] walks the list from the head, returning the first
+  player character found.
+\item [[COPY_PC_NAME_TO_BUF]] copies the selected character's name string
+  into the 20-byte display buffer at [[CHAR_SELECT_NAME]].
+\item [[FIND_NEXT_PC]] follows the link from the current [[MOB_PTR]] to
+  find the next player character, wrapping to the head if the chain ends.
+\item [[FIND_PREV_PC]] walks the entire list forward until wrapping back
+  to the current character, yielding the predecessor.
+\item [[INIT_CHAR_SELECT]] is a scene event entry point: it sets up the
+  scene, finds the first player character, and jumps to the character
+  selection menu or back to [[MOVE_LOOP]] if none found.
+\end{itemize}
+
+@ [[BROWSE_CHAR_INDEX]] holds the mob index of the currently browsed
+character during selection.  [[CHAR_SELECT_NAME]] is a 20-byte buffer
+inside the menu option strings area where the selected character's name
+is displayed.
+
+<<defines>>=
+BROWSE_CHAR_INDEX   EQU     $5A07   ; mob index of browsed character
+CHAR_SELECT_NAME    EQU     $7B4B   ; 20-byte name display buffer in menu
+@ %def BROWSE_CHAR_INDEX CHAR_SELECT_NAME
+
+@ [[FIND_FIRST_PC]] scans the mob linked list from the head pointer at
+[[$4002]], following byte-2 links.  For each mob whose byte~4 (appearance)
+is $<$~\$15 and bit~7 clear, it is a player character.  On success, copies
+the name into [[CHAR_SELECT_NAME]] and returns with carry clear.  If the
+list is exhausted (byte-2 link = 0), returns with carry set.
+
+<<find first pc>>=
+    ORG     $0AAE
+FIND_FIRST_PC:
+    SUBROUTINE FIND_FIRST_PC
+
+    LDA     $4002              ; head of character linked list
+.check:
+    CMP     #$00               ; end of list?
+    BNE     .have_entry        ; no -> examine this entry
+    SEC                        ; yes -> not found
+    RTS
+.have_entry:
+    STA     BROWSE_CHAR_INDEX  ; save current mob index
+    JSR     GET_MOB_DATA       ; -> MOB_DATA_PTR = mob record
+    LDY     #$04
+    LDA     (MOB_DATA_PTR),Y   ; byte 4 = appearance
+    BMI     .skip              ; bit 7 set -> not a PC
+    CMP     #$15               ; < 21?
+    BMI     COPY_PC_NAME_TO_BUF ; yes -> player character, go copy name
+.skip:
+    LDY     #$02
+    LDA     (MOB_DATA_PTR),Y   ; byte 2 = next link
+    JMP     .check             ; follow chain
+@ %def FIND_FIRST_PC
+
+@ [[COPY_PC_NAME_TO_BUF]] copies the name of the mob pointed to by
+[[MOB_DATA_PTR]] into the [[CHAR_SELECT_NAME]] display buffer.  It first
+copies [[MOB_DATA_PTR]] to [[MOB_PTR]], reads bytes~0--1 of the record
+(the name string pointer) into [[TARGET_REC]], then loops 20 times
+copying characters.  Byte~0 of the name string is the length; characters
+beyond the length are replaced with spaces (\$20).  Returns with carry
+clear (success).
+
+<<find first pc>>=
+    ORG     $0ACE
+COPY_PC_NAME_TO_BUF:
+    LDA     MOB_DATA_PTR       ; \
+    STA     MOB_PTR            ;  | MOB_PTR = MOB_DATA_PTR
+    LDA     MOB_DATA_PTR+1     ;  |
+    STA     MOB_PTR+1          ; /
+    LDY     #$00
+    LDA     (MOB_PTR),Y        ; byte 0 = name ptr low
+    STA     TARGET_REC         ; \
+    INY                        ;  | TARGET_REC = name string pointer
+    LDA     (MOB_PTR),Y        ;  |
+    STA     TARGET_REC+1       ; /
+    LDA     #<CHAR_SELECT_NAME ; \
+    STA     MOB_DATA_PTR       ;  | MOB_DATA_PTR = display buffer
+    LDA     #>CHAR_SELECT_NAME ;  |
+    STA     MOB_DATA_PTR+1     ; /
+    LDY     #$00
+    LDA     (TARGET_REC),Y     ; byte 0 = name length
+    TAX                        ; X = chars remaining
+.copy_loop:
+    INY
+    LDA     (TARGET_REC),Y     ; load name character
+    DEX                        ; decrement remaining count
+    BPL     .store             ; if count >= 0, keep character
+    LDA     #$20               ; else pad with space
+.store:
+    STA     (MOB_DATA_PTR),Y   ; store into display buffer
+    CPY     #$14               ; copied 20 chars?
+    BNE     .copy_loop         ; no -> continue
+    CLC                        ; success
+    RTS
+@ %def COPY_PC_NAME_TO_BUF
+
+@ [[FIND_NEXT_PC_WRAP]] is a trivial wrapper that calls [[FIND_NEXT_PC]]
+and returns.  This exists as a separate entry point at \$0AFE so callers
+can [[JSR]] to it.
+
+<<find first pc>>=
+    ORG     $0AFE
+FIND_NEXT_PC_WRAP:
+    JSR     FIND_NEXT_PC
+    RTS
+@ %def FIND_NEXT_PC_WRAP
+
+@ [[FIND_NEXT_PC]] follows the byte-2 link from [[MOB_PTR]] to find the
+next player character in the list.  If byte~2 is zero (end of chain), it
+wraps around by calling [[FIND_FIRST_PC]].  Otherwise it resolves the
+link via [[GET_MOB_DATA]], checks byte~4 for a PC (appearance $<$~\$15,
+bit~7 clear), and either copies the name or recurses.
+
+<<find first pc>>=
+    ORG     $0B02
+FIND_NEXT_PC:
+    LDY     #$02
+    LDA     (MOB_PTR),Y       ; byte 2 = next link
+    BNE     .have_link         ; nonzero -> follow it
+    JSR     FIND_FIRST_PC      ; zero -> wrap to first PC
+    RTS
+.have_link:
+    STA     BROWSE_CHAR_INDEX  ; save mob index
+    JSR     GET_MOB_DATA       ; -> MOB_DATA_PTR = mob record
+    LDA     MOB_DATA_PTR       ; \
+    STA     MOB_PTR            ;  | MOB_PTR = MOB_DATA_PTR
+    LDA     MOB_DATA_PTR+1     ;  |
+    STA     MOB_PTR+1          ; /
+    LDY     #$04
+    LDA     (MOB_PTR),Y        ; byte 4 = appearance
+    BMI     FIND_NEXT_PC       ; bit 7 set -> skip, try next
+    CMP     #$15               ; < 21?
+    BPL     FIND_NEXT_PC       ; no -> skip, try next
+    JSR     COPY_PC_NAME_TO_BUF ; yes -> copy name
+    RTS
+@ %def FIND_NEXT_PC
+
+@ [[FIND_PREV_PC]] finds the player character that precedes the current
+one in the circular linked list.  It saves the current
+[[BROWSE_CHAR_INDEX]] in [[INPUT_BUFFER]], then walks forward from the
+first PC, recording each PC's index in [[INPUT_BUFFER]]+1, until wrapping
+back to the saved index.  At that point [[INPUT_BUFFER]]+1 holds the
+predecessor.  It then resolves that index and copies the name.
+
+<<find first pc>>=
+    ORG     $0B28
+FIND_PREV_PC:
+    LDA     BROWSE_CHAR_INDEX  ; \
+    STA     INPUT_BUFFER       ; / save current index
+    JSR     FIND_FIRST_PC      ; start from first PC
+.scan:
+    LDA     BROWSE_CHAR_INDEX  ; \
+    STA     INPUT_BUFFER+1     ; / save as candidate predecessor
+    JSR     FIND_NEXT_PC       ; advance to next PC
+    LDA     BROWSE_CHAR_INDEX  ; did we wrap back to original?
+    CMP     INPUT_BUFFER       ;
+    BNE     .scan              ; no -> keep scanning
+    LDA     INPUT_BUFFER+1     ; yes -> predecessor index
+    STA     BROWSE_CHAR_INDEX  ; set as current
+    JSR     GET_MOB_DATA       ; resolve to record pointer
+    JSR     COPY_PC_NAME_TO_BUF ; copy name to buffer
+    RTS
+@ %def FIND_PREV_PC
+
+@ [[INIT_CHAR_SELECT]] is a scene event handler entry point.  It marks
+the event as handled ([[SCENE_EVENT_RESULT]]~=~1), calls [[SCENE_SETUP]]
+to initialize the scene, then searches for the first player character.
+If found (carry clear), it jumps to the character selection menu display
+at \$63E8.  If no player characters exist (carry set), it falls back to
+[[MOVE_LOOP]].
+
+<<find first pc>>=
+    ORG     $0B4F
+INIT_CHAR_SELECT:
+    STOB    #$01,SCENE_EVENT_RESULT ; mark event handled
+    JSR     SCENE_SETUP        ; set up scene boundaries
+    JSR     FIND_FIRST_PC      ; find first player character
+    BCC     .found             ; carry clear -> found
+    JMP     MOVE_LOOP          ; carry set -> no PCs, back to main loop
+.found:
+    JMP     $63E8              ; -> character selection menu display
+@ %def INIT_CHAR_SELECT
 The scene loop calls [[$A478]] (a resident routine from EALDR, still in
 memory at [[$A000]]--[[$BFFF]]) each iteration to check for user input.
 If carry is set (key pressed), the loop exits.  Otherwise, it displays
@@ -18281,6 +18472,7 @@ The following root chunks produce the assembly files when tangled.
 <<attract screen>>
 <<scene setup>>
 <<clamp char field>>
+<<find first pc>>
 <<find entity at pos>>
 <<check at boundary>>
 <<pos to colrow>>

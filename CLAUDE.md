@@ -6,6 +6,7 @@
 
 - Do NOT decompile 6502 assembly to C via Ghidra. This is hand-written assembly; work with disassembly directly.
 - All routine labels must be UPPER_CASE (e.g., BOOT1_ENTRY not boot1_entry). Data labels and local (.dot) labels are not affected.
+- Every chunk must start with an ORG directive, so that we know where the chunk goes.
 - After every ORG, there must be a label. That label should be referenced from a code chunk. If unreferenced, investigate: it may be dead code/data. Mark as such for future investigation.
 - After documenting a routine, ALWAYS grep main.nw for all raw hex references (JSR $XXXX, JMP $XXXX, etc.) and replace them with the new label name.
 - After each disassembly batch, ALWAYS do these cleanups:
@@ -30,6 +31,7 @@
 - If a chunk defines data with labels, every label must be defined in the chunk immediately preceding the first code chunk that references it. If not, split the data chunk. Use `python .claude/skills/chunk-placement/check_placement.py` to verify.
 - EQU definitions go just before the chunk that first uses them, with prose explaining purpose.
 - Chunk definitions go in the prose before their first use. Chunk references in `<<main.asm>>` follow ORG address order — use `python .claude/skills/assemble/reorder_chunks.py` if needed.
+- After adding a chunk, run `python .claude/skills/chunk-placement/check_placement.py` to see if any existing chunks need to be moved to satisfy placement rules.
 
 ### Ghidra
 
