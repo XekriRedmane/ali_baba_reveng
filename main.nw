@@ -9353,7 +9353,7 @@ LOAD_SCENE_DATA:
     LDY     #$04            ;  | ($08)+4 = 5 (track configuration)
     STA     ($08),Y         ; /
     LDA     #$00
-    JSR     SETUP_DISK_READ ; prepare disk parameters
+    JSR     RWTS_DISPATCH   ; execute RWTS command
     CLC
     JSR     DISK_READ_FIELD ; read sector data from disk
     BCS     .error
@@ -9854,35 +9854,43 @@ DRAW_MAP_ICON_B:
     STOB    #$14,BLINK_COL ; disable blink cursor
     RTS
 @ %def DRAW_MAP_ICON_B
-Prepares disk I/O parameters for the disk routines.  Stores
-the track number (A) at offset~\$0C of the parameter block at~(\$08),
-clears the sector offset at~(\$08)+3, then calls [[RWTS_ENTRY]]
-at~[[$B7B5]] with the IOB address from~\$08/\$09.
+@ \subsection{RWTS command dispatch (\$6C12--\$6C35)}
 
-@ [[RWTS_ENTRY]] is the standard DOS 3.3 RWTS entry point at [[$B7B5]].
-[[SETUP_DISK_READ]] calls it after storing the track number and clearing
-the sector offset in the IOB parameter block.
+[[DISK_READ]] and [[DISK_WRITE]] are thin wrappers that set the RWTS
+command code (IOB+\$0C: 1=read, 2=write) and fall through to
+[[RWTS_DISPATCH]].
+
+[[RWTS_DISPATCH]] stores the command at IOB+\$0C, clears the volume
+field at IOB+\$03, then calls [[RWTS_ENTRY]] with the IOB pointer
+from~\$08/\$09.  Carry reflects the RWTS result (clear=success).
 
 <<defines>>=
 RWTS_ENTRY              EQU     $B7B5   ; RWTS entry: PHP/SEI, JSR RWTS_CORE, CLC/SEC
 @ %def RWTS_ENTRY
 
-<<setup disk read>>=
-    ORG     $6C18
-SETUP_DISK_READ:
-    SUBROUTINE SETUP_DISK_READ
+<<disk read write>>=
+    ORG     $6C12
+DISK_READ:
+    LDA     #$01               ; command = read
+    BNE     RWTS_DISPATCH      ; always taken
+
+DISK_WRITE:
+    LDA     #$02               ; command = write
+                               ; fall through
+RWTS_DISPATCH:
+    SUBROUTINE RWTS_DISPATCH
 
     LDY     #$0C
-    STA     ($08),Y    ; ($08)+$0C = track number (A)
+    STA     ($08),Y            ; IOB+$0C = command (A)
     LDA     #$00
     LDY     #$03
-    STA     ($08),Y    ; ($08)+$03 = 0 (sector offset)
-    LDA     $09        ; \ A/Y = slot parameter block
-    LDY     $08        ; /
-    JSR     RWTS_ENTRY ; seek to track
-    STOB    #$00,$48 ; clear disk status
+    STA     ($08),Y            ; IOB+$03 = volume (0 = any)
+    LDA     $09                ; \ A/Y = IOB pointer
+    LDY     $08                ; /
+    JSR     RWTS_ENTRY         ; execute RWTS command
+    STOB    #$00,$48           ; clear disk status
     RTS
-@ %def SETUP_DISK_READ
+@ %def DISK_READ DISK_WRITE RWTS_DISPATCH
 
 \chapter{Entities}
 
@@ -12494,7 +12502,7 @@ SAVE_LOAD_TABLE:
     ; rec1: CONTINUE GAME NUMBER NN
     HEX     01 55 01 01 04 03
     DC.W    $7BDB              ; "CONTINUE GAME NUMBER NN"
-    DC.W    $69C8              ; continue game handler
+    DC.W    CONTINUE_GAME      ; continue game handler
     ; rec2: # (increment slot)
     HEX     01 6F 01 01 02 04
     DC.W    $7B60              ; "#"
@@ -12600,7 +12608,7 @@ The save game slot menu is entered from the ``SAVE GAME'' option in the
 game settings menu.  It presents four options:
 \begin{itemize}
 \item MOVE --- return to the game ([[MOVE_LOOP]])
-\item SAVE GAME IN SLOT NUMBER NN --- save to the current slot (handler at \$6A47)
+\item SAVE GAME IN SLOT NUMBER NN --- save to the current slot ([[SAVE_GAME]])
 \item \# --- increment slot number ([[SLOT_INC_REENTER]])
 \item @ --- decrement slot number ([[SLOT_DEC_REENTER]])
 \end{itemize}
@@ -12618,7 +12626,7 @@ SAVE_GAME_SLOT_TABLE:
     ; rec1: SAVE GAME IN SLOT NUMBER NN
     HEX     01 2C 01 01 04 03
     DC.W    $7D67              ; "SAVE GAME IN SLOT NUMBER 00"
-    DC.W    $6A47              ; disk save handler
+    DC.W    SAVE_GAME          ; save game handler
     ; rec2: # (increment)
     HEX     01 49 01 01 02 04
     DC.W    $7B60              ; "#"
@@ -12655,9 +12663,9 @@ SLOT_INC_REENTER:
 The scenario disk menu presents three options for managing save game
 disks.  It is invoked from event script~59 (ROY G.~BIV):
 \begin{itemize}
-\item USE PREVIOUSLY FORMATTED SCENARIO DISK (handler at \$6AA1)
-\item FORMAT AND USE NEW SCENARIO DISK (handler at \$6A7F)
-\item CANCEL REQUEST (handler at \$6A6E)
+\item USE PREVIOUSLY FORMATTED SCENARIO DISK ([[USE_SCENARIO_DISK]])
+\item FORMAT AND USE NEW SCENARIO DISK ([[FORMAT_SCENARIO_DISK]])
+\item CANCEL REQUEST ([[CANCEL_SCENARIO]])
 \end{itemize}
 
 <<scenario disk table>>=
@@ -12669,15 +12677,15 @@ SCENARIO_DISK_TABLE:
     ; rec0: USE PREVIOUSLY FORMATTED SCENARIO DISK
     HEX     01 00 03 02 00 00
     DC.W    $7C02              ; "USE PREVIOUSLY FORMATTED SCENARIO DISK"
-    DC.W    $6AA1              ; use existing disk handler
+    DC.W    USE_SCENARIO_DISK  ; use existing disk handler
     ; rec1: FORMAT AND USE NEW SCENARIO DISK
     HEX     01 28 01 03 00 00
     DC.W    $7C29              ; "FORMAT AND USE NEW SCENARIO DISK"
-    DC.W    $6A7F              ; format new disk handler
+    DC.W    FORMAT_SCENARIO_DISK ; format new disk handler
     ; rec2: CANCEL REQUEST
     HEX     01 50 02 01 00 00
     DC.W    $7C4A              ; "CANCEL REQUEST"
-    DC.W    $6A6E              ; cancel handler
+    DC.W    CANCEL_SCENARIO    ; cancel handler
 @ %def SCENARIO_DISK_TABLE
 
 @ [[ENTER_SCENARIO_DISK]] is the entry point called from event scripts.
@@ -12859,6 +12867,561 @@ START_GAME_INPUT:
     LDY     #<ALT_INPUT_TABLE
     JMP     INPUT_LOOP
 @ %def START_GAME_INPUT
+
+@ \section{Save/Load Disk I/O}
+
+\subsection{Disk I/O data (\$7AC5--\$7ACF)}
+
+The save/load system uses a block of configuration data in the menu
+option strings area.  [[GAME_DISK_SLOTS]] determines how many save
+slots fit on the game disk itself (just~1); higher-numbered slots
+require a separate scenario disk.  [[SAVE_TRACK_BASE]] is a two-byte
+table of base track numbers indexed by disk (0=game disk at track~\$13,
+1=scenario disk at track~\$01).  Each slot occupies two tracks (26
+sectors at 13~sectors per track).
+
+[[SAVE_SECTOR_COUNT]] is the number of sectors per save game (26).
+[[GAME_SIG_TRACK]] and [[GAME_SIG_SECTOR]] specify where the game disk
+signature lives (track~\$11, sector~\$00).  [[DISK_SIGNATURE]] is the
+3-byte ``ALI'' signature (high ASCII \$C1,\$CC,\$C9) used to identify
+valid scenario disks.  [[SHUFFLE_COUNT]] controls how many iterations
+the entity-shuffle routine performs (100).
+
+<<defines>>=
+GAME_DISK_SLOTS     EQU     $7AC5   ; save slots on game disk (1)
+SAVE_TRACK_BASE     EQU     $7AC7   ; base track table: [0]=game disk, [1]=scenario disk
+SAVE_SECTOR_COUNT   EQU     $7AC9   ; sectors per save game (26)
+GAME_SIG_TRACK      EQU     $7ACA   ; game disk signature track ($11)
+GAME_SIG_SECTOR     EQU     $7ACB   ; game disk signature sector ($00)
+DISK_SIGNATURE      EQU     $7ACC   ; 3-byte "ALI" signature (high ASCII)
+SHUFFLE_COUNT       EQU     $7ACF   ; entity shuffle iterations (100)
+@ %def GAME_DISK_SLOTS SAVE_TRACK_BASE SAVE_SECTOR_COUNT GAME_SIG_TRACK GAME_SIG_SECTOR DISK_SIGNATURE SHUFFLE_COUNT
+
+@ \subsection{Continue game handler (\$69C8--\$69FC)}
+
+[[CONTINUE_GAME]] is the handler for the ``CONTINUE'' option in the
+save/load menu ([[SAVE_LOAD_TABLE]]).
+\begin{itemize}
+\item If [[SLOT_NUMBER]] is below [[GAME_DISK_SLOTS]] (i.e.\ slot~0 on
+  the game disk), it calls [[ENSURE_GAME_DISK]] to verify the game
+  disk, then jumps to [[READ_GAME_DATA]] to load the save.
+\item Otherwise the save is on a scenario disk.  It displays message~\$33
+  (insert scenario disk prompt), waits for a keypress, then calls
+  [[VERIFY_DISK_SIGNATURE]] to check the disk has the ``ALI'' signature.
+  If valid, it reads the save and writes it back to the game disk via
+  [[ENSURE_GAME_DISK]].  If invalid, it displays message~\$16 (error)
+  and returns to [[INIT_WORLD]].
+\end{itemize}
+
+<<continue game>>=
+    ORG     $69C8
+CONTINUE_GAME:
+    SUBROUTINE CONTINUE_GAME
+    LDA     SLOT_NUMBER
+    CMP     GAME_DISK_SLOTS
+    BCS     .scenario          ; slot >= 1 -> scenario disk needed
+    JSR     ENSURE_GAME_DISK   ; verify game disk
+    JMP     READ_GAME_DATA     ; load save from game disk
+
+.scenario:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$33               ; "INSERT SCENARIO DISK"
+    JSR     DISPLAY_MESSAGE
+    JSR     WAIT_KEYPRESS      ; wait for user
+    JSR     VERIFY_DISK_SIGNATURE ; check "ALI" signature
+    BCS     .bad_disk          ; carry set -> signature mismatch
+    JSR     READ_GAME_DATA     ; load from scenario disk
+    JSR     PROMPT_INSERT_DISK ; "INSERT GAME DISK"
+    JMP     ENSURE_GAME_DISK   ; re-verify game disk
+
+.bad_disk:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$16               ; error message
+    JSR     DISPLAY_MESSAGE
+    JSR     ENSURE_GAME_DISK
+    JMP     INIT_WORLD         ; back to save/load menu
+@ %def CONTINUE_GAME
+
+@ \subsection{Shuffle entities (\$69FD--\$6A46)}
+
+[[SHUFFLE_ENTITIES]] randomly reorders the entity linked list by
+performing [[SHUFFLE_COUNT]] (100) iterations of a pick-and-relink
+algorithm.  Each iteration:
+\begin{itemize}
+\item Picks a random position (0--63) in the list via [[RANDOM_IN_RANGE]].
+\item Walks that many links forward from the list head at~\$4000.
+\item Unlinks the reached node and re-appends it at the end of the chain.
+\end{itemize}
+This effectively shuffles entity ordering so that saved games do not
+preserve a deterministic entity sequence.
+
+<<shuffle entities>>=
+    ORG     $69FD
+SHUFFLE_ENTITIES:
+    SUBROUTINE SHUFFLE_ENTITIES
+    DEC     SHUFFLE_COUNT
+    BPL     .go
+    RTS
+
+.go:
+    LDA     #$3F               ; random 0-63
+    JSR     RANDOM_IN_RANGE
+    STA     $5AA5              ; temp: walk count
+    LDA     #$00               ; \ $BA/$BB = $4000 (list head)
+    STA     $BA                ;  |
+    LDA     #$40               ;  |
+    STA     $BB                ; /
+
+.walk:
+    LDA     $BA                ; \ copy $BA/$BB -> $BE/$BF
+    STA     $BE                ;  | (previous pointer)
+    LDA     $BB                ;  |
+    STA     $BF                ; /
+    LDY     #$02
+    LDA     ($BE),Y            ; get next-pointer (byte 2)
+    STA     CURRENT_ROOM       ; temp: save next-pointer
+    JSR     GET_MOB_DATA       ; advance $BA/$BB to next record
+    DEC     $5AA5              ; decrement walk count
+    BPL     .walk              ; loop until count exhausted
+
+    ; Unlink: splice current node out of chain
+    LDY     #$02
+    LDA     ($BA),Y            ; source's next-pointer
+    STA     ($BE),Y            ; patch previous to skip source
+    LDA     #$00
+    STA     ($BA),Y            ; clear source's next-pointer
+
+    ; Re-append: walk to end of chain, link source there
+    LDA     ($BE),Y            ; follow chain from previous
+.find_end:
+    JSR     GET_MOB_DATA       ; advance
+    LDY     #$02
+    LDA     ($BA),Y
+    BNE     .find_end          ; loop until next = 0 (end of list)
+
+    LDA     CURRENT_ROOM       ; restore saved next-pointer
+    STA     ($BA),Y            ; link source at end
+    JMP     SHUFFLE_ENTITIES   ; next iteration
+@ %def SHUFFLE_ENTITIES
+
+@ \subsection{Save game handler (\$6A47--\$6A6D)}
+
+[[SAVE_GAME]] is the handler for the ``SAVE GAME IN SLOT NUMBER NN''
+option in the save game slot menu.
+\begin{itemize}
+\item If [[SLOT_NUMBER]] is below [[GAME_DISK_SLOTS]], it saves directly
+  to the game disk via [[WRITE_GAME_DATA]], then returns to [[MOVE_LOOP]].
+\item Otherwise, it checks the self-modifying flag at [[$6A58]]
+  ([[SCENARIO_INIT_FLAG]]).  On first use, it calls [[ENSURE_GAME_DISK]]
+  and enters scene~\$42 (the scenario disk prompt scene), then sets the
+  flag.  Subsequent calls jump directly to [[ENTER_SCENARIO_DISK]].
+\end{itemize}
+
+<<defines>>=
+SCENARIO_INIT_FLAG  EQU     $6A58   ; self-modifying: 0=first scenario save, 1=initialized
+@ %def SCENARIO_INIT_FLAG
+
+<<save game>>=
+    ORG     $6A47
+SAVE_GAME:
+    SUBROUTINE SAVE_GAME
+    LDA     SLOT_NUMBER
+    CMP     GAME_DISK_SLOTS
+    BCS     .scenario          ; slot >= 1 -> scenario disk
+    JSR     ENSURE_GAME_DISK
+    JSR     WRITE_GAME_DATA
+    JMP     MOVE_LOOP
+
+    DC.B    $00                ; SCENARIO_INIT_FLAG ($6A58)
+
+.scenario:
+    LDA     SCENARIO_INIT_FLAG
+    BNE     .already_init      ; flag set -> skip scene
+    JSR     ENSURE_GAME_DISK
+    LDA     #$42               ; scene $42: scenario disk prompt
+    JSR     SCENE_LOOP
+    LDA     #$01
+    STA     SCENARIO_INIT_FLAG ; set flag (self-modifying)
+.already_init:
+    JMP     ENTER_SCENARIO_DISK
+@ %def SAVE_GAME
+
+@ \subsection{Scenario disk handlers (\$6A6E--\$6AB6)}
+
+[[CANCEL_SCENARIO]] cancels the scenario disk menu and returns to
+[[MOVE_LOOP]] after verifying the game disk.
+
+[[SCENARIO_INSERT_PROMPT]] displays message~\$33 (insert scenario disk)
+and re-enters the scenario disk menu.
+
+[[FORMAT_SCENARIO_DISK]] formats a new scenario disk:
+\begin{itemize}
+\item Calls [[VERIFY_GAME_DISK]] to confirm the inserted disk.
+  If invalid, prompts and re-enters the scenario menu.
+\item Verifies the ``ALI'' signature via [[VERIFY_DISK_SIGNATURE]].
+  If the disk already has saved data, prompts with [[FORMAT_DISK_TRACK]].
+\item If the signature check indicates a blank disk, writes the signature
+  via [[WRITE_DISK_SIGNATURE]], then falls through to write game data.
+\item On success, displays message~\$1B (confirmation) and returns to
+  [[MOVE_LOOP]].
+\end{itemize}
+
+[[USE_SCENARIO_DISK]] uses a previously formatted scenario disk:
+verifies the signature, and if valid, writes game data.  If invalid,
+displays message~\$16 (error).
+
+[[DISPLAY_INSERT_MSG]] displays message~\$1B (``INSERT SCENARIO DISK''
+or similar confirmation).
+
+<<scenario disk handlers>>=
+    ORG     $6A6E
+CANCEL_SCENARIO:
+    JSR     ENSURE_GAME_DISK
+    JMP     MOVE_LOOP
+
+SCENARIO_INSERT_PROMPT:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$33               ; "INSERT SCENARIO DISK"
+    JSR     DISPLAY_MESSAGE
+    JMP     ENTER_SCENARIO_DISK
+
+FORMAT_SCENARIO_DISK:
+    SUBROUTINE FORMAT_SCENARIO_DISK
+    JSR     VERIFY_GAME_DISK   ; check game disk inserted
+    BCC     SCENARIO_INSERT_PROMPT ; not game disk -> prompt
+    JSR     VERIFY_DISK_SIGNATURE ; check "ALI" signature
+    BCC     .write             ; no signature -> blank disk, write
+    JSR     FORMAT_DISK_TRACK  ; format the track
+    BCC     .check_sig         ; format ok -> check signature
+.show_msg:
+    JSR     DISPLAY_INSERT_MSG ; display confirmation
+.cleanup:
+    JSR     PROMPT_INSERT_DISK ; "INSERT GAME DISK"
+    JSR     ENSURE_GAME_DISK
+    JMP     MOVE_LOOP
+
+.check_sig:
+    JSR     WRITE_DISK_SIGNATURE ; write "ALI" to disk
+    BCS     .show_msg          ; carry set -> show insert msg, then cleanup
+    BCC     .write             ; carry clear -> write data
+
+USE_SCENARIO_DISK:
+    JSR     VERIFY_DISK_SIGNATURE ; check "ALI" signature
+    BCS     .sig_error         ; no match -> error
+.write:
+    JSR     WRITE_GAME_DATA    ; save game data to disk
+    JMP     .cleanup
+
+.sig_error:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$16               ; error message
+    JSR     DISPLAY_MESSAGE
+    JMP     .cleanup
+
+DISPLAY_INSERT_MSG:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$1B               ; "INSERT" confirmation message
+    JMP     DISPLAY_MESSAGE
+@ %def CANCEL_SCENARIO SCENARIO_INSERT_PROMPT FORMAT_SCENARIO_DISK USE_SCENARIO_DISK DISPLAY_INSERT_MSG
+
+@ \subsection{Game disk verification (\$6ABF--\$6AE0)}
+
+[[ENSURE_GAME_DISK]] loops until the game disk is detected.  It calls
+[[VERIFY_GAME_DISK]] and if carry is set (wrong disk), displays the
+insert prompt and retries.
+
+[[PROMPT_INSERT_DISK]] displays messages~\$03 and~\$30, then waits for
+a keypress.
+
+[[WAIT_KEYPRESS]] displays message~\$30 (``PRESS ANY KEY''), clears the
+keyboard strobe, and polls until a key is pressed.
+
+<<ensure game disk>>=
+    ORG     $6ABF
+ENSURE_GAME_DISK:
+    JSR     VERIFY_GAME_DISK
+    BCS     .wrong_disk
+    RTS
+.wrong_disk:
+    JSR     PROMPT_INSERT_DISK
+    JMP     ENSURE_GAME_DISK
+
+PROMPT_INSERT_DISK:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$03               ; "INSERT GAME DISK"
+    JSR     DISPLAY_MESSAGE
+
+WAIT_KEYPRESS:
+    LDA     #$30               ; "PRESS ANY KEY"
+    JSR     DISPLAY_MESSAGE
+    STA     $C010              ; clear keyboard strobe
+.wait:
+    LDA     $C000              ; read keyboard
+    BPL     .wait              ; loop until key pressed
+    RTS
+@ %def ENSURE_GAME_DISK PROMPT_INSERT_DISK WAIT_KEYPRESS
+
+@ \subsection{Disk format and signature (\$6AE1--\$6B26)}
+
+[[FORMAT_DISK_TRACK]] issues an RWTS format command (command~4) for
+track~\$04 with 12~sectors.
+
+[[WRITE_DISK_SIGNATURE]] writes the 3-byte ``ALI'' signature
+([[DISK_SIGNATURE]]) to the disk via [[SETUP_DATA_IOB]].  It copies
+the signature to [[SCENE_TEXT_DATA]], sets up the IOB, then calls
+[[DISK_WRITE]] with up to~3 retries.  Returns carry clear on success.
+
+[[VERIFY_DISK_SIGNATURE]] reads the disk and compares the first~3 bytes
+against [[DISK_SIGNATURE]].  Returns carry clear if the signature
+matches.
+
+<<format and signature>>=
+    ORG     $6AE1
+FORMAT_DISK_TRACK:
+    LDY     #$0C               ; \ RWTS format command
+    LDA     #$04               ;  | command = 4 (format track)
+    JMP     RWTS_DISPATCH      ; /
+
+WRITE_DISK_SIGNATURE:
+    SUBROUTINE WRITE_DISK_SIGNATURE
+    LDA     #$02               ; retry counter
+    STA     $BF
+    LDX     #$02
+.copy:
+    LDA     DISK_SIGNATURE,X   ; copy "ALI" to buffer
+    STA     SCENE_TEXT_DATA,X
+    DEX
+    BPL     .copy
+    JSR     SETUP_DATA_IOB     ; set IOB buffer = $5C00
+.retry:
+    JSR     DISK_WRITE         ; write to disk
+    BCS     .error
+    RTS                        ; success (carry clear)
+.error:
+    DEC     $BF
+    BPL     .retry
+    SEC                        ; all retries failed
+    RTS
+
+VERIFY_DISK_SIGNATURE:
+    SUBROUTINE VERIFY_DISK_SIGNATURE
+    JSR     SETUP_DATA_IOB     ; set IOB buffer = $5C00
+    LDA     #$02               ; retry counter
+    STA     $BF
+.retry:
+    JSR     DISK_READ          ; read from disk
+    BCC     .check             ; success -> verify bytes
+    DEC     $BF
+    BPL     .retry
+.fail:
+    SEC                        ; all retries failed / mismatch
+    RTS
+.check:
+    LDX     #$02
+.cmp:
+    LDA     DISK_SIGNATURE,X   ; expected "ALI"
+    CMP     SCENE_TEXT_DATA,X  ; actual
+    BNE     .fail              ; mismatch -> fail immediately
+    DEX
+    BPL     .cmp
+    CLC                        ; signature match
+    RTS
+@ %def FORMAT_DISK_TRACK WRITE_DISK_SIGNATURE VERIFY_DISK_SIGNATURE
+
+@ \subsection{IOB setup and game disk check (\$6B27--\$6B71)}
+
+[[SETUP_DATA_IOB]] configures the RWTS IOB for a single-sector
+operation with the data buffer at [[SCENE_TEXT_DATA]] (\$5C00).
+It clears the track/sector fields and sets the buffer pointer.
+
+[[VERIFY_GAME_DISK]] reads the game disk at [[GAME_SIG_TRACK]]/
+[[GAME_SIG_SECTOR]] and checks for the magic signature bytes
+\$03,\$0F,\$10.  Returns carry clear if the game disk is present.
+
+<<setup data iob>>=
+    ORG     $6B27
+SETUP_DATA_IOB:
+    LDA     #$00
+    LDY     #$04
+    STA     (RWTS_IOB_PTR),Y   ; IOB+4 = track 0
+    INY
+    STA     (RWTS_IOB_PTR),Y   ; IOB+5 = sector 0
+    LDA     #$00
+    LDY     #$08
+    STA     (RWTS_IOB_PTR),Y   ; IOB+8 = buffer lo ($00)
+    INY
+    LDA     #$5C
+    STA     (RWTS_IOB_PTR),Y   ; IOB+9 = buffer hi ($5C -> $5C00)
+    RTS
+
+VERIFY_GAME_DISK:
+    SUBROUTINE VERIFY_GAME_DISK
+    JSR     SETUP_DATA_IOB
+    LDA     GAME_SIG_TRACK     ; track $11
+    LDY     #$04
+    STA     (RWTS_IOB_PTR),Y   ; IOB+4 = track
+    LDA     GAME_SIG_SECTOR    ; sector $00
+    INY
+    STA     (RWTS_IOB_PTR),Y   ; IOB+5 = sector
+    LDA     #$02               ; retry counter
+    STA     $BE
+.retry:
+    JSR     DISK_READ
+    BCC     .check
+    DEC     $BE
+    BNE     .retry
+.fail:
+    SEC                        ; all retries failed / mismatch
+    RTS
+.check:
+    LDA     SCENE_TEXT_DATA    ; byte 0
+    CMP     #$03
+    BNE     .fail
+    LDA     SCENE_TEXT_DATA+1  ; byte 1
+    CMP     #$0F
+    BNE     .fail
+    LDA     SCENE_TEXT_DATA+2  ; byte 2
+    CMP     #$10
+    BNE     .fail
+    CLC                        ; game disk confirmed
+    RTS
+@ %def SETUP_DATA_IOB VERIFY_GAME_DISK
+
+@ \subsection{Write game data (\$6B72--\$6B93)}
+
+[[WRITE_GAME_DATA]] writes [[SAVE_SECTOR_COUNT]] (26) sectors of game
+state from the \$4000 buffer to disk.  It calls [[SETUP_SLOT_IOB]] to
+calculate the starting track/sector from [[SLOT_NUMBER]], then writes
+each sector via [[DISK_WRITE]], calling [[ADVANCE_SECTOR]] to step
+through consecutive sectors.  Returns A=0 on success, A=1 on failure.
+
+<<write game data>>=
+    ORG     $6B72
+WRITE_GAME_DATA:
+    SUBROUTINE WRITE_GAME_DATA
+    LDA     #$02               ; outer retry counter
+    STA     $BF
+    JSR     SETUP_SLOT_IOB     ; calculate track from slot
+    LDA     SAVE_SECTOR_COUNT  ; 26 sectors
+    STA     $BE
+.sector:
+    JSR     DISK_WRITE
+    BCS     .error
+    JSR     ADVANCE_SECTOR
+    DEC     $BE
+    BNE     .sector
+    LDA     #$00               ; success
+    RTS
+.error:
+    DEC     $BF
+    BNE     .sector            ; retry remaining sectors
+    LDA     #$01               ; failure
+    RTS
+@ %def WRITE_GAME_DATA
+
+@ \subsection{Read game data and IOB helpers (\$6B95--\$6C11)}
+
+[[READ_GAME_DATA]] reads [[SAVE_SECTOR_COUNT]] (26) sectors of save
+data from disk into the \$4000 buffer.  On persistent failure, it
+displays message~\$3B and jumps to the EALDR error handler at [[$A56F]].
+
+[[SETUP_SLOT_IOB]] calculates the disk track for a given slot:
+\begin{itemize}
+\item If [[SLOT_NUMBER]]~< [[GAME_DISK_SLOTS]], uses disk~0 (game disk)
+  with base track from [[SAVE_TRACK_BASE]][0].
+\item Otherwise, subtracts [[GAME_DISK_SLOTS]] and uses disk~1 (scenario
+  disk) with base track from [[SAVE_TRACK_BASE]][1].
+\item Track = base + slot $\times$ 2 (each slot spans 2~tracks).
+\end{itemize}
+Sets the IOB buffer to \$4000 and clears the byte-count field.
+
+[[ADVANCE_SECTOR]] increments the buffer page (IOB+9) and sector
+(IOB+5).  When the sector reaches~13 (\$0D), it wraps to~0 and
+increments the track (IOB+4), starting the next track.
+
+<<read game data>>=
+    ORG     $6B95
+READ_GAME_DATA:
+    SUBROUTINE READ_GAME_DATA
+    LDA     #$02               ; outer retry counter
+    STA     $BF
+    JSR     SETUP_SLOT_IOB
+    LDA     SAVE_SECTOR_COUNT  ; 26 sectors
+    STA     $BE
+.sector:
+    JSR     DISK_READ
+    BCS     .error
+    JSR     ADVANCE_SECTOR
+    DEC     $BE
+    BNE     .sector
+    LDA     #$00               ; success
+    RTS
+.error:
+    DEC     $BF
+    BNE     .sector
+    JSR     SET_CURSOR_ROW21
+    LDA     #$3B               ; read error message
+    JSR     DISPLAY_MESSAGE
+    JMP     $A56F              ; EALDR error handler
+
+SETUP_SLOT_IOB:
+    SUBROUTINE SETUP_SLOT_IOB
+    LDX     #$00               ; disk index 0 (game disk)
+    LDA     SLOT_NUMBER
+    CMP     GAME_DISK_SLOTS
+    BCC     .set_track         ; slot < threshold -> game disk
+    SEC
+    SBC     GAME_DISK_SLOTS    ; adjust for scenario disk
+    INX                        ; disk index 1 (scenario disk)
+.set_track:
+    ASL                        ; slot * 2 (2 tracks per slot)
+    CLC
+    ADC     SAVE_TRACK_BASE,X  ; add base track for this disk
+    LDY     #$04
+    STA     (RWTS_IOB_PTR),Y   ; IOB+4 = track
+    INY
+    LDA     #$00
+    STA     (RWTS_IOB_PTR),Y   ; IOB+5 = sector 0
+    LDA     #$00
+    LDY     #$08
+    STA     (RWTS_IOB_PTR),Y   ; IOB+8 = buffer lo ($00)
+    LDA     #$40
+    INY
+    STA     (RWTS_IOB_PTR),Y   ; IOB+9 = buffer hi ($40 -> $4000)
+    LDA     #$00
+    LDY     #$0B
+    STA     (RWTS_IOB_PTR),Y   ; IOB+$0B = byte count (0 = 256)
+    RTS
+
+ADVANCE_SECTOR:
+    SUBROUTINE ADVANCE_SECTOR
+    LDY     #$09
+    LDA     (RWTS_IOB_PTR),Y   ; buffer page
+    TAX
+    INX                        ; next page
+    TXA
+    STA     (RWTS_IOB_PTR),Y
+    LDY     #$05
+    LDA     (RWTS_IOB_PTR),Y   ; sector number
+    TAX
+    INX
+    CPX     #$0D               ; 13 sectors per track
+    BCS     .next_track
+    TXA
+    STA     (RWTS_IOB_PTR),Y   ; store incremented sector
+    RTS
+.next_track:
+    LDA     #$00               ; sector = 0
+    STA     (RWTS_IOB_PTR),Y
+    DEY                        ; Y = 4 (track)
+    LDA     (RWTS_IOB_PTR),Y
+    TAX
+    INX                        ; next track
+    TXA
+    STA     (RWTS_IOB_PTR),Y
+    RTS
+@ %def READ_GAME_DATA SETUP_SLOT_IOB ADVANCE_SECTOR
+
 @ [[CHECK_COMBAT_ELIGIBILITY]] determines which turn options are available to
 the current entity.  It clears [[SAFE_TO_REST]] and [[UNDER_LEVEL]], then
 checks the entity's level (field~\$0C, bits~2--0 after ROR) against
@@ -18004,7 +18567,7 @@ The main program calls two entry points in this area:
 \thead{Address} & \thead{Label} & \thead{Called from} \\
 \midrule
 [[$B300]] & [[DISK_READ_FIELD]] & [[LOAD_SCENE_DATA]] (\$6DD8) \\
-[[$B7B5]] & [[RWTS_ENTRY]] & [[SETUP_DISK_READ]] (\$6C18) \\
+[[$B7B5]] & [[RWTS_ENTRY]] & [[RWTS_DISPATCH]] (\$6C18) \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -18977,8 +19540,17 @@ The following root chunks produce the assembly files when tangled.
 <<evaluate direction>>
 <<inc mob counters>>
 <<ai choose target>>
+<<continue game>>
+<<shuffle entities>>
+<<save game>>
+<<scenario disk handlers>>
+<<ensure game disk>>
+<<format and signature>>
+<<setup data iob>>
+<<write game data>>
 <<init stub2>>
-<<setup disk read>>
+<<read game data>>
+<<disk read write>>
 <<init disk iob>>
 <<scene loop>>
 <<text renderer>>
