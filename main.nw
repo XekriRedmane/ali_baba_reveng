@@ -4317,6 +4317,130 @@ DRAW_BORDER_ICONS:
     JMP     PLOT_CHAR
 @ %def DRAW_BORDER_ICONS
 
+
+@ Border display data at [[$5DBF]]--[[$5F18]].  The border animation
+cycles through positions in [[BORDER_POS_TABLE]], drawing icons at
+each map border cell.  The 3-byte records are (icon, column, row):
+icon=\$00 draws the default border glyph; nonzero icons draw special
+decorations (e.g.\ doors, markers).
+
+<<game data 5DBF>>=
+    ORG     $5DBF
+BORDER_INITIAL_CHAR:
+    DC.B    $A0               ; initial border character (space)
+BORDER_ANIM_INDEX:
+    DC.B    $06               ; current animation index (cycles $05-$15)
+BORDER_ANIM_SAVE:
+    DC.B    $A0               ; saved character at animated position
+BORDER_ICON_CHARS:
+    DC.B    $C4,$D3,$E9       ; icon character codes (D, S, i)
+BORDER_HANDLER_TABLE:
+    DC.W    $5B6D             ; handler pointer 0
+    DC.W    $5B8F             ; handler pointer 1
+    DC.W    $5B7E             ; handler pointer 2
+
+    ; --- Border position table: 46 entries of (icon, col, row) ---
+    ; Bottom border (row $13, columns $09-$12)
+BORDER_POS_TABLE:
+    DC.B    $00,$09,$13       ; \
+    DC.B    $00,$0A,$13       ;  |
+    DC.B    $00,$0B,$13       ;  |
+    DC.B    $00,$0C,$13       ;  | bottom border
+    DC.B    $00,$0D,$13       ;  |
+    DC.B    $0B,$0E,$13       ;  | ($0B = special icon)
+    DC.B    $00,$0F,$13       ;  |
+    DC.B    $00,$10,$13       ;  |
+    DC.B    $00,$11,$13       ;  |
+    DC.B    $00,$12,$13       ; /
+    ; Right border (column $10, rows $06-$0E top, $18-$20 bottom)
+    DC.B    $00,$10,$06       ; \
+    DC.B    $00,$10,$07       ;  |
+    DC.B    $00,$10,$08       ;  |
+    DC.B    $00,$10,$09       ;  |
+    DC.B    $00,$10,$0A       ;  | right border (top)
+    DC.B    $00,$10,$0B       ;  |
+    DC.B    $0F,$10,$0C       ;  | ($0F = special icon)
+    DC.B    $00,$10,$0D       ;  |
+    DC.B    $00,$10,$0E       ; /
+    DC.B    $00,$10,$20       ; \
+    DC.B    $00,$10,$1F       ;  |
+    DC.B    $00,$10,$1E       ;  |
+    DC.B    $00,$10,$1D       ;  |
+    DC.B    $00,$10,$1C       ;  | right border (bottom)
+    DC.B    $05,$10,$1B       ;  | ($05 = special icon)
+    DC.B    $00,$10,$1A       ;  |
+    DC.B    $00,$10,$19       ;  |
+    DC.B    $00,$10,$18       ; /
+    ; Left border (column $0B, rows $06-$0E top, $18-$20 bottom)
+    DC.B    $00,$0B,$06       ; \
+    DC.B    $00,$0B,$07       ;  |
+    DC.B    $00,$0B,$08       ;  |
+    DC.B    $00,$0B,$09       ;  | left border (top)
+    DC.B    $14,$0B,$0A       ;  | ($14 = special icon)
+    DC.B    $00,$0B,$0B       ;  |
+    DC.B    $00,$0B,$0C       ;  |
+    DC.B    $00,$0B,$0D       ;  |
+    DC.B    $00,$0B,$0E       ; /
+    DC.B    $00,$0B,$20       ; \
+    DC.B    $00,$0B,$1F       ;  |
+    DC.B    $00,$0B,$1E       ;  |
+    DC.B    $00,$0B,$1D       ;  |
+    DC.B    $0E,$0B,$1C       ;  | left border (bottom)
+    DC.B    $00,$0B,$1B       ;  | ($0E = special icon)
+    DC.B    $00,$0B,$1A       ;  |
+    DC.B    $00,$0B,$19       ;  |
+    DC.B    $00,$0B,$18       ; /
+
+    ; --- Display mode configuration ---
+BORDER_MODE_CONFIG:
+    DC.B    $7D               ; HRCG reset
+    DC.B    $80,$02           ; mode, value
+    ; Map viewport bounds (2 sets: normal and expanded)
+BORDER_VIEWPORT_A:
+    DC.B    $2F,$00,$00,$01,$0C,$09,$00,$00,$02,$01,$02,$01,$00,$00
+BORDER_VIEWPORT_B:
+    DC.B    $2F,$83,$01,$14,$08,$05,$00,$06,$0F,$12,$14,$19,$00,$14
+    DC.B    $08,$09,$05,$16,$05,$13
+
+    ; --- Icon position maps (column/row pairs for 3 display layers) ---
+BORDER_ICON_POS_A:
+    DC.B    $7F
+    DC.B    $01,$09,$01,$0E,$01,$13  ; layer A: col $01
+    DC.B    $16,$09,$16,$0E,$16,$13  ; layer A: col $16
+BORDER_ICON_POS_B:
+    DC.B    $01,$0A,$01,$0B,$01,$0C,$01,$0D  ; layer B: col $01
+    DC.B    $01,$0F,$01,$12
+    DC.B    $16,$0A,$16,$0D,$16,$0F,$16,$12  ; layer B: col $16
+BORDER_ICON_POS_C:
+    DC.B    $10,$0A,$10,$0D,$10,$0F,$10,$12  ; layer C: col $10
+    DC.B    $25,$0A,$25,$0D,$25,$0F           ; layer C: col $25
+    DC.B    $25,$10,$25,$11,$25,$12
+
+    ; --- Border frame pattern ---
+BORDER_FRAME_PATTERN:
+    DC.B    $11                ; length
+    HEX     F0 F1 F0 F1 F0 F1 F0 F1 ; alternating frame chars
+    HEX     F0 F1 F0 F1 F0 F1 F0 F1
+    DC.B    $F0,$02,$F0,$F1,$02,$F1,$F0 ; special frame ending
+
+    ; --- Copyright and prompt strings ---
+S_COPYRIGHT:
+    APSTR "COPYRIGHT 1982 STUART SMITH"
+S_PRESS_SPACE_BOOT:
+    APSTR "PRESS SPACE BAR TO CONTINUE"
+
+    ; --- Border frame font characters (3 rows of glyphs) ---
+BORDER_FONT_ROW1:
+    DC.B    $07               ; 7 chars
+    HEX     E8 E9 EA EB EC ED EE
+BORDER_FONT_ROW2:
+    DC.B    $08               ; 8 chars
+    HEX     EF F0 F1 F2 F3 F4 F5 F6
+BORDER_FONT_ROW3:
+    DC.B    $08               ; 8 chars
+    HEX     F7 F8 F9 FA FB FC FD FE
+@ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE BORDER_MODE_CONFIG BORDER_VIEWPORT_A BORDER_VIEWPORT_B BORDER_ICON_POS_A BORDER_ICON_POS_B BORDER_ICON_POS_C BORDER_FRAME_PATTERN S_COPYRIGHT S_PRESS_SPACE_BOOT BORDER_FONT_ROW1 BORDER_FONT_ROW2 BORDER_FONT_ROW3
+
 \subsection{Border animation handler (\$5B2A)}
 
 [[GAME_ACTION_HANDLER]] at [[$5B2A]] is called via [[DISPATCH_VEC]]
@@ -6905,128 +7029,6 @@ The following data regions contain game strings, lookup tables, and
 display data that have not yet been fully annotated.  They are included
 as raw hex to close binary gaps.
 
-@ Border display data at [[$5DBF]]--[[$5F18]].  The border animation
-cycles through positions in [[BORDER_POS_TABLE]], drawing icons at
-each map border cell.  The 3-byte records are (icon, column, row):
-icon=\$00 draws the default border glyph; nonzero icons draw special
-decorations (e.g.\ doors, markers).
-
-<<game data 5DBF>>=
-    ORG     $5DBF
-BORDER_INITIAL_CHAR:
-    DC.B    $A0               ; initial border character (space)
-BORDER_ANIM_INDEX:
-    DC.B    $06               ; current animation index (cycles $05-$15)
-BORDER_ANIM_SAVE:
-    DC.B    $A0               ; saved character at animated position
-BORDER_ICON_CHARS:
-    DC.B    $C4,$D3,$E9       ; icon character codes (D, S, i)
-BORDER_HANDLER_TABLE:
-    DC.W    $5B6D             ; handler pointer 0
-    DC.W    $5B8F             ; handler pointer 1
-    DC.W    $5B7E             ; handler pointer 2
-
-    ; --- Border position table: 46 entries of (icon, col, row) ---
-    ; Bottom border (row $13, columns $09-$12)
-BORDER_POS_TABLE:
-    DC.B    $00,$09,$13       ; \
-    DC.B    $00,$0A,$13       ;  |
-    DC.B    $00,$0B,$13       ;  |
-    DC.B    $00,$0C,$13       ;  | bottom border
-    DC.B    $00,$0D,$13       ;  |
-    DC.B    $0B,$0E,$13       ;  | ($0B = special icon)
-    DC.B    $00,$0F,$13       ;  |
-    DC.B    $00,$10,$13       ;  |
-    DC.B    $00,$11,$13       ;  |
-    DC.B    $00,$12,$13       ; /
-    ; Right border (column $10, rows $06-$0E top, $18-$20 bottom)
-    DC.B    $00,$10,$06       ; \
-    DC.B    $00,$10,$07       ;  |
-    DC.B    $00,$10,$08       ;  |
-    DC.B    $00,$10,$09       ;  |
-    DC.B    $00,$10,$0A       ;  | right border (top)
-    DC.B    $00,$10,$0B       ;  |
-    DC.B    $0F,$10,$0C       ;  | ($0F = special icon)
-    DC.B    $00,$10,$0D       ;  |
-    DC.B    $00,$10,$0E       ; /
-    DC.B    $00,$10,$20       ; \
-    DC.B    $00,$10,$1F       ;  |
-    DC.B    $00,$10,$1E       ;  |
-    DC.B    $00,$10,$1D       ;  |
-    DC.B    $00,$10,$1C       ;  | right border (bottom)
-    DC.B    $05,$10,$1B       ;  | ($05 = special icon)
-    DC.B    $00,$10,$1A       ;  |
-    DC.B    $00,$10,$19       ;  |
-    DC.B    $00,$10,$18       ; /
-    ; Left border (column $0B, rows $06-$0E top, $18-$20 bottom)
-    DC.B    $00,$0B,$06       ; \
-    DC.B    $00,$0B,$07       ;  |
-    DC.B    $00,$0B,$08       ;  |
-    DC.B    $00,$0B,$09       ;  | left border (top)
-    DC.B    $14,$0B,$0A       ;  | ($14 = special icon)
-    DC.B    $00,$0B,$0B       ;  |
-    DC.B    $00,$0B,$0C       ;  |
-    DC.B    $00,$0B,$0D       ;  |
-    DC.B    $00,$0B,$0E       ; /
-    DC.B    $00,$0B,$20       ; \
-    DC.B    $00,$0B,$1F       ;  |
-    DC.B    $00,$0B,$1E       ;  |
-    DC.B    $00,$0B,$1D       ;  |
-    DC.B    $0E,$0B,$1C       ;  | left border (bottom)
-    DC.B    $00,$0B,$1B       ;  | ($0E = special icon)
-    DC.B    $00,$0B,$1A       ;  |
-    DC.B    $00,$0B,$19       ;  |
-    DC.B    $00,$0B,$18       ; /
-
-    ; --- Display mode configuration ---
-BORDER_MODE_CONFIG:
-    DC.B    $7D               ; HRCG reset
-    DC.B    $80,$02           ; mode, value
-    ; Map viewport bounds (2 sets: normal and expanded)
-BORDER_VIEWPORT_A:
-    DC.B    $2F,$00,$00,$01,$0C,$09,$00,$00,$02,$01,$02,$01,$00,$00
-BORDER_VIEWPORT_B:
-    DC.B    $2F,$83,$01,$14,$08,$05,$00,$06,$0F,$12,$14,$19,$00,$14
-    DC.B    $08,$09,$05,$16,$05,$13
-
-    ; --- Icon position maps (column/row pairs for 3 display layers) ---
-BORDER_ICON_POS_A:
-    DC.B    $7F
-    DC.B    $01,$09,$01,$0E,$01,$13  ; layer A: col $01
-    DC.B    $16,$09,$16,$0E,$16,$13  ; layer A: col $16
-BORDER_ICON_POS_B:
-    DC.B    $01,$0A,$01,$0B,$01,$0C,$01,$0D  ; layer B: col $01
-    DC.B    $01,$0F,$01,$12
-    DC.B    $16,$0A,$16,$0D,$16,$0F,$16,$12  ; layer B: col $16
-BORDER_ICON_POS_C:
-    DC.B    $10,$0A,$10,$0D,$10,$0F,$10,$12  ; layer C: col $10
-    DC.B    $25,$0A,$25,$0D,$25,$0F           ; layer C: col $25
-    DC.B    $25,$10,$25,$11,$25,$12
-
-    ; --- Border frame pattern ---
-BORDER_FRAME_PATTERN:
-    DC.B    $11                ; length
-    HEX     F0 F1 F0 F1 F0 F1 F0 F1 ; alternating frame chars
-    HEX     F0 F1 F0 F1 F0 F1 F0 F1
-    DC.B    $F0,$02,$F0,$F1,$02,$F1,$F0 ; special frame ending
-
-    ; --- Copyright and prompt strings ---
-S_COPYRIGHT:
-    APSTR "COPYRIGHT 1982 STUART SMITH"
-S_PRESS_SPACE_BOOT:
-    APSTR "PRESS SPACE BAR TO CONTINUE"
-
-    ; --- Border frame font characters (3 rows of glyphs) ---
-BORDER_FONT_ROW1:
-    DC.B    $07               ; 7 chars
-    HEX     E8 E9 EA EB EC ED EE
-BORDER_FONT_ROW2:
-    DC.B    $08               ; 8 chars
-    HEX     EF F0 F1 F2 F3 F4 F5 F6
-BORDER_FONT_ROW3:
-    DC.B    $08               ; 8 chars
-    HEX     F7 F8 F9 FA FB FC FD FE
-@ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE BORDER_MODE_CONFIG BORDER_VIEWPORT_A BORDER_VIEWPORT_B BORDER_ICON_POS_A BORDER_ICON_POS_B BORDER_ICON_POS_C BORDER_FRAME_PATTERN S_COPYRIGHT S_PRESS_SPACE_BOOT BORDER_FONT_ROW1 BORDER_FONT_ROW2 BORDER_FONT_ROW3
 
 @ Game string data at [[$7EDD]]--[[$80A3]]: equipment names (swords,
 daggers, armor), map object descriptions (walls, doors, treasure
