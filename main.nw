@@ -4065,8 +4065,8 @@ INIT_GAME_STATE:
     STOB    #$00,$5A00 ; clear game state flag
     LDX     #$B1                  ; LDA (zp),Y opcode
     STX     $80A6                 ; patch character renderer
-    LDX     #$06                  ; script index 6 (opening)
-    JSR     SCRIPT_ENGINE         ; run opening script
+    LDX     #$06                  ; script 3: attract/opening
+    JSR     SCRIPT_ENGINE
     STOW    $4F4C,$7A49 ; patch $7A49 to JMP $7A4F
     STOB    #$7A,$7A4B
     RTS
@@ -4794,7 +4794,7 @@ HRCG_GETKEY:
     RTS
 ; --- Shifted key handling (ESC was pressed) ---
 .shifted:
-    BALT    #$C9,.try_other ; 'I' ?
+    BALT    #$C9,.try_other    ; 'I' ?
     BAEQ    #$CD,.scroll_down  ; 'M' ?
     BCS     .try_other         ; > 'M' -> try as normal
     BAEQ    #$CB,.cursor_right ; 'K' ?
@@ -8348,8 +8348,8 @@ SCENE_LOOP:
     STOW    SCENE_TEXT_DATA,TEXT_STREAM_PTR ; scene text data -> $06/$07
     JSR     TEXT_RENDERER
 
-    LDX     #$06                            ; script index 6
-    JSR     SCRIPT_ENGINE                   ; run script #3 ($A300)
+    LDX     #$06                            ; script 3: attract/opening
+    JSR     SCRIPT_ENGINE
     LDA     SCENE_TRANSITION                ; scene transition flag
     BEQ     .done                           ; zero = no transition
     STA     SCENE_NUMBER                    ; set new scene number
@@ -8515,7 +8515,7 @@ SETUP_SCENE_DISPLAY:
     STOB    #$00,AI_WAIT_FLAG
     BANE    CHAR_AI_MODE,.not_ai
     STOB    #$0A,AI_WAIT_FLAG
-    LDX     #$10
+    LDX     #$10                ; script 8: AI turn effect
     JSR     SCRIPT_ENGINE
 .not_ai:
     JSR     DRAW_CHAR_AT_POS
@@ -9902,8 +9902,8 @@ TEXT_RENDERER:
     TYA                         ; \
     PHA                         ;  | save stream index
     NOP
-    LDX     #$06
-    JSR     SCRIPT_ENGINE       ; run attract script
+    LDX     #$06                ; script 3: attract/opening
+    JSR     SCRIPT_ENGINE
     PSHW    TEXT_STREAM_PTR     ; save stream pointer
     JSR     DISPLAY_STATUS_BAR  ; (clobbers TEXT_STREAM_PTR)
     PULW    TEXT_STREAM_PTR     ; restore stream pointer
@@ -10505,8 +10505,8 @@ MOVE_LOOP:                     ; $1A31 - external entry point
     LDA     #$00
     BANE    ENTITY_REC+1,.something  ; ENTITY_REC+1 != 0 -> occupied
     BAEQ    ENTITY_REC,.empty        ; ENTITY_REC == 0 -> empty cell
-    LDX     #$0E
-    JSR     SCRIPT_ENGINE            ; display blocked message?
+    LDX     #$0E                     ; script 7: entity interaction
+    JSR     SCRIPT_ENGINE
     JMP     SHOW_LOCKED_MSG
 
 .empty:
@@ -10631,12 +10631,12 @@ RESET_TURN_POS:
     JSR     DRAW_CHAR_AT_POS
     MOVB    CURRENT_COL,TURN_START_COL
     MOVB    CURRENT_ROW,TURN_START_ROW
-    LDX     TURN_SCRIPT_GUARD
+    LDX     TURN_SCRIPT_GUARD ; X=$16 = script 11: movement effect
     BXEQ    #$16,.run_script
     RTS
 .run_script:
     DEC     TURN_SCRIPT_GUARD
-    JMP     SCRIPT_ENGINE
+    JMP     SCRIPT_ENGINE     ; X still $16 from LDX above
 @ %def COMMIT_MOVE RESET_TURN_POS
 @ [[END_TURN]] wraps up a character's turn:
 \begin{enumerate}
@@ -10809,7 +10809,7 @@ INPUT_LOOP:
     JSR     SETUP_CURSOR
     JMP     .loop
 .run_script:
-    LDX     #$12
+    LDX     #$12                ; script 9: menu selection effect
     JSR     SCRIPT_ENGINE
     JMP     .loop
 .exit:
@@ -11896,7 +11896,7 @@ PLAYER_ATTACK:
     JSR     CLASSIFY_ENTITY_TYPE
     JSR     PRINT_BOTTOM_CENTERED
     LDY     COMBAT_STRENGTH
-    LDX     #$02
+    LDX     #$02                ; script 1: combat hit effect
     JSR     SCRIPT_ENGINE
     LDY     #$01
     LDA     (MOB_PTR),Y
@@ -11923,7 +11923,7 @@ PLAYER_ATTACK:
     STA     FONT_COL
     JSR     GET_ENTITY_FONTCHAR
     JSR     RENDER_FONT_CHAR
-    LDX     #$0C
+    LDX     #$0C              ; script 6: combat avoided effect
     JSR     SCRIPT_ENGINE
     JSR     SET_CURSOR_ROW21
     LDA     #$02
@@ -11958,7 +11958,7 @@ PLAYER_ATTACK:
     LDA     $BA
     LDY     #$02
     STA     (MOB_PTR),Y
-    LDX     #$0E
+    LDX     #$0E              ; script 7: entity interaction
     JSR     SCRIPT_ENGINE
     JSR     DISPATCH_ON_MODE
     LDY     #$00
@@ -12018,7 +12018,7 @@ MOB_ATTACK:
     JSR     SCROLL_STATUS_LINE
     JSR     PRINT_MEMBER_NAME
     LDY     COMBAT_STRENGTH
-    LDX     #$02
+    LDX     #$02              ; script 1: combat hit effect
     JSR     SCRIPT_ENGINE
     LDY     #$04
     LDA     (ENTITY_PTR),Y
@@ -12110,8 +12110,8 @@ APPLY_DAMAGE:
     TXA
     JSR     DISPLAY_MESSAGE   ; show damage message
     LDY     DAMAGE_AMOUNT
-    LDX     #$04
-    JSR     SCRIPT_ENGINE     ; run damage script
+    LDX     #$04              ; script 2: combat damage effect
+    JSR     SCRIPT_ENGINE
     LDY     #$06
     LDA     (EFFECT_REC),Y    ; field 6 (HP + flags)
     TAX
@@ -12151,13 +12151,13 @@ APPLY_DAMAGE:
 .dead:
     LDY     #$04
     LDA     (EFFECT_REC),Y    ; field 4
-    LDX     #$08              ; default script
+    LDX     #$08              ; script 4: mob death effect
     BALT    #$15,.skip_flag
     LDY     #$0F
     LDA     (EFFECT_REC),Y
     ORA     #$10              ; set death flag
     STA     (EFFECT_REC),Y
-    LDX     #$0A              ; NPC death script
+    LDX     #$0A              ; script 5: NPC death effect
 .skip_flag:
     TXA
     PHA
@@ -12268,8 +12268,8 @@ HANDLE_ENCOUNTER:
     JSR     SET_CURSOR_ROW21
     LDA     #$01
     JSR     DISPLAY_MESSAGE            ; "encounter" message
-    LDX     #$14
-    JMP     SCRIPT_ENGINE              ; run encounter script
+    LDX     #$14              ; script 10: encounter effect
+    JMP     SCRIPT_ENGINE
 
     ; --- specific encounter path (type >= $40) ---
 .specific:
@@ -12331,8 +12331,8 @@ HANDLE_ENCOUNTER:
     MOVB    TURN_START_COL,BLINK_COL
     MOVB    TURN_START_ROW,BLINK_ROW
     MOVB    FONT_CHARNUM,BLINK_CHAR
-    LDX     #$0C
-    JSR     SCRIPT_ENGINE              ; run "avoided" script
+    LDX     #$0C              ; script 6: combat avoided effect
+    JSR     SCRIPT_ENGINE
     JSR     SET_CURSOR_ROW21
     LDA     #$02
     JMP     DISPLAY_MESSAGE            ; "avoided encounter" message
@@ -12494,7 +12494,7 @@ HANDLE_EVENT_SLOT:
     JMP     MOVE_LOOP
 .not_active:
     PHA
-    LDX     #$0E
+    LDX     #$0E              ; script 7: entity interaction
     JSR     SCRIPT_ENGINE
     PLA
     BANE    #$00,.has_type
@@ -12903,7 +12903,7 @@ PROCESS_ENTITY_SCRIPT:
     STA     $BA
     LDA     #$FE
     STA     (MOB_PTR),Y
-    LDX     #$0E
+    LDX     #$0E              ; script 7: entity interaction
     JSR     SCRIPT_ENGINE
     JSR     DISPATCH_ON_MODE
     LDA     $BA
@@ -14949,23 +14949,55 @@ SCRIPT_PC               EQU     $E4     ; script instruction pointer (2 bytes, $
     LDA     SCRIPT_TABLE+1,X ; high byte
     STA     SCRIPT_PC+1      ; SCRIPT_PC/SCRIPT_PC+1 = script start address
 
-@ The eight script base addresses are stored in the table below.
+@ The script base addresses are stored in the table below.
+The X~register passed to [[SCRIPT_ENGINE]] is a byte offset into
+this table (X~=~0 for script~0, X~=~2 for script~1, etc.).
+
+The table contains 12~entries (scripts 0--11).  The X~register passed
+to [[SCRIPT_ENGINE]] is a byte offset (X~=~0 for script~0, X~=~2 for
+script~1, etc.).  All scripts except 0--2 point into the
+[[$A300]]--[[$A5FF]] resident region.
+
+\begin{center}
+\begin{tabular}{cclll}
+\hline
+\textbf{X} & \textbf{Script} & \textbf{Address} & \textbf{Purpose} & \textbf{Callers} \\
+\hline
+\$00 & 0  & \$80C6 & (empty --- single END byte) & --- \\
+\$02 & 1  & \$80C7 & combat hit effect & attack routines \\
+\$04 & 2  & \$80D7 & combat damage effect & damage handler \\
+\$06 & 3  & \$A300 & attract/opening & attract screen, scene loop, game init \\
+\$08 & 4  & \$A3C3 & mob death effect & death handler (field~4 $<$ \$15) \\
+\$0A & 5  & \$A3CE & NPC death effect & death handler (field~4 $\geq$ \$15) \\
+\$0C & 6  & \$A3DE & combat avoided effect & hit handler, avoid handler \\
+\$0E & 7  & \$A409 & entity interaction effect & movement, entity scripts \\
+\$10 & 8  & \$A432 & AI turn effect & [[SETUP_SCENE_DISPLAY]] \\
+\$12 & 9  & \$A437 & menu selection effect & [[INPUT_LOOP]] \\
+\$14 & 10 & \$A3FC & encounter effect & encounter handler \\
+\$16 & 11 & \$A43C & movement effect & [[COMMIT_MOVE]] \\
+\hline
+\end{tabular}
+\end{center}
 
 <<script pointer table>>=
     ORG     $80AE
 SCRIPT_TABLE:
-    DC.W    $80C6 ; script 0
-    DC.W    $80C7 ; script 1
-    DC.W    $80D7 ; script 2
-    DC.W    $A300 ; script 3 (attract -- EALDR resident)
-    DC.W    $A3C3 ; script 4
-    DC.W    $A3CE ; script 5
-    DC.W    $A3DE ; script 6
-    DC.W    $A409 ; script 7
+    DC.W    $80C6 ; script 0  (X=$00): empty (single END byte)
+    DC.W    $80C7 ; script 1  (X=$02): combat hit effect
+    DC.W    $80D7 ; script 2  (X=$04): combat damage effect
+    DC.W    $A300 ; script 3  (X=$06): attract/opening
+    DC.W    $A3C3 ; script 4  (X=$08): mob death effect
+    DC.W    $A3CE ; script 5  (X=$0A): NPC death effect
+    DC.W    $A3DE ; script 6  (X=$0C): combat avoided effect
+    DC.W    $A409 ; script 7  (X=$0E): entity interaction effect
+    DC.W    $A432 ; script 8  (X=$10): AI turn effect
+    DC.W    $A437 ; script 9  (X=$12): menu selection effect
+    DC.W    $A3FC ; script 10 (X=$14): encounter effect
+    DC.W    $A43C ; script 11 (X=$16): movement effect
 @ %def SCRIPT_TABLE
-@ Scripts 3--7 are in the [[$A300]]--[[$A5FF]] resident region (which was
-also copied to [[$0500]]--[[$07FF]] by EALDR, but the script table
-points to the original addresses).
+@ All scripts except 0--2 point into the [[$A300]]--[[$A5FF]] resident
+region (copied to [[$0500]]--[[$07FF]] by EALDR, but the script table
+uses the original addresses).
 
 @ [[SCRIPT_LOOP_CTR]] counts iterations of the script's built-in loop
 construct.  [[SCRIPT_PRNG_MASK]] controls action randomization: the
