@@ -93,22 +93,48 @@ def find_chunk_def_line(lines: list[str], chunk_name: str) -> int | None:
     return None
 
 
+def is_data_only_chunk(lines: list[str], chunk_start: int) -> bool:
+    """Check if a chunk starting at chunk_start contains only data directives."""
+    j = chunk_start + 1
+    while j < len(lines):
+        line = lines[j].strip()
+        if line.startswith('@ %def') or line == '@':
+            return True
+        if line.startswith('<<') and line.endswith('>>='):
+            return True
+        if not line or line.startswith(';') or line.startswith('@'):
+            j += 1
+            continue
+        if re.match(r'^[A-Za-z_]\w*\s*[:=]', line):
+            j += 1
+            continue
+        first_word = line.split()[0] if line.split() else ''
+        if first_word in DATA_DIRECTIVES:
+            j += 1
+            continue
+        return False
+    return True
+
+
 def chunk_immediately_before(
     lines: list[str], data_chunk: str, code_chunk: str
 ) -> bool:
     """Check if data_chunk definition appears immediately before code_chunk
-    definition (with only prose/comments between, no other chunk defs)."""
+    definition (with only prose/comments and other data-only chunks between)."""
     data_line = find_chunk_def_line(lines, data_chunk)
     code_line = find_chunk_def_line(lines, code_chunk)
     if data_line is None or code_line is None:
         return False
     if data_line >= code_line:
         return False
-    # Check no other chunk definitions between them
+    # Check no code chunk definitions between them
+    # (data-only chunks and continuations of data_chunk are allowed)
     for i in range(data_line + 1, code_line):
         m = re.match(r'^<<(.+)>>=\s*$', lines[i].strip())
         if m and m.group(1) != data_chunk:
-            return False
+            # Allow other data-only chunks between
+            if not is_data_only_chunk(lines, i):
+                return False
     return True
 
 
