@@ -4391,6 +4391,10 @@ control codes, border label position tables (used by
 [[DRAW_BORDER_LABELS]]), the frame pattern, copyright text, and
 decorative font characters.
 
+@ The UI text stream begins with HRCG control codes and viewport
+configuration, parsed by [[TEXT_RENDERER]] when [[INIT_GAME_DISPLAY]]
+sets [[TEXT_STREAM_PTR]] to [[UI_TEXT_STREAM]].
+
 <<ui text stream>>=
     ORG     $5E55
     DC.B    $7D               ; HRCG reset to full screen
@@ -4399,8 +4403,14 @@ decorative font characters.
     DC.B    $2F,$00,$00,$01,$0C,$09,$00,$00,$02,$01,$02,$01,$00,$00
     DC.B    $2F,$83,$01,$14,$08,$05,$00,$06,$0F,$12,$14,$19,$00,$14
     DC.B    $08,$09,$05,$16,$05,$13
-    ; Border label positions (col/row pairs)
     DC.B    $7F
+@ %def UI_TEXT_STREAM_DATA
+
+@ Border label position tables, used by [[DRAW_BORDER_LABELS]] to
+place text labels around the game map border.
+
+<<border label positions>>=
+    ORG     $5E7B
 BORDER_POS_HORIZ:                     ; 6 col/row pairs for horizontal labels
     DC.B    $01,$09,$01,$0E,$01,$13
     DC.B    $16,$09,$16,$0E,$16,$13
@@ -4412,18 +4422,23 @@ BORDER_POS_VERT_R:                    ; 10 col/row pairs for vertical labels (ri
     DC.B    $10,$0A,$10,$0D,$10,$0F,$10,$12
     DC.B    $25,$0A,$25,$0D,$25,$0F
     DC.B    $25,$10,$25,$11,$25,$12
-    ; Border frame pattern
+@ %def BORDER_POS_HORIZ BORDER_POS_VERT_L BORDER_POS_VERT_R
+
+@ The border frame pattern and game strings, used by
+[[DRAW_BORDER_LABELS]] (frame pattern) and [[INIT_GAME_DISPLAY]]
+(copyright, prompt, and decorative rows).
+
+<<border strings>>=
+    ORG     $5EAF
 BORDER_STR_HORIZ:                     ; horizontal border pattern string
     DC.B    $11               ; length = 17
     HEX     F0 F1 F0 F1 F0 F1 F0 F1
     HEX     F0 F1 F0 F1 F0 F1 F0 F1
     DC.B    $F0,$02,$F0,$F1,$02,$F1,$F0
-    ; Copyright and prompt strings
 S_COPYRIGHT:
     APSTR "COPYRIGHT 1982 STUART SMITH"
 S_PRESS_SPACE_BOOT:
     APSTR "PRESS SPACE BAR TO CONTINUE"
-    ; Decorative border font rows
 S_DECOR_ROW1:
     DC.B    $07
     HEX     E8 E9 EA EB EC ED EE
@@ -4433,7 +4448,7 @@ S_DECOR_ROW2:
 S_DECOR_ROW3:
     DC.B    $08
     HEX     F7 F8 F9 FA FB FC FD FE
-@ %def BORDER_POS_HORIZ BORDER_POS_VERT_L BORDER_POS_VERT_R BORDER_STR_HORIZ S_COPYRIGHT S_PRESS_SPACE_BOOT S_DECOR_ROW1 S_DECOR_ROW2 S_DECOR_ROW3
+@ %def BORDER_STR_HORIZ S_COPYRIGHT S_PRESS_SPACE_BOOT S_DECOR_ROW1 S_DECOR_ROW2 S_DECOR_ROW3
 
 \subsection{Border animation handler (\$5B2A)}
 
@@ -18285,6 +18300,8 @@ The following root chunks produce the assembly files when tangled.
 <<plot char>>
 <<border animation data>>
 <<ui text stream>>
+<<border label positions>>
+<<border strings>>
 <<input loop>>
 <<setup input>>
 <<draw input options>>
