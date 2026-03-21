@@ -1,44 +1,56 @@
 #!/usr/bin/env python3
-"""Compare assembled output against the reference binary (main.bin).
+"""Compare assembled output against reference binaries.
 
 Usage:
-    python .claude/skills/assemble/verify.py [START END]
+    python .claude/skills/assemble/verify.py [TARGET] [START END]
 
-With no arguments, shows overall coverage statistics and lists all
-undocumented gaps.
+TARGET is one of: main (default), boot1, ealdr
 
-With START END (hex addresses), checks just that region for mismatches.
+With no START/END, shows overall coverage statistics and lists gaps.
+With START END (hex addresses), checks just that region.
 
 Examples:
-    python .claude/skills/assemble/verify.py              # full report
-    python .claude/skills/assemble/verify.py 0503 0569    # check one region
+    python .claude/skills/assemble/verify.py              # main full report
+    python .claude/skills/assemble/verify.py main 0503 0569
+    python .claude/skills/assemble/verify.py boot1
+    python .claude/skills/assemble/verify.py ealdr
 """
 
 from __future__ import annotations
 
 import sys
 
-BASE = 0x0500
-TEST_BIN = 'output/main_test.bin'
-REF_BIN = 'main.bin'
+TARGETS: dict[str, tuple[str, str, int]] = {
+    'main':  ('output/main.bin',  'main.bin',  0x0500),
+    'boot1': ('output/boot1.bin', 'boot1.bin', 0x0800),
+    'ealdr': ('output/ealdr.bin', 'ealdr.bin', 0xA000),
+}
 
 
 def parse_addr(s: str) -> int:
-    """Parse hex address: '$7780', '0x7780', or '7780'."""
     return int(s.strip().lstrip('$').removeprefix('0x').removeprefix('0X'), 16)
 
 
 def main() -> None:
+    args = sys.argv[1:]
+
+    # Parse target name
+    target = 'main'
+    if args and args[0] in TARGETS:
+        target = args.pop(0)
+
+    test_path, ref_path, base = TARGETS[target]
+
     try:
-        test = open(TEST_BIN, 'rb').read()
+        test = open(test_path, 'rb').read()
     except FileNotFoundError:
-        print(f'ERROR: {TEST_BIN} not found. Run /assemble first.')
+        print(f'ERROR: {test_path} not found. Run /assemble first.')
         sys.exit(1)
 
     try:
-        ref = open(REF_BIN, 'rb').read()
+        ref = open(ref_path, 'rb').read()
     except FileNotFoundError:
-        print(f'ERROR: {REF_BIN} not found.')
+        print(f'ERROR: {ref_path} not found.')
         sys.exit(1)
 
     if len(test) != len(ref):
@@ -47,29 +59,27 @@ def main() -> None:
     size = min(len(test), len(ref))
 
     # Region check mode
-    if len(sys.argv) >= 3:
-        start = parse_addr(sys.argv[1])
-        end = parse_addr(sys.argv[2])
+    if len(args) >= 2:
+        start = parse_addr(args[0])
+        end = parse_addr(args[1])
         ok = True
-        for i in range(start - BASE, end - BASE):
-            if i >= size:
+        for i in range(start - base, end - base):
+            if i < 0 or i >= size:
                 break
             if test[i] != ref[i]:
-                print(f'  DIFF at ${BASE + i:04X}: '
+                print(f'  DIFF at ${base + i:04X}: '
                       f'expected ${ref[i]:02X}, got ${test[i]:02X}')
                 ok = False
-                if not ok:
-                    # Show up to 5 more diffs
-                    count = 1
-                    for j in range(i + 1, min(i + 20, end - BASE)):
-                        if j < size and test[j] != ref[j]:
-                            print(f'  DIFF at ${BASE + j:04X}: '
-                                  f'expected ${ref[j]:02X}, got ${test[j]:02X}')
-                            count += 1
-                            if count >= 5:
-                                print('  ...')
-                                break
-                    break
+                count = 1
+                for j in range(i + 1, min(i + 20, end - base)):
+                    if j < size and test[j] != ref[j]:
+                        print(f'  DIFF at ${base + j:04X}: '
+                              f'expected ${ref[j]:02X}, got ${test[j]:02X}')
+                        count += 1
+                        if count >= 5:
+                            print('  ...')
+                            break
+                break
         if ok:
             print(f'${start:04X}-${end - 1:04X}: MATCH ({end - start} bytes)')
         return
@@ -93,14 +103,15 @@ def main() -> None:
     total_diff = sum(e - s for s, e in gaps)
     documented = size - total_diff
 
-    print(f'Coverage: {documented}/{size} bytes '
-          f'({documented * 100 / size:.1f}%)')
-    print(f'Remaining: {total_diff} bytes '
-          f'({total_diff * 100 / size:.1f}%)')
-    print(f'Gaps: {len(gaps)}')
+    print(f'{target}: {documented}/{size} bytes '
+          f'({documented * 100 / size:.1f}%) documented')
+    if total_diff == 0:
+        print('  No gaps — perfect match!')
+        return
+
+    print(f'  Remaining: {total_diff} bytes, {len(gaps)} gaps')
     print()
 
-    # Group gaps by size
     large = [(s, e) for s, e in gaps if e - s >= 500]
     medium = [(s, e) for s, e in gaps if 100 <= e - s < 500]
     small = [(s, e) for s, e in gaps if e - s < 100]
@@ -108,12 +119,12 @@ def main() -> None:
     if large:
         print(f'Large gaps (>= 500 bytes): {len(large)}')
         for s, e in large:
-            print(f'  ${BASE + s:04X}-${BASE + e - 1:04X}  {e - s:5d}B')
+            print(f'  ${base + s:04X}-${base + e - 1:04X}  {e - s:5d}B')
 
     if medium:
         print(f'Medium gaps (100-499 bytes): {len(medium)}')
         for s, e in medium:
-            print(f'  ${BASE + s:04X}-${BASE + e - 1:04X}  {e - s:5d}B')
+            print(f'  ${base + s:04X}-${base + e - 1:04X}  {e - s:5d}B')
 
     if small:
         total_small = sum(e - s for s, e in small)

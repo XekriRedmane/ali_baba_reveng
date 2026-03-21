@@ -16,7 +16,7 @@ Run the apply script, verify the result, and report:
 
 1. **Apply** — Run `python .claude/skills/macro-apply/apply_macros.py` from the project root. This scans main.nw for all macro candidates and applies substitutions in-place. It prints a summary of what it changed.
 
-2. **Verify** — Run `python weave.py main.nw output` to retangle. Then assemble with `cd output && dasm main.asm -f3 -omain_test.bin -lmain.lst -smain.sym` and compare `output/main_test.bin` byte-for-byte against `output/main_test_orig.bin` to confirm no regression.
+2. **Verify** — Run `python weave.py main.nw output` to retangle. Then assemble with `cd output && dasm main.asm -f3 -omain.bin -lmain.lst -smain.sym` and verify with `python .claude/skills/assemble/verify.py`.
 
 3. **Report** — Show the user the script output (macro counts) and the binary comparison result.
 

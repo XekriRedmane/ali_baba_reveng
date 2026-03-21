@@ -17952,7 +17952,6 @@ The following root chunks produce the assembly files when tangled.
 
 <<boot1.asm>>=
     PROCESSOR 6502
-<<boot1 defines>>
 <<boot1 entry>>
 <<boot1 saninc>>
 <<boot1 read error>>
@@ -17969,13 +17968,12 @@ The following root chunks produce the assembly files when tangled.
 <<boot1 interleave table>>
 <<boot1 dest pages>>
 <<boot1 loader doc>>
+<<Macros>>
+<<boot1 defines>>
 @
 
 <<ealdr.asm>>=
     PROCESSOR 6502
-<<Macros>>
-<<EALDR VM macros>>
-<<ealdr defines>>
 <<EALDR entry>>
 <<EALDR copy subroutine>>
 <<EALDR VM exec>>
@@ -18016,6 +18014,9 @@ The following root chunks produce the assembly files when tangled.
 <<EALDR RWTS interleave table>>
 <<EALDR RWTS dest pages>>
 <<EALDR RWTS tail padding>>
+<<Macros>>
+<<EALDR VM macros>>
+<<ealdr defines>>
 @
 
 \chapter{Index}\par\noindent

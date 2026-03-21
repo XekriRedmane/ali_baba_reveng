@@ -1,6 +1,6 @@
 # assemble
 
-Tangle main.nw and assemble main.asm using dasm. Reports any errors.
+Tangle main.nw and assemble using dasm. Reports any errors.
 
 ## Usage
 
@@ -10,34 +10,45 @@ Tangle main.nw and assemble main.asm using dasm. Reports any errors.
 
 ## Instructions
 
-Run these two commands in sequence:
+Run these commands in sequence:
 
 1. Tangle: `python weave.py main.nw output`
-2. Assemble: `cd C:/Users/rober/Projects/ali_baba_re/output && dasm main.asm -f3 -omain_test.bin -lmain.lst -smain.sym`
+2. Assemble main: `cd output && dasm main.asm -f3 -omain.bin -lmain.lst -smain.sym`
+3. Assemble boot1: `dasm boot1.asm -f3 -oboot1.bin -lboot1.lst -sboot1.sym`
+4. Assemble ealdr: `dasm ealdr.asm -f3 -oealdr.bin -lealdr.lst -sealdr.sym`
 
 Report the result:
-- If assembly succeeds with no errors or warnings (exit code 0), say so and report the binary size.
+- If assembly succeeds with no errors, say so.
 - If there are unresolved symbols, list them all.
-- If there is an "Origin Reverse-indexed" error, run `python .claude/skills/assemble/reorder_chunks.py` to auto-fix the chunk order in `<<main.asm>>`, then retry the build.
-- If there are other errors or warnings (excluding "unreferenced chunk" warnings from weave.py), list them.
+- If there is an "Origin Reverse-indexed" error, run `python .claude/skills/assemble/reorder_chunks.py TARGET` to auto-fix, then retry.
+- If there are other errors (excluding "unreferenced chunk" warnings from weave.py), list them.
 
-## Verify against reference binary
+## Verify against reference binaries
 
-After assembling, verify the output matches `main.bin`:
+After assembling, verify output matches the reference binaries:
 
 ```
-python .claude/skills/assemble/verify.py              # full coverage report
-python .claude/skills/assemble/verify.py 0503 0569    # check one region
+python .claude/skills/assemble/verify.py              # main full report
+python .claude/skills/assemble/verify.py main 0503 0569   # check region
+python .claude/skills/assemble/verify.py boot1        # boot1 report
+python .claude/skills/assemble/verify.py ealdr        # ealdr report
 ```
 
-Full mode shows coverage percentage and lists all undocumented gaps grouped by size. Region mode checks a specific address range and shows the first few mismatches.
+Targets and their reference binaries:
+
+| Target | Output | Reference | Base address |
+|--------|--------|-----------|-------------|
+| main | output/main.bin | main.bin | $0500 |
+| boot1 | output/boot1.bin | boot1.bin | $0800 |
+| ealdr | output/ealdr.bin | ealdr.bin | $A000 |
 
 ## Reorder chunks
 
-If chunk references in `<<main.asm>>` get out of ORG order (causing "Origin Reverse-indexed" errors), run:
+If chunk references get out of ORG order (causing "Origin Reverse-indexed" errors):
 
 ```
-python .claude/skills/assemble/reorder_chunks.py
+python .claude/skills/assemble/reorder_chunks.py          # main only
+python .claude/skills/assemble/reorder_chunks.py boot1    # boot1 only
+python .claude/skills/assemble/reorder_chunks.py all      # all three
+python .claude/skills/assemble/reorder_chunks.py all -v   # verbose
 ```
-
-This reads main.nw, resolves each chunk's first ORG address, and reorders the references in ascending address order. Use `-v` for verbose output showing all chunks with their addresses.
