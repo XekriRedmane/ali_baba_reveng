@@ -4103,6 +4103,27 @@ TEXT_ROW                EQU     $25
 TEXT_COL                EQU     $24     ; Cursor position
 @ %def TEXT_ROW TEXT_COL
 
+@ Copyright notice, boot prompt, and decorative border font strings,
+printed by [[INIT_GAME_DISPLAY]] at the bottom of the screen and
+along the right panel.
+
+<<display strings>>=
+    ORG     $5EC7
+S_COPYRIGHT:
+    APSTR "COPYRIGHT 1982 STUART SMITH"
+S_PRESS_SPACE_BOOT:
+    APSTR "PRESS SPACE BAR TO CONTINUE"
+S_DECOR_ROW1:
+    DC.B    $07
+    HEX     E8 E9 EA EB EC ED EE
+S_DECOR_ROW2:
+    DC.B    $08
+    HEX     EF F0 F1 F2 F3 F4 F5 F6
+S_DECOR_ROW3:
+    DC.B    $08
+    HEX     F7 F8 F9 FA FB FC FD FE
+@ %def S_COPYRIGHT S_PRESS_SPACE_BOOT S_DECOR_ROW1 S_DECOR_ROW2 S_DECOR_ROW3
+
 <<init game display>>=
     ORG     $5C6D
 INIT_GAME_DISPLAY:
@@ -4209,6 +4230,18 @@ BORDER_STR_VERT_L      EQU     $5EC1   ; vertical border pattern string (left)
 BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
 BORDER_LOOP_CTR        EQU     $5DC3   ; loop counter for border label drawing
 @ %def BORDER_STR_VERT_L BORDER_STR_VERT_R BORDER_LOOP_CTR
+
+@ The horizontal border frame pattern string, printed repeatedly by
+[[DRAW_BORDER_LABELS]] along the top and bottom edges of the map.
+
+<<border frame pattern>>=
+    ORG     $5EAF
+BORDER_STR_HORIZ:
+    DC.B    $11               ; length = 17
+    HEX     F0 F1 F0 F1 F0 F1 F0 F1
+    HEX     F0 F1 F0 F1 F0 F1 F0 F1
+    DC.B    $F0,$02,$F0,$F1,$02,$F1,$F0
+@ %def BORDER_STR_HORIZ
 
 <<draw border labels>>=
     ORG     $5CFD
@@ -4424,31 +4457,6 @@ BORDER_POS_VERT_R:                    ; 10 col/row pairs for vertical labels (ri
     DC.B    $25,$10,$25,$11,$25,$12
 @ %def BORDER_POS_HORIZ BORDER_POS_VERT_L BORDER_POS_VERT_R
 
-@ The border frame pattern and game strings, used by
-[[DRAW_BORDER_LABELS]] (frame pattern) and [[INIT_GAME_DISPLAY]]
-(copyright, prompt, and decorative rows).
-
-<<border strings>>=
-    ORG     $5EAF
-BORDER_STR_HORIZ:                     ; horizontal border pattern string
-    DC.B    $11               ; length = 17
-    HEX     F0 F1 F0 F1 F0 F1 F0 F1
-    HEX     F0 F1 F0 F1 F0 F1 F0 F1
-    DC.B    $F0,$02,$F0,$F1,$02,$F1,$F0
-S_COPYRIGHT:
-    APSTR "COPYRIGHT 1982 STUART SMITH"
-S_PRESS_SPACE_BOOT:
-    APSTR "PRESS SPACE BAR TO CONTINUE"
-S_DECOR_ROW1:
-    DC.B    $07
-    HEX     E8 E9 EA EB EC ED EE
-S_DECOR_ROW2:
-    DC.B    $08
-    HEX     EF F0 F1 F2 F3 F4 F5 F6
-S_DECOR_ROW3:
-    DC.B    $08
-    HEX     F7 F8 F9 FA FB FC FD FE
-@ %def BORDER_STR_HORIZ S_COPYRIGHT S_PRESS_SPACE_BOOT S_DECOR_ROW1 S_DECOR_ROW2 S_DECOR_ROW3
 
 \subsection{Border animation handler (\$5B2A)}
 
@@ -18301,7 +18309,8 @@ The following root chunks produce the assembly files when tangled.
 <<border animation data>>
 <<ui text stream>>
 <<border label positions>>
-<<border strings>>
+<<border frame pattern>>
+<<display strings>>
 <<input loop>>
 <<setup input>>
 <<draw input options>>
