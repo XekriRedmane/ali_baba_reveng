@@ -15540,8 +15540,7 @@ this table (X~=~0 for script~0, X~=~2 for script~1, etc.).
 
 The table contains 12~entries (scripts 0--11).  The X~register passed
 to [[TUNE_PLAYER]] is a byte offset (X~=~0 for script~0, X~=~2 for
-script~1, etc.).  All scripts except 0--2 point into the
-[[$A300]]--[[$A5FF]] resident region.
+script~1, etc.).
 
 \begin{center}
 \begin{tabular}{cclll}
@@ -15580,9 +15579,6 @@ TUNE_TABLE:
     DC.W    $A3FC ; script 10 (X=$14): encounter effect
     DC.W    $A43C ; script 11 (X=$16): movement effect
 @ %def TUNE_TABLE
-@ All tunes except 0--2 point into the [[$A300]]--[[$A5FF]] resident
-region (copied to [[$0500]]--[[$07FF]] by EALDR, but the tune table
-uses the original addresses).
 
 \subsubsection{Script 0 --- empty}
 
@@ -15639,10 +15635,6 @@ TUNE_2_COMBAT_DAMAGE:
 @ %def TUNE_2_COMBAT_DAMAGE
 
 \subsubsection{Scripts 3--11 --- resident region}
-
-Scripts 3--11 reside at [[$A300]]--[[$A440]] in the EALDR image, which
-is copied to [[$0500]]--[[$07FF]] during boot.  The tune pointer table
-references the original [[$A3xx]]/[[$A4xx]] addresses.
 
 Note that scripts 4 and~5 overlap: script~5 (NPC death) starts at
 [[$A3CE]], which is partway through script~4 (mob death).  Script~5 is
@@ -16312,35 +16304,177 @@ operations.
 <<resident data and bytecodes>>=
     ORG     $0572
     SUBROUTINE resident_data_and_bytecodes
-; EALDR VM bytecodes + embedded native disk I/O routines ($0572-$06B2)
-; Bytecode encryption: low XOR $03, high XOR $D9, immediate XOR $4C
-;
-; Native routines within this region:
-;   $05FD  SEARCH_ADDR_FIELD -- scan for D5 AA 96 address prologue
-;   $064B  READ_AND_VERIFY -- read data with phase toggling
-;   $0681  DELAY_LOOP -- nested countdown for motor timing
-;
-; $0572-$06A5: VM bytecodes (output as raw data)
-    HEX 0463dc0774028fdf0462dc072c028fdf ; $0572
-    HEX 0464dc0774028fdf05a4dc0290dc00a7 ; $0582
-    HEX dc05a4dc029fdc00a7dc074e028fdf00 ; $0592
-    HEX 71dc08a5df04ea1903b301ab2503b301 ; $05A2
-    HEX ab2504ed19034c06e1de05ccdc05ccdc ; $05B2
-    HEX 05ccdc05ccdc04eb1904e0de09034f06 ; $05C2
-    HEX 4fdf014edf04e419014edf014edf04e2 ; $05D2
-    HEX 190569df034f064fdf014edf04e41901 ; $05E2
-    HEX 4edf014edf04e6190569df09a0ffae4c ; $05F2
-    HEX 06adecc010fbc9d5f00788d0f4cad0f1 ; $0602
-    HEX 60adecc010fbc9aaf00588d0e43860ad ; $0612
-    HEX ecc010fbc996f00588d0d63860a002ad ; $0622
-    HEX ecc010fb2a8550adecc010fb25508550 ; $0632
-    HEX 888e4c0610e918a201600320fe05b003 ; $0642
-    HEX 200305a9006de2078de207ade0c0ade2 ; $0652
-    HEX c0ade4c0ade6c060033c0182df04e319 ; $0662
-    HEX 04e11904e71904e51903640182df09a2 ; $0672
-    HEX 20cad0fd38e901d0f6600603dd0a8ddf ; $0682
-    HEX 028fdf048cdf01b3df07b301b3df068c ; $0692
-    HEX df008fdf                         ; $06A2
+    ; --- Copy-protection verifier bytecodes ($0572-$05FD) ---
+    ; Checks integrity of three disk addresses, then reads sectors
+    ; with half-track seeks.  On failure, falls through to error display.
+    ;
+    ; Phase 1: verify three addresses match expected values
+    VMLD    $0560             ; check addr byte 1
+    VMSUBI  $38
+    VMBEQ   VM_RES_ERROR      ; mismatch -> error
+    VMLD    $0561             ; check addr byte 2
+    VMSUBI  $60
+    VMBEQ   VM_RES_ERROR
+    VMLD    $0567             ; check addr byte 3
+    VMSUBI  $38
+    VMBEQ   VM_RES_ERROR
+    ;
+    ; Phase 2: two half-track read attempts
+    VMCALL  .vm_read_tracks
+    VMBEQ   .vm_pass1_ok
+    VMGOTO  .vm_done          ; read failed -> exit ok (cracked)
+.vm_pass1_ok:
+    VMCALL  .vm_read_tracks
+    VMBEQ   .vm_pass2_ok
+    VMGOTO  .vm_done
+.vm_pass2_ok:
+    VMSUBI  $02               ; check error count
+    VMBEQ   VM_RES_ERROR      ; too many errors -> fail
+    VMGOTO  $0572             ; retry from start
+.vm_done:
+    VMCALL0 $06A6             ; exit via VM_EXIT_OK
+
+    ; --- VM subroutine: read tracks with half-track seeks ---
+.vm_read_tracks:
+    VMLD    $C0E9             ; motor on
+    VMLDI   $FF               ; \ delay for motor spin-up
+    VMCALL1 $FCA8             ;  | (ROM WAIT routine)
+    VMLDI   $FF               ;  |
+    VMCALL1 $FCA8             ; /
+    VMLD    $C0EE             ; set drive to read mode
+    VMLDI   $00
+    VMST    $07E2             ; clear error counter
+    VMCALL  .vm_read_one      ; \ read 4 sectors at
+    VMCALL  .vm_read_one      ;  | different half-track
+    VMCALL  .vm_read_one      ;  | positions
+    VMCALL  .vm_read_one      ; /
+    VMLD    $C0E8             ; motor off
+    VMLD    $07E3             ; return error status
+    VMRET
+
+    ; --- VM subroutine: read one sector + seek half track ---
+.vm_read_one:
+    VMLDI   $03
+    VMST    RES_RETRY_COUNT ; 3 retries
+    VMCALL1 READ_AND_VERIFY_RES ; read sector
+    VMLD    $C0E7             ; \ seek: toggle phases
+    VMCALL1 READ_AND_VERIFY_RES ;  | for half-track
+    VMCALL1 READ_AND_VERIFY_RES ; /
+    VMLD    $C0E1             ; phase 0 on
+    VMCALL  .vm_seek_delay
+    VMLDI   $03
+    VMST    RES_RETRY_COUNT
+    VMCALL1 READ_AND_VERIFY_RES
+    VMLD    $C0E7             ; \ more phase toggling
+    VMCALL1 READ_AND_VERIFY_RES ;  |
+    VMCALL1 READ_AND_VERIFY_RES ; /
+    VMLD    $C0E5             ; phase 2 on
+    VMCALL  .vm_seek_delay
+    VMRET
+
+    ; --- Native: search for D5 AA 96 address field ---
+SEARCH_ADDR_FIELD_RES:
+    LDY     #$FF              ; outer retry counter
+.search_d5:
+    LDX     RES_RETRY_COUNT ; inner retry counter
+.wait_d5:
+    LDA     DISK_DATA_REG     ; \ wait for disk byte
+    BPL     .wait_d5          ; /
+    CMP     #$D5              ; D5 prologue?
+    BEQ     .found_d5
+    DEY
+    BNE     .wait_d5
+    DEX
+    BNE     .wait_d5
+    RTS                       ; timeout (carry undefined)
+.found_d5:
+    LDA     DISK_DATA_REG     ; \ wait for next byte
+    BPL     *-3               ; /
+    CMP     #$AA              ; AA?
+    BEQ     .found_aa
+    DEY
+    BNE     .wait_d5          ; retry
+    SEC
+    RTS                       ; timeout
+.found_aa:
+    LDA     DISK_DATA_REG     ; \ wait for next byte
+    BPL     *-3               ; /
+    CMP     #$96              ; 96? (address field marker)
+    BEQ     .found_96
+    DEY
+    BNE     .wait_d5          ; retry
+    SEC
+    RTS
+.found_96:
+    ; --- Decode 4&4 nibble data (2 pairs -> $50) ---
+    LDY     #$02              ; 2 pairs to decode
+.decode_pair:
+    LDA     DISK_DATA_REG     ; \ wait for even nibble
+    BPL     *-3               ; /
+    ROL                       ; shift into position
+    STA     $50               ; save
+    LDA     DISK_DATA_REG     ; \ wait for odd nibble
+    BPL     *-3               ; /
+    AND     $50               ; combine
+    STA     $50               ; decoded byte
+    DEY
+    STX     RES_RETRY_COUNT ; save retry count
+    BPL     .decode_pair      ; next pair
+    CLC                       ; success
+    LDX     #$01
+    RTS
+RES_RETRY_COUNT:
+    DC.B    $03               ; retry count (self-modified)
+
+    ; --- Native: read and verify one sector ---
+READ_AND_VERIFY_RES:
+    JSR     SEARCH_ADDR_FIELD_RES
+    BCS     .read_done
+    JSR     READ_DATA_FIELD   ; read data field
+.read_done:
+    LDA     #$00
+    ADC     $07E2             ; accumulate errors
+    STA     $07E2
+    LDA     $C0E0             ; \ reset drive phases
+    LDA     $C0E2             ;  |
+    LDA     $C0E4             ;  |
+    LDA     $C0E6             ; /
+    RTS
+
+    ; --- VM bytecodes: seek delay subroutine ---
+.vm_seek_delay:
+    VMLDI   $70               ; delay count
+    VMCALL1 DELAY_RES         ; delay
+    VMLD    $C0E0             ; \ toggle phases for
+    VMLD    $C0E2             ;  | half-track positioning
+    VMLD    $C0E4             ;  |
+    VMLD    $C0E6             ; /
+    VMLDI   $28               ; shorter delay
+    VMCALL1 DELAY_RES
+    VMRET
+
+    ; --- Native: delay loop ---
+DELAY_RES:
+    LDX     #$20              ; outer counter
+.delay_inner:
+    DEX
+    BNE     .delay_inner      ; inner loop
+    SEC
+    SBC     #$01              ; decrement A
+    BNE     DELAY_RES         ; outer loop
+    RTS
+
+    ; --- VM bytecodes: error display loop ---
+VM_RES_ERROR:
+    VMST    $0400             ; write char to screen
+    VMLDX   $068E             ; load from table (self-ref)
+    VMBEQ   VM_RES_ERROR      ; zero -> loop
+    VMLD    $068F             ; load addr
+    VMCALL1 $06B0             ; decrypt high byte
+    VMSUBI  $FF               ; adjust
+    VMCALL1 $06B0             ; decrypt again
+    VMST    $068F             ; store back
+    VMGOTO  VM_RES_ERROR      ; infinite error loop
 ;
 ; $06A6-$06B2: Native utility routines
 VM_EXIT_OK:
@@ -16837,7 +16971,7 @@ SEARCH_ADDR_FIELD:
     LDY     #$FF               ; 256 inner retries
 ; $B400: FF is the immediate operand (part of the LDY instruction)
 .search:
-    LDX     SEARCH_RETRY_COUNT ; outer retry count
+    LDX     DISK_RETRY_COUNT ; outer retry count
 .next_nibble:
     LDA     DISK_DATA_REG      ; read nibble
     BPL     *-3                ; wait for ready
@@ -16879,16 +17013,16 @@ SEARCH_ADDR_FIELD:
     AND     $50                ; combine: result = decoded byte
     STA     $50                ; last decoded value (sector on final iter)
     DEY
-    STX     SEARCH_RETRY_COUNT ; save remaining retry count
+    STX     DISK_RETRY_COUNT ; save remaining retry count
     BPL     .decode_pair       ; Y: 2->1->0->FF (3 iterations)
 
     CLC                        ; success
     LDX     #$01
     RTS
 
-SEARCH_RETRY_COUNT:
+DISK_RETRY_COUNT:
     DC.B    3                  ; $B44D: outer retry counter (default 3)
-@ %def SEARCH_ADDR_FIELD SEARCH_RETRY_COUNT
+@ %def SEARCH_ADDR_FIELD DISK_RETRY_COUNT
 Native routine called by the VM via CALL1.  Searches for an address
 field ([[JSR $B3FF]]), then verifies the data field
 ([[JSR VERIFY_DATA_FIELD]]).  Accumulates errors in
@@ -17374,6 +17508,10 @@ The following root chunks produce the assembly files when tangled.
 
 <<main.asm>>=
     PROCESSOR 6502
+<<Macros>>
+<<EALDR VM macros>>
+<<zero page defines>>
+<<defines>>
 <<stub entry>>
 <<read data field>>
 <<attract loop>>
@@ -17952,6 +18090,8 @@ The following root chunks produce the assembly files when tangled.
 
 <<boot1.asm>>=
     PROCESSOR 6502
+<<Macros>>
+<<boot1 defines>>
 <<boot1 entry>>
 <<boot1 saninc>>
 <<boot1 read error>>
@@ -17968,12 +18108,13 @@ The following root chunks produce the assembly files when tangled.
 <<boot1 interleave table>>
 <<boot1 dest pages>>
 <<boot1 loader doc>>
-<<Macros>>
-<<boot1 defines>>
 @
 
 <<ealdr.asm>>=
     PROCESSOR 6502
+<<Macros>>
+<<EALDR VM macros>>
+<<ealdr defines>>
 <<EALDR entry>>
 <<EALDR copy subroutine>>
 <<EALDR VM exec>>
@@ -18014,9 +18155,6 @@ The following root chunks produce the assembly files when tangled.
 <<EALDR RWTS interleave table>>
 <<EALDR RWTS dest pages>>
 <<EALDR RWTS tail padding>>
-<<Macros>>
-<<EALDR VM macros>>
-<<ealdr defines>>
 @
 
 \chapter{Index}\par\noindent
