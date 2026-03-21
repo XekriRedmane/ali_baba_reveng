@@ -3677,7 +3677,7 @@ page for graphics.  After this relocation the full memory map is:
 \$59C9--\$5AFF &    311 & Residual debug text (unused) \\
 \$5B00--\$5FFF &  1\,280 & Game state, display setup, UI tables \\
 \$6000--\$7FFF &  8\,192 & Main program code (continued) \\
-\$80A4--\$83A4 &    769 & Script table and script bytecode \\
+\$80A4--\$83A4 &    769 & Tune table and tune bytecode \\
 \$83A5--\$92A4 &  3\,840 & Custom font data (120 chars $\times$ 32 bytes) \\
 \$92A8--\$97A4 &  1\,277 & HRCG library (Hi-Res Character Generator) \\
 \$97A5--\$9AA4 &    768 & Standard font data (96 chars $\times$ 8 bytes) \\
@@ -3836,7 +3836,7 @@ before the main loop or attract screen.  The steps, in order:
 \item Call [[SET_TEXT_WINDOW_WRAP]] to enable text window wrap mode.
 \item Call [[INIT_STUB]] (a single RTS---likely a disabled hook point).
 \item Call [[INIT_GAME_STATE]] to draw the game display (borders, labels,
-  icons) and run the opening script.
+  icons) and run the opening tune.
 \item Call [[FILL_MAP]] to fill the map grid with default tiles.
 \item Call [[SET_TEXT_WINDOW_BOTTOM]] to confine text output to the bottom
   three rows (the status/input area).
@@ -4027,24 +4027,24 @@ INIT_STUB:
     RTS
 @ %def INIT_STUB
 Called once from [[GAME_INIT]] to set up the game display and run the
-opening script.  Steps:
+opening tune.  Steps:
 
 \begin{enumerate}
 \item Calls [[$5C6D]] to initialize the game display (draws borders,
   sets text windows).
 \item Sets [[DISPATCH_VEC]] to point to the game action handler at [[$5B2A]],
-  used by the script engine's indirect dispatch at [[$7A49]].
+  used by the tune player's indirect dispatch at [[$7A49]].
 \item Clears [[$5A00]] (game state flag).
 \item Patches [[$80A6]] to [[$B1]] ([[LDA (zp),Y]] opcode), restoring
   the character renderer's indirect load.
-\item Runs the opening script (index~6) via [[SCRIPT_ENGINE]].
+\item Runs the opening tune (index~6) via [[TUNE_PLAYER]].
 \item Patches [[$7A49--$7A4B]] from [[JMP (DISPATCH_VEC)]] to [[JMP $7A4F]],
   disabling the indirect action handler now that init is complete.
 \end{enumerate}
 
 @ [[INIT_GAME_STATE]] stores [[GAME_ACTION_HANDLER]] into the zero-page
-vector [[DISPATCH_VEC]] ([[$F6/$F7]]).  The script engine uses this vector
-for indirect action dispatch; after the opening script finishes,
+vector [[DISPATCH_VEC]] ([[$F6/$F7]]).  The tune player uses this vector
+for indirect action dispatch; after the opening tune finishes,
 [[INIT_GAME_STATE]] patches the dispatch site to bypass the vector entirely.
 
 <<defines>>=
@@ -4052,7 +4052,7 @@ GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
 @ %def GAME_ACTION_HANDLER
 
 <<zero page defines>>=
-DISPATCH_VEC            EQU     $F6     ; script action dispatch vector (2 bytes, $F6/$F7)
+DISPATCH_VEC            EQU     $F6     ; tune action dispatch vector (2 bytes, $F6/$F7)
 @ %def DISPATCH_VEC
 
 <<init game state>>=
@@ -4065,8 +4065,8 @@ INIT_GAME_STATE:
     STOB    #$00,$5A00 ; clear game state flag
     LDX     #$B1                  ; LDA (zp),Y opcode
     STX     $80A6                 ; patch character renderer
-    LDX     #$06                  ; script 3: attract/opening
-    JSR     SCRIPT_ENGINE
+    LDX     #$06                  ; tune 3: attract/opening
+    JSR     TUNE_PLAYER
     STOW    $4F4C,$7A49 ; patch $7A49 to JMP $7A4F
     STOB    #$7A,$7A4B
     RTS
@@ -6127,9 +6127,9 @@ randomness.
 \begin{table}[]
 \begin{tabular}{llll}
 \multicolumn{1}{c}{Byte} & \multicolumn{1}{c}{Opcode} & \multicolumn{1}{c}{Argument} & \multicolumn{1}{c}{Operation} \\
-[[1F]] & [[MARK2]] & none & [[SCRIPT_LOOP_ADDR <- IP+1]] \\
-[[20]] & [[MARK1]] & none & [[SCRIPT_GOSUB_ADDR <- IP+1]] \\
-[[21]] & [[GOTO1]] & none & [[IP <- SCRIPT_GOSUB_ADDR]] \\
+[[1F]] & [[MARK2]] & none & [[TUNE_LOOP_ADDR <- IP+1]] \\
+[[20]] & [[MARK1]] & none & [[TUNE_GOSUB_ADDR <- IP+1]] \\
+[[21]] & [[GOTO1]] & none & [[IP <- TUNE_GOSUB_ADDR]] \\
 [[22]] & [[LOW]] & none & [[TONE_ROUTINE_ADDR <- tone]] \\
 [[23]] & [[HIGH]] & none & [[TONE_ROUTINE_ADDR <- high_tone]] \\
 [[24]] & [[END]] & none & Ends the song routine \\
@@ -6208,8 +6208,8 @@ sequence repeats [[SOUND_DURATION]] times.  [[SOUND_FREQ]] controls the
 pitch (higher value = lower frequency).
 
 <<zero page defines>>=
-SOUND_FREQ              EQU     $E1     ; sound frequency / script modified action
-SOUND_DURATION          EQU     $E2     ; sound duration / script parameter byte
+SOUND_FREQ              EQU     $E1     ; sound frequency / tune modified action
+SOUND_DURATION          EQU     $E2     ; sound duration / tune parameter byte
 @ %def SOUND_FREQ SOUND_DURATION
 
 <<play tone>>=
@@ -6337,33 +6337,8 @@ unless we assume that the programmer erred, thinking that the low tones were
 just one octave below the high tones. In that case, we should just use the high
 tone table and subtract one octave for the low tones.
 
-<<song table>>=
-SPLASH_SONG:
-    LOW
-    TONE 3F, 65 ; G5  @ 655ms
-    HIGH
-    TONE 3F, 49 ; G6  @ 469ms
-    TONE 3F, 8A ; G6  @ 887ms
-    TONE 3F, 8A ; G6  @ 887ms
-    TONE 3F, 8A ; G6  @ 887ms
-    TONE 3F, 5C ; G6  @ 591ms
-    LOW
-    TONE C1, 0C ; C4  @ 231ms
-    TONE 80, 04 ; G4  @  51ms
-    TONE 50, 06 ; Eb5 @  49ms
-    TONE 3F, 08 ; G5  @  52ms
-    HIGH
-    TONE 60, 0A ; C6  @  97ms (tone inaccurate)
-    TONE 50, 0C ; Eb5 @  97ms
-    TONE 3F, 2E ; G6  @ 296ms
-    TONE 47, 1B ; F5  @ 195ms
-    TONE 3F, 1F ; G6  @ 199ms
-    TONE 47, 1B ; F5  @ 195ms
-    TONE 50, 18 ; Eb5 @ 194ms
-    TONE 47, 1B ; F5  @ 195ms
-    TONE 50, 18 ; Eb5 @ 194ms
-    TONE 55, 17 ; D6  @ 197ms (tone inaccurate)
-@
+@ The splash song bytecode is documented in [[TUNE_3_ATTRACT]]
+(\S\ref{sec:tune_player}).
 
 \chapter{Utility Routines}
 
@@ -6773,7 +6748,7 @@ CLAMP_CHAR_FIELD:
 The scene loop calls [[$A478]] (a resident routine from EALDR, still in
 memory at [[$A000]]--[[$BFFF]]) each iteration to check for user input.
 If carry is set (key pressed), the loop exits.  Otherwise, it displays
-the status bar, renders the scene text from [[$5C00]], runs script \#3
+the status bar, renders the scene text from [[$5C00]], runs tune~\#3
 (the attract animation at [[$A300]]), and checks [[$5CFF]] for a scene
 transition.
 
@@ -8043,7 +8018,7 @@ The attract screen call flow:
   \item [[SCENE_LOOP]] ([[$6C37]]): saves ZP pointers, steps PRNG,
         conditionally loads scene data from disk.  In a loop: checks
         keyboard/timer via [[$A478]], displays status bar, renders scene
-        text via [[TEXT_RENDERER]], runs [[SCRIPT_ENGINE]] with script \#3.
+        text via [[TEXT_RENDERER]], runs [[TUNE_PLAYER]] with tune~\#3.
         Exits when user presses a key or scene sequence ends.
 \end{itemize}
 
@@ -8052,9 +8027,9 @@ Key subsystems:
   \item \textbf{Text renderer} ([[TEXT_RENDERER]]): Reads byte streams with
         position commands, pause/reset control codes, and character data
         for the HRCG font.
-  \item \textbf{Script engine} ([[SCRIPT_ENGINE]]): Runs short bytecode
-        programs from [[SCRIPT_TABLE]].  Supports loops, gosub, action
-        dispatch with PRNG randomization.
+  \item \textbf{Tune player} ([[TUNE_PLAYER]]): Plays sound effects and
+        music from [[TUNE_TABLE]].  Supports loops, gosub, tone/noise
+        selection, and PRNG-based note randomization.
   \item \textbf{Resident interpreter} ([[$0500]]--[[$07FF]]): A
         secondary VM copied from EALDR, using context-swapped zero-page
         state and XOR-encrypted addresses.
@@ -8121,7 +8096,7 @@ MOB_DATA_TABLE:
 \thead{Byte} & \thead{Meaning} \\
 \midrule
 \$7D & Reset to full-screen mode (col=0, row=0, width=20) \\
-\$7E & Pause: run script engine and status bar, then resume \\
+\$7E & Pause: run tune player and status bar, then resume \\
 \$7F & End of stream \\
 \$80--\$FE & Set row (byte \& \$7F), next byte = column \\
 Other & Character code for HRCG font \\
@@ -8348,8 +8323,8 @@ SCENE_LOOP:
     STOW    SCENE_TEXT_DATA,TEXT_STREAM_PTR ; scene text data -> $06/$07
     JSR     TEXT_RENDERER
 
-    LDX     #$06                            ; script 3: attract/opening
-    JSR     SCRIPT_ENGINE
+    LDX     #$06                            ; tune 3: attract/opening
+    JSR     TUNE_PLAYER
     LDA     SCENE_TRANSITION                ; scene transition flag
     BEQ     .done                           ; zero = no transition
     STA     SCENE_NUMBER                    ; set new scene number
@@ -8491,7 +8466,7 @@ charset index.  The four glyph indices are consecutive starting at
 
 Called when entering a new scene.  Initialises the AI wait delay:
 if [[CHAR_AI_MODE]] is non-zero (AI-controlled character), sets
-[[AI_WAIT_FLAG]] to~\$0A and calls [[SCRIPT_ENGINE]] with index~\$10;
+[[AI_WAIT_FLAG]] to~\$0A and calls [[TUNE_PLAYER]] with index~\$10;
 otherwise clears the flag.  Then draws the character, sets
 [[WAIT_LOOP_COUNT]] to twice the wait flag (via ROL), and jumps to
 [[DRAW_SPRITE]].
@@ -8500,7 +8475,7 @@ otherwise clears the flag.  Then draws the character, sets
 AI-controlled mobs (modes 2--5).  [[AI_WAIT_FLAG]] is set to [[$0A]] when
 entering a scene with an AI character and cleared otherwise.
 [[SETUP_SCENE_DISPLAY]] tests both values to decide whether to invoke the
-[[SCRIPT_ENGINE]] and how long to delay before drawing the sprite.
+[[TUNE_PLAYER]] and how long to delay before drawing the sprite.
 
 <<defines>>=
 CHAR_AI_MODE    EQU     $5A05   ; 0 = player, 2-5 = AI behavior modes
@@ -8515,8 +8490,8 @@ SETUP_SCENE_DISPLAY:
     STOB    #$00,AI_WAIT_FLAG
     BANE    CHAR_AI_MODE,.not_ai
     STOB    #$0A,AI_WAIT_FLAG
-    LDX     #$10                ; script 8: AI turn effect
-    JSR     SCRIPT_ENGINE
+    LDX     #$10                ; tune 8: AI turn effect
+    JSR     TUNE_PLAYER
 .not_ai:
     JSR     DRAW_CHAR_AT_POS
     JSR     SETUP_CHAR_SPRITE
@@ -9897,13 +9872,13 @@ TEXT_RENDERER:
     INY
     JMP     .fetch
 
-    ; --- Pause ($7E): run script engine, show status bar ---
+    ; --- Pause ($7E): run tune player, show status bar ---
 .pause:
     TYA                         ; \
     PHA                         ;  | save stream index
     NOP
-    LDX     #$06                ; script 3: attract/opening
-    JSR     SCRIPT_ENGINE
+    LDX     #$06                ; tune 3: attract/opening
+    JSR     TUNE_PLAYER
     PSHW    TEXT_STREAM_PTR     ; save stream pointer
     JSR     DISPLAY_STATUS_BAR  ; (clobbers TEXT_STREAM_PTR)
     PULW    TEXT_STREAM_PTR     ; restore stream pointer
@@ -10505,8 +10480,8 @@ MOVE_LOOP:                     ; $1A31 - external entry point
     LDA     #$00
     BANE    ENTITY_REC+1,.something  ; ENTITY_REC+1 != 0 -> occupied
     BAEQ    ENTITY_REC,.empty        ; ENTITY_REC == 0 -> empty cell
-    LDX     #$0E                     ; script 7: entity interaction
-    JSR     SCRIPT_ENGINE
+    LDX     #$0E                     ; tune 7: entity interaction
+    JSR     TUNE_PLAYER
     JMP     SHOW_LOCKED_MSG
 
 .empty:
@@ -10585,7 +10560,7 @@ TURN_DISPATCH:
   \item Packs them into a single byte with [[COLROW_TO_POS]].
   \item Stores the result in the entity's position field (byte~3 of [[ENTITY_PTR]]).
   \item Draws the character's sprite at the new location via [[RENDER_FONT_CHAR]].
-  \item Sets [[TURN_SCRIPT_GUARD]] to~\$16.
+  \item Sets [[TURN_TUNE_GUARD]] to~\$16.
 \end{enumerate}
 Execution falls through into [[RESET_TURN_POS]], which:
 \begin{enumerate}
@@ -10593,13 +10568,13 @@ Execution falls through into [[RESET_TURN_POS]], which:
   \item Calls [[DRAW_CHAR_AT_POS]] to restore whatever was underneath the character's old location.
   \item Updates the starting position to the new current position.
 \end{enumerate}
-If [[TURN_SCRIPT_GUARD]] is exactly~\$16---meaning this is the
+If [[TURN_TUNE_GUARD]] is exactly~\$16---meaning this is the
 first call since [[COMMIT_MOVE]] set it---the guard is decremented and the
-[[SCRIPT_ENGINE]] is invoked to process any movement-triggered scripts.
+[[TUNE_PLAYER]] is invoked to play the movement sound effect.
 
 <<defines>>=
-TURN_SCRIPT_GUARD   EQU     $5AA9   ; turn reset: guards one-shot script execution
-@ %def TURN_SCRIPT_GUARD
+TURN_TUNE_GUARD   EQU     $5AA9   ; turn reset: guards one-shot script execution
+@ %def TURN_TUNE_GUARD
 
 <<commit move>>=
     ORG     $1B52
@@ -10620,23 +10595,23 @@ COMMIT_MOVE:
     STOB    #$01,FONT_CHARSET
     JSR     RENDER_FONT_CHAR ; draw sprite
     LDX     #$16
-    STX     TURN_SCRIPT_GUARD
+    STX     TURN_TUNE_GUARD
     ; falls through to RESET_TURN_POS
 RESET_TURN_POS:
     ; Reset to turn start: convert start col/row to packed pos,
-    ; call $1156, update current->start, conditionally run script
+    ; call $1156, update current->start, conditionally play tune
     LDA     TURN_START_COL
     LDY     TURN_START_ROW
     JSR     COLROW_TO_POS
     JSR     DRAW_CHAR_AT_POS
     MOVB    CURRENT_COL,TURN_START_COL
     MOVB    CURRENT_ROW,TURN_START_ROW
-    LDX     TURN_SCRIPT_GUARD ; X=$16 = script 11: movement effect
+    LDX     TURN_TUNE_GUARD ; X=$16 = tune 11: movement effect
     BXEQ    #$16,.run_script
     RTS
 .run_script:
-    DEC     TURN_SCRIPT_GUARD
-    JMP     SCRIPT_ENGINE     ; X still $16 from LDX above
+    DEC     TURN_TUNE_GUARD
+    JMP     TUNE_PLAYER     ; X still $16 from LDX above
 @ %def COMMIT_MOVE RESET_TURN_POS
 @ [[END_TURN]] wraps up a character's turn:
 \begin{enumerate}
@@ -10765,7 +10740,7 @@ return from [[READ_KEYBOARD]]), the exit handler address is loaded from bytes
 8--9 of the option record and executed via an indirect jump.  Any other
 keypress is validated by [[VALIDATE_INPUT]]; if it changes the selection, the
 cursor is repositioned and the loop continues; if the selection stays the
-same, the script engine is called with script type~\$12 to handle the
+same, the tune player is called with tune~\$12 to play the
 in-place action.
 
 @ [[INPUT_JMP_VEC]] at [[$5F5E]] is a 2-byte indirect jump vector used by
@@ -10809,8 +10784,8 @@ INPUT_LOOP:
     JSR     SETUP_CURSOR
     JMP     .loop
 .run_script:
-    LDX     #$12                ; script 9: menu selection effect
-    JSR     SCRIPT_ENGINE
+    LDX     #$12                ; tune 9: menu selection effect
+    JSR     TUNE_PLAYER
     JMP     .loop
 .exit:
     LDWIY    $C2,#$08,INPUT_JMP_VEC
@@ -11867,7 +11842,7 @@ RESOLVE_ATTACK:
 first computes the combat strength via [[CALC_COMBAT_STRENGTH]], displays the
 attacker's name and a strength-based descriptor through [[MAP_VALUE_TO_STRING]],
 then copies [[MOB_PTR]] to [[ENTITY_REC]] and classifies the target entity.
-The script engine is invoked with script type~2 and the combat strength as a
+The tune player is invoked with tune~2 and the combat strength as a
 parameter.  If the target's byte~1 is~\$FE (marked dead/empty), the routine
 falls through to event-slot processing.  Otherwise it checks whether the
 target's byte~2 flags indicate an activated event: if the high bits are~\$C0,
@@ -11876,7 +11851,7 @@ larger values result in the slot being cleared.  For non-event targets, a
 hit roll compares a random number (0--12) against the combat strength; if the
 roll is at or above the strength, the attack is ``immune'' (blocked).  A
 successful hit sets bit~6 of the target's byte~1 (marking damage taken),
-redraws the entity at its position, runs script type~\$0C, and displays a
+redraws the entity at its position, plays tune~\$0C, and displays a
 hit confirmation.  The routine also handles locked containers: if the target
 has a type flag and the player's strength is below the required threshold,
 the attack is blocked with message~\$10.
@@ -11896,8 +11871,8 @@ PLAYER_ATTACK:
     JSR     CLASSIFY_ENTITY_TYPE
     JSR     PRINT_BOTTOM_CENTERED
     LDY     COMBAT_STRENGTH
-    LDX     #$02                ; script 1: combat hit effect
-    JSR     SCRIPT_ENGINE
+    LDX     #$02                ; tune 1: combat hit effect
+    JSR     TUNE_PLAYER
     LDY     #$01
     LDA     (MOB_PTR),Y
     BAEQ    #$FE,.check_event
@@ -11923,8 +11898,8 @@ PLAYER_ATTACK:
     STA     FONT_COL
     JSR     GET_ENTITY_FONTCHAR
     JSR     RENDER_FONT_CHAR
-    LDX     #$0C              ; script 6: combat avoided effect
-    JSR     SCRIPT_ENGINE
+    LDX     #$0C              ; tune 6: combat avoided effect
+    JSR     TUNE_PLAYER
     JSR     SET_CURSOR_ROW21
     LDA     #$02
     JMP     DISPLAY_MESSAGE
@@ -11958,8 +11933,8 @@ PLAYER_ATTACK:
     LDA     $BA
     LDY     #$02
     STA     (MOB_PTR),Y
-    LDX     #$0E              ; script 7: entity interaction
-    JSR     SCRIPT_ENGINE
+    LDX     #$0E              ; tune 7: entity interaction
+    JSR     TUNE_PLAYER
     JSR     DISPATCH_ON_MODE
     LDY     #$00
     LDA     (MOB_PTR),Y
@@ -11987,7 +11962,7 @@ PLAYER_ATTACK:
 @ %def PLAYER_ATTACK
 @ [[MOB_ATTACK]] resolves an attack from a mob against the current character.
 The structure mirrors [[PLAYER_ATTACK]]: compute combat strength, display the
-attacker name and strength descriptor, print the target's name, run script
+attacker name and strength descriptor, print the target's name, play tune
 type~2 with the strength value, and call [[DISPATCH_ON_MODE]] for any
 mode-specific behavior.  The key difference is in the defense calculation: the
 routine reads byte~8 of the target ([[MOB_PTR]]) and uses its low 4~bits as a
@@ -12018,8 +11993,8 @@ MOB_ATTACK:
     JSR     SCROLL_STATUS_LINE
     JSR     PRINT_MEMBER_NAME
     LDY     COMBAT_STRENGTH
-    LDX     #$02              ; script 1: combat hit effect
-    JSR     SCRIPT_ENGINE
+    LDX     #$02              ; tune 1: combat hit effect
+    JSR     TUNE_PLAYER
     LDY     #$04
     LDA     (ENTITY_PTR),Y
     BAGE    #$15,.npc
@@ -12072,8 +12047,8 @@ damage amount in~A and the target character's record pointer in [[EFFECT_REC]].
 The routine first computes a message index by counting the leading zero bits of
 the damage value (using repeated ROR), which maps larger damage to lower
 message indices---producing increasingly alarming descriptions as damage rises.
-It then invokes the [[SCRIPT_ENGINE]] with script type~4 to run any
-damage-response scripts.  The actual HP reduction follows: field~6 of the
+It then invokes the [[TUNE_PLAYER]] with tune~4 to play the
+damage sound effect.  The actual HP reduction follows: field~6 of the
 target record holds hit points in its low six bits (with flags in the upper
 two), and the damage is subtracted.  If HP drops to zero or below, execution
 falls into the death handler, which sets a death flag in field~15, re-sorts
@@ -12096,7 +12071,7 @@ APPLY_DAMAGE:
     SUBROUTINE APPLY_DAMAGE
     ; Apply damage A to char at (EFFECT_REC).
     ; Subtracts from field 6 (HP). Displays damage message,
-    ; runs script. If HP drops to 0: death handling.
+    ; plays tune. If HP drops to 0: death handling.
     AND     #$1F
     STA     DAMAGE_AMOUNT     ; damage amount
     JSR     SET_CURSOR_ROW21
@@ -12110,8 +12085,8 @@ APPLY_DAMAGE:
     TXA
     JSR     DISPLAY_MESSAGE   ; show damage message
     LDY     DAMAGE_AMOUNT
-    LDX     #$04              ; script 2: combat damage effect
-    JSR     SCRIPT_ENGINE
+    LDX     #$04              ; tune 2: combat damage effect
+    JSR     TUNE_PLAYER
     LDY     #$06
     LDA     (EFFECT_REC),Y    ; field 6 (HP + flags)
     TAX
@@ -12151,13 +12126,13 @@ APPLY_DAMAGE:
 .dead:
     LDY     #$04
     LDA     (EFFECT_REC),Y    ; field 4
-    LDX     #$08              ; script 4: mob death effect
+    LDX     #$08              ; tune 4: mob death effect
     BALT    #$15,.skip_flag
     LDY     #$0F
     LDA     (EFFECT_REC),Y
     ORA     #$10              ; set death flag
     STA     (EFFECT_REC),Y
-    LDX     #$0A              ; script 5: NPC death effect
+    LDX     #$0A              ; tune 5: NPC death effect
 .skip_flag:
     TXA
     PHA
@@ -12176,7 +12151,7 @@ APPLY_DAMAGE:
     JSR     DISPLAY_MESSAGE   ; death message
     PLA
     TAX
-    JSR     SCRIPT_ENGINE     ; death script
+    JSR     TUNE_PLAYER     ; death tune
     STOB    #$00,ACTIVE_CHAR
     MOVB    CURRENT_PLAYER,SOURCE_CHAR
     MOVW    EFFECT_REC,TARGET_REC
@@ -12214,7 +12189,7 @@ For random encounters (type below [[$40]]), the character's avoidance stat
 (low 5~bits of field~5) is compared against a random roll out of~20.  If the
 stat is high enough, the encounter is avoided: the event is marked as
 activated and the character returns to its starting position.  Otherwise a
-second PRNG roll decides whether this is a normal encounter (script [[$14]])
+second PRNG roll decides whether this is a normal encounter (tune [[$14]])
 or a rare special encounter (scene~9, which deals 1~damage).
 
 For specific encounters (type [[$40]] and above), the routine extracts a
@@ -12268,8 +12243,8 @@ HANDLE_ENCOUNTER:
     JSR     SET_CURSOR_ROW21
     LDA     #$01
     JSR     DISPLAY_MESSAGE            ; "encounter" message
-    LDX     #$14              ; script 10: encounter effect
-    JMP     SCRIPT_ENGINE
+    LDX     #$14              ; tune 10: encounter effect
+    JMP     TUNE_PLAYER
 
     ; --- specific encounter path (type >= $40) ---
 .specific:
@@ -12331,8 +12306,8 @@ HANDLE_ENCOUNTER:
     MOVB    TURN_START_COL,BLINK_COL
     MOVB    TURN_START_ROW,BLINK_ROW
     MOVB    FONT_CHARNUM,BLINK_CHAR
-    LDX     #$0C              ; script 6: combat avoided effect
-    JSR     SCRIPT_ENGINE
+    LDX     #$0C              ; tune 6: combat avoided effect
+    JSR     TUNE_PLAYER
     JSR     SET_CURSOR_ROW21
     LDA     #$02
     JMP     DISPLAY_MESSAGE            ; "avoided encounter" message
@@ -12443,7 +12418,7 @@ of the event entry and branches on its top two bits.  If the high bits
 are~\$C0 (activated event), the low 5~bits give a sub-type: values below~\$1D
 clear the event slot and optionally trigger scene~\$0A, then the character
 commits the move, checks for adjacent threats, and continues the movement
-loop.  If the event is not activated, the routine runs script type~\$0E, then
+loop.  If the event is not activated, the routine plays tune~\$0E, then
 dispatches on the event's high-nibble type.  Type~\$00 (no special flag) with
 a small sub-value displays a message and deals~1 damage; sub-values at~\$1B
 or above trigger [[SHOW_LOCKED_MSG]].  Type~\$40 or above represents a
@@ -12494,8 +12469,8 @@ HANDLE_EVENT_SLOT:
     JMP     MOVE_LOOP
 .not_active:
     PHA
-    LDX     #$0E              ; script 7: entity interaction
-    JSR     SCRIPT_ENGINE
+    LDX     #$0E              ; tune 7: entity interaction
+    JSR     TUNE_PLAYER
     PLA
     BANE    #$00,.has_type
     LDA     EVENT_SLOT_BYTE
@@ -12885,9 +12860,9 @@ LOAD_TARGET_PTR:
     RTS
 @ %def LOAD_TARGET_PTR
 @ [[PROCESS_ENTITY_SCRIPT]] temporarily removes an entity from the map, runs
-a script, and restores it.  The routine saves the entity's byte~0 (position
+a tune, and restores it.  The routine saves the entity's byte~0 (position
 character) from [[MOB_PTR]], overwrites it with~\$FE (marking the slot empty),
-runs script type~\$0E via [[SCRIPT_ENGINE]], calls [[DISPATCH_ON_MODE]] for
+plays tune~\$0E via [[TUNE_PLAYER]], calls [[DISPATCH_ON_MODE]] for
 timing/animation, and then redraws the original character at the entity's
 position with [[DRAW_CHAR_AT_POS]].  This is used during event interactions
 where the entity needs to be temporarily invisible---for example, when opening
@@ -12896,15 +12871,15 @@ a chest.
 <<process entity script>>=
     ORG     $1849
     SUBROUTINE PROCESS_ENTITY_SCRIPT
-; Saves entity char, marks as $FE, runs script $0E, dispatches, restores
+; Saves entity char, marks as $FE, plays tune $0E, dispatches, restores
 PROCESS_ENTITY_SCRIPT:
     LDY     #$00
     LDA     (MOB_PTR),Y
     STA     $BA
     LDA     #$FE
     STA     (MOB_PTR),Y
-    LDX     #$0E              ; script 7: entity interaction
-    JSR     SCRIPT_ENGINE
+    LDX     #$0E              ; tune 7: entity interaction
+    JSR     TUNE_PLAYER
     JSR     DISPATCH_ON_MODE
     LDA     $BA
     JMP     DRAW_CHAR_AT_POS
@@ -14893,15 +14868,15 @@ CHECK_CAN_LEAVE:
     RTS
 @ %def CHECK_CAN_LEAVE
 
-\section{Script engine}
+\section{Tune player}
 
-\label{sec:script_engine}
+\label{sec:tune_player}
 
-The script engine runs short bytecode programs that control animations,
-sound, and game events.  It is called with a script index in X.
+The tune player runs short bytecode programs that play sound effects and
+sound effects and music.  It is called with a tune index in X.
 
-@ [[ATTRACT_FLAG]] is set to 1 when [[SCRIPT_ENGINE]] is invoked with
-script index 6 (the attract/demo mode) and cleared to 0 for all other
+@ [[ATTRACT_FLAG]] is set to 1 when [[TUNE_PLAYER]] is invoked with
+tune index 6 (the attract/demo mode) and cleared to 0 for all other
 indices.  Downstream code checks this flag to alter behavior during the
 title screen sequence.
 
@@ -14909,14 +14884,14 @@ title screen sequence.
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
 @ %def ATTRACT_FLAG
 
-<<script engine>>=
+<<tune player>>=
     ORG     $795B
-SCRIPT_ENGINE:
-    SUBROUTINE SCRIPT_ENGINE
+TUNE_PLAYER:
+    SUBROUTINE TUNE_PLAYER
 
     STA     $C010             ; clear keyboard strobe
     STOB    #$00,ATTRACT_FLAG ; attract_flag = 0
-    BXNE    #$06,.not_attract ; script index 6 = attract
+    BXNE    #$06,.not_attract ; tune index 6 = attract
     INC     ATTRACT_FLAG      ; attract_flag = 1
 .not_attract:
 
@@ -14932,36 +14907,36 @@ SCRIPT_ENGINE:
     DEY
     STY     $80E3             ; patch byte in script 2 data
 @
-@ [[SCRIPT_PC]] is the 2-byte script instruction pointer at [[$E4/$E5]].
+@ [[TUNE_PC]] is the 2-byte script instruction pointer at [[$E4/$E5]].
 The script base address is loaded from the table at [[$80AE]] into
-[[SCRIPT_PC]], and the interpreter reads successive bytes through this
+[[TUNE_PC]], and the interpreter reads successive bytes through this
 pointer, advancing it after each instruction.
 
 <<zero page defines>>=
-SCRIPT_PC               EQU     $E4     ; script instruction pointer (2 bytes, $E4/$E5)
-@ %def SCRIPT_PC
+TUNE_PC               EQU     $E4     ; script instruction pointer (2 bytes, $E4/$E5)
+@ %def TUNE_PC
 
-<<script engine>>=
+<<tune player>>=
 
 .load_ptr:
-    LDA     SCRIPT_TABLE,X   ; low byte
-    STA     SCRIPT_PC
-    LDA     SCRIPT_TABLE+1,X ; high byte
-    STA     SCRIPT_PC+1      ; SCRIPT_PC/SCRIPT_PC+1 = script start address
+    LDA     TUNE_TABLE,X   ; low byte
+    STA     TUNE_PC
+    LDA     TUNE_TABLE+1,X ; high byte
+    STA     TUNE_PC+1      ; TUNE_PC/TUNE_PC+1 = script start address
 
 @ The script base addresses are stored in the table below.
-The X~register passed to [[SCRIPT_ENGINE]] is a byte offset into
+The X~register passed to [[TUNE_PLAYER]] is a byte offset into
 this table (X~=~0 for script~0, X~=~2 for script~1, etc.).
 
 The table contains 12~entries (scripts 0--11).  The X~register passed
-to [[SCRIPT_ENGINE]] is a byte offset (X~=~0 for script~0, X~=~2 for
+to [[TUNE_PLAYER]] is a byte offset (X~=~0 for script~0, X~=~2 for
 script~1, etc.).  All scripts except 0--2 point into the
 [[$A300]]--[[$A5FF]] resident region.
 
 \begin{center}
 \begin{tabular}{cclll}
 \hline
-\textbf{X} & \textbf{Script} & \textbf{Address} & \textbf{Purpose} & \textbf{Callers} \\
+\textbf{X} & \textbf{Tune} & \textbf{Address} & \textbf{Purpose} & \textbf{Callers} \\
 \hline
 \$00 & 0  & \$80C6 & (empty --- single END byte) & --- \\
 \$02 & 1  & \$80C7 & combat hit effect & attack routines \\
@@ -14979,62 +14954,398 @@ script~1, etc.).  All scripts except 0--2 point into the
 \end{tabular}
 \end{center}
 
-<<script pointer table>>=
+<<tune pointer table>>=
     ORG     $80AE
-SCRIPT_TABLE:
-    DC.W    $80C6 ; script 0  (X=$00): empty (single END byte)
-    DC.W    $80C7 ; script 1  (X=$02): combat hit effect
-    DC.W    $80D7 ; script 2  (X=$04): combat damage effect
-    DC.W    $A300 ; script 3  (X=$06): attract/opening
-    DC.W    $A3C3 ; script 4  (X=$08): mob death effect
-    DC.W    $A3CE ; script 5  (X=$0A): NPC death effect
-    DC.W    $A3DE ; script 6  (X=$0C): combat avoided effect
-    DC.W    $A409 ; script 7  (X=$0E): entity interaction effect
-    DC.W    $A432 ; script 8  (X=$10): AI turn effect
-    DC.W    $A437 ; script 9  (X=$12): menu selection effect
+TUNE_TABLE:
+    DC.W    $80C6 ; tune 0  (X=$00): empty (single END byte)
+    DC.W    $80C7 ; tune 1  (X=$02): combat hit effect
+    DC.W    $80D7 ; tune 2  (X=$04): combat damage effect
+    DC.W    $A300 ; tune 3  (X=$06): attract/opening
+    DC.W    $A3C3 ; tune 4  (X=$08): mob death effect
+    DC.W    $A3CE ; tune 5  (X=$0A): NPC death effect
+    DC.W    $A3DE ; tune 6  (X=$0C): combat avoided effect
+    DC.W    $A409 ; tune 7  (X=$0E): entity interaction effect
+    DC.W    $A432 ; tune 8  (X=$10): AI turn effect
+    DC.W    $A437 ; tune 9  (X=$12): menu selection effect
     DC.W    $A3FC ; script 10 (X=$14): encounter effect
     DC.W    $A43C ; script 11 (X=$16): movement effect
-@ %def SCRIPT_TABLE
-@ All scripts except 0--2 point into the [[$A300]]--[[$A5FF]] resident
-region (copied to [[$0500]]--[[$07FF]] by EALDR, but the script table
+@ %def TUNE_TABLE
+@ All tunes except 0--2 point into the [[$A300]]--[[$A5FF]] resident
+region (copied to [[$0500]]--[[$07FF]] by EALDR, but the tune table
 uses the original addresses).
 
-@ [[SCRIPT_LOOP_CTR]] counts iterations of the script's built-in loop
-construct.  [[SCRIPT_PRNG_MASK]] controls action randomization: the
+\subsubsection{Script 0 --- empty}
+
+A single END byte.  Used as a no-op placeholder (script index~0 is
+never called).
+
+<<tune bytecode>>=
+    ORG     $80C6
+TUNE_0:
+    DC.B    $24               ; END
+@ %def TUNE_0
+
+\subsubsection{Script 1 --- combat hit}
+
+Played when an attack lands.  The Y register holds the combat strength
+on entry; the tune player patches byte [[$80D5]] with the decremented
+value to control the loop iteration count.
+
+<<tune bytecode>>=
+    ORG     $80C7
+TUNE_1_COMBAT_HIT:
+    DC.B    $1F               ; MARK2
+    DC.B    $26               ; NORAND
+    DC.B    $23               ; HIGH
+    DC.B    $C1,$05            ; NOTE $C1, dur $05
+    DC.B    $22               ; LOW
+    DC.B    $50,$06            ; NOTE $50, dur $06
+    DC.B    $3F,$08            ; NOTE $3F, dur $08
+    DC.B    $25               ; HIRAND
+    DC.B    $23               ; HIGH
+    DC.B    $60,$10            ; NOTE $60, dur $10
+    DC.B    $00               ; LOOP 0 (patched at runtime)
+    DC.B    $24               ; END
+@ %def TUNE_1_COMBAT_HIT
+
+\subsubsection{Script 2 --- combat damage}
+
+Played when damage is dealt.  Byte [[$80E3]] is patched with the
+decremented damage amount.
+
+<<tune bytecode>>=
+    ORG     $80D7
+TUNE_2_COMBAT_DAMAGE:
+    DC.B    $25               ; HIRAND
+    DC.B    $1F               ; MARK2
+    DC.B    $22               ; LOW
+    DC.B    $3F,$05            ; NOTE $3F, dur $05
+    DC.B    $50,$04            ; NOTE $50, dur $04
+    DC.B    $80,$02            ; NOTE $80, dur $02
+    DC.B    $23               ; HIGH
+    DC.B    $C1,$04            ; NOTE $C1, dur $04
+    DC.B    $00               ; LOOP 0 (patched at runtime)
+    DC.B    $24               ; END
+@ %def TUNE_2_COMBAT_DAMAGE
+
+\subsubsection{Scripts 3--11 --- resident region}
+
+Scripts 3--11 reside at [[$A300]]--[[$A440]] in the EALDR image, which
+is copied to [[$0500]]--[[$07FF]] during boot.  The tune pointer table
+references the original [[$A3xx]]/[[$A4xx]] addresses.
+
+Note that scripts 4 and~5 overlap: script~5 (NPC death) starts at
+[[$A3CE]], which is partway through script~4 (mob death).  Script~5 is
+the shorter suffix of the same descending melody.
+
+<<resident tune bytecode>>=
+    ORG     $A300
+TUNE_3_ATTRACT:
+    ; --- intro: exact notes, set gosub return point ---
+    DC.B    $26               ; NORAND
+    DC.B    $20               ; MARK1 (gosub target for GOTO1 at end)
+    ; --- opening phrase (low then high) ---
+    DC.B    $22               ; LOW
+    DC.B    $3F,$65            ; NOTE $3F, dur $65
+    DC.B    $23               ; HIGH
+    DC.B    $3F,$49            ; NOTE $3F, dur $49
+    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
+    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
+    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
+    DC.B    $3F,$5C            ; NOTE $3F, dur $5C
+    ; --- ascending arpeggio (loop 1x) ---
+    DC.B    $1F               ; MARK2
+    DC.B    $22               ; LOW
+    DC.B    $C1,$03            ; NOTE $C1, dur $03
+    DC.B    $80,$04            ; NOTE $80, dur $04
+    DC.B    $50,$06            ; NOTE $50, dur $06
+    DC.B    $3F,$08            ; NOTE $3F, dur $08
+    DC.B    $23               ; HIGH
+    DC.B    $60,$0A            ; NOTE $60, dur $0A
+    DC.B    $50,$0C            ; NOTE $50, dur $0C
+    ; --- melody ---
+    DC.B    $3F,$2E            ; NOTE $3F, dur $2E
+    DC.B    $47,$1B            ; NOTE $47, dur $1B
+    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
+    DC.B    $47,$1B            ; NOTE $47, dur $1B
+    DC.B    $50,$18            ; NOTE $50, dur $18
+    DC.B    $47,$1B            ; NOTE $47, dur $1B
+    DC.B    $50,$18            ; NOTE $50, dur $18
+    DC.B    $55,$17            ; NOTE $55, dur $17
+    DC.B    $50,$18            ; NOTE $50, dur $18
+    DC.B    $55,$17            ; NOTE $55, dur $17
+    DC.B    $60,$14            ; NOTE $60, dur $14
+    DC.B    $50,$18            ; NOTE $50, dur $18
+    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
+    DC.B    $35,$24            ; NOTE $35, dur $24
+    DC.B    $38,$22            ; NOTE $38, dur $22
+    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
+    DC.B    $3F,$E5            ; NOTE $3F, dur $E5
+    DC.B    $01               ; LOOP 1 (repeat arpeggio+melody once)
+    ; --- second section ---
+    DC.B    $22               ; LOW
+    DC.B    $C1,$03            ; NOTE $C1, dur $03
+    DC.B    $80,$04            ; NOTE $80, dur $04
+    DC.B    $23               ; HIGH
+    DC.B    $D9,$05            ; NOTE $D9, dur $05
+    DC.B    $22               ; LOW
+    DC.B    $50,$06            ; NOTE $50, dur $06
+    DC.B    $3F,$08            ; NOTE $3F, dur $08
+    DC.B    $23               ; HIGH
+    DC.B    $6C,$09            ; NOTE $6C, dur $09
+    DC.B    $50,$0C            ; NOTE $50, dur $0C
+    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
+    DC.B    $60,$14            ; NOTE $60, dur $14
+    DC.B    $50,$18            ; NOTE $50, dur $18
+    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
+    DC.B    $35,$24            ; NOTE $35, dur $24
+    DC.B    $38,$22            ; NOTE $38, dur $22
+    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
+    DC.B    $3F,$5C            ; NOTE $3F, dur $5C
+    ; --- bridge ---
+    DC.B    $C1,$0A            ; NOTE $C1, dur $0A
+    DC.B    $22               ; LOW
+    DC.B    $50,$0C            ; NOTE $50, dur $0C
+    DC.B    $3F,$0F            ; NOTE $3F, dur $0F
+    DC.B    $23               ; HIGH
+    DC.B    $6C,$12            ; NOTE $6C, dur $12
+    DC.B    $72,$11            ; NOTE $72, dur $11
+    DC.B    $22               ; LOW
+    DC.B    $3F,$0F            ; NOTE $3F, dur $0F
+    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
+    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
+    ; --- slow descending phrase ---
+    DC.B    $C1,$0F            ; NOTE $C1, dur $0F
+    DC.B    $A2,$12            ; NOTE $A2, dur $12
+    DC.B    $80,$17            ; NOTE $80, dur $17
+    DC.B    $23               ; HIGH
+    DC.B    $D9,$1B            ; NOTE $D9, dur $1B
+    DC.B    $22               ; LOW
+    DC.B    $72,$1A            ; NOTE $72, dur $1A
+    DC.B    $80,$17            ; NOTE $80, dur $17
+    DC.B    $23               ; HIGH
+    DC.B    $C1,$1F            ; NOTE $C1, dur $1F
+    DC.B    $22               ; LOW
+    DC.B    $50,$24            ; NOTE $50, dur $24
+    DC.B    $3F,$2E            ; NOTE $3F, dur $2E
+    DC.B    $23               ; HIGH
+    DC.B    $6C,$36            ; NOTE $6C, dur $36
+    DC.B    $72,$34            ; NOTE $72, dur $34
+    DC.B    $22               ; LOW
+    DC.B    $3F,$2E            ; NOTE $3F, dur $2E
+    ; --- long sustain + finale ---
+    DC.B    $23               ; HIGH
+    DC.B    $60,$7A            ; NOTE $60, dur $7A
+    DC.B    $50,$92            ; NOTE $50, dur $92
+    DC.B    $3F,$B8            ; NOTE $3F, dur $B8
+    DC.B    $35,$D9            ; NOTE $35, dur $D9
+    DC.B    $38,$CE            ; NOTE $38, dur $CE
+    DC.B    $38,$67            ; NOTE $38, dur $67
+    DC.B    $3F,$5C            ; NOTE $3F, dur $5C
+    ; --- quick ascending run ---
+    DC.B    $22               ; LOW
+    DC.B    $FF,$02            ; NOTE $FF, dur $02
+    DC.B    $AC,$03            ; NOTE $AC, dur $03
+    DC.B    $80,$04            ; NOTE $80, dur $04
+    DC.B    $23               ; HIGH
+    DC.B    $CD,$05            ; NOTE $CD, dur $05
+    DC.B    $AC,$06            ; NOTE $AC, dur $06
+    DC.B    $22               ; LOW
+    DC.B    $3F,$08            ; NOTE $3F, dur $08
+    DC.B    $23               ; HIGH
+    DC.B    $65,$0A            ; NOTE $65, dur $0A
+    DC.B    $55,$0B            ; NOTE $55, dur $0B
+    ; --- closing sustained notes ---
+    DC.B    $3F,$C7            ; NOTE $3F, dur $C7
+    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
+    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
+    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
+    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
+    DC.B    $21               ; GOTO1 (loop back to MARK1)
+@ %def TUNE_3_ATTRACT
+
+@ Script 4 (mob death) and script 5 (NPC death) overlap: script~5
+begins at [[$A3CE]], which is partway through script~4.  Both end at
+[[$A3DD]].
+
+<<resident tune bytecode>>=
+    ORG     $A3C3
+TUNE_4_MOB_DEATH:
+    DC.B    $23               ; HIGH
+    DC.B    $50,$3D            ; NOTE $50, dur $3D
+    DC.B    $47,$44            ; NOTE $47, dur $44
+    DC.B    $43,$90            ; NOTE $43, dur $90
+    DC.B    $47,$88            ; NOTE $47, dur $88
+    DC.B    $50,$79            ; NOTE $50, dur $79
+    ; --- script 5 entry point (NPC death, shorter suffix) ---
+TUNE_5_NPC_DEATH:
+    DC.B    $23               ; HIGH
+    DC.B    $50,$3D            ; NOTE $50, dur $3D
+    DC.B    $47,$44            ; NOTE $47, dur $44
+    DC.B    $43,$48            ; NOTE $43, dur $48
+    DC.B    $35,$5A            ; NOTE $35, dur $5A
+    DC.B    $47,$44            ; NOTE $47, dur $44
+    DC.B    $43,$48            ; NOTE $43, dur $48
+    DC.B    $50,$79            ; NOTE $50, dur $79
+    DC.B    $24               ; END
+@ %def TUNE_4_MOB_DEATH TUNE_5_NPC_DEATH
+
+<<resident tune bytecode>>=
+    ORG     $A3DE
+TUNE_6_COMBAT_AVOIDED:
+    DC.B    $25               ; HIRAND
+    DC.B    $22               ; LOW
+    DC.B    $80,$07            ; NOTE $80, dur $07
+    DC.B    $23               ; HIGH
+    DC.B    $D9,$08            ; NOTE $D9, dur $08
+    DC.B    $AC,$0A            ; NOTE $AC, dur $0A
+    DC.B    $22               ; LOW
+    DC.B    $3F,$0E            ; NOTE $3F, dur $0E
+    DC.B    $23               ; HIGH
+    DC.B    $6C,$10            ; NOTE $6C, dur $10
+    DC.B    $55,$15            ; NOTE $55, dur $15
+    DC.B    $3F,$1C            ; NOTE $3F, dur $1C
+    DC.B    $35,$21            ; NOTE $35, dur $21
+    DC.B    $29,$29            ; NOTE $29, dur $29
+    DC.B    $27,$2B            ; NOTE $27, dur $2B
+    DC.B    $27,$2B            ; NOTE $27, dur $2B
+    DC.B    $27,$50            ; NOTE $27, dur $50
+    DC.B    $24               ; END
+@ %def TUNE_6_COMBAT_AVOIDED
+
+<<resident tune bytecode>>=
+    ORG     $A3FC
+TUNE_10_ENCOUNTER:
+    DC.B    $25               ; HIRAND
+    DC.B    $23               ; HIGH
+    DC.B    $FA,$07            ; NOTE $FA, dur $07
+    DC.B    $D7,$08            ; NOTE $D7, dur $08
+    DC.B    $BE,$0A            ; NOTE $BE, dur $0A
+    DC.B    $AA,$0A            ; NOTE $AA, dur $0A
+    DC.B    $82,$0A            ; NOTE $82, dur $0A
+    DC.B    $24               ; END
+@ %def TUNE_10_ENCOUNTER
+
+<<resident tune bytecode>>=
+    ORG     $A409
+TUNE_7_ENTITY_INTERACTION:
+    DC.B    $25               ; HIRAND
+    DC.B    $23               ; HIGH
+    DC.B    $C1,$02            ; NOTE $C1, dur $02
+    DC.B    $C1,$02            ; NOTE $C1, dur $02
+    DC.B    $AC,$02            ; NOTE $AC, dur $02
+    DC.B    $22               ; LOW
+    DC.B    $72,$02            ; NOTE $72, dur $02
+    DC.B    $23               ; HIGH
+    DC.B    $C1,$02            ; NOTE $C1, dur $02
+    DC.B    $C1,$02            ; NOTE $C1, dur $02
+    DC.B    $99,$06            ; NOTE $99, dur $06
+    DC.B    $22               ; LOW
+    DC.B    $80,$04            ; NOTE $80, dur $04
+    DC.B    $23               ; HIGH
+    DC.B    $C1,$03            ; NOTE $C1, dur $03
+    DC.B    $C1,$01            ; NOTE $C1, dur $01
+    DC.B    $C1,$02            ; NOTE $C1, dur $02
+    DC.B    $C1,$08            ; NOTE $C1, dur $08
+    DC.B    $AC,$01            ; NOTE $AC, dur $01
+    DC.B    $22               ; LOW
+    DC.B    $72,$01            ; NOTE $72, dur $01
+    DC.B    $23               ; HIGH
+    DC.B    $C1,$03            ; NOTE $C1, dur $03
+    DC.B    $C1,$05            ; NOTE $C1, dur $05
+    DC.B    $24               ; END
+@ %def TUNE_7_ENTITY_INTERACTION
+
+<<resident tune bytecode>>=
+    ORG     $A432
+TUNE_8_AI_TURN:
+    DC.B    $26               ; NORAND
+    DC.B    $22               ; LOW
+    DC.B    $3F,$12            ; NOTE $3F, dur $12
+    DC.B    $24               ; END
+@ %def TUNE_8_AI_TURN
+
+<<resident tune bytecode>>=
+    ORG     $A437
+TUNE_9_MENU_SELECTION:
+    DC.B    $26               ; NORAND
+    DC.B    $22               ; LOW
+    DC.B    $AC,$05            ; NOTE $AC, dur $05
+    DC.B    $24               ; END
+@ %def TUNE_9_MENU_SELECTION
+
+<<resident tune bytecode>>=
+    ORG     $A43C
+TUNE_11_MOVEMENT:
+    DC.B    $26               ; NORAND
+    DC.B    $23               ; HIGH
+    DC.B    $3F,$1E            ; NOTE $3F, dur $1E
+    DC.B    $24               ; END
+@ %def TUNE_11_MOVEMENT
+
+@ [[TUNE_LOOP_CTR]] counts iterations of the script's built-in loop
+construct.  [[TUNE_PRNG_MASK]] controls action randomization: the
 interpreter ANDs the PRNG output with this mask before dispatching.
 Both are initialized to 0 and 1 respectively at the start of each
 script invocation.
 
 <<defines>>=
-SCRIPT_LOOP_CTR     EQU     $5A8D   ; script loop iteration counter
-SCRIPT_PRNG_MASK    EQU     $5A92   ; PRNG mask for action randomization
-@ %def SCRIPT_LOOP_CTR SCRIPT_PRNG_MASK
+TUNE_LOOP_CTR     EQU     $5A8D   ; tune loop iteration counter
+TUNE_PRNG_MASK    EQU     $5A92   ; PRNG mask for action randomization
+@ %def TUNE_LOOP_CTR TUNE_PRNG_MASK
 
 After setup, the interpreter initializes its loop counter and PRNG mask:
 
-<<script engine>>=
+<<tune player>>=
 
-    STOB    #$00,SCRIPT_LOOP_CTR ; loop counter = 0
-    STOB    #$01,SCRIPT_PRNG_MASK ; PRNG mask = 1
-SCRIPT_ENGINE_FETCH:
+    STOB    #$00,TUNE_LOOP_CTR ; loop counter = 0
+    STOB    #$01,TUNE_PRNG_MASK ; PRNG mask = 1
+TUNE_PLAYER_FETCH:
 .fetch:
     LDY     #$00
-    LDA     (SCRIPT_PC),Y    ; read script byte
+    LDA     (TUNE_PC),Y    ; read script byte
     BALT    #$27,.control ; < $27 -> control command
     JMP     .action          ; >= $27 -> action dispatch
 @
+\subsubsection{Opcode reference}
+
+Each script byte is interpreted as follows:
+
+\begin{center}
+\begin{tabular}{cll}
+\hline
+\textbf{Byte} & \textbf{Mnemonic} & \textbf{Effect} \\
+\hline
+\$00--\$1E & LOOP $n$ & If loop counter $<$ $n$, increment counter and jump to MARK2 address; else reset counter and advance \\
+\$1F & MARK2 & Save next address as loop target \\
+\$20 & MARK1 & Save next address as gosub target \\
+\$21 & GOTO1 & Set PC to MARK1 address (gosub/restart) \\
+\$22 & LOW & Set action vector to [[PLAY_TONE]] (low octave) \\
+\$23 & HIGH & Set action vector to [[PLAY_TONE]] (high octave) \\
+\$24 & END & Return from script \\
+\$25 & HIRAND & Set PRNG mask to \$0F (high randomness) \\
+\$26 & NORAND & Set PRNG mask to \$00 (exact notes) \\
+\$27--\$FF & NOTE $f$,$d$ & Play note: frequency byte $f$ (XORed with masked PRNG), followed by duration byte $d$ \\
+\hline
+\end{tabular}
+\end{center}
+
+NOTE dispatches through [[TUNE_ACTION_VEC]], which is set by the LOW/HIGH
+commands to point at [[PLAY_TONE]].  The PRNG mask (set by NORAND/HIRAND)
+controls how much the frequency byte is randomized before playback.
+
 \subsubsection{Control commands (< \$27)}
 
-@ [[SCRIPT_LOOP_ADDR]] is a 2-byte address saved by the ``set loop
+@ [[TUNE_LOOP_ADDR]] is a 2-byte address saved by the ``set loop
 address'' command (\$1F).  When the loop counter has not yet reached the
-target byte value, the interpreter copies [[SCRIPT_LOOP_ADDR]] back into
-[[SCRIPT_PC]] to restart the loop body.
+target byte value, the interpreter copies [[TUNE_LOOP_ADDR]] back into
+[[TUNE_PC]] to restart the loop body.
 
 <<defines>>=
-SCRIPT_LOOP_ADDR    EQU     $5A8E   ; script loop address (2 bytes)
-@ %def SCRIPT_LOOP_ADDR
+TUNE_LOOP_ADDR    EQU     $5A8E   ; tune loop address (2 bytes)
+@ %def TUNE_LOOP_ADDR
 
-<<script engine>>=
+<<tune player>>=
 
 .control:
     BAEQ    #$25,.cmd_25              ; set PRNG mask = $0F
@@ -15050,16 +15361,16 @@ SCRIPT_LOOP_ADDR    EQU     $5A8E   ; script loop address (2 bytes)
     BCS     .cmd_20                   ; set gosub address
 
     ; --- Loop/end-loop (byte < $1F) ---
-    BAEQ    SCRIPT_LOOP_CTR,.end_loop ; compare with loop counter
+    BAEQ    TUNE_LOOP_CTR,.end_loop ; compare with loop counter
     BCC     .end_loop
 
-    INC     SCRIPT_LOOP_CTR           ; counter++
-    MOVW    SCRIPT_LOOP_ADDR,SCRIPT_PC ;  SCRIPT_PC/SCRIPT_PC+1 = loop address
+    INC     TUNE_LOOP_CTR           ; counter++
+    MOVW    TUNE_LOOP_ADDR,TUNE_PC ;  TUNE_PC/TUNE_PC+1 = loop address
     JMP     .fetch
 
 .end_loop:
-    STOB    #$00,SCRIPT_LOOP_CTR ; reset loop counter
-    JMP     SCRIPT_ADVANCE
+    STOB    #$00,TUNE_LOOP_CTR ; reset loop counter
+    JMP     TUNE_ADVANCE
 @
 When the byte value equals or exceeds the loop counter, the loop
 terminates and the counter resets.  Otherwise, the counter increments
@@ -15067,87 +15378,87 @@ and execution jumps back to the saved loop address.
 
 \subsubsection{Command implementations}
 
-@ [[SCRIPT_GOSUB_ADDR]] saves the return address for the script's gosub
-command (\$21): after the subroutine finishes, [[SCRIPT_PC]] is restored
-from this 2-byte value.  [[SCRIPT_ACTION_VEC]] is a 2-byte vector set by
+@ [[TUNE_GOSUB_ADDR]] saves the return address for the script's gosub
+command (\$21): after the subroutine finishes, [[TUNE_PC]] is restored
+from this 2-byte value.  [[TUNE_ACTION_VEC]] is a 2-byte vector set by
 commands \$23 and \$24 to select between the tone and noise action handlers.
 
 <<defines>>=
-SCRIPT_GOSUB_ADDR   EQU     $5A90   ; script gosub return address (2 bytes)
-SCRIPT_ACTION_VEC   EQU     $5A93   ; action handler vector (2 bytes)
-@ %def SCRIPT_GOSUB_ADDR SCRIPT_ACTION_VEC
+TUNE_GOSUB_ADDR   EQU     $5A90   ; tune gosub return address (2 bytes)
+TUNE_ACTION_VEC   EQU     $5A93   ; action handler vector (2 bytes)
+@ %def TUNE_GOSUB_ADDR TUNE_ACTION_VEC
 
-<<script engine>>=
+<<tune player>>=
 
 .cmd_25:                            ; PRNG mask = $0F
-    STOB    #$0F,SCRIPT_PRNG_MASK
-    JMP     SCRIPT_ADVANCE
+    STOB    #$0F,TUNE_PRNG_MASK
+    JMP     TUNE_ADVANCE
 
 .cmd_26:                            ; PRNG mask = $00
-    STOB    #$00,SCRIPT_PRNG_MASK
-    JMP     SCRIPT_ADVANCE
+    STOB    #$00,TUNE_PRNG_MASK
+    JMP     TUNE_ADVANCE
 
 .cmd_23:                            ; action vector -> PLAY_TONE
-    STOW    PLAY_TONE,SCRIPT_ACTION_VEC
-    JMP     SCRIPT_ADVANCE
+    STOW    PLAY_TONE,TUNE_ACTION_VEC
+    JMP     TUNE_ADVANCE
 
 .cmd_24:                            ; action vector -> PLAY_NOISE
-    STOW    PLAY_NOISE,SCRIPT_ACTION_VEC
-    JMP     SCRIPT_ADVANCE
+    STOW    PLAY_NOISE,TUNE_ACTION_VEC
+    JMP     TUNE_ADVANCE
 
 .cmd_22:                            ; nop (return from script)
     RTS
 
 .cmd_21:                            ; gosub: jump to saved address
-    MOVW    SCRIPT_GOSUB_ADDR,SCRIPT_PC
+    MOVW    TUNE_GOSUB_ADDR,TUNE_PC
     JMP     .fetch
 
 .cmd_1F:                            ; set loop address = current+1
-    JSR     SCRIPT_INC_PC
-    MOVW    SCRIPT_PC,SCRIPT_LOOP_ADDR
+    JSR     TUNE_INC_PC
+    MOVW    TUNE_PC,TUNE_LOOP_ADDR
     JMP     .fetch
 
 .cmd_20:                            ; set gosub address = current+1
-    JSR     SCRIPT_INC_PC
-    MOVW    SCRIPT_PC,SCRIPT_GOSUB_ADDR
+    JSR     TUNE_INC_PC
+    MOVW    TUNE_PC,TUNE_GOSUB_ADDR
     JMP     .fetch
 @
 \subsubsection{Action dispatch ($\geq$ \$27)}
 
 When the script byte is [[$27]] or higher, the PRNG output is masked and
 XORed with the action byte, introducing randomness.  The action vector
-at [[\DISPATCH_VEC]] is set by the handlers at [[SCRIPT_ACTION_VEC]].
+at [[\DISPATCH_VEC]] is set by the handlers at [[TUNE_ACTION_VEC]].
 
-<<script engine>>=
+<<tune player>>=
 
 .action:
     STA     SOUND_DURATION         ; save action byte
     JSR     STEP_PRNG
     LDA     PRNG_OUTPUT            ; PRNG output
-    AND     SCRIPT_PRNG_MASK       ; apply mask
+    AND     TUNE_PRNG_MASK       ; apply mask
     EOR     SOUND_DURATION         ; XOR with action byte
     STA     SOUND_FREQ             ; modified action
-    JSR     SCRIPT_INC_PC          ; advance script pointer
+    JSR     TUNE_INC_PC          ; advance tune pointer
     LDY     #$00
-    LDA     (SCRIPT_PC),Y          ; read parameter byte
+    LDA     (TUNE_PC),Y          ; read parameter byte
     STA     SOUND_DURATION
-    JSR     SCRIPT_ACTION_INDIRECT ; -> JMP (SCRIPT_ACTION_VEC)
+    JSR     TUNE_ACTION_INDIRECT ; -> JMP (TUNE_ACTION_VEC)
     JMP     (DISPATCH_VEC)         ; dispatch via action vector
-@ %def SCRIPT_ENGINE
-The ``advance'' routine is the target of all [[JMP SCRIPT_ADVANCE]] in
-the control commands.  It increments the script pointer, checks for user
+@ %def TUNE_PLAYER
+The ``advance'' routine is the target of all [[JMP TUNE_ADVANCE]] in
+the control commands.  It increments the tune pointer, checks for user
 input (during attract mode), and loops back to [[.fetch]].
 
-During the attract screen ([[ATTRACT_FLAG]] = 1), [[SCRIPT_ADVANCE]] checks
+During the attract screen ([[ATTRACT_FLAG]] = 1), [[TUNE_ADVANCE]] checks
 for keyboard or joystick input.  If detected, it returns immediately via RTS,
-which exits the entire [[SCRIPT_ENGINE]] call.
+which exits the entire [[TUNE_PLAYER]] call.
 
-<<script advance>>=
+<<tune advance>>=
     ORG     $7A4F
-SCRIPT_ADVANCE:
-    SUBROUTINE SCRIPT_ADVANCE
+TUNE_ADVANCE:
+    SUBROUTINE TUNE_ADVANCE
 
-    JSR     SCRIPT_INC_PC       ; advance script pointer
+    JSR     TUNE_INC_PC       ; advance tune pointer
     LDA     ATTRACT_FLAG        ; attract_flag
     BEQ     .continue           ; not attract mode -> skip input check
 
@@ -15171,28 +15482,28 @@ SCRIPT_ADVANCE:
 
 .continue:
     LSR     WAIT_LOOP_COUNT     ; shift timing flag
-    JMP     SCRIPT_ENGINE_FETCH ; loop back to interpreter
-@ %def SCRIPT_ADVANCE
-<<script action indirect>>=
+    JMP     TUNE_PLAYER_FETCH ; loop back to interpreter
+@ %def TUNE_ADVANCE
+<<tune action indirect>>=
     ORG     $7A4C
-SCRIPT_ACTION_INDIRECT:
-    JMP     (SCRIPT_ACTION_VEC)
-@ %def SCRIPT_ACTION_INDIRECT
-@ [[SCRIPT_INC_PC]] increments the 16-bit script program counter at
-[[SCRIPT_PC]]/[[SCRIPT_PC+1]], handling the carry from low to high byte.
+TUNE_ACTION_INDIRECT:
+    JMP     (TUNE_ACTION_VEC)
+@ %def TUNE_ACTION_INDIRECT
+@ [[TUNE_INC_PC]] increments the 16-bit script program counter at
+[[TUNE_PC]]/[[TUNE_PC+1]], handling the carry from low to high byte.
 
-<<script helpers>>=
+<<tune helpers>>=
     ORG     $7A77
-SCRIPT_INC_PC:
-    SUBROUTINE SCRIPT_INC_PC
+TUNE_INC_PC:
+    SUBROUTINE TUNE_INC_PC
 
-    INC     SCRIPT_PC
+    INC     TUNE_PC
     BEQ     .carry
     RTS
 .carry:
-    INC     SCRIPT_PC+1
+    INC     TUNE_PC+1
     RTS
-@ %def SCRIPT_INC_PC
+@ %def TUNE_INC_PC
 
 \chapter{The Attract Screen}
 
@@ -15261,9 +15572,9 @@ interleave:
 After [[GAME_INIT]], the relocation
 [[$2000--$32FF]]~$\to$~[[$9600--$A8FF]] overwrites the original
 [[$A300]]--[[$A5FF]] with HRCG/font data.  From that point on, only the
-copy at [[$0500]]--[[$07FF]] survives.  The script pointer table
-(\S\ref{sec:script_engine}) references the original [[$A300]]-based
-addresses, which is safe because scripts~3--7 run only during attract
+copy at [[$0500]]--[[$07FF]] survives.  The tune pointer table
+(\S\ref{sec:tune_player}) references the original [[$A300]]-based
+addresses, which is safe because tunes~3--7 run only during attract
 mode, before [[GAME_INIT]].
 
 The reset vector points here.  Simply jumps to [[ATTRACT_LOOP]].
@@ -16562,16 +16873,17 @@ The following root chunks produce the assembly files when tangled.
 <<init stub>>
 <<init hrcg>>
 <<set text window upper left>>
-<<script engine>>
-<<script action indirect>>
-<<script advance>>
-<<script helpers>>
+<<tune player>>
+<<tune action indirect>>
+<<tune advance>>
+<<tune helpers>>
 <<play tone>>
 <<play noise>>
 <<status border data>>
 <<status bar strings>>
 <<print font char data>>
-<<script pointer table>>
+<<tune pointer table>>
+<<tune bytecode>>
 <<font data>>
 <<hrcg init>>
 <<hrcg version string>>
@@ -16595,6 +16907,7 @@ The following root chunks produce the assembly files when tangled.
 <<hrcg home clr>>
 <<hrcg calc addr>>
 <<std font data>>
+<<resident tune bytecode>>
 <<disk read field>>
 <<verify data field>>
 <<disk vm loop>>
