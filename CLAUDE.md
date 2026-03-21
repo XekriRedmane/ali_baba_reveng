@@ -147,11 +147,11 @@ Page offset: F   8   1   9   2   A   3   B   4   C   5   D   6   E   7   0
 
 | Range | Source | Contents |
 |---|---|---|
-| $0500-$07FF | EALDR $A300-$A5FF | Resident routines |
+| $0500-$07FF | EALDR $A300-$A5FF (pre-reloc) | Resident routines (copied during boot, then $A300 overwritten) |
 | $0800-$3FFF | Tracks $0D-$10 | Main program code |
 | $4000-$67FF | Tracks $07-$09 (DXR decrypted) | Game data (encrypted) |
 | $6800-$95FF | Tracks $09-$0C | Game data (HRCG code at $92A8+) |
-| $9600-$A8FF | Relocated from $2000-$32FF | HRCG code ($9600-$97A4), standard font ($97A5-$9AA4) |
+| $9600-$A8FF | Relocated from $2000-$32FF | HRCG library, standard font, game support routines, tune data |
 | $B300-$BFFF | Relocated from $3300-$3FFF | Disk I/O routines |
 
 ## Font Data
@@ -291,13 +291,13 @@ After writing any new assembly chunk:
 - $A8F2-$B2FF (2574): Between HRCG end and disk I/O
 - $9AA5-$A262 (1982): Game message strings
 - $7AAC-$7D82 (727): Menu option strings
-- $A44E-$A6B1 (612): EALDR resident routines/data
+- $A44E-$A6B1 (612): Relocated block tail (game support routines, originally at $2E4E-$30B1)
 
 ### Medium code gaps (100-500 bytes)
 
 - $0AAE-$0B61 (180), $14D8-$15AA (211), $62EC-$63C7 (220), $63C9-$643F (119)
 - $69C8-$6B93 (460), $6B95-$6C17 (131), $6EE9-$704C (356), $720B-$72A6 (156)
-- $A264-$A2FF (156), $A6B9-$A723 (107), $A7C1-$A8CC (268)
+- $A264-$A2FF (156), $A6B9-$A723 (107), $A7C1-$A8CC (268) — relocated block (originally $2000-$32FF)
 
 ### Dead code/data (confirmed)
 

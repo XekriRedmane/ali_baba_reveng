@@ -3978,6 +3978,20 @@ RELOCATE_HIRES_STAGING:
     INC     COPY_DEST+1   ; next dest page
     JMP     .copy
 @ %def RELOCATE_HIRES_STAGING
+
+@ \subsection{Zeroed hi-res page (\$2000--\$3FFF)}
+
+After [[RELOCATE_HIRES_STAGING]] copies \$2000--\$32FF to
+\$9600--\$A8FF and \$3300--\$3FFF to \$B300--\$BFFF, it clears
+each source byte to zero.  The result is 8192 bytes of zeros at
+\$2000--\$3FFF, making the hi-res page available for graphics.
+
+<<zeroed hires page>>=
+    ORG     $2000
+HIRES_PAGE:
+    DS      $2000,$00          ; 8192 bytes zeroed by game_init
+@ %def HIRES_PAGE
+
 The plain text screen (using the standard Apple text characters) is 40
 columns by 24 rows. The [[TEXT_COL]] and [[TEXT_ROW]] locations keep track
 of the cursor position when ROM routines are used for printing text.
@@ -7816,8 +7830,8 @@ INIT_CHAR_SELECT:
 .found:
     JMP     ENTER_CHAR_SELECT  ; -> character selection menu
 @ %def INIT_CHAR_SELECT
-The scene loop calls [[$A478]] (a resident routine from EALDR, still in
-memory at [[$A000]]--[[$BFFF]]) each iteration to check for user input.
+The scene loop calls [[$A478]] (a game support routine in the relocated
+block at [[$9600]]--[[$A8FF]]) each iteration to check for user input.
 If carry is set (key pressed), the loop exits.  Otherwise, it displays
 the status bar, renders the scene text from [[$5C00]], runs tune~\#3
 (the attract animation at [[$A300]]), and checks [[$5CFF]] for a scene
@@ -9309,7 +9323,7 @@ SCENE_LOOP:
     JSR     LOAD_SCENE_DATA
 
 .display:
-    JSR     $A478                           ; keyboard/timing check (EALDR resident)
+    JSR     $A478                           ; keyboard/timing check (relocated block)
     BCS     .exit                           ; carry set = user pressed key
 
     JSR     DISPLAY_STATUS_BAR
@@ -11059,7 +11073,7 @@ character sprite, checks whether the group actually needs a turn, and if so
 enters [[GAME_TURN_LOOP]].
 
 There is also a 1-in-24 chance (based on a PRNG roll masked with [[$17]]) of
-calling a periodic disk checkpoint at [[$A508]] in the resident area.
+calling a periodic disk checkpoint at [[$A508]] in the relocated block.
 
 <<process mob groups>>=
     ORG     $0884
@@ -11076,7 +11090,7 @@ PROCESS_MOB_GROUPS:
     LDA     PRNG_OUTPUT
     AND     #$17             ; 1-in-24 chance (bits 0-2,4)
     BNE     .walk_list
-    JSR     $A508            ; periodic disk checkpoint (resident)
+    JSR     $A508            ; periodic disk checkpoint (relocated block)
 .walk_list:
     LDA     CURRENT_ROOM     ; current link in chain
     BNE     .has_mob
@@ -11317,7 +11331,7 @@ or if [[CHECK_ENCOUNTER]] returns~2 (hostile territory), a
 
 \paragraph{Input.}
 For the player ([[$5A05]]~=~0), keyboard input is read via the
-resident dispatch at [[$A44C]].  For NPCs, [[AI_CHOOSE_TARGET]]
+keyboard input routine at [[$A44C]] (relocated block).  For NPCs, [[AI_CHOOSE_TARGET]]
 selects a destination and [[FUN_6742]] computes a direction.
 The direction value encodes both movement and commands:
 
@@ -11483,7 +11497,7 @@ MOVE_LOOP:                     ; $1A31 - external entry point
 .have_input:
     JSR     GET_INPUT_TABLE_PTR
     JSR     SETUP_INPUT
-    JSR     $A44C                    ; resident: read keyboard
+    JSR     $A44C                    ; read keyboard (relocated block)
     STA     INPUT_DIR
     BANE    #$00,.do_move            ; player goes straight to movement
     JMP     TEARDOWN_INPUT           ; cancelled
@@ -11821,13 +11835,13 @@ INPUT_JMP_VEC   EQU     $5F5E   ; indirect jump vector for input callbacks
 CURRENT_SELECTION EQU   $5AAB   ; current menu selection index
 @ %def INPUT_JMP_VEC CURRENT_SELECTION
 
-@ [[READ_KEYBOARD]] at [[$A44C]] is the resident keyboard input routine
-in the EALDR region.  [[INPUT_LOOP]] calls it to wait for a keypress; a
-zero return indicates the player pressed return (select), while any other
-value is passed to [[VALIDATE_INPUT]].
+@ [[READ_KEYBOARD]] at [[$A44C]] is the keyboard input routine in the
+relocated block (\$9600--\$A8FF).  [[INPUT_LOOP]] calls it to wait for
+a keypress; a zero return indicates the player pressed return (select),
+while any other value is passed to [[VALIDATE_INPUT]].
 
 <<defines>>=
-READ_KEYBOARD                EQU     $A44C   ; resident: read keyboard input
+READ_KEYBOARD                EQU     $A44C   ; read keyboard input (relocated block)
 @ %def READ_KEYBOARD
 
 <<input loop>>=
@@ -20198,6 +20212,7 @@ The following root chunks produce the assembly files when tangled.
 <<set target restricted>>
 <<dispatch on mode>>
 <<orphaned encounter handler>>
+<<zeroed hires page>>
 <<Location data>>
 <<Location names>>
 <<Location events>>
