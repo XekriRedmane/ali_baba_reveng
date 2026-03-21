@@ -6552,6 +6552,159 @@ STATS_PROMPT_JOYSTICK:        ; $7E18
     ; (STATUS_BORDER_DATA follows immediately at $7E2F)
 @ %def STATS_PROMPT_KEYBOARD STATS_PROMPT_JOYSTICK
 
+\section{Undocumented data regions}
+
+The following data regions contain game strings, lookup tables, and
+display data that have not yet been fully annotated.  They are included
+as raw hex to close binary gaps.
+
+@ Border/UI data at [[$5DBF]]--[[$5F18]]: border positions, pattern
+strings, copyright text (``COPYRIGHT 1982 STUART SMITH''), and
+font character data for the border frame.
+
+<<game data 5DBF>>=
+    ORG     $5DBF
+GAME_DATA_5DBF:
+    HEX     A0 06 A0 C4 D3 E9 6D 5B 8F 5B 7E 5B 00 09 13 00
+    HEX     0A 13 00 0B 13 00 0C 13 00 0D 13 0B 0E 13 00 0F
+    HEX     13 00 10 13 00 11 13 00 12 13 00 10 06 00 10 07
+    HEX     00 10 08 00 10 09 00 10 0A 00 10 0B 0F 10 0C 00
+    HEX     10 0D 00 10 0E 00 10 20 00 10 1F 00 10 1E 00 10
+    HEX     1D 00 10 1C 05 10 1B 00 10 1A 00 10 19 00 10 18
+    HEX     00 0B 06 00 0B 07 00 0B 08 00 0B 09 14 0B 0A 00
+    HEX     0B 0B 00 0B 0C 00 0B 0D 00 0B 0E 00 0B 20 00 0B
+    HEX     1F 00 0B 1E 00 0B 1D 0E 0B 1C 00 0B 1B 00 0B 1A
+    HEX     00 0B 19 00 0B 18 7D 80 02 2F 00 00 01 0C 09 00
+    HEX     00 02 01 02 01 00 00 2F 83 01 14 08 05 00 06 0F
+    HEX     12 14 19 00 14 08 09 05 16 05 13 7F 01 09 01 0E
+    HEX     01 13 16 09 16 0E 16 13 01 0A 01 0B 01 0C 01 0D
+    HEX     01 0F 01 12 16 0A 16 0D 16 0F 16 12 10 0A 10 0D
+    HEX     10 0F 10 12 25 0A 25 0D 25 0F 25 10 25 11 25 12
+    HEX     11 F0 F1 F0 F1 F0 F1 F0 F1 F0 F1 F0 F1 F0 F1 F0
+    HEX     F1 F0 02 F0 F1 02 F1 F0 1B C3 CF D0 D9 D2 C9 C7
+    HEX     C8 D4 A0 B1 B9 B8 B2 A0 D3 D4 D5 C1 D2 D4 A0 D3
+    HEX     CD C9 D4 C8 1B D0 D2 C5 D3 D3 A0 D3 D0 C1 C3 C5
+    HEX     A0 C2 C1 D2 A0 D4 CF A0 C3 CF CE D4 C9 CE D5 C5
+    HEX     07 E8 E9 EA EB EC ED EE 08 EF F0 F1 F2 F3 F4 F5
+    HEX     F6 08 F7 F8 F9 FA FB FC FD FE
+@ %def GAME_DATA_5DBF
+
+@ Game string data at [[$7EDD]]--[[$80A3]]: equipment names (swords,
+daggers, armor), map object descriptions (walls, doors, treasure
+chests), attack verb strings (``JABS'' through ``LAMBASTES''),
+and related lookup tables.
+
+<<game data 7EDD>>=
+    ORG     $7EDD
+GAME_DATA_7EDD:
+    ; Equipment/combat lookup table ($7EDD-$7F2C)
+    HEX     0B 72 2F 7F 0A 11 72 3D 7F 32 B7 C5 A0 AE A0 17
+    HEX     72 4B 7F 03 B2 AE A0 A0 AE 1D 72 57 7F 0F 23 72
+    HEX     66 7F 0A B6 A0 B4 A0 C6 32 49 72 72 7F 50 4D 72
+    HEX     7E 7F C8 51 72 92 7F 28 55 72 9D 7F 64 59 72 B0
+    HEX     7F 08 A0 B5 CF AE B5 A0 CB CC B1 CD D0 AF B1 C1
+    ; Weapon strings
+    HEX     B9 33 0D C1 CE A0 C9 D2 CF CE A0 D3 D7 CF D2 C4
+    HEX     0D C1 A0 D3 D4 C5 C5 CC A0 D3 D7 CF D2 C4 0B C1
+    HEX     CE A0 CF C1 CB A0 C3 CC D5 C2 0E C1 A0 D3 D4 C5
+    HEX     C5 CC A0 C4 C1 C7 C7 C5 D2 06 C1 A0 D3 C8 C9 D6
+    ; Armor strings
+    HEX     07 88 84 83 06 0B D0 CC C1 D4 C5 A0 C1 D2 CD CF
+    HEX     D2 13 D2 C9 D4 C8 CD C9 CC A0 D0 CC C1 D4 C5 A0
+    HEX     C1 D2 CD CF D2 0A C3 C8 C1 C9 CE A0 CD C1 C9 CC
+    HEX     12 D2 C9 D4 C8 CD C9 CC A0 C3 C8 C1 C9 CE A0 CD
+    HEX     C1 C9 CC 0D CC C5 C1 D4 C8 C5 D2 A0 C1 D2 CD CF
+    ; XP table + map object strings
+    HEX     D2 75 35 53 23 21 06 C1 A0 D7 C1 CC CC 08 C1 A0
+    HEX     D3 D4 C1 D4 D5 C5 10 C1 A0 D4 D2 C5 C1 D3 D5 D2
+    HEX     C5 A0 C3 C8 C5 D3 D4 0B C5 CD D0 D4 D9 A0 D3 D0
+    HEX     C1 C3 C5 0B C1 CE A0 C9 CC CC D5 D3 C9 CF CE 06
+    HEX     C1 A0 C4 CF CF D2 12 C1 CE A0 C9 CE D6 C9 D3 C9
+    HEX     C2 CC C5 A0 D7 C1 CC CC A1 11 D3 CF CD C5 A0 D2
+    HEX     D5 CE C5 A0 D7 D2 C9 D4 C9 CE C7 11 C1 A0 D4 D2
+    HEX     C1 C4 C9 CE C7 A0 CF D5 D4 D0 CF D3 D4
+    ; Attack verb strings ("JABS" through "LAMBASTES")
+    HEX     04 CA C1 C2 D3 05 D0 CF CB C5 D3 04 C8 C9 D4 D3
+    HEX     06 C3 CC CF D5 D4 D3 06 D0 CF D5 CE C4 D3 06 D3
+    HEX     CD C1 C3 CB D3 06 D3 CD C9 D4 C5 D3 05 D7 C8 CF
+    HEX     D0 D3 06 D7 C8 C1 C3 CB D3 06 C2 C1 D3 C8 C5 D3
+    HEX     06 D7 C8 CF CD D0 D3 07 D7 C1 CC CC CF D0 D3 07
+    HEX     D3 CD C1 D3 C8 C5 D3 08 C3 CC CF C2 C2 C5 D2 D3
+    HEX     09 CC C1 CD C2 C1 D3 D4 C5 D3
+@ %def GAME_DATA_7EDD
+
+@ Duplicate weapon/armor/object string table at [[$8133]]--[[$82B3]],
+prefixed with 6~bytes of font rendering data.  This copy is used by the
+``See Your Lot'' display and other routines that need item names.
+
+<<game data 8133>>=
+    ORG     $8133
+GAME_DATA_8133:
+    ; Font rendering data (6 bytes)
+    HEX     F7 FD ED E6 ED FD
+    ; Weapon strings (same as $7F2D)
+    HEX     33 0D C1 CE A0 C9 D2 CF CE A0 D3 D7 CF D2 C4 0D
+    HEX     C1 A0 D3 D4 C5 C5 CC A0 D3 D7 CF D2 C4 0B C1 CE
+    HEX     A0 CF C1 CB A0 C3 CC D5 C2 0E C1 A0 D3 D4 C5 C5
+    HEX     CC A0 C4 C1 C7 C7 C5 D2 06 C1 A0 D3 C8 C9 D6
+    ; Armor strings
+    HEX     07 88 84 83 06 0B D0 CC C1 D4 C5 A0 C1 D2 CD CF
+    HEX     D2 13 D2 C9 D4 C8 CD C9 CC A0 D0 CC C1 D4 C5 A0
+    HEX     C1 D2 CD CF D2 0A C3 C8 C1 C9 CE A0 CD C1 C9 CC
+    HEX     12 D2 C9 D4 C8 CD C9 CC A0 C3 C8 C1 C9 CE A0 CD
+    HEX     C1 C9 CC 0D CC C5 C1 D4 C8 C5 D2 A0 C1 D2 CD CF
+    ; XP table + map object strings
+    HEX     D2 75 35 53 23 21 06 C1 A0 D7 C1 CC CC 08 C1 A0
+    HEX     D3 D4 C1 D4 D5 C5 10 C1 A0 D4 D2 C5 C1 D3 D5 D2
+    HEX     C5 A0 C3 C8 C5 D3 D4 0B C5 CD D0 D4 D9 A0 D3 D0
+    HEX     C1 C3 C5 0B C1 CE A0 C9 CC CC D5 D3 C9 CF CE 06
+    HEX     C1 A0 C4 CF CF D2 12 C1 CE A0 C9 CE D6 C9 D3 C9
+    HEX     C2 CC C5 A0 D7 C1 CC CC A1 11 D3 CF CD C5 A0 D2
+    HEX     D5 CE C5 A0 D7 D2 C9 D4 C9 CE C7 11 C1 A0 D4 D2
+    HEX     C1 C4 C9 CE C7 A0 CF D5 D4 D0 CF D3 D4
+    ; Attack verb strings
+    HEX     04 CA C1 C2 D3 05 D0 CF CB C5 D3 04 C8 C9 D4 D3
+    HEX     06 C3 CC CF D5 D4 D3 06 D0 CF D5 CE C4 D3 06 D3
+    HEX     CD C1 C3 CB D3 06 D3 CD C9 D4 C5 D3 05 D7 C8 CF
+    HEX     D0 D3 06 D7 C8 C1 C3 CB D3 06 C2 C1 D3 C8 C5 D3
+    HEX     06 D7 C8 CF CD D0 D3 07 D7 C1 CC CC CF D0 D3 07
+    HEX     D3 CD C1 D3 C8 C5 D3 08 C3 CC CF C2 C2 C5 D2 D3
+    HEX     09 CC C1 CD C2 C1 D3 D4 C5 D3
+    ; HRCG control string fragment
+    HEX     09 81 B1 82 DB
+@ %def GAME_DATA_8133
+
+@ Data at [[$82B5]]--[[$83A4]]: HRCG control string continuation,
+duplicate tune pointer table fragment, duplicate tune bytecode
+(scripts 1--2), and border/icon bitmap data.
+
+<<game data 82B5>>=
+    ORG     $82B5
+GAME_DATA_82B5:
+    ; HRCG control string continuation
+    HEX     83 ED ED 84 D1 82 D2 82 E2 82
+    ; Duplicate tune pointer table ($82BF = copy of $80AE data)
+    HEX     00 A3 C3 A3 CE A3 DE A3 09 A4 32 A4 37 A4 FC A3
+    HEX     3C A4
+    ; Duplicate tune bytecodes (scripts 1 and 2)
+    HEX     24 1F 26 23 C1 05 22 50 06 3F 08 25 23 60 10 00
+    HEX     24 25 1F 22 3F 05 50 04 80 02 23 C1 04 00 24
+    ; Second copy of tune pointer table + bytecodes
+    HEX     A3 09 A4 32 A4 37 A4 FC A3 3C A4
+    HEX     24 1F 26 23 C1 05 22 50 06 3F 08 25 23 60 10 00
+    HEX     24 25 1F 22 3F 05 50 04 80 02 23 C1 04 00 24
+    ; Border/icon bitmap data
+    HEX     2A 2A 2A 2A 2A 50 54 44 44 54 50 40 40 02 02 08
+    HEX     08 02 02 00 00 41 55 40 40 54 04 04 05 20 2A 00
+    HEX     00 0A 08 08 28 40 40 50 50 50 54 54 54 00 00 02
+    HEX     02 02 0A 0A 0A AA A2 A2 AA 88 A8 A0 00 95 91 91
+    HEX     95 84 85 81 00 00 84 84 85 95 95 85 84 00 00 00
+    HEX     00 00 05 05 05 84 7F C4 C4 00 40 60 00 0F 1F 3F
+    HEX     1F 0F 19 30 00 00 00 00 00 00 00 D0 D0 00 00 00
+    HEX     00 00 00 00 00 A0 A0 A8 A0 A0 D0 88 00 00 00 81
+    HEX     80 00 00 81 00 2A 2A 2A 2A 2A 2A
+@ %def GAME_DATA_82B5
+
 \chapter{Utility Routines}
 
 
@@ -17241,6 +17394,7 @@ The following root chunks produce the assembly files when tangled.
 <<draw border labels>>
 <<draw border icons>>
 <<plot char>>
+<<game data 5DBF>>
 <<input loop>>
 <<setup input>>
 <<draw input options>>
@@ -17348,9 +17502,12 @@ The following root chunks produce the assembly files when tangled.
 <<stats template data>>
 <<status border data>>
 <<status bar strings>>
+<<game data 7EDD>>
 <<print font char data>>
 <<tune pointer table>>
 <<tune bytecode>>
+<<game data 8133>>
+<<game data 82B5>>
 <<font data>>
 <<hrcg init>>
 <<hrcg version string>>
