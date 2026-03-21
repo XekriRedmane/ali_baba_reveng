@@ -845,8 +845,17 @@ PWREDUP         EQU     $03F4   ; power-up byte (EOR of SOFTEV bytes)
 IWM_MOTORON     EQU     $C0E9   ; IWM motor on (slot-indexed)
 @ %def SOFTEV PWREDUP IWM_MOTORON
 
+@ [[BOOT1_ERROR_FLAG]] is set by [[BOOT1_LOAD_TRACK]] when a timeout occurs.
+
+<<boot1 error flag>>=
+    ORG     $09C7
+BOOT1_ERROR_FLAG:
+    HEX     00              ; nonzero = error occurred
+@ %def BOOT1_ERROR_FLAG
+
 <<boot1 entry>>=
     ORG     $0800
+BOOT1_SECTOR_COUNT:
     HEX     05              ; sector count: 5 sectors in BOOT1
     JMP     BOOT1_ENTRY
 
@@ -888,7 +897,7 @@ BOOT1_ENTRY:
     LDA     BOOT1_ERROR_FLAG
     BNE     BOOT1_ENTRY     ; retry on error
     JMP     BOOT1_DELAY     ; delay, then RTS -> $A806
-@ %def BOOT1_ENTRY
+@ %def BOOT1_SECTOR_COUNT BOOT1_ENTRY
 
 @ The region at [[$0840]]--[[$08FF]] is part of the san~inc hard-disk
 conversion.  As described in the introduction
@@ -1166,16 +1175,13 @@ BOOT1_READ_SECTOR:
 @ %def BOOT1_READ_SECTOR
 
 @ [[BOOT1_TRACK]] is the current track number, modified by
-[[BOOT1_SEEK_TRACK]].  [[BOOT1_ERROR_FLAG]] is set by
-[[BOOT1_LOAD_TRACK]] when a timeout occurs.
+[[BOOT1_SEEK_TRACK]].
 
 <<boot1 track vars>>=
     ORG     $09C6
 BOOT1_TRACK:
     HEX     00              ; current track number
-BOOT1_ERROR_FLAG:
-    HEX     00              ; nonzero = error occurred
-@ %def BOOT1_TRACK BOOT1_ERROR_FLAG
+@ %def BOOT1_TRACK
 
 @ [[BOOT1_SEEK_TRACK]] moves the drive head to the track in~A.
 The target track (doubled for half-track stepping) is compared
@@ -1385,6 +1391,15 @@ BOOT1_NIBBLE_TABLE_B:
     HEX     00 03 03 FC 02 03 03 FD 01 03 03 FE 03 03 03 FF
 @ %def BOOT1_NIBBLE_TABLE_B
 
+@ The interleave table maps physical sector numbers to page offsets
+within the target region.  The destination page table is computed at
+runtime by adding the base page to each interleave entry.
+
+<<boot1 interleave table>>=
+    ORG     $0C48
+BOOT1_INTERLEAVE:
+    HEX     0F 08 01 09 02 0A 03 0B 04 0C 05 0D 06 0E 07 00
+@ %def BOOT1_INTERLEAVE
 @ [[BOOT1_LOAD_TRACK]] is the sector loader.  It takes a track number
 in~A and reads all 16 sectors:
 \begin{enumerate}
@@ -1448,15 +1463,6 @@ BOOT1_LOAD_TRACK:
     RTS
 @ %def BOOT1_LOAD_TRACK
 
-@ The interleave table maps physical sector numbers to page offsets
-within the target region.  The destination page table is computed at
-runtime by adding the base page to each interleave entry.
-
-<<boot1 interleave table>>=
-    ORG     $0C48
-BOOT1_INTERLEAVE:
-    HEX     0F 08 01 09 02 0A 03 0B 04 0C 05 0D 06 0E 07 00
-@ %def BOOT1_INTERLEAVE
 
 <<boot1 dest pages>>=
     ORG     $0C58
@@ -1986,6 +1992,21 @@ single-byte accumulator register.
 EALDR_PTR           EQU     $46     ; VM instruction pointer (2 bytes)
 EALDR_PSUEDOACC     EQU     $48     ; VM accumulator
 @ %def EALDR_PTR EALDR_PSUEDOACC
+\subsection{Dispatch table}
+
+The dispatch table at [[$AA60]] holds 18 one-byte offsets.  The
+handler address is [[$AA72]] + offset.  Opcodes [[0C]]--[[11]] point
+to three-byte [[JMP]] trampolines at [[$AB43]]--[[$AB54]] because
+their handlers lie beyond the one-byte offset range.
+
+<<EALDR dispatch table>>=
+    ORG     $AA60
+EALDR_DISPATCH_TABLE:
+    HEX  00 3C 53 5D 6B 88 AB BC 4D A0 77 B7
+    ;    GOTO CALL1 BEQ LDI LD CALL ST SUBI CALL0 RET LDX ASL
+    HEX  D1 D4 D7 DA DD E0
+    ;    INC  ADD  DXR  BNE  SUB  COPY (trampolines)
+@ %def EALDR_DISPATCH_TABLE
 
 <<EALDR VM interpreter>>=
     ORG     $AA35
@@ -2062,21 +2083,6 @@ EALDR_VM_INIT:
     JMP      ($0042)   ; jump to instruction after JSR EALDR_VM_INIT
 @ %def EALDR_VM_INIT
 
-\subsection{Dispatch table}
-
-The dispatch table at [[$AA60]] holds 18 one-byte offsets.  The
-handler address is [[$AA72]] + offset.  Opcodes [[0C]]--[[11]] point
-to three-byte [[JMP]] trampolines at [[$AB43]]--[[$AB54]] because
-their handlers lie beyond the one-byte offset range.
-
-<<EALDR dispatch table>>=
-    ORG     $AA60
-EALDR_DISPATCH_TABLE:
-    HEX  00 3C 53 5D 6B 88 AB BC 4D A0 77 B7
-    ;    GOTO CALL1 BEQ LDI LD CALL ST SUBI CALL0 RET LDX ASL
-    HEX  D1 D4 D7 DA DD E0
-    ;    INC  ADD  DXR  BNE  SUB  COPY (trampolines)
-@ %def EALDR_DISPATCH_TABLE
 
 The goto path at [[$AA72]] is entered when an opcode handler needs to
 set the instruction pointer from a decoded address in [[$42]]/[[$43]]:
@@ -3005,6 +3011,28 @@ EALDR_RWTS_READ_ERROR:
     RTS
 @ %def EALDR_RWTS_TRACK EALDR_RWTS_ERROR_FLAG EALDR_RWTS_READ_ERROR
 
+
+<<EALDR RWTS nibble table B>>=
+    ORG     $BE00
+EALDR_RWTS_NIBBLE_B:
+    ; 256-byte secondary decode table
+    HEX     00 00 00 96 02 00 00 97 01 00 00 9A 03 00 00 9B
+    HEX     00 02 00 9D 02 02 00 9E 01 02 00 9F 03 02 00 A6
+    HEX     00 01 00 A7 02 01 00 AB 01 01 00 AC 03 01 00 AD
+    HEX     00 03 00 AE 02 03 00 AF 01 03 00 B2 03 03 00 B3
+    HEX     00 00 02 B4 02 00 02 B5 01 00 02 B6 03 00 02 B7
+    HEX     00 02 02 B9 02 02 02 BA 01 02 02 BB 03 02 02 BC
+    HEX     00 01 02 BD 02 01 02 BE 01 01 02 BF 03 01 02 CB
+    HEX     00 03 02 CD 02 03 02 CE 01 03 02 CF 03 03 02 D3
+    HEX     00 00 01 D6 02 00 01 D7 01 00 01 D9 03 00 01 DA
+    HEX     00 02 01 DB 02 02 01 DC 01 02 01 DD 03 02 01 DE
+    HEX     00 01 01 DF 02 01 01 E5 01 01 01 E6 03 01 01 E7
+    HEX     00 03 01 E9 02 03 01 EA 01 03 01 EB 03 03 01 EC
+    HEX     00 00 03 ED 02 00 03 EE 01 00 03 EF 03 00 03 F2
+    HEX     00 02 03 F3 02 02 03 F4 01 02 03 F5 03 02 03 F6
+    HEX     00 01 03 F7 02 01 03 F9 01 01 03 FA 03 01 03 FB
+    HEX     00 03 03 FC 02 03 03 FD 01 03 03 FE 03 03 03 FF
+@ %def EALDR_RWTS_NIBBLE_B
 @ [[EALDR_RWTS_READ_SECTOR]] reads and decodes one sector's data field
 from the disk.  It searches for the [[D5 AA AD]] data prologue, then
 reads the 6-and-2 encoded nibbles, decodes them through the translation
@@ -3370,28 +3398,16 @@ EALDR_RWTS_NIBBLE_A:
     HEX     F8 E4 E8 EC F0 F4 F8 FC
 @ %def EALDR_RWTS_NIBBLE_A
 
-<<EALDR RWTS nibble table B>>=
-    ORG     $BE00
-EALDR_RWTS_NIBBLE_B:
-    ; 256-byte secondary decode table
-    HEX     00 00 00 96 02 00 00 97 01 00 00 9A 03 00 00 9B
-    HEX     00 02 00 9D 02 02 00 9E 01 02 00 9F 03 02 00 A6
-    HEX     00 01 00 A7 02 01 00 AB 01 01 00 AC 03 01 00 AD
-    HEX     00 03 00 AE 02 03 00 AF 01 03 00 B2 03 03 00 B3
-    HEX     00 00 02 B4 02 00 02 B5 01 00 02 B6 03 00 02 B7
-    HEX     00 02 02 B9 02 02 02 BA 01 02 02 BB 03 02 02 BC
-    HEX     00 01 02 BD 02 01 02 BE 01 01 02 BF 03 01 02 CB
-    HEX     00 03 02 CD 02 03 02 CE 01 03 02 CF 03 03 02 D3
-    HEX     00 00 01 D6 02 00 01 D7 01 00 01 D9 03 00 01 DA
-    HEX     00 02 01 DB 02 02 01 DC 01 02 01 DD 03 02 01 DE
-    HEX     00 01 01 DF 02 01 01 E5 01 01 01 E6 03 01 01 E7
-    HEX     00 03 01 E9 02 03 01 EA 01 03 01 EB 03 03 01 EC
-    HEX     00 00 03 ED 02 00 03 EE 01 00 03 EF 03 00 03 F2
-    HEX     00 02 03 F3 02 02 03 F4 01 02 03 F5 03 02 03 F6
-    HEX     00 01 03 F7 02 01 03 F9 01 01 03 FA 03 01 03 FB
-    HEX     00 03 03 FC 02 03 03 FD 01 03 03 FE 03 03 03 FF
-@ %def EALDR_RWTS_NIBBLE_B
+@ The interleave table maps physical sector numbers to page offsets
+within the target region.  This is identical to [[BOOT1_INTERLEAVE]]
+at [[$0C48]].  The destination page table at [[$BF74]] is computed at
+runtime by adding the base page to each interleave entry.
 
+<<EALDR RWTS interleave table>>=
+    ORG     $BF64
+EALDR_RWTS_INTERLEAVE:
+    HEX     0F 08 01 09 02 0A 03 0B 04 0C 05 0D 06 0E 07 00
+@ %def EALDR_RWTS_INTERLEAVE
 @ [[EALDR_RWTS_READ_TRACK]] reads all 16~sectors of a track into
 memory.  It takes a track number in~A, seeks to it, and loops until
 every sector has been read or a timeout occurs.  On entry, the track
@@ -3483,16 +3499,6 @@ EALDR_RWTS_READ_TRACK:
     RTS
 @ %def EALDR_RWTS_READ_TRACK
 
-@ The interleave table maps physical sector numbers to page offsets
-within the target region.  This is identical to [[BOOT1_INTERLEAVE]]
-at [[$0C48]].  The destination page table at [[$BF74]] is computed at
-runtime by adding the base page to each interleave entry.
-
-<<EALDR RWTS interleave table>>=
-    ORG     $BF64
-EALDR_RWTS_INTERLEAVE:
-    HEX     0F 08 01 09 02 0A 03 0B 04 0C 05 0D 06 0E 07 00
-@ %def EALDR_RWTS_INTERLEAVE
 
 <<EALDR RWTS dest pages>>=
     ORG     $BF74
@@ -4047,13 +4053,18 @@ vector [[DISPATCH_VEC]] ([[$F6/$F7]]).  The tune player uses this vector
 for indirect action dispatch; after the opening tune finishes,
 [[INIT_GAME_STATE]] patches the dispatch site to bypass the vector entirely.
 
-<<defines>>=
-GAME_ACTION_HANDLER     EQU     $5B2A   ; game action dispatch target
-@ %def GAME_ACTION_HANDLER
+@ [[GAME_ACTION_HANDLER]] is defined in [[<<border animation>>]] at [[$5B2A]].
 
 <<zero page defines>>=
 DISPATCH_VEC            EQU     $F6     ; tune action dispatch vector (2 bytes, $F6/$F7)
 @ %def DISPATCH_VEC
+@ Copyright notice string, first used by [[INIT_GAME_STATE]].
+
+<<copyright string>>=
+    ORG     $5EC7
+S_COPYRIGHT:
+    APSTR "COPYRIGHT 1982 STUART SMITH"
+@ %def S_COPYRIGHT
 
 <<init game state>>=
     ORG     $5B00
@@ -4081,9 +4092,7 @@ and finishes with the copyright notice ([[S_COPYRIGHT]]) and ``press
 space bar'' prompt ([[S_PRESS_SPACE_BOOT]]).  The decorative strings
 [[S_DECOR_ROW1]] through [[S_DECOR_ROW3]] are drawn on the right panel.
 
-<<defines>>=
-UI_TEXT_STREAM          EQU     $5E55   ; text stream data for game UI background
-@ %def UI_TEXT_STREAM
+@ [[UI_TEXT_STREAM]] is the label at [[$5E55]] defined in [[<<ui text stream>>]].
 
 @ All character output in the game passes through [[ROM_COUT1]], the
 Apple~II ROM's character output routine at [[$FDED]].  When the HRCG is
@@ -4103,14 +4112,12 @@ TEXT_ROW                EQU     $25
 TEXT_COL                EQU     $24     ; Cursor position
 @ %def TEXT_ROW TEXT_COL
 
-@ Copyright notice, boot prompt, and decorative border font strings,
-printed by [[INIT_GAME_DISPLAY]] at the bottom of the screen and
-along the right panel.
 
-<<display strings>>=
-    ORG     $5EC7
-S_COPYRIGHT:
-    APSTR "COPYRIGHT 1982 STUART SMITH"
+@ Boot prompt and decorative border font strings, printed by
+[[INIT_GAME_DISPLAY]] along the right panel.
+
+<<boot display strings>>=
+    ORG     $5EE3
 S_PRESS_SPACE_BOOT:
     APSTR "PRESS SPACE BAR TO CONTINUE"
 S_DECOR_ROW1:
@@ -4122,7 +4129,16 @@ S_DECOR_ROW2:
 S_DECOR_ROW3:
     DC.B    $08
     HEX     F7 F8 F9 FA FB FC FD FE
-@ %def S_COPYRIGHT S_PRESS_SPACE_BOOT S_DECOR_ROW1 S_DECOR_ROW2 S_DECOR_ROW3
+@ %def S_PRESS_SPACE_BOOT S_DECOR_ROW1 S_DECOR_ROW2 S_DECOR_ROW3
+
+@ The ``press space bar'' prompt displayed by [[INIT_GAME_DISPLAY]]
+in the status window.
+
+<<press space string>>=
+    ORG     $7E97
+S_PRESS_SPACE:
+    APSTR   "  PRESS SPACE BAR TO CONTINUE   "
+@ %def S_PRESS_SPACE
 
 <<init game display>>=
     ORG     $5C6D
@@ -4230,6 +4246,24 @@ BORDER_STR_VERT_L      EQU     $5EC1   ; vertical border pattern string (left)
 BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
 BORDER_LOOP_CTR        EQU     $5DC3   ; loop counter for border label drawing
 @ %def BORDER_STR_VERT_L BORDER_STR_VERT_R BORDER_LOOP_CTR
+
+@ Border label position tables, used by [[DRAW_BORDER_LABELS]] to
+place text labels around the game map border.
+
+<<border label positions>>=
+    ORG     $5E7B
+BORDER_POS_HORIZ:                     ; 6 col/row pairs for horizontal labels
+    DC.B    $01,$09,$01,$0E,$01,$13
+    DC.B    $16,$09,$16,$0E,$16,$13
+BORDER_POS_VERT_L:                    ; 10 col/row pairs for vertical labels (left)
+    DC.B    $01,$0A,$01,$0B,$01,$0C,$01,$0D
+    DC.B    $01,$0F,$01,$12
+    DC.B    $16,$0A,$16,$0D,$16,$0F,$16,$12
+BORDER_POS_VERT_R:                    ; 10 col/row pairs for vertical labels (right)
+    DC.B    $10,$0A,$10,$0D,$10,$0F,$10,$12
+    DC.B    $25,$0A,$25,$0D,$25,$0F
+    DC.B    $25,$10,$25,$11,$25,$12
+@ %def BORDER_POS_HORIZ BORDER_POS_VERT_L BORDER_POS_VERT_R
 
 @ The horizontal border frame pattern string, printed repeatedly by
 [[DRAW_BORDER_LABELS]] along the top and bottom edges of the map.
@@ -4348,6 +4382,31 @@ each map border cell.  The 3-byte records are (icon, column, row):
 icon=\$00 draws the default border glyph; nonzero icons draw special
 decorations (e.g.\ doors, markers).
 
+
+@ The UI text stream is a concatenated display string parsed by
+[[TEXT_RENDERER]] during [[INIT_GAME_DISPLAY]].  It contains HRCG
+control codes, border label position tables (used by
+[[DRAW_BORDER_LABELS]]), the frame pattern, copyright text, and
+decorative font characters.
+
+@ The UI text stream begins with HRCG control codes and viewport
+configuration, parsed by [[TEXT_RENDERER]] when [[INIT_GAME_DISPLAY]]
+sets [[TEXT_STREAM_PTR]] to [[UI_TEXT_STREAM]].
+
+<<ui text stream>>=
+    ORG     $5E55
+UI_TEXT_STREAM:
+    DC.B    $7D               ; HRCG reset to full screen
+    DC.B    $80,$02           ; mode control
+    ; Map viewport bounds (2 sets)
+    DC.B    $2F,$00,$00,$01,$0C,$09,$00,$00,$02,$01,$02,$01,$00,$00
+    DC.B    $2F,$83,$01,$14,$08,$05,$00,$06,$0F,$12,$14,$19,$00,$14
+    DC.B    $08,$09,$05,$16,$05,$13
+    DC.B    $7F
+@ %def UI_TEXT_STREAM
+
+
+
 @ Border animation state and position data, used by [[<<border animation>>]].
 
 <<border animation data>>=
@@ -4417,47 +4476,6 @@ BORDER_POS_TABLE:
     DC.B    $00,$0B,$19       ;  |
     DC.B    $00,$0B,$18       ; /
 @ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE
-
-@ The UI text stream is a concatenated display string parsed by
-[[TEXT_RENDERER]] during [[INIT_GAME_DISPLAY]].  It contains HRCG
-control codes, border label position tables (used by
-[[DRAW_BORDER_LABELS]]), the frame pattern, copyright text, and
-decorative font characters.
-
-@ The UI text stream begins with HRCG control codes and viewport
-configuration, parsed by [[TEXT_RENDERER]] when [[INIT_GAME_DISPLAY]]
-sets [[TEXT_STREAM_PTR]] to [[UI_TEXT_STREAM]].
-
-<<ui text stream>>=
-    ORG     $5E55
-    DC.B    $7D               ; HRCG reset to full screen
-    DC.B    $80,$02           ; mode control
-    ; Map viewport bounds (2 sets)
-    DC.B    $2F,$00,$00,$01,$0C,$09,$00,$00,$02,$01,$02,$01,$00,$00
-    DC.B    $2F,$83,$01,$14,$08,$05,$00,$06,$0F,$12,$14,$19,$00,$14
-    DC.B    $08,$09,$05,$16,$05,$13
-    DC.B    $7F
-@ %def UI_TEXT_STREAM_DATA
-
-@ Border label position tables, used by [[DRAW_BORDER_LABELS]] to
-place text labels around the game map border.
-
-<<border label positions>>=
-    ORG     $5E7B
-BORDER_POS_HORIZ:                     ; 6 col/row pairs for horizontal labels
-    DC.B    $01,$09,$01,$0E,$01,$13
-    DC.B    $16,$09,$16,$0E,$16,$13
-BORDER_POS_VERT_L:                    ; 10 col/row pairs for vertical labels (left)
-    DC.B    $01,$0A,$01,$0B,$01,$0C,$01,$0D
-    DC.B    $01,$0F,$01,$12
-    DC.B    $16,$0A,$16,$0D,$16,$0F,$16,$12
-BORDER_POS_VERT_R:                    ; 10 col/row pairs for vertical labels (right)
-    DC.B    $10,$0A,$10,$0D,$10,$0F,$10,$12
-    DC.B    $25,$0A,$25,$0D,$25,$0F
-    DC.B    $25,$10,$25,$11,$25,$12
-@ %def BORDER_POS_HORIZ BORDER_POS_VERT_L BORDER_POS_VERT_R
-
-
 \subsection{Border animation handler (\$5B2A)}
 
 [[GAME_ACTION_HANDLER]] at [[$5B2A]] is called via [[DISPATCH_VEC]]
@@ -4476,7 +4494,8 @@ the border positions, wrapping from \$15 back to \$05.
 
 <<border animation>>=
     ORG     $5B2A
-    SUBROUTINE GAME_ACTION_HANDLER_CODE
+GAME_ACTION_HANDLER:
+    SUBROUTINE GAME_ACTION_HANDLER
 
     ; --- Main entry: 3-pass border animation loop ---
 .restart:
@@ -4654,7 +4673,7 @@ ANIM_BORDER_ICONS_B:
     LDA     BORDER_POS_TABLE+2,X ;  |
     STA     $24               ; /
     JMP     $749A             ; render and return
-@ %def GAME_ACTION_HANDLER_CODE BORDER_HANDLER_A BORDER_HANDLER_B BORDER_HANDLER_C DRAW_BORDER_ICON_LIST DRAW_BORDER_ICON_ENTRY DRAW_BORDER_CHAR_AT TICK_BORDER_ANIM ANIM_BORDER_ICONS_A ANIM_BORDER_ICONS_B
+@ %def GAME_ACTION_HANDLER BORDER_HANDLER_A BORDER_HANDLER_B BORDER_HANDLER_C DRAW_BORDER_ICON_LIST DRAW_BORDER_ICON_ENTRY DRAW_BORDER_CHAR_AT TICK_BORDER_ANIM ANIM_BORDER_ICONS_A ANIM_BORDER_ICONS_B
 
 @ [[INIT_WORLD]] is a thin wrapper that passes a pointer to the world
 initialization data table ([[WORLD_INIT_DATA]] at [[$62B9]]) to the game
@@ -4947,6 +4966,20 @@ FONT_DATA:
 STD_FONT_DATA:
     INCLUDE "stdfontdata.asm"
 @ %def STD_FONT_DATA
+@ Immediately following the entry table is the HRCG version string.  The
+string is stored in high-bit ASCII (the standard Apple II text encoding) and
+is prefixed with a ctrl-P character, which triggers the HRCG's ``home cursor''
+command.  A carriage return ([[$8D]]) terminates the string.
+[[HRCG_PRINT_VERSION]] prints this string to the screen character by character
+via [[ROM_COUT1]]; it is not used during normal gameplay.
+
+<<hrcg version string>>=
+    ORG     $92E8
+HRCG_VERSION_STR:
+; "HI-RES CHAR GEN VERSION 1.0" with ctrl-P prefix and CR suffix (high-bit ASCII)
+    HEX     90 C8 C9 AD D2 C5 D3 A0 C3 C8 C1 D2 A0 C7 C5 CE
+    HEX     A0 D6 C5 D2 D3 C9 CF CE A0 B1 AE B0 8D
+@ %def HRCG_VERSION_STR
 
 \input{font_data.tex}
 
@@ -5005,20 +5038,6 @@ HRCG_INIT_BODY:
     BIT     $C050          ; graphics mode on
     RTS
 @ %def HRCG_INIT HRCG_NUM_CHARSETS HRCG_FONT_BASE HRCG_ENTRY2 HRCG_ENTRY3 HRCG_PRINT_VERSION HRCG_INIT_BODY
-@ Immediately following the entry table is the HRCG version string.  The
-string is stored in high-bit ASCII (the standard Apple II text encoding) and
-is prefixed with a ctrl-P character, which triggers the HRCG's ``home cursor''
-command.  A carriage return ([[$8D]]) terminates the string.
-[[HRCG_PRINT_VERSION]] prints this string to the screen character by character
-via [[ROM_COUT1]]; it is not used during normal gameplay.
-
-<<hrcg version string>>=
-    ORG     $92E8
-HRCG_VERSION_STR:
-; "HI-RES CHAR GEN VERSION 1.0" with ctrl-P prefix and CR suffix (high-bit ASCII)
-    HEX     90 C8 C9 AD D2 C5 D3 A0 C3 C8 C1 D2 A0 C7 C5 CE
-    HEX     A0 D6 C5 D2 D3 C9 CF CE A0 B1 AE B0 8D
-@ %def HRCG_VERSION_STR
 @ The HRCG maintains its state in a self-modifying parameter block at
 [[$9305--$9319]].  These 21~bytes control every aspect of text rendering:
 which font is active, whether characters are drawn in replace, OR, AND, or
@@ -5034,32 +5053,13 @@ a saved copy, a ``saved'' flag byte, and the saved cursor position.
     ORG     $9305
 HRCG_SHIFT_FLAG:
     DC.B    $00                             ; $00=normal, $40=next-shifted, $80=charset-select
-HRCG_MODE_FLAGS:
-    DC.B    $00                             ; bit 7/6 shifted by ASL during dispatch
+@ %def HRCG_SHIFT_FLAG
+
+<<hrcg video mode>>=
+    ORG     $9307
 HRCG_VIDEO_MODE:
     DC.B    $20                             ; $20=replace, $40=OR, $80=AND, $C0=XOR
-HRCG_MASK:
-    DC.B    $00                             ; $00=normal, $7F=inverse
-HRCG_DRAW_MODE:
-    DC.B    $00                             ; video mode for drawing ($00/$80/$C0)
-HRCG_PAGE_MASK:
-    DC.B    $00                             ; $00=page1, $60=page2
-HRCG_WRAP_FLAG:
-    DC.B    $00                             ; $00=scroll, $FF=wrap
-HRCG_INVERT_FLAG:
-    DC.B    $00                             ; $00=normal, $80=lowercase, $C0=XOR-invert
-HRCG_FONT_PTR_LO:
-    DC.B    $A5                             ; font data pointer low
-HRCG_FONT_PTR_HI:
-    DC.B    $97                             ; font data pointer high ($97A5 = standard font)
-HRCG_SAVED_PARAMS:
-    DC.B    $20,$00,$00,$00,$00,$00,$A5,$97 ; saved copy of video mode..font ptr (8 bytes)
-    DC.B    $FF                             ; HRCG_SAVED_FLAG ($00=not saved, $FF=saved)
-HRCG_SAVED_CH:
-    DC.B    $01                             ; saved cursor X
-HRCG_SAVED_CV:
-    DC.B    $17                             ; saved cursor Y (23)
-@ %def HRCG_SHIFT_FLAG HRCG_MODE_FLAGS HRCG_VIDEO_MODE HRCG_MASK HRCG_DRAW_MODE HRCG_PAGE_MASK HRCG_WRAP_FLAG HRCG_INVERT_FLAG HRCG_FONT_PTR_LO HRCG_FONT_PTR_HI HRCG_SAVED_PARAMS HRCG_SAVED_CH HRCG_SAVED_CV
+@ %def HRCG_VIDEO_MODE
 @ The HRCG replaces both the Apple II's character output vector (CSW at
 [[$36/$37]]) and its keyboard input vector (KSW at [[$38/$39]]).
 [[HRCG_GETKEY]] is the KSW handler.  Its primary job is to blink the cursor
@@ -5166,53 +5166,6 @@ HRCG_GETKEY:
     JSR     HRCG_SCROLL_UP
     JMP     .reload_ch
 @ %def HRCG_GETKEY
-@ [[HRCG_COUT]] is the CSW handler---the replacement for the Apple II's
-standard character output routine.  Every [[JSR ROM_COUT1]] in the game
-ultimately lands here.  The handler is a thin wrapper: it saves the CPU
-registers, calls [[HRCG_PROCESS_CHAR]], and restores them.
-
-[[HRCG_PROCESS_CHAR]] strips the high bit from the character (Apple II text
-uses high-bit ASCII) and decides what to do with it.  If the ``charset
-select'' flag is set in [[HRCG_MODE_FLAGS]], the character is treated as a
-charset number and routed to [[HRCG_CHARSET_SELECT]].  Otherwise, printable
-characters ([[$20]] and above) go to [[HRCG_DRAW_CHAR]] for rendering, and
-control characters (below [[$20]]) are dispatched through a 27-entry
-RTS-trick jump table.  The dispatch doubles the control code to form a
-table index, pushes the handler address (minus one) onto the stack, and
-falls through to [[RTS]]---the classic 6502 technique for computed jumps.
-
-<<hrcg cout>>=
-    ORG     $93BE
-HRCG_COUT:
-    SUBROUTINE HRCG_COUT
-; --- CSW handler: save regs, process char, restore ---
-    STA     $FF                   ; save A
-    STX     $EB                   ; save X
-    STY     $35                   ; save Y
-    JSR     HRCG_PROCESS_CHAR
-    LDY     $35                   ; restore Y
-    LDX     $EB                   ; restore X
-    LDA     $FF                   ; restore A
-    RTS
-; --- HRCG_PROCESS_CHAR ---
-HRCG_PROCESS_CHAR:
-    AND     #$7F                  ; strip high bit
-    ASL     HRCG_MODE_FLAGS       ; shift mode bit 7 into carry
-    BCS     HRCG_CHARSET_SELECT   ; if set -> charset select
-    BALT    #$20,.ctrl_dispatch ; printable char (>= space)?
-    JMP     HRCG_DRAW_CHAR
-.ctrl_dispatch:
-    BAGE    #$1B,.shift_and_rts ; >= ESC ($1B)?
-    ASL                           ; char * 2 for table index
-    TAX
-    LDA     HRCG_DISPATCH_TBL+1,X ; high byte of handler-1
-    PHA
-    LDA     HRCG_DISPATCH_TBL,X   ; low byte of handler-1
-    PHA
-.shift_and_rts:
-    ASL     HRCG_MODE_FLAGS       ; shift mode bit 6 into carry
-    RTS                           ; RTS-trick dispatch
-@ %def HRCG_COUT HRCG_PROCESS_CHAR
 @ The dispatch table maps each control character (ctrl-@~through ctrl-Z)
 to a handler address, stored as address-minus-one for the RTS trick.  The
 HRCG supports a ``shifted'' variant of each control character: if the
@@ -5281,6 +5234,59 @@ HRCG_DISPATCH_TBL:
 ; ctrl-Z: reset
     DC.W    HRCG_CTRL_Z-1
 @ %def HRCG_DISPATCH_TBL
+@ [[HRCG_COUT]] is the CSW handler---the replacement for the Apple II's
+standard character output routine.  Every [[JSR ROM_COUT1]] in the game
+ultimately lands here.  The handler is a thin wrapper: it saves the CPU
+registers, calls [[HRCG_PROCESS_CHAR]], and restores them.
+
+[[HRCG_PROCESS_CHAR]] strips the high bit from the character (Apple II text
+uses high-bit ASCII) and decides what to do with it.  If the ``charset
+select'' flag is set in [[HRCG_MODE_FLAGS]], the character is treated as a
+charset number and routed to [[HRCG_CHARSET_SELECT]].  Otherwise, printable
+characters ([[$20]] and above) go to [[HRCG_DRAW_CHAR]] for rendering, and
+control characters (below [[$20]]) are dispatched through a 27-entry
+RTS-trick jump table.  The dispatch doubles the control code to form a
+table index, pushes the handler address (minus one) onto the stack, and
+falls through to [[RTS]]---the classic 6502 technique for computed jumps.
+
+<<hrcg mode flags>>=
+    ORG     $9306
+HRCG_MODE_FLAGS:
+    DC.B    $00                             ; bit 7/6 shifted by ASL during dispatch
+@ %def HRCG_MODE_FLAGS
+
+<<hrcg cout>>=
+    ORG     $93BE
+HRCG_COUT:
+    SUBROUTINE HRCG_COUT
+; --- CSW handler: save regs, process char, restore ---
+    STA     $FF                   ; save A
+    STX     $EB                   ; save X
+    STY     $35                   ; save Y
+    JSR     HRCG_PROCESS_CHAR
+    LDY     $35                   ; restore Y
+    LDX     $EB                   ; restore X
+    LDA     $FF                   ; restore A
+    RTS
+; --- HRCG_PROCESS_CHAR ---
+HRCG_PROCESS_CHAR:
+    AND     #$7F                  ; strip high bit
+    ASL     HRCG_MODE_FLAGS       ; shift mode bit 7 into carry
+    BCS     HRCG_CHARSET_SELECT   ; if set -> charset select
+    BALT    #$20,.ctrl_dispatch ; printable char (>= space)?
+    JMP     HRCG_DRAW_CHAR
+.ctrl_dispatch:
+    BAGE    #$1B,.shift_and_rts ; >= ESC ($1B)?
+    ASL                           ; char * 2 for table index
+    TAX
+    LDA     HRCG_DISPATCH_TBL+1,X ; high byte of handler-1
+    PHA
+    LDA     HRCG_DISPATCH_TBL,X   ; low byte of handler-1
+    PHA
+.shift_and_rts:
+    ASL     HRCG_MODE_FLAGS       ; shift mode bit 6 into carry
+    RTS                           ; RTS-trick dispatch
+@ %def HRCG_COUT HRCG_PROCESS_CHAR
 @ \subsubsection{Control character handlers}
 
 The control character handlers follow.  Each one checks the carry flag on
@@ -5295,6 +5301,14 @@ When the charset-select path fires, the character is converted to a font
 pointer by multiplying the charset index by 3~pages (768~bytes per charset of
 96~characters at 8~bytes each) and adding the font base address.  Charset~0
 always maps to the standard font at [[$97A5]].
+
+<<hrcg font ptr>>=
+    ORG     $930D
+HRCG_FONT_PTR_LO:
+    DC.B    $A5                             ; font data pointer low
+HRCG_FONT_PTR_HI:
+    DC.B    $97                             ; font data pointer high ($97A5 = standard font)
+@ %def HRCG_FONT_PTR_LO HRCG_FONT_PTR_HI
 
 <<hrcg ctrl a>>=
     ORG     $9424
@@ -5332,6 +5346,17 @@ This save/restore mechanism is used by the game to temporarily switch fonts
 or video modes for status display, then return to the previous rendering
 context.
 
+<<hrcg saved state>>=
+    ORG     $930F
+HRCG_SAVED_PARAMS:
+    DC.B    $20,$00,$00,$00,$00,$00,$A5,$97 ; saved copy of video mode..font ptr (8 bytes)
+    DC.B    $FF                             ; HRCG_SAVED_FLAG ($00=not saved, $FF=saved)
+HRCG_SAVED_CH:
+    DC.B    $01                             ; saved cursor X
+HRCG_SAVED_CV:
+    DC.B    $17                             ; saved cursor Y (23)
+@ %def HRCG_SAVED_PARAMS HRCG_SAVED_CH HRCG_SAVED_CV
+
 <<hrcg ctrl b>>=
     ORG     $944A
 HRCG_SET_REPLACE:
@@ -5365,6 +5390,14 @@ column matches the current column, it also performs a line feed.  If the
 saved column is to the right of the current column, it does nothing---this
 prevents the cursor from jumping backwards unexpectedly.  The shifted
 variant enables XOR draw mode on page~1.
+
+<<hrcg draw mode>>=
+    ORG     $9309
+HRCG_DRAW_MODE:
+    DC.B    $00                             ; video mode for drawing ($00/$80/$C0)
+HRCG_PAGE_MASK:
+    DC.B    $00                             ; $00=page1, $60=page2
+@ %def HRCG_DRAW_MODE HRCG_PAGE_MASK
 
 <<hrcg ctrl c>>=
     ORG     $9478
@@ -5431,6 +5464,12 @@ with [[$7F]] before rendering---flipping all 7~pixel bits.
 
 All shifted variants in this group are no-ops.
 
+<<hrcg mask>>=
+    ORG     $9308
+HRCG_MASK:
+    DC.B    $00                             ; $00=normal, $7F=inverse
+@ %def HRCG_MASK
+
 <<hrcg ctrl efhi>>=
     ORG     $94C1
 HRCG_CTRL_E:
@@ -5473,6 +5512,12 @@ for ctrl-S (the pause key, [[$93]]).  If a pause is detected, the routine
 waits for another keypress before continuing.  Ctrl-C ([[$83]]) cancels the
 pause.  After the pause check, the handler sets the cursor column to zero
 and falls through to the line feed logic.
+
+<<hrcg invert flag>>=
+    ORG     $930C
+HRCG_INVERT_FLAG:
+    DC.B    $00                             ; $00=normal, $80=lowercase, $C0=XOR-invert
+@ %def HRCG_INVERT_FLAG
 
 <<hrcg ctrl klm>>=
     ORG     $94EE
@@ -5561,6 +5606,12 @@ the XOR-invert flag (for character-level inversion); its shifted variant
 clears the wrap flag, switching to scroll mode.  Ctrl-T (shifted only) sets
 AND draw mode with page-2 overlay.  The normal variants of ctrl-R and ctrl-T
 are no-ops.
+
+<<hrcg wrap flag>>=
+    ORG     $930B
+HRCG_WRAP_FLAG:
+    DC.B    $00                             ; $00=scroll, $FF=wrap
+@ %def HRCG_WRAP_FLAG
 
 <<hrcg ctrl rst>>=
     ORG     $9554
@@ -6191,10 +6242,14 @@ Since text on the lower part always starts at row 21, and the column number only
 needs 6 bits, we can specify a compressed 8-bit version of the cursor, where the
 row number can be specified by upper two bits (so 20 through 23).
 
+\textbf{Dead code:} No callers found in the binary (Ghidra confirms zero xrefs).
+Possibly an unused utility left over from development.
+
 <<set cursor compressed>>=
     ORG     $776E
 SET_CURSOR_COMPRESSED:
     SUBROUTINE SET_CURSOR_COMPRESSED
+; DEAD CODE — no callers found (for future investigation)
 
     PHA
     AND     #$3F
@@ -6634,6 +6689,84 @@ tone table and subtract one octave for the low tones.
 @ The splash song bytecode is documented in [[TUNE_3_ATTRACT]]
 (\S\ref{sec:tune_player}).
 
+@ [[NUM_TO_DECIMAL]] writes five digit positions starting from
+[[DECIMAL_OUT_PTR]] (ten-thousands, thousands, hundreds, tens, ones).
+Leading zeros are suppressed (the pre-cleared spaces remain).  These
+EQUs mark where each stat's ten-thousands position falls in the
+template, so that the rightmost digits land on the placeholder ``00''s.
+
+<<defines>>=
+STATS_LIFE_OUT      EQU     STATS_LIFE-3     ; $7D8D: life force output (2 digits at +3,+4)
+STATS_STR_OUT       EQU     STATS_STR-3      ; $7D9C: strength output
+STATS_DUCATS_OUT    EQU     STATS_DUCATS-1   ; $7DB6: ducats/experience output (5 digits at +0..+4)
+STATS_SPEED_OUT     EQU     STATS_SPEED-3    ; $7DC6: speed output
+STATS_SWORD_OUT     EQU     STATS_SWORD-3    ; $7DD2: sword output
+STATS_WEAP_OUT      EQU     STATS_WEAP       ; $7DE1: weapons/group count output
+STATS_DEXT_OUT      EQU     STATS_DEXT-3     ; $7DF0: dexterity output
+STATS_DAGGR_OUT     EQU     STATS_DAGGR-3    ; $7DFC: dagger output
+@ %def STATS_LIFE_OUT STATS_STR_OUT STATS_DUCATS_OUT STATS_SPEED_OUT STATS_SWORD_OUT STATS_WEAP_OUT STATS_DEXT_OUT STATS_DAGGR_OUT
+
+<<stats template data>>=
+    ORG     $7D83
+STATS_TEMPLATE:
+    ; Pascal-format string: length $7D (125 bytes), body $7D84-$7E00.
+    ; NUM_TO_DECIMAL writes 5 digit positions starting from each
+    ; STATS_*_OUT address.  $FF bytes are line separators.
+    DC.B    $7D               ; length = 125 bytes
+    ;   " LIFE FORCE 00"
+    HEX     A0 CC C9 C6 C5 A0 C6 CF D2 C3 C5 A0
+STATS_LIFE:                   ; $7D90
+    HEX     B0 B0
+    HEX     FF                ; --- separator ---
+    ;   CR " STRENGTH  00"
+    HEX     8C A0 D3 D4 D2 C5 CE C7 D4 C8 A0 A0
+STATS_STR:                    ; $7D9F
+    HEX     B0 B0
+    HEX     FF                ; --- separator ---
+    ;   VT "   WEAPONS  DUCATS  00000"
+    HEX     8B A0 A0 A0 D7 C5 C1 D0 CF CE D3
+    HEX     A0 A0 C4 D5 C3 C1 D4 D3 A0 A0
+STATS_DUCATS:                 ; $7DB7 (16-bit, 5 digits)
+    HEX     B0 B0 B0 B0 B0
+    HEX     FF                ; --- separator ---
+    ;   CR " SPEED     00" VT
+    HEX     8C A0 D3 D0 C5 C5 C4 A0 A0 A0 A0 A0
+STATS_SPEED:                  ; $7DC9
+    HEX     B0 B0
+    HEX     8B
+    HEX     FF                ; --- separator ---
+    ;   " SWORD  00  ARMOR       0"
+    HEX     A0 D3 D7 CF D2 C4 A0 A0
+STATS_SWORD:                  ; $7DD5
+    HEX     B0 B0
+    HEX     A0 A0 C1 D2 CD CF D2 A0 A0 A0
+STATS_WEAP:                   ; $7DE1 (group count)
+    HEX     A0 A0 A0 A0
+STATS_ARMOR:                  ; $7DE5
+    HEX     B0
+    HEX     FF                ; --- separator ---
+    ;   CR " DEXTERITY 00" VT
+    HEX     8C A0 C4 C5 D8 D4 C5 D2 C9 D4 D9 A0
+STATS_DEXT:                   ; $7DF3
+    HEX     B0 B0
+    HEX     8B
+    HEX     FF                ; --- separator ---
+    ;   " DAGGER 00"
+    HEX     A0 C4 C1 C7 C7 C5 D2 A0
+STATS_DAGGR:                  ; $7DFF
+    HEX     B0 B0
+@ %def STATS_TEMPLATE STATS_LIFE STATS_STR STATS_DUCATS STATS_SPEED STATS_SWORD STATS_WEAP STATS_ARMOR STATS_DEXT STATS_DAGGR
+
+@ The input prompt strings at [[$7E01]] and [[$7E18]] are separate
+Pascal strings displayed after the stats.
+
+<<stats template data>>=
+STATS_PROMPT_KEYBOARD:        ; $7E01
+    APSTR "\x09PRESS M TO CONTINUE \x0E" ; \x09=tab, \x0E=ctrl-E (HRCG clear to EOL)
+STATS_PROMPT_JOYSTICK:        ; $7E18
+    APSTR "\x09PUSH BUTTON TO GO ON\x0E" ; \x09=tab, \x0E=ctrl-E (HRCG clear to EOL)
+    ; (STATUS_BORDER_DATA follows immediately at $7E2F)
+@ %def STATS_PROMPT_KEYBOARD STATS_PROMPT_JOYSTICK
 \section{Character stats display}
 
 [[DISPLAY_CHAR_STATS]] formats and displays the statistics of the
@@ -6812,84 +6945,6 @@ DISPLAY_CHAR_STATS:
 the formatted display layout with placeholder digits that
 [[NUM_TO_DECIMAL]] overwrites at runtime.
 
-@ [[NUM_TO_DECIMAL]] writes five digit positions starting from
-[[DECIMAL_OUT_PTR]] (ten-thousands, thousands, hundreds, tens, ones).
-Leading zeros are suppressed (the pre-cleared spaces remain).  These
-EQUs mark where each stat's ten-thousands position falls in the
-template, so that the rightmost digits land on the placeholder ``00''s.
-
-<<defines>>=
-STATS_LIFE_OUT      EQU     STATS_LIFE-3     ; $7D8D: life force output (2 digits at +3,+4)
-STATS_STR_OUT       EQU     STATS_STR-3      ; $7D9C: strength output
-STATS_DUCATS_OUT    EQU     STATS_DUCATS-1   ; $7DB6: ducats/experience output (5 digits at +0..+4)
-STATS_SPEED_OUT     EQU     STATS_SPEED-3    ; $7DC6: speed output
-STATS_SWORD_OUT     EQU     STATS_SWORD-3    ; $7DD2: sword output
-STATS_WEAP_OUT      EQU     STATS_WEAP       ; $7DE1: weapons/group count output
-STATS_DEXT_OUT      EQU     STATS_DEXT-3     ; $7DF0: dexterity output
-STATS_DAGGR_OUT     EQU     STATS_DAGGR-3    ; $7DFC: dagger output
-@ %def STATS_LIFE_OUT STATS_STR_OUT STATS_DUCATS_OUT STATS_SPEED_OUT STATS_SWORD_OUT STATS_WEAP_OUT STATS_DEXT_OUT STATS_DAGGR_OUT
-
-<<stats template data>>=
-    ORG     $7D83
-STATS_TEMPLATE:
-    ; Pascal-format string: length $7D (125 bytes), body $7D84-$7E00.
-    ; NUM_TO_DECIMAL writes 5 digit positions starting from each
-    ; STATS_*_OUT address.  $FF bytes are line separators.
-    DC.B    $7D               ; length = 125 bytes
-    ;   " LIFE FORCE 00"
-    HEX     A0 CC C9 C6 C5 A0 C6 CF D2 C3 C5 A0
-STATS_LIFE:                   ; $7D90
-    HEX     B0 B0
-    HEX     FF                ; --- separator ---
-    ;   CR " STRENGTH  00"
-    HEX     8C A0 D3 D4 D2 C5 CE C7 D4 C8 A0 A0
-STATS_STR:                    ; $7D9F
-    HEX     B0 B0
-    HEX     FF                ; --- separator ---
-    ;   VT "   WEAPONS  DUCATS  00000"
-    HEX     8B A0 A0 A0 D7 C5 C1 D0 CF CE D3
-    HEX     A0 A0 C4 D5 C3 C1 D4 D3 A0 A0
-STATS_DUCATS:                 ; $7DB7 (16-bit, 5 digits)
-    HEX     B0 B0 B0 B0 B0
-    HEX     FF                ; --- separator ---
-    ;   CR " SPEED     00" VT
-    HEX     8C A0 D3 D0 C5 C5 C4 A0 A0 A0 A0 A0
-STATS_SPEED:                  ; $7DC9
-    HEX     B0 B0
-    HEX     8B
-    HEX     FF                ; --- separator ---
-    ;   " SWORD  00  ARMOR       0"
-    HEX     A0 D3 D7 CF D2 C4 A0 A0
-STATS_SWORD:                  ; $7DD5
-    HEX     B0 B0
-    HEX     A0 A0 C1 D2 CD CF D2 A0 A0 A0
-STATS_WEAP:                   ; $7DE1 (group count)
-    HEX     A0 A0 A0 A0
-STATS_ARMOR:                  ; $7DE5
-    HEX     B0
-    HEX     FF                ; --- separator ---
-    ;   CR " DEXTERITY 00" VT
-    HEX     8C A0 C4 C5 D8 D4 C5 D2 C9 D4 D9 A0
-STATS_DEXT:                   ; $7DF3
-    HEX     B0 B0
-    HEX     8B
-    HEX     FF                ; --- separator ---
-    ;   " DAGGER 00"
-    HEX     A0 C4 C1 C7 C7 C5 D2 A0
-STATS_DAGGR:                  ; $7DFF
-    HEX     B0 B0
-@ %def STATS_TEMPLATE STATS_LIFE STATS_STR STATS_DUCATS STATS_SPEED STATS_SWORD STATS_WEAP STATS_ARMOR STATS_DEXT STATS_DAGGR
-
-@ The input prompt strings at [[$7E01]] and [[$7E18]] are separate
-Pascal strings displayed after the stats.
-
-<<stats template data>>=
-STATS_PROMPT_KEYBOARD:        ; $7E01
-    APSTR "\x09PRESS M TO CONTINUE \x0E" ; \x09=tab, \x0E=ctrl-E (HRCG clear to EOL)
-STATS_PROMPT_JOYSTICK:        ; $7E18
-    APSTR "\x09PUSH BUTTON TO GO ON\x0E" ; \x09=tab, \x0E=ctrl-E (HRCG clear to EOL)
-    ; (STATUS_BORDER_DATA follows immediately at $7E2F)
-@ %def STATS_PROMPT_KEYBOARD STATS_PROMPT_JOYSTICK
 
 \section{Game message strings}
 
@@ -8905,60 +8960,6 @@ MOB_DATA_TABLE:
     INCLUDE "mobdata.asm"
 @ %def MOB_DATA_TABLE
 @
-
-\begin{center}
-\begin{tabular}{cl}
-\toprule
-\thead{Byte} & \thead{Meaning} \\
-\midrule
-\$7D & Reset to full-screen mode (col=0, row=0, width=20) \\
-\$7E & Pause: run tune player and status bar, then resume \\
-\$7F & End of stream \\
-\$80--\$FE & Set row (byte \& \$7F), next byte = column \\
-Other & Character code for HRCG font \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-The text renderer data at [[STATUS_BORDER_DATA]] draws a decorative
-border for the status bar.  Characters \$33--\$41 are box-drawing glyphs
-in the HRCG font.
-
-<<status border data>>=
-    ORG     $7E2F
-STATUS_BORDER_DATA:
-    HEX     7D                      ; $7D: reset to full-screen
-    HEX     80 00                   ; row 0, col 0
-    HEX     33 3C                   ; top-left corner, left tee
-    HEX     34 34 34 34 34 34 34 34 ; horizontal bar (x16)
-    HEX     34 34 34 34 34 34 34 34
-    HEX     3D 35                   ; right tee, top-right corner
-    HEX     3A 3F                   ; decorative
-    HEX     81 12 3E 36 3A 3F       ; row 1, col 18, right edge
-    HEX     82 12 3E 36 3A 3F       ; row 2
-    HEX     83 12 3E 36 3A 3F       ; row 3
-    HEX     84 12 3E 36 3A 3F       ; row 4
-    HEX     85 12 3E 36 3A 3F       ; row 5
-    HEX     86 12 3E 36 3A 3F       ; row 6
-    HEX     87 12 3E 36 3A 3F       ; row 7
-    HEX     88 12 3E 36 3A 3F       ; row 8
-    HEX     89 12 3E 36 3A 3F       ; row 9
-    HEX     8A 12 3E 36             ; row 10
-    HEX     39 40                   ; bottom-left corner, left tee
-    HEX     38 38 38 38 38 38 38 38 ; horizontal bar (x16)
-    HEX     38 38 38 38 38 38 38 38
-    HEX     41 37                   ; right tee, bottom-right corner
-    HEX     7F                      ; end of stream
-@ %def STATUS_BORDER_DATA
-
-<<status bar strings>>=
-    ORG     $7E97
-S_PRESS_SPACE:
-    APSTR   "  PRESS SPACE BAR TO CONTINUE   "
-
-S_PRESS_BUTTON:
-    APSTR   "  PRESS THE BUTTON TO CONTINUE  "
-@ %def S_PRESS_SPACE S_PRESS_BUTTON
 @ [[s_PRINT_FONT_CHAR]] at [[$80A4]] is the 10-byte self-modifying HRCG
 control string that [[RENDER_FONT_CHAR]] patches with character-set and
 glyph codes before passing to [[PRINT_STRING]].  It is a 9-byte
@@ -8976,21 +8977,6 @@ CHAR_UPPER_RIGHT    EQU     $80A9
 CHAR_CHARSET        EQU     $80A6
 CHAR_UPPER_LEFT     EQU     $80A8
 @ %def CHAR_LOWER_LEFT CHAR_LOWER_RIGHT CHAR_UPPER_RIGHT CHAR_CHARSET CHAR_UPPER_LEFT
-
-<<print font char data>>=
-    ORG     $80A4
-s_PRINT_FONT_CHAR:
-    HEX     09 ; num chars in this string
-    HEX     81 ; ctrl-A (set character set)
-    HEX     B1 ; CHAR_CHARSET (self-modified)
-    HEX     82 ; ctrl-B (block display mode)
-    HEX     A0 ; CHAR_UPPER_LEFT (self-modified)
-    HEX     A0 ; CHAR_UPPER_RIGHT (self-modified)
-    HEX     83 ; ctrl-C (move to lower left of block)
-    HEX     A0 ; CHAR_LOWER_LEFT (self-modified)
-    HEX     A0 ; CHAR_LOWER_RIGHT (self-modified)
-    HEX     84 ; ctrl-D (complete block data)
-@ %def s_PRINT_FONT_CHAR
 
 The [[PLOT_CHAR]] routine prints the character number in [[A]], at the text
 coordinate in [[X]] and [[Y]].
@@ -9907,6 +9893,21 @@ GET_ENTITY_FONTCHAR:
 
 \section{Entity rendering}
 
+
+<<print font char data>>=
+    ORG     $80A4
+s_PRINT_FONT_CHAR:
+    HEX     09 ; num chars in this string
+    HEX     81 ; ctrl-A (set character set)
+    HEX     B1 ; CHAR_CHARSET (self-modified)
+    HEX     82 ; ctrl-B (block display mode)
+    HEX     A0 ; CHAR_UPPER_LEFT (self-modified)
+    HEX     A0 ; CHAR_UPPER_RIGHT (self-modified)
+    HEX     83 ; ctrl-C (move to lower left of block)
+    HEX     A0 ; CHAR_LOWER_LEFT (self-modified)
+    HEX     A0 ; CHAR_LOWER_RIGHT (self-modified)
+    HEX     84 ; ctrl-D (complete block data)
+@ %def s_PRINT_FONT_CHAR
 @ [[RENDER_FONT_CHAR]] is the main entry
 point for drawing a 2$\times$2 custom font character on the hi-res screen.
 It converts the font position to a text position, then computes which HRCG
@@ -10547,6 +10548,57 @@ REORDER_CURRENT_CHAR:
     MOVB    CURRENT_PLAYER,SOURCE_CHAR
     JMP     REORDER_CHAR
 @ %def REORDER_CURRENT_CHAR
+
+<<press button string>>=
+    ORG     $7EB8
+S_PRESS_BUTTON:
+    APSTR   "  PRESS THE BUTTON TO CONTINUE  "
+@ %def S_PRESS_BUTTON
+
+\begin{center}
+\begin{tabular}{cl}
+\toprule
+\thead{Byte} & \thead{Meaning} \\
+\midrule
+\$7D & Reset to full-screen mode (col=0, row=0, width=20) \\
+\$7E & Pause: run tune player and status bar, then resume \\
+\$7F & End of stream \\
+\$80--\$FE & Set row (byte \& \$7F), next byte = column \\
+Other & Character code for HRCG font \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The text renderer data at [[STATUS_BORDER_DATA]] draws a decorative
+border for the status bar.  Characters \$33--\$41 are box-drawing glyphs
+in the HRCG font.
+
+<<status border data>>=
+    ORG     $7E2F
+STATUS_BORDER_DATA:
+    HEX     7D                      ; $7D: reset to full-screen
+    HEX     80 00                   ; row 0, col 0
+    HEX     33 3C                   ; top-left corner, left tee
+    HEX     34 34 34 34 34 34 34 34 ; horizontal bar (x16)
+    HEX     34 34 34 34 34 34 34 34
+    HEX     3D 35                   ; right tee, top-right corner
+    HEX     3A 3F                   ; decorative
+    HEX     81 12 3E 36 3A 3F       ; row 1, col 18, right edge
+    HEX     82 12 3E 36 3A 3F       ; row 2
+    HEX     83 12 3E 36 3A 3F       ; row 3
+    HEX     84 12 3E 36 3A 3F       ; row 4
+    HEX     85 12 3E 36 3A 3F       ; row 5
+    HEX     86 12 3E 36 3A 3F       ; row 6
+    HEX     87 12 3E 36 3A 3F       ; row 7
+    HEX     88 12 3E 36 3A 3F       ; row 8
+    HEX     89 12 3E 36 3A 3F       ; row 9
+    HEX     8A 12 3E 36             ; row 10
+    HEX     39 40                   ; bottom-left corner, left tee
+    HEX     38 38 38 38 38 38 38 38 ; horizontal bar (x16)
+    HEX     38 38 38 38 38 38 38 38
+    HEX     41 37                   ; right tee, bottom-right corner
+    HEX     7F                      ; end of stream
+@ %def STATUS_BORDER_DATA
 
 \chapter{Game Display}
 
@@ -13666,7 +13718,8 @@ no-op stub for external callers at [[$4A1F]] and [[$4BE4]].
 
 <<orphaned encounter handler>>=
     ORG     $1F19
-    SUBROUTINE orphaned_encounter_handler
+ORPHANED_ENCOUNTER_HANDLER:
+    SUBROUTINE ORPHANED_ENCOUNTER_HANDLER
 ; ---------------------------------------------------------------
 ; DEAD CODE -- orphaned encounter handler ($1F19-$1FFF)
 ;
@@ -13802,7 +13855,7 @@ no-op stub for external callers at [[$4A1F]] and [[$4BE4]].
 
 ; Trailing orphan byte
     HEX     61
-@
+@ %def ORPHANED_ENCOUNTER_HANDLER
 
 \section{Target selection}
 
@@ -13834,6 +13887,14 @@ returns 1 (attack ready), the caller uses these to load the target.
 TARGET_PTR_LO   EQU     $5A86   ; selected combat target pointer (low byte)
 TARGET_PTR_HI   EQU     $5A87   ; selected combat target pointer (high byte)
 @ %def TARGET_PTR_LO TARGET_PTR_HI
+@ [[GET_ENTITY_THREAT]] evaluates the threat level of the mob at [[MOB_PTR]]
+relative to the current entity.  This is a stub---the full implementation has
+not yet been disassembled.
+
+<<get entity threat>>=
+    ORG     $1979
+GET_ENTITY_THREAT:
+@ %def GET_ENTITY_THREAT
 
 <<select combat target>>=
     ORG     $18E4
@@ -13895,14 +13956,6 @@ SELECT_COMBAT_TARGET:
     LDA     #$01
     RTS
 @ %def SELECT_COMBAT_TARGET
-@ [[GET_ENTITY_THREAT]] evaluates the threat level of the mob at [[MOB_PTR]]
-relative to the current entity.  This is a stub---the full implementation has
-not yet been disassembled.
-
-<<get entity threat>>=
-    ORG     $1979
-GET_ENTITY_THREAT:
-@ %def GET_ENTITY_THREAT
 @ [[LOAD_TARGET_PTR]] copies the pre-selected combat target address from
 [[TARGET_PTR_LO]]/[[TARGET_PTR_HI]] into [[MOB_PTR]] and clears
 [[IS_PLAYER_TURN]] to zero, indicating that the next attack sequence is from
@@ -15942,47 +15995,6 @@ title screen sequence.
 <<defines>>=
 ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
 @ %def ATTRACT_FLAG
-
-<<tune player>>=
-    ORG     $795B
-TUNE_PLAYER:
-    SUBROUTINE TUNE_PLAYER
-
-    STA     $C010             ; clear keyboard strobe
-    STOB    #$00,ATTRACT_FLAG ; attract_flag = 0
-    BXNE    #$06,.not_attract ; tune index 6 = attract
-    INC     ATTRACT_FLAG      ; attract_flag = 1
-.not_attract:
-
-    BXEQ    #$02,.setup_2     ; special setup for index 2
-    BXEQ    #$04,.setup_4     ; special setup for index 4
-    JMP     .load_ptr
-
-.setup_2:
-    DEY
-    STY     $80D5             ; patch byte in script 1 data
-    JMP     .load_ptr
-.setup_4:
-    DEY
-    STY     $80E3             ; patch byte in script 2 data
-@
-@ [[TUNE_PC]] is the 2-byte script instruction pointer at [[$E4/$E5]].
-The script base address is loaded from the table at [[$80AE]] into
-[[TUNE_PC]], and the interpreter reads successive bytes through this
-pointer, advancing it after each instruction.
-
-<<zero page defines>>=
-TUNE_PC               EQU     $E4     ; script instruction pointer (2 bytes, $E4/$E5)
-@ %def TUNE_PC
-
-<<tune player>>=
-
-.load_ptr:
-    LDA     TUNE_TABLE,X   ; low byte
-    STA     TUNE_PC
-    LDA     TUNE_TABLE+1,X ; high byte
-    STA     TUNE_PC+1      ; TUNE_PC/TUNE_PC+1 = script start address
-
 @ The script base addresses are stored in the table below.
 The X~register passed to [[TUNE_PLAYER]] is a byte offset into
 this table (X~=~0 for script~0, X~=~2 for script~1, etc.).
@@ -16028,6 +16040,47 @@ TUNE_TABLE:
     DC.W    $A3FC ; script 10 (X=$14): encounter effect
     DC.W    $A43C ; script 11 (X=$16): movement effect
 @ %def TUNE_TABLE
+
+<<tune player>>=
+    ORG     $795B
+TUNE_PLAYER:
+    SUBROUTINE TUNE_PLAYER
+
+    STA     $C010             ; clear keyboard strobe
+    STOB    #$00,ATTRACT_FLAG ; attract_flag = 0
+    BXNE    #$06,.not_attract ; tune index 6 = attract
+    INC     ATTRACT_FLAG      ; attract_flag = 1
+.not_attract:
+
+    BXEQ    #$02,.setup_2     ; special setup for index 2
+    BXEQ    #$04,.setup_4     ; special setup for index 4
+    JMP     .load_ptr
+
+.setup_2:
+    DEY
+    STY     $80D5             ; patch byte in script 1 data
+    JMP     .load_ptr
+.setup_4:
+    DEY
+    STY     $80E3             ; patch byte in script 2 data
+@
+@ [[TUNE_PC]] is the 2-byte script instruction pointer at [[$E4/$E5]].
+The script base address is loaded from the table at [[$80AE]] into
+[[TUNE_PC]], and the interpreter reads successive bytes through this
+pointer, advancing it after each instruction.
+
+<<zero page defines>>=
+TUNE_PC               EQU     $E4     ; script instruction pointer (2 bytes, $E4/$E5)
+@ %def TUNE_PC
+
+<<tune player>>=
+
+.load_ptr:
+    LDA     TUNE_TABLE,X   ; low byte
+    STA     TUNE_PC
+    LDA     TUNE_TABLE+1,X ; high byte
+    STA     TUNE_PC+1      ; TUNE_PC/TUNE_PC+1 = script start address
+@
 
 \subsubsection{Script 0 --- empty}
 
@@ -16852,7 +16905,8 @@ operations.
 
 <<resident data and bytecodes>>=
     ORG     $0572
-    SUBROUTINE resident_data_and_bytecodes
+RESIDENT_BYTECODES:
+    SUBROUTINE RESIDENT_BYTECODES
     ; --- Copy-protection verifier bytecodes ($0572-$05FD) ---
     ; Checks integrity of three disk addresses, then reads sectors
     ; with half-track seeks.  On failure, falls through to error display.
@@ -17037,7 +17091,7 @@ VM_EXIT_ERR:
 DECRYPT_HIGH_BYTE:
     EOR     #$D9                         ; decrypt high byte of address
     RTS
-@ %def VM_EXIT_OK VM_EXIT_ERR DECRYPT_HIGH_BYTE
+@ %def RESIDENT_BYTECODES VM_EXIT_OK VM_EXIT_ERR DECRYPT_HIGH_BYTE
 Swaps 16 bytes between zero page [[$50]]--[[$5F]] and [[$07E5]]--[[$07F4]].
 This gives the resident interpreter its own private set of zero-page
 temporaries that don't interfere with the main program.
@@ -17066,9 +17120,19 @@ message.
 
 <<context swap padding>>=
     ORG     $06F2
+RESIDUAL_DONT_BREAK:
 ; Residual string: "DON'T BREAK TH" (high-bit ASCII, truncated)
     HEX     c4cfcea7d4a0c2d2c5c1cba0d4c8
-@
+@ %def RESIDUAL_DONT_BREAK
+The 18-byte table maps opcode indices to handler addresses in page [[$07]]:
+
+<<resident dispatch table>>=
+    ORG     $06D3
+RESIDENT_DISPATCH_TABLE:
+    HEX     00 27 55 5F 6D 8A AD B9
+    HEX     4F A2 CE 26 79
+; last 5 bytes overlap with CONTEXT_SWAP code at $06E0
+@ %def RESIDENT_DISPATCH_TABLE
 Dispatches one bytecode instruction using a stack trick.  X and Y hold
 the bytecode pointer from the previous iteration.  They are pushed onto
 the stack at entry, then [[PULL_TWO_RET_ADDRS]] rearranges the stack
@@ -17104,15 +17168,6 @@ RESIDENT_DISPATCH_FETCH:
 resident_jmp:
     JMP     RESIDENT_DECODE_DISPATCH ; self-modified -> $07xx
 @ %def RESIDENT_DISPATCH
-The 18-byte table maps opcode indices to handler addresses in page [[$07]]:
-
-<<resident dispatch table>>=
-    ORG     $06D3
-RESIDENT_DISPATCH_TABLE:
-    HEX     00 27 55 5F 6D 8A AD B9
-    HEX     4F A2 CE 26 79
-; last 5 bytes overlap with CONTEXT_SWAP code at $06E0
-@ %def RESIDENT_DISPATCH_TABLE
 Opcode \$00 handler---the resident interpreter's GOTO instruction.
 Decodes an address and redirects execution there.
 
@@ -17355,11 +17410,12 @@ the low-ASCII fragment ``\texttt{e checker}''.
 
 <<resident page tail>>=
     ORG     $07E2
+RESIDUAL_PAGE_TAIL:
 ; Unused residual data at end of resident handler page
     HEX     0000000e968c41964120
     HEX     d3d3d3d3d3d3d3d3d3d3
     HEX     006520636865636b6572  ; "e checker" (low ASCII)
-@
+@ %def RESIDUAL_PAGE_TAIL
 
 \chapter{Disk I/O}
 
@@ -17428,8 +17484,9 @@ RWTS_CORE               EQU     $BD00   ; RWTS core dispatcher
 
 <<dos33 rwts>>=
     ORG     $B600
+DOS33_RWTS:
     INCLUDE "dos.asm"
-@
+@ %def DOS33_RWTS
 [[DISK_READ_FIELD]] is the entry point called by [[LOAD_SCENE_DATA]]
 to read sector data from disk.  It is a trampoline into the disk~VM
 interpreter loop at~[[$B36A]], which uses an embedded bytecode program
@@ -17706,6 +17763,16 @@ SEARCH_ADDR_FIELD:
 DISK_RETRY_COUNT:
     DC.B    3                  ; $B44D: outer retry counter (default 3)
 @ %def SEARCH_ADDR_FIELD DISK_RETRY_COUNT
+Three bytes between the dispatch trampoline and the saved state.
+[[$B5E2]] is the error accumulator used by [[READ_AND_VERIFY]]
+to count failed sector reads across multiple attempts.
+
+<<disk vm error accum>>=
+    ORG     $B5E2
+DISK_VM_ERROR_ACCUM:
+    DC.B    0   ; error count (updated by READ_AND_VERIFY)
+    DC.B    0,0 ; scratch
+@ %def DISK_VM_ERROR_ACCUM
 Native routine called by the VM via CALL1.  Searches for an address
 field ([[JSR $B3FF]]), then verifies the data field
 ([[JSR VERIFY_DATA_FIELD]]).  Accumulates errors in
@@ -18152,16 +18219,6 @@ opcode table.
 DISK_VM_TRAMPOLINE:
     JMP     DISK_VM_OP_GOTO         ; self-modified: low byte patched
 @ %def DISK_VM_TRAMPOLINE
-Three bytes between the dispatch trampoline and the saved state.
-[[$B5E2]] is the error accumulator used by [[READ_AND_VERIFY]]
-to count failed sector reads across multiple attempts.
-
-<<disk vm error accum>>=
-    ORG     $B5E2
-DISK_VM_ERROR_ACCUM:
-    DC.B    0   ; error count (updated by READ_AND_VERIFY)
-    DC.B    0,0 ; scratch
-@ %def DISK_VM_ERROR_ACCUM
 The 16-byte region at~[[$B5E5--$B5F4]] holds the saved copy of
 zero-page [[$50--$5F]] when the VM is not executing.  The context
 swap routine ([[DISK_VM_SWAP]]) exchanges these with the live
@@ -18310,7 +18367,8 @@ The following root chunks produce the assembly files when tangled.
 <<ui text stream>>
 <<border label positions>>
 <<border frame pattern>>
-<<display strings>>
+<<copyright string>>
+<<boot display strings>>
 <<input loop>>
 <<setup input>>
 <<draw input options>>
@@ -18417,7 +18475,8 @@ The following root chunks produce the assembly files when tangled.
 <<play low tone>>
 <<stats template data>>
 <<status border data>>
-<<status bar strings>>
+<<press space string>>
+<<press button string>>
 <<game data 7EDD>>
 <<print font char data>>
 <<tune pointer table>>
@@ -18428,6 +18487,14 @@ The following root chunks produce the assembly files when tangled.
 <<hrcg init>>
 <<hrcg version string>>
 <<hrcg params>>
+<<hrcg mode flags>>
+<<hrcg video mode>>
+<<hrcg mask>>
+<<hrcg draw mode>>
+<<hrcg wrap flag>>
+<<hrcg invert flag>>
+<<hrcg font ptr>>
+<<hrcg saved state>>
 <<hrcg getkey>>
 <<hrcg cout>>
 <<hrcg dispatch table>>
@@ -18484,299 +18551,6 @@ The following root chunks produce the assembly files when tangled.
 <<dos33 rwts>>
 @
 
-<<fontdata.asm>>=
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     78 7C 66 66 7C 78 60 60 03 07 0C 0C 07 03 00 00
-    HEX     63 7F 60 60 7C 0C 0C 0F 30 3F 00 00 0F 0C 0C 3C
-    HEX     C0 C0 D0 D0 D0 D4 D4 D4 80 80 82 82 82 8A 8A 8A
-    HEX     2A 22 22 2A 08 28 20 00 15 11 11 15 04 05 01 00
-    HEX     00 04 04 05 15 15 05 04 00 00 00 00 00 85 85 85
-    HEX     04 7F 44 44 00 40 60 00 0F 1F 3F 1F 0F 19 30 00
-    HEX     00 00 00 00 00 70 F8 B0 00 00 00 00 00 00 00 00
-    HEX     20 22 28 20 20 50 08 06 00 04 01 00 00 00 01 06
-    HEX     D0 90 D0 D0 D4 91 91 90 00 00 00 18 3A 60 40 00
-    HEX     10 10 50 10 15 01 01 00 00 00 0A 08 08 28 00 00
-    HEX     00 00 0F 0F 7C 44 44 7C 00 00 78 78 1F 11 11 1F
-    HEX     1C 44 70 10 10 70 60 00 1C 11 07 04 04 07 03 00
-    HEX     30 60 1C 06 23 2E 28 28 00 00 00 00 11 55 05 01
-    HEX     08 08 00 00 00 00 00 00 04 04 00 00 00 00 00 00
-    HEX     00 01 05 05 55 15 55 55 00 00 00 00 00 4A 2A 2A
-    HEX     55 55 55 55 05 05 00 00 2A 00 0A 0A 00 00 00 00
-    HEX     00 94 D5 C1 C9 D5 D4 C4 00 8A AA A0 A4 AA 8A 88
-    HEX     90 D4 C5 D5 85 94 D0 00 82 8A A8 AA A8 8A 82 00
-    HEX     A8 A8 A0 A0 AA AA A8 A8 81 91 D1 90 85 95 D5 D5
-    HEX     AA AA A0 A0 AA 8A A8 00 85 95 D5 84 94 D4 D0 00
-    HEX     00 00 0E 1B 59 58 58 58 00 00 04 0C 3F 0C 08 01
-    HEX     58 7C 26 27 7E 26 26 00 01 03 06 0E 07 06 06 00
-    HEX     00 00 00 00 00 40 62 6A 00 18 1C 0E 07 03 01 00
-    HEX     28 24 14 05 01 00 00 00 00 01 05 00 00 00 00 00
-    HEX     00 00 1E 33 33 30 30 28 00 00 1E 33 33 03 03 05
-    HEX     2A 22 2A 28 28 20 20 00 15 11 15 05 05 01 01 00
-    HEX     00 00 00 A0 A8 82 A2 82 00 00 00 00 81 81 80 80
-    HEX     82 56 54 44 46 42 00 00 08 22 0A 08 18 10 00 00
-    HEX     00 60 79 CF D2 D4 C4 D4 00 01 27 3C 9A 8A 88 8A
-    HEX     D0 90 D0 C0 00 00 00 00 82 82 82 00 00 00 00 00
-    HEX     8A AA 8A 88 A8 A8 A8 A8 00 95 95 95 B9 30 20 00
-    HEX     A8 A8 A8 A0 A0 80 80 00 80 A0 B1 B5 95 95 00 00
-    HEX     60 78 03 63 03 06 0C 78 07 0F 1C 0F 0C 06 03 01
-    HEX     20 2A 28 2A 28 2A 20 00 01 15 05 15 05 15 01 00
-    HEX     00 00 00 02 03 07 0F D6 00 00 00 10 30 38 3C 9A
-    HEX     D4 C4 D4 D0 D0 C0 00 00 8A 88 8A 82 82 80 00 00
-    HEX     50 40 40 14 15 05 65 75 02 00 00 0A 2A 28 28 29
-    HEX     75 75 64 04 90 90 90 D4 29 29 08 08 82 82 82 8A
-    HEX     00 00 00 00 00 42 6A 0A 00 00 20 18 0E 07 03 01
-    HEX     0A 2A 2A 2A 2A 0A 0A 00 15 15 01 05 00 00 00 00
-    HEX     00 A8 A0 00 80 A2 AA A8 00 00 81 85 85 95 D1 D5
-    HEX     AA A2 80 A0 A8 00 00 00 95 85 85 81 00 00 00 00
-    HEX     00 00 00 00 7C 6E 47 00 00 00 00 00 38 1D 07 00
-    HEX     7C 6E 47 00 00 00 00 00 38 1D 07 00 00 00 00 00
-    HEX     00 00 40 40 7C 44 44 44 00 00 01 01 1F 11 11 11
-    HEX     51 55 44 40 40 60 70 00 45 55 11 01 01 03 07 00
-    HEX     00 00 00 00 66 66 36 1E 00 00 00 00 0C 0C 0C 0E
-    HEX     06 66 3E 06 06 06 00 00 07 01 00 00 00 00 00 00
-    HEX     00 00 00 00 60 44 04 7F 00 00 00 00 00 03 0E 3F
-    HEX     04 44 60 00 00 00 00 00 0E 03 00 00 00 00 00 00
-    HEX     00 00 00 00 D0 D4 C4 00 00 00 00 00 8A AA A2 80
-    HEX     44 54 44 54 44 50 00 00 22 2A 22 2A 22 0A 00 00
-    HEX     7F 7F 0F 23 29 29 01 29 7F 7F 78 71 65 65 60 61
-    HEX     29 09 21 01 29 01 7F 7F 64 65 65 60 65 60 7F 7F
-    HEX     7F 7F 0F 07 03 03 03 03 7F 7F 78 70 60 60 60 60
-    HEX     03 03 03 03 03 03 7F 7F 60 60 60 60 60 60 7F 7F
-    HEX     00 33 3F 1E 1E 1E 7E 7E 00 66 7E 3C 3C 3C 3F 3F
-    HEX     0E 4E 4E 4E 4E 4E 4E 00 38 3A 3A 3A 3A 3A 3A 00
-    HEX     00 3C 3B 23 00 03 0B 03 00 06 40 60 00 60 58 78
-    HEX     00 01 00 0F 00 47 67 77 00 7C 71 73 00 67 77 77
-    HEX     00 3C 3B 23 00 4B 5B 73 00 36 38 3C 00 62 78 7E
-    HEX     00 19 0D 2F 00 67 67 77 00 3C 39 33 00 67 77 77
-    HEX     55 55 55 55 55 55 55 55 2A 2A 2A 2A 2A 2A 2A 2A
-    HEX     55 55 55 55 55 55 55 55 2A 2A 2A 2A 2A 2A 2A 2A
-    HEX     50 54 44 44 54 50 40 40 02 02 08 08 02 02 00 00
-    HEX     41 55 40 40 54 04 04 05 20 2A 00 00 0A 08 08 28
-    HEX     40 40 50 50 50 54 54 54 00 00 02 02 02 0A 0A 0A
-    HEX     AA A2 A2 AA 88 A8 A0 00 95 91 91 95 84 85 81 00
-    HEX     00 84 84 85 95 95 85 84 00 00 00 00 00 05 05 05
-    HEX     84 7F C4 C4 00 40 60 00 0F 1F 3F 1F 0F 19 30 00
-    HEX     00 00 00 00 00 F0 70 60 00 00 00 00 00 00 01 00
-    HEX     A0 A2 A8 A0 A0 D0 08 04 00 84 81 80 00 00 01 02
-    HEX     2A 2A 2A 2A 2A 2A 2A 2A 55 55 55 55 55 55 55 55
-    HEX     2A 2A 2A 2A 2A 2A 2A 2A 55 55 55 55 55 55 55 55
-    HEX     2A 2A 2A 2A 2A 2A 2A 2A 55 55 55 55 55 55 55 55
-    HEX     2A 2A 2A 2A 2A 2A 2A 2A 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     AA AA AA AA AA AA AA AA D5 D5 D5 D5 D5 D5 D5 D5
-    HEX     AA AA AA AA AA AA AA AA D5 D5 D5 D5 D5 D5 D5 D5
-    HEX     D5 D5 D5 D5 D5 D5 D5 D5 AA AA AA AA AA AA AA AA
-    HEX     D5 D5 D5 D5 D5 D5 D5 D5 AA AA AA AA AA AA AA AA
-    HEX     7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F
-    HEX     7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F
-    HEX     00 3F 3F 3F 00 7B 7B 7B 00 3F 3F 3F 00 7B 7B 7B
-    HEX     00 3F 3F 3F 00 77 77 77 00 3F 3F 3F 00 77 77 77
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 7F 7F 7F 7F 7F 7F 7F 7F
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 55 0C 7E 03 00 00 00 00 2A 00 0F 18
-    HEX     78 0C 0C 70 00 00 00 00 1F 10 1F 11 00 00 00 00
-    HEX     01 03 06 06 57 06 66 1E 00 00 00 00 2A 00 03 0C
-    HEX     06 0E 36 46 00 00 00 00 18 18 18 07 00 00 00 00
-    HEX     00 00 00 00 55 00 78 0C 00 00 00 00 2A 03 07 0C
-    HEX     06 06 08 70 00 00 00 00 00 00 0C 07 00 00 00 00
-    HEX     00 00 00 00 55 00 70 18 04 0C 18 18 3A 18 1B 1E
-    HEX     0C 04 18 70 00 00 00 00 18 1E 1B 19 00 00 00 00
-    HEX     00 00 00 00 55 40 7E 02 00 00 00 00 2A 01 03 06
-    HEX     1C 06 02 7C 00 00 00 00 00 0C 07 01 00 00 00 00
-    HEX     78 0C 18 30 7D 70 70 70 03 06 0C 00 2B 00 00 00
-    HEX     70 70 60 40 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 55 18 7C 06 00 00 00 00 2A 00 0C 13
-    HEX     06 7E 03 7E 00 60 18 06 03 00 0E 13 30 19 0E 00
-    HEX     02 06 0C 0C 5D 0C 4C 7C 00 00 00 00 2A 00 0F 10
-    HEX     1C 0C 0C 0C 00 00 00 00 30 1C 0E 03 00 00 00 00
-    HEX     60 70 60 00 55 00 60 60 01 03 01 00 2A 00 01 01
-    HEX     60 60 60 40 00 00 00 00 01 01 01 01 00 00 00 00
-    HEX     60 70 60 00 55 00 60 60 01 03 01 00 2A 00 01 01
-    HEX     60 60 60 60 60 26 1C 00 01 01 01 01 00 00 00 00
-    HEX     01 03 06 06 57 06 66 1E 00 00 00 00 2A 00 03 0C
-    HEX     06 66 06 06 00 00 00 00 0F 03 0F 3C 00 00 00 00
-    HEX     10 30 60 60 75 60 60 60 00 00 01 01 2A 01 01 01
-    HEX     60 60 60 40 00 00 00 00 01 01 01 01 00 00 00 00
-    HEX     00 00 00 00 55 00 1E 63 00 00 00 00 2A 0C 0F 11
-    HEX     63 03 06 0C 00 00 00 00 30 30 18 0C 00 00 00 00
-    HEX     00 00 00 00 55 00 46 76 00 00 00 00 2A 00 07 18
-    HEX     1E 06 06 46 00 00 00 00 18 0E 07 01 00 00 00 00
-    HEX     00 00 00 00 55 00 70 3C 00 00 00 00 2A 03 0F 10
-    HEX     0E 03 02 7C 00 00 00 00 30 1C 0F 03 00 00 00 00
-    HEX     00 00 00 00 55 00 46 76 00 00 00 00 2A 00 07 08
-    HEX     1E 06 1E 66 06 06 06 00 18 18 0E 03 00 00 00 00
-    HEX     00 00 00 00 55 00 78 44 00 00 00 00 2A 00 18 1B
-    HEX     06 06 1C 78 00 00 00 00 1E 18 1E 19 18 18 18 00
-    HEX     00 00 00 00 55 00 46 76 00 00 00 00 2A 00 07 08
-    HEX     1E 06 06 06 00 00 00 00 0C 04 00 00 00 00 00 00
-    HEX     00 00 00 00 55 00 7C 03 00 00 00 00 2A 30 33 1C
-    HEX     7E 40 07 7C 00 00 00 00 00 07 0C 03 00 00 00 00
-    HEX     00 04 0C 0C 7F 0C 0C 0C 00 00 00 00 2A 00 00 00
-    HEX     0C 0C 48 70 00 00 00 00 00 06 03 00 00 00 00 00
-    HEX     00 00 00 00 55 06 06 06 00 00 00 00 2A 00 38 38
-    HEX     06 06 0C 78 00 00 00 00 38 38 36 21 00 00 00 00
-    HEX     00 00 00 00 55 00 07 18 00 00 00 00 2A 30 30 30
-    HEX     0C 06 18 60 00 00 00 00 30 0C 03 00 00 00 00 00
-    HEX     00 00 00 00 55 00 30 1C 00 00 00 00 2A 30 30 30
-    HEX     06 46 66 38 00 00 00 00 30 30 19 0E 00 00 00 00
-    HEX     00 00 00 00 55 00 00 0E 00 00 00 00 2A 38 38 1C
-    HEX     38 70 3C 06 00 00 00 00 07 01 0E 38 00 00 00 00
-    HEX     00 00 00 00 55 0C 0C 0C 00 00 00 00 2A 00 20 30
-    HEX     0C 18 30 60 06 03 7C 00 38 38 38 37 30 1C 0F 00
-    HEX     00 00 00 00 55 0C 7F 00 00 00 00 00 2A 00 3F 18
-    HEX     00 4E 31 4E 00 00 00 00 06 01 38 0F 00 00 00 00
-    HEX     00 00 00 00 55 60 70 08 00 00 00 00 2A 00 07 0C
-    HEX     0C 0C 18 70 00 00 00 00 18 18 08 07 00 00 00 00
-    HEX     00 00 00 00 55 00 60 60 00 00 00 00 2A 00 00 00
-    HEX     60 60 60 60 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 40 60 40 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 55 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 55 30 7C 06 00 00 00 00 2A 00 03 0E
-    HEX     7C 00 00 7C 00 00 00 00 19 18 0C 07 00 00 00 00
-    HEX     00 00 00 00 55 00 00 00 00 00 00 00 2A 00 00 00
-    HEX     00 40 60 40 00 00 60 00 00 03 07 07 06 03 00 00
-    HEX     00 00 00 00 55 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 40 60 40 00 00 00 00 00 03 07 03 00 00 00 00
-    HEX     00 00 00 00 55 00 00 00 00 00 00 00 2A 00 00 00
-    HEX     78 00 00 00 00 00 00 00 07 00 00 00 00 00 00 00
-    HEX     00 00 40 40 40 40 40 40 02 03 03 03 03 03 03 03
-    HEX     00 40 60 40 00 00 00 00 00 03 07 03 00 00 00 00
-    HEX     70 1C 07 00 00 60 70 70 03 0E 1C 0C 07 01 00 00
-    HEX     00 70 78 70 00 00 00 00 00 00 01 00 00 00 00 00
-    HEX     00 00 0C 4E 42 4E 00 00 00 00 03 03 00 03 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 30 70 40 70 00 00 00 00 0C 1C 10 1C 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 60 30 18 18 00 00 06 01 00 00 00 00
-    HEX     18 38 70 60 00 00 00 00 00 00 00 01 03 00 00 00
-    HEX     00 00 00 30 60 40 00 00 00 00 00 00 01 03 07 06
-    HEX     00 00 00 40 20 18 00 00 06 06 03 01 00 00 00 00
-    HEX     00 00 00 00 55 60 7C 66 00 00 00 00 2A 00 07 0C
-    HEX     66 7C 60 66 7C 60 00 00 00 07 0C 0C 07 00 00 00
-    HEX     40 00 00 00 00 00 42 6A 01 07 0E 0E 0E 0F 07 03
-    HEX     68 24 14 05 01 00 00 00 01 01 05 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    HEX     C1 C4 00 C5 80 C4 C1 00 A0 88 00 A8 00 0C 18 30
-    HEX     00 03 1F 73 40 00 00 00 30 30 30 18 07 00 00 00
-    HEX     00 00 00 00 40 70 1C 0C 00 00 00 A0 01 07 0E 1C
-    HEX     06 46 4E 7E 7C 7C 70 40 1F 7F 7F 7F 1F 1F 0F 03
-    HEX     00 00 C0 D0 D4 95 95 95 00 AA 82 80 90 80 84 80
-    HEX     D5 D4 D0 00 00 00 08 00 90 80 82 AA 00 11 01 55
-    HEX     A0 A8 8A 82 82 8A A8 A0 85 94 D0 C0 C0 D0 94 85
-    HEX     A0 A8 88 88 A8 A0 00 00 85 94 90 90 94 85 00 00
-    HEX     00 95 D0 C0 C0 00 82 A0 00 00 00 82 8A AA AA AA
-    HEX     00 C0 D0 95 00 08 00 2A AA 8A 82 00 00 01 11 01
-    HEX     20 22 20 82 8A 88 88 A0 15 00 04 00 00 94 D1 D0
-    HEX     A0 88 88 8A 82 08 00 2A D0 D1 94 00 00 01 11 01
-    HEX     20 22 20 00 00 94 D0 C0 15 00 04 00 00 8A 82 00
-    HEX     C1 C4 C1 95 C1 C4 C1 90 A0 88 A0 AA A0 88 A0 82
-    HEX     A0 A8 8A 82 82 8A A8 A0 85 94 D0 C0 C0 D0 94 85
-    HEX     A0 A8 88 88 A8 A0 00 00 85 94 90 90 94 85 00 00
-    HEX     28 00 20 00 00 94 D0 C0 05 44 04 00 00 8A 82 00
-    HEX     C1 C4 C1 95 C1 C4 C1 90 A0 88 A0 AA A0 88 A0 82
-    HEX     28 00 20 00 00 A8 82 82 05 44 04 C0 D0 90 91 84
-    HEX     82 82 A8 00 00 00 08 00 84 91 90 D0 C0 11 01 55
-    HEX     00 00 00 00 55 40 00 00 00 00 00 A0 00 02 0C 30
-    HEX     00 00 00 00 00 00 00 00 60 40 7C 42 61 13 0C 00
-    HEX     00 00 00 00 00 00 00 A0 00 00 00 C0 D0 94 85 81
-    HEX     A8 88 88 A0 00 00 00 80 00 00 94 D1 D0 D0 94 85
-    HEX     00 00 00 82 8A A8 A0 00 00 00 90 80 C0 00 81 85
-    HEX     00 00 A8 8A 8A 8A A8 A0 94 90 90 85 00 00 00 81
-    HEX     00 00 00 00 00 00 00 00 85 94 D0 C0 00 00 00 00
-    HEX     00 00 00 00 00 00 00 00 00 00 00 00 C0 D0 94 85
-    HEX     A0 A8 8A 82 00 00 00 00 81 00 00 00 00 00 00 00
-    HEX     00 00 00 00 82 8A A8 A0 00 00 00 00 00 00 00 81
-    HEX     00 00 00 00 00 00 00 50 85 94 D0 C0 00 02 02 2A
-    HEX     40 40 40 10 00 00 00 00 0A 0A 08 20 00 00 00 00
-    HEX     A0 A8 8A 82 00 40 40 54 81 80 80 80 00 00 00 0A
-    HEX     50 50 10 04 00 00 00 00 02 02 02 08 00 00 00 00
-    HEX     00 7F 1F 00 7F 1F 00 7F 00 7F 00 00 7F 00 00 7F
-    HEX     00 1F 00 00 5F 60 00 7F 00 70 18 00 7F 01 00 7F
-    HEX     00 00 00 00 1F 00 00 7F 20 70 60 00 7C 40 00 7F
-    HEX     00 00 00 00 03 03 00 0F 1F 00 7F 1F 00 7F 1F 00
-    HEX     00 00 7F 00 00 7F 00 00 3C 00 7F 3E 00 7F 7E 00
-    HEX     00 00 7F 00 00 7F 00 00 00 00 7F 60 00 7F 78 00
-    HEX     01 00 7F 03 00 7F 03 00 0F 00 3F 3E 00 7F 7C 00
-    HEX     00 00 00 00 00 01 01 00 7F 1F 00 7F 1F 00 7F 7F
-    HEX     7F 00 00 7F 00 00 7F 7F 7F 7C 00 6F 40 00 0F 0F
-    HEX     7F 03 00 7F 7F 00 78 70 7F 7E 00 7F 1F 00 7F 7F
-    HEX     7F 01 00 7F 00 00 7F 7F 7F 78 00 7F 70 00 7F 7F
-    HEX     07 07 00 1F 1F 00 7F 7F 00 00 00 00 00 00 00 00
-@
-
-<<stdfontdata.asm>>=
-    HEX     00 00 00 00 00 00 00 00 08 08 08 08 08 00 08 00
-    HEX     14 14 14 00 00 00 00 00 08 1C 3E 7F 1C 1C 1C 1C
-    HEX     08 3C 0A 1C 28 1E 08 00 06 26 10 08 04 32 30 00
-    HEX     04 0A 0A 04 2A 12 2C 00 08 08 08 00 00 00 00 00
-    HEX     08 04 02 02 02 04 08 00 08 10 20 20 20 10 08 00
-    HEX     08 2A 1C 08 1C 2A 08 00 00 08 08 3E 08 08 00 00
-    HEX     00 00 00 00 00 8C 88 84 00 00 00 3E 00 00 00 00
-    HEX     00 00 00 00 00 00 8C 00 00 20 10 08 04 02 00 00
-    HEX     8C 92 22 22 22 92 8C 00 08 0C 08 08 08 08 1C 00
-    HEX     1C 22 20 10 84 82 3E 00 3E 90 10 18 20 22 1C 00
-    HEX     10 18 14 12 3E 10 10 00 3E 02 1E 20 20 22 1C 00
-    HEX     18 04 82 1E 22 22 1C 00 3E 90 10 88 08 84 04 00
-    HEX     1C 22 22 1C 22 22 1C 00 1C 22 22 3C 90 10 0C 00
-    HEX     00 00 8C 00 00 8C 00 00 00 00 8C 00 00 8C 88 84
-    HEX     08 0C 7E 7F 7E 0C 08 00 00 00 3E 00 3E 00 00 00
-    HEX     08 18 3F 7F 3F 18 08 00 1C 22 90 88 08 00 08 00
-    HEX     1C 1C 1C 1C 7F 3E 1C 08 08 8C 14 92 3E 22 22 00
-    HEX     1E 22 22 1E 22 22 1E 00 1C 22 02 02 02 22 1C 00
-    HEX     1E 22 22 22 22 22 1E 00 3E 02 02 1E 02 02 3E 00
-    HEX     3E 02 02 1E 02 02 02 00 3C 02 02 02 32 22 3C 00
-    HEX     22 22 22 3E 22 22 22 00 1C 08 08 08 08 08 1C 00
-    HEX     20 20 20 20 20 22 1C 00 22 12 0A 06 0A 12 22 00
-    HEX     02 02 02 02 02 02 3E 00 22 36 2A 2A 22 22 22 00
-    HEX     22 22 26 2A 32 22 22 00 1C 22 22 22 22 22 1C 00
-    HEX     1E 22 22 1E 02 02 02 00 1C 22 22 22 2A 12 2C 00
-    HEX     1E 22 22 1E 0A 12 22 00 1C 22 02 1C 20 22 1C 00
-    HEX     3E 08 08 08 08 08 08 00 22 22 22 22 22 22 1C 00
-    HEX     22 22 22 92 14 8C 08 00 22 22 22 2A 2A 36 22 00
-    HEX     22 92 14 08 14 92 22 00 22 92 14 08 08 08 08 00
-    HEX     3E 90 10 08 04 82 3E 00 3E 06 06 06 06 06 3E 00
-    HEX     00 02 04 08 10 20 00 00 3E 30 30 30 30 30 3E 00
-    HEX     00 00 08 14 22 00 00 00 00 00 00 00 00 00 00 7F
-    HEX     04 08 10 00 00 00 00 00 00 00 1C 20 3C 22 3C 00
-    HEX     02 02 1E 22 22 22 1E 00 00 00 3C 02 02 02 3C 00
-    HEX     20 20 3C 22 22 22 3C 00 00 00 1C 22 3E 02 3C 00
-    HEX     18 24 04 1E 04 04 04 00 00 00 1C 22 22 3C 20 1C
-    HEX     02 02 1E 22 22 22 22 00 08 00 0C 08 08 08 1C 00
-    HEX     10 00 18 10 10 10 12 0C 02 02 22 12 0E 12 22 00
-    HEX     0C 08 08 08 08 08 1C 00 00 00 36 2A 2A 2A 22 00
-    HEX     00 00 1E 22 22 22 22 00 00 00 1C 22 22 22 1C 00
-    HEX     00 00 1E 22 22 1E 02 02 00 00 3C 22 22 3C 20 20
-    HEX     00 00 3A 06 02 02 02 00 00 00 3C 02 1C 20 1E 00
-    HEX     04 04 1E 04 04 24 18 00 00 00 22 22 22 32 2C 00
-    HEX     00 00 22 92 14 8C 08 00 00 00 22 22 2A 2A 36 00
-    HEX     00 00 22 14 08 14 22 00 00 00 22 92 14 8C 08 86
-    HEX     00 00 3E 10 08 04 3E 00 38 0C 0C 06 0C 0C 38 00
-    HEX     08 08 08 08 08 08 08 08 0E 18 18 30 18 18 0E 00
-    HEX     2C 1A 00 00 00 00 00 00 7F 7F 7F 7F 7F 7F 7F 7F
-@
 
 <<boot1.asm>>=
     PROCESSOR 6502
@@ -18787,6 +18561,7 @@ The following root chunks produce the assembly files when tangled.
 <<boot1 read error>>
 <<boot1 read sector>>
 <<boot1 track vars>>
+<<boot1 error flag>>
 <<boot1 seek track>>
 <<boot1 phase on>>
 <<boot1 delay>>

@@ -65,7 +65,9 @@
       "mcp__ghidra-server__get_bulk_xrefs",
       "mcp__ghidra-server__list_data_items_by_xrefs",
       "mcp__ghidra-server__search_byte_patterns",
-      "Bash(pdflatex:*)"
+      "Bash(pdflatex:*)",
+      "Bash(curl:*)",
+      "Read(//tmp/**)"
     ]
   }
 }

@@ -13,7 +13,8 @@ Tangle main.nw and assemble using dasm. Reports any errors.
 Run these commands in sequence:
 
 1. Tangle: `python weave.py main.nw output`
-2. Assemble main: `cd output && dasm main.asm -f3 -omain.bin -lmain.lst -smain.sym`
+2. Copy support files: `cp ea_splash_screen.asm dos.asm mobdata.asm fontdata.asm stdfontdata.asm output/`
+3. Assemble main: `cd output && dasm main.asm -f3 -omain.bin -lmain.lst -smain.sym`
 3. Assemble boot1: `dasm boot1.asm -f3 -oboot1.bin -lboot1.lst -sboot1.sym`
 4. Assemble ealdr: `dasm ealdr.asm -f3 -oealdr.bin -lealdr.lst -sealdr.sym`
 

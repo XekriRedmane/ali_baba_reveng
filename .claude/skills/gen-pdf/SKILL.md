@@ -8,8 +8,9 @@ Run these commands from the project root.
 
 If any of these steps fail, stop and inform the user.
 
-1. Tangle: `python weave.py main.nw output`
-2. Generate font_data.tex: `python font_data.py 83A5 92A4 font_data.tex`
-3. Ensure the output directory exists, creating it if it doesn't: `mkdir -p output`
-4. Run pdflatex once: `pdflatex --output-directory=. output/main.tex`
-5. Run pdflatex again (to resolve references): `pdflatex --output-directory=. output/main.tex`
+1. Ensure the output directory exists: `mkdir -p output`
+2. Tangle: `python weave.py main.nw output`
+3. Copy support files: `cp noweb.sty output/ && cp -r images output/`
+4. Generate font_data.tex: `python font_data.py 83A5 92A4 output/font_data.tex`
+5. Run pdflatex once: `cd output && pdflatex main.tex`
+6. Run pdflatex again (to resolve references): `pdflatex main.tex`
