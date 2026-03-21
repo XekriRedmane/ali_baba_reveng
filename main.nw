@@ -184,6 +184,57 @@ However, a restriction is that you cannot use local labels as arguments to a mac
 since macros implicitly create an anonymous local scope for themselves. Thus, they are
 not good candidates for use in self-modifying code.
 
+\begin{center}
+\begin{tabular}{lll}
+\hline
+\textbf{Macro} & \textbf{Args} & \textbf{Description} \\
+\hline
+\multicolumn{3}{l}{\textit{Store / Move}} \\
+[[STOW]]  & val, dst     & Store 16-bit immediate to memory \\
+[[STOW2]] & val, dst     & Same as [[STOW]], opposite instruction order \\
+[[STOB]]  & \#val, dst   & Store immediate byte to memory \\
+[[MOVB]]  & src, dst     & Move byte between memory locations \\
+[[MOVW]]  & src, dst     & Move 16-bit value between memory locations \\
+[[LDWIY]] & ptr, \#off, dst & Load 16-bit word via indirect Y-indexed pointer \\
+\hline
+\multicolumn{3}{l}{\textit{Stack}} \\
+[[PSHW]]  & addr         & Push 16-bit value onto stack \\
+[[PULB]]  & addr         & Pull byte from stack to memory \\
+[[PULW]]  & addr         & Pull 16-bit value from stack to memory \\
+\hline
+\multicolumn{3}{l}{\textit{Arithmetic}} \\
+[[INCW]]  & addr         & Increment 16-bit value in memory \\
+[[ADDA]]  & addr         & Add A to 16-bit memory (with carry propagation) \\
+[[ADDAC]] & addr         & Add A + carry to 16-bit memory \\
+[[ADDB]]  & addr, val    & Add 8-bit value to 16-bit memory \\
+[[ADDB2]] & addr, val    & Same as [[ADDB]], swapped [[CLC]]/[[LDA]] order \\
+[[ADDW]]  & a, b, c      & Add two 16-bit values, store to third \\
+[[ADDWC]] & a, b, c      & Same as [[ADDW]] but without [[CLC]] (uses existing carry) \\
+[[SUBB]]  & addr, val    & Subtract 8-bit value from 16-bit memory \\
+[[SUBB2]] & addr, val    & Same as [[SUBB]], swapped [[SEC]]/[[LDA]] order \\
+[[SUBW]]  & a, b, c      & Subtract two 16-bit values, store to third \\
+[[SUBWL]] & \#val, b, c  & Subtract 16-bit memory from 16-bit literal \\
+\hline
+\multicolumn{3}{l}{\textit{Rotate}} \\
+[[ROLW]]  & addr         & Rotate 16-bit memory left \\
+[[RORW]]  & addr         & Rotate 16-bit memory right \\
+[[ROL2]]  &              & Rotate accumulator left by two bits \\
+\hline
+\multicolumn{3}{l}{\textit{Compare and branch}} \\
+[[BAEQ]]  & val, lbl     & Branch if A equals val \\
+[[BANE]]  & val, lbl     & Branch if A does not equal val \\
+[[BAPL]]  & val, lbl     & Branch if A minus val is positive \\
+[[BAMI]]  & val, lbl     & Branch if A minus val is negative \\
+[[BALT]]  & val, lbl     & Branch if A is less than val (unsigned) \\
+[[BAGE]]  & val, lbl     & Branch if A is greater than or equal to val (unsigned) \\
+[[BXEQ]]  & val, lbl     & Branch if X equals val \\
+[[BXNE]]  & val, lbl     & Branch if X does not equal val \\
+[[BYEQ]]  & val, lbl     & Branch if Y equals val \\
+[[BYNE]]  & val, lbl     & Branch if Y does not equal val \\
+\hline
+\end{tabular}
+\end{center}
+
 \subsection{STOW, STOW2}
 
 [[STOW]] stores a 16-bit literal value to a memory location.
