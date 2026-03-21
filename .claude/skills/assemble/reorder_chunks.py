@@ -97,7 +97,7 @@ def reorder_target(target: str, lines: list[str]) -> list[str]:
     # Sort
     resolved = [n for n in refs if n in chunk_orgs]
     resolved.sort(key=lambda n: chunk_orgs[n])
-    new_refs = resolved + unresolved
+    new_refs = unresolved + resolved  # non-ORG chunks first (macros, defines)
 
     # Count changes
     changes = sum(1 for a, b in zip(refs, new_refs) if a != b)
