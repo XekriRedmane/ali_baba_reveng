@@ -11397,6 +11397,249 @@ CONFIGURE_INPUT:
     STA     GAME_INPUT_TABLE+4  ; rec1 byte 0 (movement)
     RTS
 @ %def CONFIGURE_INPUT
+
+\subsection{Menu handler routines (\$6101--\$62E4)}
+
+The main game menu at [[GAME_INPUT_TABLE]] dispatches to sub-menus and
+actions throughout the \$6101--\$62E4 region.  Each sub-menu has a
+descriptor table (same format as [[GAME_INPUT_TABLE]]: 4-byte header
+followed by 10-byte records) and a small code entry point that loads
+the table address into X/Y and jumps to [[INPUT_LOOP]].
+
+\begin{center}
+\begin{tabular}{clll}
+\hline
+\textbf{Table} & \textbf{Entry} & \textbf{Menu} & \textbf{Options} \\
+\hline
+\$607D & \$60C7 & Main actions & Move, Attack, Defend, Stop, Other, Rest, See Your Lot \\
+\$610F & \$6145 & Attack direction & Defend, Attack Left/Above/Right/Below \\
+\$614C & \$618C & Other options & Move, Drop Gold/Armor, Retire, Add Someone, more... \\
+\$6193 & \$61F6 & Game settings & Move, Game Speed, Sound, Danger, Save Game \\
+\$623F & \$6261 & Attack target & Attack [target], Someone Else, Cancel \\
+\$626C & \$62A2 & Drop gold & Ducats to Drop, Drop Gold, Keep All Gold \\
+\$62B9 & --- & Save/load & Begin New Game, Continue Game Number \\
+\hline
+\end{tabular}
+\end{center}
+
+@ ``See Your Lot'' (\$6101) shows the character stats screen, then returns to
+the main menu.  ``Attack'' (\$6107) checks eligibility via [[$1564]], then
+either enters the attack direction menu or exits.
+
+<<menu handlers>>=
+    ORG     $6101
+MENU_SEE_YOUR_LOT:
+    JSR     DISPLAY_CHAR_STATS ; show character stats
+    JMP     TEARDOWN_INPUT     ; return to main menu
+
+MENU_CHECK_ATTACK:
+    JSR     $1564              ; check attack eligibility
+    BCC     ENTER_ATTACK_MENU  ; eligible -> attack menu
+    JMP     $14EA              ; not eligible -> exit
+@ %def MENU_SEE_YOUR_LOT MENU_CHECK_ATTACK
+
+@ The attack direction menu at [[$610F]].
+
+<<attack direction table>>=
+    ORG     $610F
+ATTACK_DIR_TABLE:
+    ; 5 options, max_range=1, init=$626B
+    HEX     05 01 6B 62
+    ; rec0: DEFEND     rec1: LEFT     rec2: ABOVE    rec3: RIGHT    rec4: BELOW
+    HEX     01 39 03 05 02 04 78 7B B7 14
+    HEX     01 29 03 05 04 01 6A 7C DD 14
+    HEX     01 0C 05 01 02 04 59 7C E2 14
+    HEX     01 44 03 05 01 02 76 7C D8 14
+    HEX     01 5C 01 03 02 04 83 7C E7 14
+
+    ; --- enter attack (target of BCC from MENU_CHECK_ATTACK) ---
+ENTER_ATTACK_MENU:
+    LDX     #>ATTACK_DIR_TABLE ; X = high byte
+    LDY     #<ATTACK_DIR_TABLE ; Y = low byte
+    JMP     INPUT_LOOP
+@ %def ATTACK_DIR_TABLE ENTER_ATTACK_MENU
+@ The ``Other Options'' sub-menu at [[$614C]].  Record~5 (``Other
+Options'') chains to the game settings menu via [[$61F1]].
+
+<<other options table>>=
+    ORG     $614C
+OTHER_OPTIONS_TABLE:
+    ; 6 options, max_range=1, init=$626B
+    HEX     06 01 6B 62
+    ; rec0: MOVE       rec1: DROP GOLD   rec2: DROP ARMOR
+    ; rec3: OTHER OPT  rec4: RETIRE      rec5: ADD SOMEONE
+    HEX     01 05 03 02 06 04 53 7D 31 1A
+    HEX     01 2D 01 03 04 05 FA 7A 17 6F
+    HEX     01 55 02 01 05 06 DC 7A E9 6E
+    HEX     01 15 06 05 01 02 45 7D F1 61
+    HEX     01 3D 04 06 02 03 E7 7A E7 09
+    HEX     01 65 05 04 03 01 EE 7A EF 63
+@ %def OTHER_OPTIONS_TABLE
+
+<<other options entry>>=
+    ORG     $618C
+MENU_OTHER_OPTIONS:
+    LDX     #>OTHER_OPTIONS_TABLE
+    LDY     #<OTHER_OPTIONS_TABLE
+    JMP     INPUT_LOOP
+@ %def MENU_OTHER_OPTIONS
+
+@ The game settings menu at [[$6193]].  This includes game speed
+adjustment (records~1--3 with arrow keys), sound toggle, danger level
+(records~5--7), and save game.  The ``game settings'' entry at [[$61F1]]
+is an indirect jump through [[$A963]], a resident vector.  [[$61F6]] is
+the direct entry that loads the settings table and enters [[INPUT_LOOP]].
+[[$61FD]] initializes the settings display: it calls the splash routine
+at [[$09AC]], then formats the current game speed (\$7ABD) as a digit
+into the ``GAME SPEED'' label string at [[$7D66]].
+
+<<game settings table>>=
+    ORG     $6193
+GAME_SETTINGS_TABLE:
+    ; 9 options, max_range=1, init=$61FD
+    ; header: 9 options, max_range=1, init=MENU_SETTINGS_INIT
+    DC.B    $09,$01
+    DC.W    MENU_SETTINGS_INIT
+    ; rec0: MOVE             rec1: GAME SPEED      rec2: # (speed up)
+    ; rec3: @ (speed down)   rec4: SOUND IS ON      rec5: DANGER :
+    ; rec6: # (danger up)    rec7: @ (danger down)  rec8: SAVE GAME
+    HEX     01 03 05 09 08 03 53 7D 31 1A
+    HEX     01 13 00 00 00 00 58 7D 6B 62
+    HEX     01 23 07 07 01 04 60 7B 09 62
+    HEX     01 25 08 08 03 09 62 7B 20 62
+    HEX     01 53 09 01 09 07 04 7B 84 09
+    HEX     01 66 00 00 00 00 1B 7B 6B 62
+    HEX     01 73 03 03 05 08 60 7B 2D 62
+    HEX     01 75 04 04 07 01 62 7B 36 62
+    HEX     01 2B 01 05 04 05 11 7B 6C 63
+@ %def GAME_SETTINGS_TABLE
+
+<<game settings entry>>=
+    ORG     $61F1
+MENU_GAME_SETTINGS:
+    SUBROUTINE MENU_GAME_SETTINGS
+    LDA     #$01
+    STA     GAME_SETTINGS_TABLE+1 ; patch max_range = 1
+MENU_GAME_SETTINGS_ENTER:
+    LDX     #>GAME_SETTINGS_TABLE
+    LDY     #<GAME_SETTINGS_TABLE
+    JMP     INPUT_LOOP
+
+MENU_SETTINGS_INIT:
+    JSR     $09AC              ; splash screen setup
+    LDA     $7ABD              ; game speed value
+    ORA     #$B0               ; convert to ASCII digit
+    STA     $7D66              ; patch into "GAME SPEED : X" string
+    RTS
+@ %def MENU_GAME_SETTINGS MENU_SETTINGS_INIT
+
+@ The settings adjustment handlers increment or decrement the game speed
+([[$7ABD]]) and danger threshold, then re-enter the settings menu.
+[[$7ABC]] is the maximum game speed.
+
+<<settings handlers>>=
+    ORG     $6209
+SETTINGS_SPEED_UP:
+    SUBROUTINE SETTINGS_SPEED_UP
+    JSR     $6071              ; patch menu record
+    INC     $7ABD              ; speed++
+    LDA     $7ABD
+    CMP     $7ABC              ; at max?
+    BCC     .done
+    LDA     $7ABC              ; clamp to max
+    STA     $7ABD
+.done:
+    JMP     MENU_GAME_SETTINGS_ENTER ; re-enter settings menu
+
+SETTINGS_SPEED_DOWN:
+    JSR     $6071              ; patch menu record
+    DEC     $7ABD              ; speed--
+    BNE     .done              ; nonzero -> ok
+    INC     $7ABD              ; clamp to 1
+    BNE     .done              ; (always taken)
+
+SETTINGS_DANGER_UP:
+    JSR     $6071              ; patch menu record
+    JSR     $09CF              ; increment danger threshold
+    JMP     MENU_GAME_SETTINGS_ENTER
+
+SETTINGS_DANGER_DOWN:
+    JSR     $6071              ; patch menu record
+    JSR     $09CB              ; decrement danger threshold
+    JMP     MENU_GAME_SETTINGS_ENTER
+@ %def SETTINGS_SPEED_UP SETTINGS_SPEED_DOWN SETTINGS_DANGER_UP SETTINGS_DANGER_DOWN
+
+@ The attack target menu at [[$623F]].
+
+<<attack target table>>=
+    ORG     $623F
+ATTACK_TARGET_TABLE:
+    ; 3 options, max_range=2, init=MENU_ATTACK_INIT
+    HEX     03 02
+    DC.W    MENU_ATTACK_INIT
+    ; rec0: ATTACK [target]  rec1: SOMEONE ELSE  rec2: CANCEL
+    HEX     01 06 03 02 00 00 94 7C AB 15
+    HEX     01 2E 01 03 00 00 B0 7C 5E 15
+    HEX     01 56 02 01 00 00 C4 7C 6B 62
+
+MENU_ATTACK_TARGET:
+    LDX     #>ATTACK_TARGET_TABLE
+    LDY     #<ATTACK_TARGET_TABLE
+    JMP     INPUT_LOOP
+
+MENU_ATTACK_INIT:
+    JSR     $1537              ; init attack target display
+    RTS
+@ %def ATTACK_TARGET_TABLE MENU_ATTACK_TARGET MENU_ATTACK_INIT
+
+@ The drop gold menu at [[$626C]].
+
+<<drop gold table>>=
+    ORG     $626C
+DROP_GOLD_TABLE:
+    ; 5 options, max_range=2, init=MENU_DROP_GOLD_INIT
+    HEX     05 02
+    DC.W    MENU_DROP_GOLD_INIT
+    ; rec0: DUCATS   rec1: # (inc)  rec2: @ (dec)
+    ; rec3: DROP     rec4: KEEP ALL
+    HEX     01 2A 00 00 00 00 D9 7C A2 62
+    HEX     01 43 04 04 04 03 60 7B B3 62
+    HEX     01 45 04 04 02 04 62 7B AD 62
+    HEX     01 52 02 03 03 05 FA 7A B5 6F
+    HEX     01 69 02 03 04 04 F1 7C 31 1A
+
+MENU_DROP_GOLD:
+    LDX     #>DROP_GOLD_TABLE
+    LDY     #<DROP_GOLD_TABLE
+    JMP     INPUT_LOOP
+
+MENU_DROP_GOLD_INIT:
+    JSR     $6F52              ; init drop amount display
+    RTS
+
+MENU_DROP_INC:
+    JSR     $6071              ; patch menu record
+    JMP     $6F72              ; increment drop amount
+
+MENU_DROP_DEC:
+    JSR     $6071              ; patch menu record
+    JMP     $6F76              ; decrement drop amount
+@ %def DROP_GOLD_TABLE MENU_DROP_GOLD MENU_DROP_GOLD_INIT MENU_DROP_INC MENU_DROP_DEC
+
+@ The save/load game menu at [[$62B9]].
+
+<<save load table>>=
+    ORG     $62B9
+SAVE_LOAD_TABLE:
+    ; 4 options, max_range=1, init=$62EC
+    HEX     04 01 EC 62
+    ; rec0: NEW GAME   rec1: CONTINUE   rec2: # (up)   rec3: @ (down)
+    HEX     01 05 02 02 00 00 F3 7B 6B 62
+    HEX     01 55 01 01 04 03 DB 7B C8 69
+    HEX     01 6F 01 01 02 04 60 7B 0F 63
+    HEX     01 71 01 01 03 02 62 7B 15 63
+@ %def SAVE_LOAD_TABLE
+
 @ [[START_GAME_INPUT]] enters the input loop with a pointer to the alternative
 input table at~\$6436 (X=\$64, Y=\$36).  This is used when the game needs to
 present a different set of options than the standard action menu---for example,
@@ -17015,6 +17258,16 @@ The following root chunks produce the assembly files when tangled.
 <<teardown input>>
 <<get input table ptr>>
 <<configure input>>
+<<menu handlers>>
+<<attack direction table>>
+<<other options table>>
+<<other options entry>>
+<<game settings table>>
+<<game settings entry>>
+<<settings handlers>>
+<<attack target table>>
+<<drop gold table>>
+<<save load table>>
 <<init world>>
 <<start game input>>
 <<check threats here>>
