@@ -16194,6 +16194,92 @@ The reset vector points here.  Simply jumps to [[ATTRACT_LOOP]].
 STUB_ENTRY:
     JMP     ATTRACT_LOOP
 @ %def STUB_ENTRY
+
+@ [[READ_DATA_FIELD]] reads a disk data field from the drive.  It
+searches for the D5~AA~AD prologue, reads 342~(\$156) bytes of
+encoded data (checking each against \$AF), then reads 256~(\$100)
+bytes, and finally verifies the DE~AA epilogue.  Returns with carry
+clear on success, carry set on error.  The entry at [[READ_DATA_FIELD_AD]]
+(\$051E) skips the D5~AA search and checks only for the AD~byte.
+
+During reading, [[BIT \$C000]] polls the keyboard---if a key is
+pressed, the read is aborted and the nibble is stored at [[$07F6]].
+
+<<read data field>>=
+    ORG     $0503
+READ_DATA_FIELD:
+    SUBROUTINE READ_DATA_FIELD
+
+    ; --- Search for D5 AA AD prologue ---
+    LDY     #$20              ; retry counter
+.search_d5:
+    DEY
+    BEQ     .error            ; timeout -> error
+    LDA     DISK_DATA_REG     ; \ wait for disk byte
+    BPL     *-3               ; /
+.recheck:
+    EOR     #$D5              ; D5?
+    BNE     .search_d5        ; no -> restart search
+    LDA     DISK_DATA_REG     ; \ wait for next byte
+    BPL     *-3               ; /
+    CMP     #$AA              ; AA?
+    BNE     .recheck          ; no -> re-check as D5
+READ_DATA_FIELD_AD:
+    LDA     DISK_DATA_REG     ; \ wait for next byte
+    BPL     *-3               ; /
+    CMP     #$AD              ; AD?
+    BNE     .recheck          ; no -> re-check as D5
+
+    ; --- Read 342 bytes of encoded data ---
+    PHA                       ; timing padding
+    PLA
+    LDY     #$56              ; 342 bytes ($156 wraps via DEY from $56)
+.read_342:
+    LDA     DISK_DATA_REG     ; \ wait for disk byte
+    BPL     *-3               ; /
+    BIT     $C000             ; check keyboard
+    CMP     #$AF              ; valid nibble? (must be >= $AF)
+    BNE     .abort            ; invalid -> abort
+    DEY
+    BNE     .read_342         ; loop for $56 bytes (86 dec)
+
+    ; --- Read 256 bytes of data ---
+    LDY     #$00              ; 256 bytes
+.read_256:
+    LDA     DISK_DATA_REG     ; \ wait for disk byte
+    BPL     *-3               ; /
+    BIT     $C000             ; check keyboard
+    CMP     #$AF              ; valid nibble?
+    BNE     .abort            ; invalid -> abort
+    DEY
+    BNE     .read_256         ; loop for 256 bytes
+
+    ; --- Verify DE AA epilogue ---
+    LDY     DISK_DATA_REG     ; \ wait for epilogue byte 1
+    BPL     *-3               ; / (value discarded)
+    PHA                       ; timing padding
+    PLA
+    LDA     DISK_DATA_REG     ; \ wait for epilogue byte 2
+    BPL     *-3               ; /
+    CMP     #$DE              ; DE?
+    BNE     .error            ; no -> error
+    LDA     DISK_DATA_REG     ; \ wait for epilogue byte 3
+    BPL     *-3               ; /
+    CMP     #$AA              ; AA?
+    BEQ     .ok               ; yes -> success
+
+.error:
+    SEC                       ; carry set = error
+    RTS
+.ok:
+    CLC                       ; carry clear = success
+    RTS
+.abort:
+    STA     $07F6             ; save nibble that caused abort
+    SEC                       ; carry set = error
+    RTS
+@ %def READ_DATA_FIELD READ_DATA_FIELD_AD
+
 This 321-byte region between [[ATTRACT_LOOP]] and [[CONTEXT_SWAP]]
 contains EALDR VM bytecodes interleaved with native 6502 routines.
 The bytecodes drive the attract-screen display and the
@@ -17289,6 +17375,7 @@ The following root chunks produce the assembly files when tangled.
 <<main.asm>>=
     PROCESSOR 6502
 <<stub entry>>
+<<read data field>>
 <<attract loop>>
 <<resident data and bytecodes>>
 <<resident dispatch>>
