@@ -8426,15 +8426,6 @@ replaces the indirect jump to [[indirect_routine]] in [[start_sound]] to an
 absolute jump to [[next_table_entry]], since there is no further need to
 animate while playing sound.
 
-
-<<Message data>>=
-MESSAGE_DATA:
-    APSTR ""
-    APSTR "GOLD EATING ROCK SLIME GOBBLES THE CASH."
-    APSTR ""
-    APSTR "YOUR USED ARMOR IS WORTHLESS."
-    APSTR ""
-@ %def MESSAGE_DATA
 Immediately after the event lists, the region [[$4C80--$5AFF]] holds
 the mob data table and associated name strings.
 
@@ -11645,7 +11636,7 @@ adjustment (records~1--3 with arrow keys), sound toggle, danger level
 is an indirect jump through [[$A963]], a resident vector.  [[$61F6]] is
 the direct entry that loads the settings table and enters [[INPUT_LOOP]].
 [[$61FD]] initializes the settings display: it calls the splash routine
-at [[$09AC]], then formats the current game speed (\$7ABD) as a digit
+at [[SETTINGS_DISPLAY_INIT]] ([[$09AC]]), then formats the current game speed (\$7ABD) as a digit
 into the ``GAME SPEED'' label string at [[$7D66]].
 
 <<game settings table>>=
@@ -16113,6 +16104,106 @@ The soft-switch reads at [[$C050]]--[[$C057]] configure the Apple II display:
 [[GR]], full-screen (no split text), page 1, hi-res. This puts the display
 into HGR mode showing the framebuffer at [[$2000]]--[[$3FFF]].
 
+\subsection{Sound and settings routines (\$0984--\$09F3)}
+
+[[TOGGLE_SOUND]] (\$0984) is the handler for the ``SOUND IS ON'' menu
+option.  It checks whether [[PLAY_HIGH_TONE]] starts with \$60 (RTS,
+meaning sound is off) or \$A0 (LDY, meaning sound is on).  To disable
+sound, it writes RTS (\$60) to both [[PLAY_HIGH_TONE]] and
+[[PLAY_LOW_TONE]], making them return immediately.  To enable sound,
+it restores the original LDY~\#\$0A opcode (\$A0).  It also patches
+the ``SOUND IS ON'' label string: ``ON~'' (\$CE/\$A0) becomes ``OFF''
+(\$C6/\$C6).
+
+[[SETTINGS_DISPLAY_INIT]] (\$09AC) initializes the game settings
+display by writing spaces into the ``DANGER'' label, formatting
+[[EVENT_THRESHOLD]] via [[NUM_TO_DECIMAL]], and jumping to the
+settings menu.
+
+[[DEC_EVENT_THRESHOLD]] and [[INC_EVENT_THRESHOLD]] adjust the
+random event probability (clamped to 0--99).
+
+[[RETIRE_CHARACTER]] (\$09E7) clears [[ACTIVE_CHAR]], calls
+[[REORDER_CURRENT_CHAR]], and re-enters [[SCENE_LOOP]] with scene~\$23.
+
+<<sound and settings>>=
+    ORG     $0984
+TOGGLE_SOUND:
+    SUBROUTINE TOGGLE_SOUND
+    ; Check current state: PLAY_HIGH_TONE byte = $60 (RTS) means off
+    LDA     #$60              ; RTS opcode
+    CMP     PLAY_HIGH_TONE    ; is sound disabled?
+    BNE     .turn_off
+    ; --- Enable sound ---
+    LDA     #$CE              ; 'N' (high-bit ASCII)
+    STA     $7B0F             ; patch "OFF" -> "ON "
+    LDA     #$A0              ; ' ' (space) / LDY opcode
+    STA     $7B10             ; trailing space
+    LDA     #$A0              ; LDY #$xx opcode (restores original)
+.patch_tones:
+    STA     PLAY_HIGH_TONE    ; patch PLAY_HIGH_TONE entry byte
+    STA     PLAY_LOW_TONE     ; patch PLAY_LOW_TONE entry byte
+    JMP     MENU_GAME_SETTINGS ; re-enter settings menu
+.turn_off:
+    ; --- Disable sound ---
+    LDA     #$C6              ; 'F' (high-bit ASCII)
+    STA     $7B0F             ; patch "ON " -> "OFF"
+    STA     $7B10             ;
+    LDA     #$60              ; RTS opcode
+    BNE     .patch_tones      ; -> STA PLAY_HIGH_TONE / PLAY_LOW_TONE
+
+    ; --- Initialize settings display ---
+SETTINGS_DISPLAY_INIT:
+    LDA     #$20              ; \ clear danger digit area
+    STA     $7B24             ;  |
+    STA     $7B25             ;  |
+    STA     $7B26             ; /
+    LDA     #$00
+    STA     NUM_VALUE+1       ; high byte = 0
+    LDA     EVENT_THRESHOLD   ; current threshold value
+    STA     NUM_VALUE         ; -> NUM_VALUE
+    LDA     #$22              ; \ DECIMAL_OUT_PTR = $7B22
+    STA     DECIMAL_OUT_PTR   ;  | (danger display area)
+    LDA     #$7B              ;  |
+    STA     DECIMAL_OUT_PTR+1 ; /
+    JMP     NUM_TO_DECIMAL    ; format and return
+
+    ; --- Decrement event threshold (wrapper for menu) ---
+DEC_THRESHOLD_WRAP:
+    JSR     DEC_EVENT_THRESHOLD
+    RTS
+
+    ; --- Increment event threshold (wrapper for menu) ---
+INC_THRESHOLD_WRAP:
+    JSR     INC_EVENT_THRESHOLD
+    RTS
+
+    ; --- Decrement EVENT_THRESHOLD (clamp to 0) ---
+DEC_EVENT_THRESHOLD:
+    DEC     EVENT_THRESHOLD
+    BPL     .dec_done         ; >= 0 -> ok
+    INC     EVENT_THRESHOLD   ; clamp: -1 -> 0
+.dec_done:
+    RTS
+
+    ; --- Increment EVENT_THRESHOLD (clamp to 99) ---
+INC_EVENT_THRESHOLD:
+    LDA     EVENT_THRESHOLD
+    CMP     #$63              ; 99 decimal
+    BCS     .inc_done         ; already at max
+    INC     EVENT_THRESHOLD
+.inc_done:
+    RTS
+
+    ; --- Retire current character ---
+RETIRE_CHARACTER:
+    LDA     #$00
+    STA     ACTIVE_CHAR       ; clear active character
+    JSR     REORDER_CURRENT_CHAR
+    LDA     #$23              ; scene $23
+    JMP     SCENE_LOOP
+@ %def TOGGLE_SOUND SETTINGS_DISPLAY_INIT DEC_THRESHOLD_WRAP INC_THRESHOLD_WRAP DEC_EVENT_THRESHOLD INC_EVENT_THRESHOLD RETIRE_CHARACTER
+
 \label{sec:attract_screen}
 
 <<attract screen>>=
@@ -17668,6 +17759,7 @@ The following root chunks produce the assembly files when tangled.
 <<load char name ptr>>
 <<setup char sprite>>
 <<check mob needs turn>>
+<<sound and settings>>
 <<attract screen>>
 <<scene setup>>
 <<clamp char field>>
