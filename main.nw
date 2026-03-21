@@ -6552,6 +6552,155 @@ STATS_PROMPT_JOYSTICK:        ; $7E18
     ; (STATUS_BORDER_DATA follows immediately at $7E2F)
 @ %def STATS_PROMPT_KEYBOARD STATS_PROMPT_JOYSTICK
 
+\section{Game message strings}
+
+The 61-entry message string table at [[$9AA5]]--[[$A262]] holds all
+narrative text displayed by [[DISPLAY_MESSAGE]].  Each message is one
+or more consecutive Pascal strings (length byte + high-bit ASCII)
+terminated by a \$00 separator.  Multi-string messages display as
+consecutive lines.
+
+<<game message strings>>=
+    ORG     $9AA5
+GAME_MESSAGE_STRINGS:
+    ; Game narrative messages, accessed by index via DISPLAY_MESSAGE.
+    ; Each entry is a $00-terminated group of Pascal strings.
+    DC.B    $04,$00              ; header
+    APSTR "THE DOOR CREAKS BUT REMAINS SHUT."
+    DC.B    $00               ; --- message 0 separator ---
+    APSTR "THE DOOR SWINGS OPEN!"
+    DC.B    $00               ; --- message 1 separator ---
+    APSTR "INSERT ALI BABA DISK"
+    DC.B    $00               ; --- message 2 separator ---
+    APSTR "HAH! JUST A SCRATCH!"
+    DC.B    $00               ; --- message 3 separator ---
+    APSTR "OUCH!"
+    DC.B    $00               ; --- message 4 separator ---
+    APSTR "AAARGH!"
+    DC.B    $00               ; --- message 5 separator ---
+    APSTR "AIIYEEEEE!!"
+    DC.B    $00               ; --- message 6 separator ---
+    APSTR "OH MA, I THINK IT'S MY TIME."
+    DC.B    $00               ; --- message 7 separator ---
+    APSTR "FALLS UNCONSCIOUS TO THE FLOOR."
+    DC.B    $00               ; --- message 8 separator ---
+    APSTR "IS FEELING RATHER WEAK."
+    DC.B    $00               ; --- message 9 separator ---
+    APSTR "STILL HAS LOTS OF FIGHT LEFT."
+    DC.B    $00               ; --- message 10 separator ---
+    APSTR "SMASHES INTO A SOLID WALL."
+    DC.B    $00               ; --- message 11 separator ---
+    APSTR "CHARGES INTO A STONE STATUE."
+    DC.B    $00               ; --- message 12 separator ---
+    APSTR "DEPARTS THE LAND OF THE LIVING."
+    DC.B    $00               ; --- message 13 separator ---
+    APSTR "CONGRATULATIONS!"
+    APSTR "YOU ARE IN THE MOUNTAIN."
+    APSTR "I HAVE SHOWN YOU DOORS,"
+    APSTR "WEALTH AND TRADING OUTPOSTS."
+    APSTR "NO LONGER SHALL I POINT THEM OUT."
+    APSTR ". . .  THE FRIENDLY MAGE"
+    DC.B    $00               ; --- message 14 separator ---
+    APSTR "A LITTLE ROCK CRACKS AND FALLS."
+    DC.B    $00               ; --- message 15 separator ---
+    APSTR "A HEAVY PIECE OF ROCK FALLS,"
+    APSTR "KNOCKING DOWN"
+    DC.B    $00               ; --- message 16 separator ---
+    APSTR "A BILLOWING CLOUD OF DUST"
+    APSTR "ENVELOPS THE WALL."
+    DC.B    $00               ; --- message 17 separator ---
+    APSTR "THE SCULPTURE TOPPLES OVER"
+    APSTR "AND CRUMBLES INTO DUST."
+    DC.B    $00               ; --- message 18 separator ---
+    APSTR "BUT NOTHING INTERESTING HAPPENS."
+    DC.B    $00               ; --- message 19 separator ---
+    APSTR "AS SOON AS IT IS TOUCHED,"
+    APSTR "THE ILLUSION DISAPPEARS!"
+    DC.B    $00               ; --- message 20 separator ---
+    APSTR "THAT'S NOT A SCENARIO DISK!"
+    DC.B    $00               ; --- message 21 separator ---
+    APSTR "WHOSE TOUGH HIDE SOFTENS THE BLOW."
+    DC.B    $00               ; --- message 22 separator ---
+    APSTR "WHOSE ARMOR TAKES SOME OF THE IMPACT."
+    DC.B    $00               ; --- message 23 separator ---
+    APSTR "WHO, UNHARMED, GROWLS OMINOUSLY."
+    DC.B    $00               ; --- message 24 separator ---
+    APSTR "WHO CHORTLES MERRILY"
+    APSTR "AS THE ARMOR TAKES THE FULL BLOW."
+    DC.B    $00               ; --- message 25 separator ---
+    APSTR "DISK I/O ERROR!"
+    DC.B    $00               ; --- message 26 separator ---
+    APSTR "BREAKS FREE OF THE FRACAS."
+    DC.B    $00               ; --- message 27 separator ---
+    APSTR "FAILS TO ESCAPE FROM THE ENEMY."
+    DC.B    $00               ; --- message 28 separator ---
+    APSTR "FAILS TO TACKLE THE ENEMY."
+    DC.B    $00               ; --- message 29 separator ---
+    APSTR "LEAPS INTO A FLYING TACKLE"
+    APSTR "AND WRESTLES WITH THE FOE."
+    DC.B    $00               ; --- message 30 separator ---
+    APSTR "IS UNCONSCIOUS."
+    DC.B    $00               ; --- message 31 separator ---
+    APSTR "FEELS STRONGER AFTER RESTING."
+    DC.B    $00               ; --- message 32 separator ---
+    APSTR "STRUGGLES BACK TO CONSCIOUSNESS."
+    DC.B    $00               ; --- message 33 separator ---
+    APSTR "PLEASE ENTER A NUMBER"
+    APSTR "FROM 1 TO 24."
+    DC.B    $00               ; --- message 34 separator ---
+    APSTR "YOU SAVED ME FROM MY IMPRISONMENT,"
+    DC.B    $00               ; --- message 35 separator ---
+    APSTR "IN GRATITUDE I AM YOURS TO COMMAND."
+    DC.B    $00               ; --- message 36 separator ---
+    APSTR "THANK YOU."
+    DC.B    $00               ; --- message 37 separator ---
+    APSTR "SHUFFLES OFF THIS MORTAL COIL."
+    DC.B    $00               ; --- message 38 separator ---
+    APSTR "GIVES AN OBOLUS TO CHARON."
+    DC.B    $00               ; --- message 39 separator ---
+    APSTR "TURNS THE TOES UP TO THE DAISIES."
+    DC.B    $00               ; --- message 40 separator ---
+    APSTR "GOLD EATING ROCK SLIME GOBBLES THE CASH."
+    DC.B    $00               ; --- message 41 separator ---
+    APSTR "YOUR USED ARMOR IS WORTHLESS."
+    DC.B    $00               ; --- message 42 separator ---
+    APSTR "ALL THE GOLD SINKS INTO SOME QUICKSAND."
+    DC.B    $00               ; --- message 43 separator ---
+    APSTR "SOME GOLD FALLS THRU HOLES IN THE FLOOR."
+    DC.B    $00               ; --- message 44 separator ---
+    APSTR "YOU HAVE NO GOLD!"
+    DC.B    $00               ; --- message 45 separator ---
+    APSTR "MOVE WITH THE JOYSTICK OR"
+    APSTR "PRESS BUTTON FOR OPTIONS."
+    DC.B    $00               ; --- message 46 separator ---
+    APSTR "PRESS ANY KEY TO CONTINUE."
+    DC.B    $00               ; --- message 47 separator ---
+    APSTR "SORRY, BUT YOU ARE TOO POOR."
+    DC.B    $00               ; --- message 48 separator ---
+    DC.B    $00               ; --- message 49 separator ---
+    APSTR "PLEASE INSERT SCENARIO DISK."
+    DC.B    $00               ; --- message 50 separator ---
+    APSTR "WHO, UNAWARE OF DANGER,"
+    APSTR "ESCAPES THE BLOW UNHARMED."
+    DC.B    $00               ; --- message 51 separator ---
+    APSTR "ENOUGH IS ENOUGH!"
+    APSTR "NO MORE PLAYERS ARE ALLOWED."
+    DC.B    $00               ; --- message 52 separator ---
+    DC.B    $00               ; --- message 53 separator ---
+    APSTR "YOU HAVE NO ARMOR!"
+    DC.B    $00               ; --- message 54 separator ---
+    APSTR "PRESS SPACE BAR TO USE KEYBOARD OR"
+    APSTR "JOYSTICK BUTTON TO USE JOYSTICK."
+    DC.B    $00               ; --- message 55 separator ---
+    DC.B    $00               ; --- message 56 separator ---
+    DC.B    $00               ; --- message 57 separator ---
+    APSTR "CAN NOT READ SCENARIO FROM DISK"
+    APSTR "PROGRAM WILL NOW CRASH!!"
+    DC.B    $00               ; --- message 58 separator ---
+    DC.B    $00               ; --- message 59 separator ---
+    DC.B    $00               ; --- message 60 separator ---
+@ %def GAME_MESSAGE_STRINGS
+
 \section{Undocumented data regions}
 
 The following data regions contain game strings, lookup tables, and
@@ -17981,6 +18130,7 @@ The following root chunks produce the assembly files when tangled.
 <<hrcg home clr>>
 <<hrcg calc addr>>
 <<std font data>>
+<<game message strings>>
 <<resident tune bytecode>>
 <<disk read field>>
 <<verify data field>>
