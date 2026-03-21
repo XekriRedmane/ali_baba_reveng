@@ -21,6 +21,17 @@ Report the result:
 - If there is an "Origin Reverse-indexed" error, run `python .claude/skills/assemble/reorder_chunks.py` to auto-fix the chunk order in `<<main.asm>>`, then retry the build.
 - If there are other errors or warnings (excluding "unreferenced chunk" warnings from weave.py), list them.
 
+## Verify against reference binary
+
+After assembling, verify the output matches `main.bin`:
+
+```
+python .claude/skills/assemble/verify.py              # full coverage report
+python .claude/skills/assemble/verify.py 0503 0569    # check one region
+```
+
+Full mode shows coverage percentage and lists all undocumented gaps grouped by size. Region mode checks a specific address range and shows the first few mismatches.
+
 ## Reorder chunks
 
 If chunk references in `<<main.asm>>` get out of ORG order (causing "Origin Reverse-indexed" errors), run:
