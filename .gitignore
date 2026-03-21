@@ -1,5 +1,6 @@
 __pycache__/
 *.lock*
+output/
 
 # Ghidra project transient files
 AliBaba.rep/**/tmp*.ps
