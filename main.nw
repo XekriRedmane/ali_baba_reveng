@@ -6148,11 +6148,11 @@ that the frequency of the note played will be equal to [[510204 / (10X+31)]] Hz.
 See \href{https://6502disassembly.com/a2-rom/}{The Oft Misunderstood WAIT} for a derivation of average cycle time.
 
 @ Note: the [[tone]] and [[high_tone]] routines referenced in the old
-song table documentation are identical to [[PLAY_NOISE]] (\$7A91) and
-[[PLAY_TONE]] (\$7A7F) respectively.  The names came from an earlier
+song table documentation are identical to [[PLAY_LOW_TONE]] (\$7A91) and
+[[PLAY_HIGH_TONE]] (\$7A7F) respectively.  The names came from an earlier
 analysis before the tune player was fully understood.
 
-@ [[PLAY_TONE]] generates a square wave tone by toggling the Apple~II
+@ [[PLAY_HIGH_TONE]] generates a square wave tone by toggling the Apple~II
 speaker at [[$C030]].  The outer loop runs 10~iterations (Y), each toggling
 the speaker then delaying by~X cycles.  After all 10~toggles, the whole
 sequence repeats [[SOUND_DURATION]] times.  [[SOUND_FREQ]] controls the
@@ -6165,8 +6165,8 @@ SOUND_DURATION          EQU     $E2     ; sound duration / tune parameter byte
 
 <<play tone>>=
     ORG     $7A7F
-PLAY_TONE:
-    SUBROUTINE PLAY_TONE
+PLAY_HIGH_TONE:
+    SUBROUTINE PLAY_HIGH_TONE
 
 .outer:
     LDY     #$0A           ; 10 speaker toggles per cycle
@@ -6180,32 +6180,36 @@ PLAY_TONE:
     DEC     SOUND_DURATION ; repeat whole cycle
     BNE     .outer
     RTS
-@ %def PLAY_TONE
+@ %def PLAY_HIGH_TONE
 
-@ [[PLAY_NOISE]] generates noise by toggling the speaker while rotating
-[[NOISE_SHIFT]], a zero-page shift register.  The ROL/ROR pair with the
-speaker read creates pseudo-random bit patterns that produce a ``hiss''
-or explosion-like sound.
+@ [[PLAY_LOW_TONE]] generates a low-octave tone.  It has the same
+structure as [[PLAY_HIGH_TONE]] but with extra cycles in the inner loop
+(ROL/ROR [[$E3]] plus three NOPs), producing a longer toggle period and
+thus a lower frequency for the same X~value.  The formula is
+[[510204 / (10X+31)]]~Hz, roughly one octave below [[PLAY_HIGH_TONE]].
+
+The ROL/ROR pair on~[[$E3]] cancels out (no net effect on the shift
+register); it exists purely for cycle padding.
 
 <<zero page defines>>=
-NOISE_SHIFT             EQU     $E3     ; noise generator shift register
-@ %def NOISE_SHIFT
+TONE_PADDING            EQU     $E3     ; byte used for cycle padding in PLAY_LOW_TONE
+@ %def TONE_PADDING
 
-<<play noise>>=
+<<play low tone>>=
     ORG     $7A91
-PLAY_NOISE:
-    SUBROUTINE PLAY_NOISE
+PLAY_LOW_TONE:
+    SUBROUTINE PLAY_LOW_TONE
 
 .outer:
     LDY     #$0A           ; 10 toggles per cycle
 .toggle:
     LDA     $C030          ; toggle speaker
-    ROL     NOISE_SHIFT    ; rotate shift register left
+    ROL     TONE_PADDING   ; \ cycle padding (5 cycles)
     DEX
     BNE     .toggle        ; inner delay loop
     LDX     SOUND_FREQ     ; reload pitch counter
-    ROL     NOISE_SHIFT    ; \ rotate left then right =
-    ROR     NOISE_SHIFT    ; / feedback from carry bit
+    ROL     TONE_PADDING   ; \ more cycle padding
+    ROR     TONE_PADDING   ; / (ROL+ROR cancels out)
     NOP                    ; \
     NOP                    ;  | timing padding
     NOP                    ; /
@@ -6214,7 +6218,7 @@ PLAY_NOISE:
     DEC     SOUND_DURATION ; repeat whole cycle
     BNE     .outer
     RTS
-@ %def PLAY_NOISE
+@ %def PLAY_LOW_TONE
 Based on cycle times, these are the closest values for various notes. At the higher
 frequencies, the values get so low that they differ only by one, which means the
 notes aren't very accurate.
@@ -6643,7 +6647,7 @@ CALL_ROM_WAIT:
     JMP     ROM_WAIT      ; tail-call ROM WAIT
 @ %def CALL_ROM_WAIT
 @ [[DISPATCH_ON_MODE]] provides a timing delay appropriate to the current
-display mode.  It checks [[PLAY_TONE]]: if the byte is~\$60 (an RTS opcode,
+display mode.  It checks [[PLAY_HIGH_TONE]]: if the byte is~\$60 (an RTS opcode,
 used as a ``sound disabled'' sentinel), it calls [[DELAY_WITH_ANIMATION]] for
 a longer pause with blinking; otherwise it calls [[ANIM_TICK_AND_WAIT]] for a
 shorter animation step.  This keeps the game's pacing consistent whether sound
@@ -6653,9 +6657,9 @@ is enabled or not.
 <<dispatch on mode>>=
     ORG     $1F0C
     SUBROUTINE DISPATCH_ON_MODE
-; Dispatches on PLAY_TONE: if $60 (RTS) then DELAY_WITH_ANIMATION else ANIM_TICK_AND_WAIT
+; Dispatches on PLAY_HIGH_TONE: if $60 (RTS) then DELAY_WITH_ANIMATION else ANIM_TICK_AND_WAIT
 DISPATCH_ON_MODE:
-    LDA     PLAY_TONE
+    LDA     PLAY_HIGH_TONE
     BAEQ    #$60,.mode_60
     JMP     ANIM_TICK_AND_WAIT
 .mode_60:
@@ -7979,8 +7983,8 @@ Key subsystems:
         position commands, pause/reset control codes, and character data
         for the HRCG font.
   \item \textbf{Tune player} ([[TUNE_PLAYER]]): Plays sound effects and
-        music from [[TUNE_TABLE]].  Supports loops, gosub, tone/noise
-        selection, and PRNG-based note randomization.
+        music from [[TUNE_TABLE]].  Supports loops, gosub, high/low
+        octave selection, and PRNG-based note randomization.
   \item \textbf{Resident interpreter} ([[$0500]]--[[$07FF]]): A
         secondary VM copied from EALDR, using context-swapped zero-page
         state and XOR-encrypted addresses.
@@ -14950,8 +14954,8 @@ TUNE_1_COMBAT_HIT:
     DC.B    $23               ; HIGH
     DC.B    $C1,$05            ; C5 (48ms)
     DC.B    $22               ; LOW
-    DC.B    $50,$06            ; Eb6 (24ms)
-    DC.B    $3F,$08            ; G6 (26ms)
+    DC.B    $50,$06            ; Eb5 (49ms)
+    DC.B    $3F,$08            ; G5 (52ms)
     DC.B    $25               ; HIRAND
     DC.B    $23               ; HIGH
     DC.B    $60,$10            ; C6 (77ms)
@@ -14970,9 +14974,9 @@ TUNE_2_COMBAT_DAMAGE:
     DC.B    $25               ; HIRAND
     DC.B    $1F               ; MARK2
     DC.B    $22               ; LOW
-    DC.B    $3F,$05            ; G6 (16ms)
-    DC.B    $50,$04            ; Eb6 (16ms)
-    DC.B    $80,$02            ; G5 (13ms)
+    DC.B    $3F,$05            ; G5 (32ms)
+    DC.B    $50,$04            ; Eb5 (33ms)
+    DC.B    $80,$02            ; G4 (26ms)
     DC.B    $23               ; HIGH
     DC.B    $C1,$04            ; C5 (38ms)
     DC.B    $00               ; LOOP 0 (patched at runtime)
@@ -14997,7 +15001,7 @@ TUNE_3_ATTRACT:
     DC.B    $20               ; MARK1 (gosub target for GOTO1 at end)
     ; --- opening phrase (low then high) ---
     DC.B    $22               ; LOW
-    DC.B    $3F,$65            ; G6 (324ms)
+    DC.B    $3F,$65            ; G5 (654ms)
     DC.B    $23               ; HIGH
     DC.B    $3F,$49            ; G6 (234ms)
     DC.B    $3F,$8A            ; G6 (442ms)
@@ -15007,10 +15011,10 @@ TUNE_3_ATTRACT:
     ; --- ascending arpeggio (loop 1x) ---
     DC.B    $1F               ; MARK2
     DC.B    $22               ; LOW
-    DC.B    $C1,$03            ; C5 (29ms)
-    DC.B    $80,$04            ; G5 (26ms)
-    DC.B    $50,$06            ; Eb6 (24ms)
-    DC.B    $3F,$08            ; G6 (26ms)
+    DC.B    $C1,$03            ; C4 (58ms)
+    DC.B    $80,$04            ; G4 (51ms)
+    DC.B    $50,$06            ; Eb5 (49ms)
+    DC.B    $3F,$08            ; G5 (52ms)
     DC.B    $23               ; HIGH
     DC.B    $60,$0A            ; C6 (48ms)
     DC.B    $50,$0C            ; Eb6 (48ms)
@@ -15035,13 +15039,13 @@ TUNE_3_ATTRACT:
     DC.B    $01               ; LOOP 1 (repeat arpeggio+melody once)
     ; --- second section ---
     DC.B    $22               ; LOW
-    DC.B    $C1,$03            ; C5 (29ms)
-    DC.B    $80,$04            ; G5 (26ms)
+    DC.B    $C1,$03            ; C4 (58ms)
+    DC.B    $80,$04            ; G4 (51ms)
     DC.B    $23               ; HIGH
     DC.B    $D9,$05            ; Bb4 (54ms)
     DC.B    $22               ; LOW
-    DC.B    $50,$06            ; Eb6 (24ms)
-    DC.B    $3F,$08            ; G6 (26ms)
+    DC.B    $50,$06            ; Eb5 (49ms)
+    DC.B    $3F,$08            ; G5 (52ms)
     DC.B    $23               ; HIGH
     DC.B    $6C,$09            ; Bb5 (49ms)
     DC.B    $50,$0C            ; Eb6 (48ms)
@@ -15056,34 +15060,34 @@ TUNE_3_ATTRACT:
     ; --- bridge ---
     DC.B    $C1,$0A            ; C5 (96ms)
     DC.B    $22               ; LOW
-    DC.B    $50,$0C            ; Eb6 (48ms)
-    DC.B    $3F,$0F            ; G6 (48ms)
+    DC.B    $50,$0C            ; Eb5 (98ms)
+    DC.B    $3F,$0F            ; G5 (97ms)
     DC.B    $23               ; HIGH
     DC.B    $6C,$12            ; Bb5 (97ms)
     DC.B    $72,$11            ; A5 (97ms)
     DC.B    $22               ; LOW
-    DC.B    $3F,$0F            ; G6 (48ms)
-    DC.B    $3F,$8A            ; G6 (442ms)
-    DC.B    $3F,$8A            ; G6 (442ms)
+    DC.B    $3F,$0F            ; G5 (97ms)
+    DC.B    $3F,$8A            ; G5 (894ms)
+    DC.B    $3F,$8A            ; G5 (894ms)
     ; --- slow descending phrase ---
-    DC.B    $C1,$0F            ; C5 (144ms)
-    DC.B    $A2,$12            ; Eb5 (145ms)
-    DC.B    $80,$17            ; G5 (147ms)
+    DC.B    $C1,$0F            ; C4 (288ms)
+    DC.B    $A2,$12            ; Eb4 (291ms)
+    DC.B    $80,$17            ; G4 (295ms)
     DC.B    $23               ; HIGH
     DC.B    $D9,$1B            ; Bb4 (290ms)
     DC.B    $22               ; LOW
-    DC.B    $72,$1A            ; A5 (148ms)
-    DC.B    $80,$17            ; G5 (147ms)
+    DC.B    $72,$1A            ; A4 (298ms)
+    DC.B    $80,$17            ; G4 (295ms)
     DC.B    $23               ; HIGH
     DC.B    $C1,$1F            ; C5 (297ms)
     DC.B    $22               ; LOW
-    DC.B    $50,$24            ; Eb6 (145ms)
-    DC.B    $3F,$2E            ; G6 (147ms)
+    DC.B    $50,$24            ; Eb5 (293ms)
+    DC.B    $3F,$2E            ; G5 (298ms)
     DC.B    $23               ; HIGH
     DC.B    $6C,$36            ; Bb5 (292ms)
     DC.B    $72,$34            ; A5 (297ms)
     DC.B    $22               ; LOW
-    DC.B    $3F,$2E            ; G6 (147ms)
+    DC.B    $3F,$2E            ; G5 (298ms)
     ; --- long sustain + finale ---
     DC.B    $23               ; HIGH
     DC.B    $60,$7A            ; C6 (588ms)
@@ -15095,14 +15099,14 @@ TUNE_3_ATTRACT:
     DC.B    $3F,$5C            ; G6 (295ms)
     ; --- quick ascending run ---
     DC.B    $22               ; LOW
-    DC.B    $FF,$02            ; G4 (25ms)
-    DC.B    $AC,$03            ; D5 (26ms)
-    DC.B    $80,$04            ; G5 (26ms)
+    DC.B    $FF,$02            ; G3 (51ms)
+    DC.B    $AC,$03            ; D4 (51ms)
+    DC.B    $80,$04            ; G4 (51ms)
     DC.B    $23               ; HIGH
     DC.B    $CD,$05            ; B4 (51ms)
     DC.B    $AC,$06            ; D5 (51ms)
     DC.B    $22               ; LOW
-    DC.B    $3F,$08            ; G6 (26ms)
+    DC.B    $3F,$08            ; G5 (52ms)
     DC.B    $23               ; HIGH
     DC.B    $65,$0A            ; B5 (51ms)
     DC.B    $55,$0B            ; D6 (47ms)
@@ -15146,12 +15150,12 @@ TUNE_5_NPC_DEATH:
 TUNE_6_COMBAT_AVOIDED:
     DC.B    $25               ; HIRAND
     DC.B    $22               ; LOW
-    DC.B    $80,$07            ; G5 (45ms)
+    DC.B    $80,$07            ; G4 (90ms)
     DC.B    $23               ; HIGH
     DC.B    $D9,$08            ; Bb4 (86ms)
     DC.B    $AC,$0A            ; D5 (85ms)
     DC.B    $22               ; LOW
-    DC.B    $3F,$0E            ; G6 (45ms)
+    DC.B    $3F,$0E            ; G5 (91ms)
     DC.B    $23               ; HIGH
     DC.B    $6C,$10            ; Bb5 (87ms)
     DC.B    $55,$15            ; D6 (90ms)
@@ -15186,13 +15190,13 @@ TUNE_7_ENTITY_INTERACTION:
     DC.B    $C1,$02            ; C5 (19ms)
     DC.B    $AC,$02            ; D5 (17ms)
     DC.B    $22               ; LOW
-    DC.B    $72,$02            ; A5 (11ms)
+    DC.B    $72,$02            ; A4 (23ms)
     DC.B    $23               ; HIGH
     DC.B    $C1,$02            ; C5 (19ms)
     DC.B    $C1,$02            ; C5 (19ms)
     DC.B    $99,$06            ; E5 (46ms)
     DC.B    $22               ; LOW
-    DC.B    $80,$04            ; G5 (26ms)
+    DC.B    $80,$04            ; G4 (51ms)
     DC.B    $23               ; HIGH
     DC.B    $C1,$03            ; C5 (29ms)
     DC.B    $C1,$01            ; C5 (10ms)
@@ -15200,7 +15204,7 @@ TUNE_7_ENTITY_INTERACTION:
     DC.B    $C1,$08            ; C5 (77ms)
     DC.B    $AC,$01            ; D5 (9ms)
     DC.B    $22               ; LOW
-    DC.B    $72,$01            ; A5 (6ms)
+    DC.B    $72,$01            ; A4 (11ms)
     DC.B    $23               ; HIGH
     DC.B    $C1,$03            ; C5 (29ms)
     DC.B    $C1,$05            ; C5 (48ms)
@@ -15212,7 +15216,7 @@ TUNE_7_ENTITY_INTERACTION:
 TUNE_8_AI_TURN:
     DC.B    $26               ; NORAND
     DC.B    $22               ; LOW
-    DC.B    $3F,$12            ; G6 (58ms)
+    DC.B    $3F,$12            ; G5 (117ms)
     DC.B    $24               ; END
 @ %def TUNE_8_AI_TURN
 
@@ -15221,7 +15225,7 @@ TUNE_8_AI_TURN:
 TUNE_9_MENU_SELECTION:
     DC.B    $26               ; NORAND
     DC.B    $22               ; LOW
-    DC.B    $AC,$05            ; D5 (43ms)
+    DC.B    $AC,$05            ; D4 (86ms)
     DC.B    $24               ; END
 @ %def TUNE_9_MENU_SELECTION
 
@@ -15271,9 +15275,9 @@ Each script byte is interpreted as follows:
 \$1F & MARK2 & Save next address as loop target \\
 \$20 & MARK1 & Save next address as gosub target \\
 \$21 & GOTO1 & Set PC to MARK1 address (gosub/restart) \\
-\$22 & LOW & Set action vector to [[PLAY_TONE]] (low octave) \\
-\$23 & HIGH & Set action vector to [[PLAY_TONE]] (high octave) \\
-\$24 & END & Return from script \\
+\$22 & LOW & Set action vector to [[PLAY_LOW_TONE]] \\
+\$23 & HIGH & Set action vector to [[PLAY_HIGH_TONE]] \\
+\$24 & END & Return from tune \\
 \$25 & HIRAND & Set PRNG mask to \$0F (high randomness) \\
 \$26 & NORAND & Set PRNG mask to \$00 (exact notes) \\
 \$27--\$FF & NOTE $f$,$d$ & Play note: frequency byte $f$ (XORed with masked PRNG), followed by duration byte $d$ \\
@@ -15282,7 +15286,7 @@ Each script byte is interpreted as follows:
 \end{center}
 
 NOTE dispatches through [[TUNE_ACTION_VEC]], which is set by the LOW/HIGH
-commands to point at [[PLAY_TONE]].  The PRNG mask (set by NORAND/HIRAND)
+commands to point at [[PLAY_HIGH_TONE]].  The PRNG mask (set by NORAND/HIRAND)
 controls how much the frequency byte is randomized before playback.
 
 \subsubsection{Control commands (< \$27)}
@@ -15302,11 +15306,11 @@ TUNE_LOOP_ADDR    EQU     $5A8E   ; tune loop address (2 bytes)
     BAEQ    #$25,.cmd_25              ; set PRNG mask = $0F
     BCS     .cmd_26                   ; $26: PRNG mask = $00
 
-    BAEQ    #$23,.cmd_23              ; set action vector -> PLAY_TONE
-    BCS     .cmd_24                   ; set action vector -> PLAY_NOISE
+    BAEQ    #$23,.cmd_23              ; $23: HIGH (PLAY_HIGH_TONE)
+    BCS     .cmd_24                   ; $24: END (return)
 
-    BAEQ    #$21,.cmd_21              ; gosub
-    BCS     .cmd_22                   ; nop (return)
+    BAEQ    #$21,.cmd_21              ; $21: gosub
+    BCS     .cmd_22                   ; $22: LOW (PLAY_LOW_TONE)
 
     BAEQ    #$1F,.cmd_1F              ; set loop address
     BCS     .cmd_20                   ; set gosub address
@@ -15332,7 +15336,7 @@ and execution jumps back to the saved loop address.
 @ [[TUNE_GOSUB_ADDR]] saves the return address for the script's gosub
 command (\$21): after the subroutine finishes, [[TUNE_PC]] is restored
 from this 2-byte value.  [[TUNE_ACTION_VEC]] is a 2-byte vector set by
-commands \$23 and \$24 to select between the tone and noise action handlers.
+commands \$22 and \$23 to select between the low and high tone handlers.
 
 <<defines>>=
 TUNE_GOSUB_ADDR   EQU     $5A90   ; tune gosub return address (2 bytes)
@@ -15349,18 +15353,18 @@ TUNE_ACTION_VEC   EQU     $5A93   ; action handler vector (2 bytes)
     STOB    #$00,TUNE_PRNG_MASK
     JMP     TUNE_ADVANCE
 
-.cmd_23:                            ; action vector -> PLAY_TONE
-    STOW    PLAY_TONE,TUNE_ACTION_VEC
+.cmd_23:                            ; HIGH ($23): action vector -> PLAY_HIGH_TONE
+    STOW    PLAY_HIGH_TONE,TUNE_ACTION_VEC
     JMP     TUNE_ADVANCE
 
-.cmd_24:                            ; action vector -> PLAY_NOISE
-    STOW    PLAY_NOISE,TUNE_ACTION_VEC
+.cmd_24:                            ; LOW ($22): action vector -> PLAY_LOW_TONE
+    STOW    PLAY_LOW_TONE,TUNE_ACTION_VEC
     JMP     TUNE_ADVANCE
 
-.cmd_22:                            ; nop (return from script)
+.cmd_22:                            ; END ($24): return from tune
     RTS
 
-.cmd_21:                            ; gosub: jump to saved address
+.cmd_21:                            ; GOTO1 ($21): jump to saved address
     MOVW    TUNE_GOSUB_ADDR,TUNE_PC
     JMP     .fetch
 
@@ -16829,7 +16833,7 @@ The following root chunks produce the assembly files when tangled.
 <<tune advance>>
 <<tune helpers>>
 <<play tone>>
-<<play noise>>
+<<play low tone>>
 <<status border data>>
 <<status bar strings>>
 <<print font char data>>
