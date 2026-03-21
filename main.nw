@@ -6295,6 +6295,243 @@ tone table and subtract one octave for the low tones.
 @ The splash song bytecode is documented in [[TUNE_3_ATTRACT]]
 (\S\ref{sec:tune_player}).
 
+\section{Character stats display}
+
+[[DISPLAY_CHAR_STATS]] formats and displays the statistics of the
+character whose record is pointed to by [[ENTITY_PTR]] ([[$F8/$F9]]).
+It reads eight fields from the entity record, converts each to decimal
+via [[NUM_TO_DECIMAL]], and writes the digits into a pre-formatted
+string template at [[$7D83]].  After displaying the stats, it waits for
+a keypress (or joystick button if [[INPUT_MODE]] is nonzero), then
+exits via [[CLEAR_MAP]].
+
+\begin{itemize}
+  \item Field 6, bits 5--0: life force (max 63)
+  \item Field 8, bits 3--0: group member count
+  \item Field 7, bits 3--0: plus 1 = weapons
+  \item Field 9, bits 3--0: plus 1 = ducats (gold)
+  \item Field 5, bits 4--0: strength (max 31)
+  \item Field 12, bits 3--0: sword rating
+  \item Field 11, bits 4--0: level/armor
+  \item Fields 13--14: 16-bit dagger/experience value
+\end{itemize}
+
+The routine first clears the digit positions in the template string by
+writing spaces ([[$A0]]), then fills them via [[NUM_TO_DECIMAL]].  After
+a cosmetic fix (suppressing a leading ``0'' in the experience field), it
+scrolls the status line, prints the formatted stats, and enters an
+input wait loop.
+
+<<display char stats>>=
+    ORG     $7780
+DISPLAY_CHAR_STATS:
+    SUBROUTINE DISPLAY_CHAR_STATS
+
+    ; --- Clear digit positions in the stats template ---
+    LDA     #$A0              ; space (high-bit ASCII)
+    STA     $7D90             ; life force digits
+    STA     $7DB7             ; \
+    STA     $7DB8             ;  | ducats digits
+    STA     $7DB9             ; /
+    STA     $7DD5             ; sword digits
+    STA     $7DFF             ; dagger digits
+    STA     $7D9F             ; strength digits
+    STA     $7DC9             ; speed digits
+    STA     $7DF3             ; dexterity digits
+
+    ; --- Format life force: field 6, bits 5-0 ---
+    LDA     #$00
+    STA     $BD               ; high byte = 0
+    LDY     #$06
+    LDA     (ENTITY_PTR),Y    ; field 6
+    AND     #$3F              ; bits 5-0 = life force
+    STA     $BC               ; NUM_VALUE = life force
+    LDA     #$8D              ; \ output to $7D8D
+    STA     $BA               ;  | (LIFE FORCE area)
+    LDA     #$7D              ;  |
+    STA     $BB               ; /
+    JSR     NUM_TO_DECIMAL
+
+    ; --- Format group count: field 8, bits 3-0 ---
+    LDY     #$08
+    LDA     (ENTITY_PTR),Y    ; field 8
+    AND     #$0F              ; bits 3-0 = group count
+    STA     $BC
+    LDA     #$E1              ; \ output to $7DE1
+    STA     $BA               ;  | (WEAPONS area)
+    LDA     #$7D              ;  |
+    STA     $BB               ; /
+    JSR     NUM_TO_DECIMAL
+
+    ; --- Format weapons: field 7, bits 3-0, plus 1 ---
+    LDY     #$07
+    LDA     (ENTITY_PTR),Y    ; field 7
+    AND     #$0F              ; bits 3-0
+    CLC
+    ADC     #$01              ; +1
+    STA     $BC
+    LDA     #$D2              ; \ output to $7DD2
+    STA     $BA               ;  | (SWORD area)
+    LDA     #$7D              ;  |
+    STA     $BB               ; /
+    JSR     NUM_TO_DECIMAL
+
+    ; --- Format ducats: field 9, bits 3-0, plus 1 ---
+    LDY     #$09
+    LDA     (ENTITY_PTR),Y    ; field 9
+    AND     #$0F              ; bits 3-0
+    CLC
+    ADC     #$01              ; +1
+    STA     $BC
+    LDA     #$FC              ; \ output to $7DFC
+    STA     $BA               ;  | (DAGGER area)
+    LDA     #$7D              ;  |
+    STA     $BB               ; /
+    JSR     NUM_TO_DECIMAL
+
+    ; --- Format strength: field 5, bits 4-0 ---
+    LDY     #$05
+    LDA     (ENTITY_PTR),Y    ; field 5
+    AND     #$1F              ; bits 4-0 = strength
+    STA     $BC
+    LDA     #$9C              ; \ output to $7D9C
+    STA     $BA               ;  | (STRENGTH area)
+    LDA     #$7D              ;  |
+    STA     $BB               ; /
+    JSR     NUM_TO_DECIMAL
+
+    ; --- Format armor: field 12, bits 3-0 ---
+    LDY     #$0C
+    LDA     (ENTITY_PTR),Y    ; field 12
+    AND     #$0F              ; bits 3-0
+    STA     $BC
+    LDA     #$C6              ; \ output to $7DC6
+    STA     $BA               ;  | (ARMOR area)
+    LDA     #$7D              ;  |
+    STA     $BB               ; /
+    JSR     NUM_TO_DECIMAL
+
+    ; --- Format dexterity: field 11, bits 4-0 ---
+    LDY     #$0B
+    LDA     (ENTITY_PTR),Y    ; field 11
+    AND     #$1F              ; bits 4-0 = dexterity
+    STA     $BC
+    LDA     #$F0              ; \ output to $7DF0
+    STA     $BA               ;  | (DEXTERITY area)
+    LDA     #$7D              ;  |
+    STA     $BB               ; /
+    JSR     NUM_TO_DECIMAL
+
+    ; --- Format experience: fields 13-14 (16-bit) ---
+    LDY     #$0D
+    LDA     (ENTITY_PTR),Y    ; field 13 (low byte)
+    STA     $BC
+    INY
+    LDA     (ENTITY_PTR),Y    ; field 14 (high byte)
+    STA     $BD
+    LDA     #$B6              ; \ output to $7DB6
+    STA     $BA               ;  | (DUCATS area)
+    LDA     #$7D              ;  |
+    STA     $BB               ; /
+    JSR     NUM_TO_DECIMAL
+
+    ; --- Cosmetic: suppress leading "0" in experience ---
+    LDA     $7DB9             ; check ten-thousands digit
+    CMP     #$A0              ; space?
+    BNE     .show             ; no -> has 5 digits, show as-is
+    LDA     $7DBA             ; check thousands digit
+    CMP     #$B0              ; "0"?
+    BNE     .show             ; no -> show as-is
+    LDA     #$A0              ; replace leading "0" with space
+    STA     $7DBA
+
+    ; --- Display the stats ---
+.show:
+    JSR     SCROLL_STATUS_LINE
+    JSR     PRINT_CTRL_AB              ; save cursor state
+    LDA     #$15                       ; \  cursor to column 21,
+    STA     $25                        ;  | row 0 (right half of
+    LDA     #$00                       ;  | screen)
+    STA     $24                        ; /
+    LDA     #<STATS_TEMPLATE           ; \ print the stats template
+    STA     $BC                        ;  | string at $7D83
+    LDA     #>STATS_TEMPLATE           ;  |
+    STA     $BD                        ; /
+    JSR     PRINT_STRING               ; display stats
+    LDA     #$14                       ; \  cursor to column 20,
+    STA     $25                        ;  | row 0
+    LDA     #$00                       ;  |
+    STA     $24                        ; /
+
+    ; --- Show input prompt based on mode ---
+    LDA     INPUT_MODE
+    BEQ     .keyboard                  ; 0 = keyboard mode
+    LDX     #$18                       ; \ joystick: "PUSH BUTTON
+    LDY     #$7E                       ; / TO GO ON" at $7E18
+    BNE     .print_prompt
+.keyboard:
+    LDX     #$01                       ; \ keyboard: "PRESS M TO
+    LDY     #$7E                       ; / CONTINUE" at $7E01
+.print_prompt:
+    JSR     PRINT_STRING_AT_ADDR       ; print prompt
+    JSR     ANIM_TICK_AND_WAIT         ; tick animation + wait
+
+    ; --- Wait for input ---
+    STA     $C010                      ; clear keyboard strobe
+.wait_key:
+    LDA     $C000                      ; read keyboard
+    BMI     .done                      ; key pressed -> exit
+    LDA     INPUT_MODE
+    BEQ     .wait_key                  ; keyboard mode -> loop
+    LDX     #$00
+    LDA     $C061,X                    ; read joystick button 0
+    BMI     .done                      ; pressed -> exit
+    INX
+    LDA     $C061,X                    ; read joystick button 1
+    BPL     .wait_key                  ; not pressed -> loop
+.done:
+    JMP     CLEAR_MAP                  ; exit via CLEAR_MAP
+@ %def DISPLAY_CHAR_STATS
+
+@ The stats template string at [[STATS_TEMPLATE]] ([[$7D83]]) contains
+the formatted display layout with placeholder digits that
+[[NUM_TO_DECIMAL]] overwrites at runtime.
+
+<<stats template data>>=
+    ORG     $7D83
+STATS_TEMPLATE:
+    ; The stats template is a pre-formatted display string with
+    ; placeholder digits that NUM_TO_DECIMAL overwrites at runtime.
+    ; The routine writes to these absolute addresses:
+    ;   $7D8D: life force    $7D9C: strength    $7DB6: ducats (16-bit)
+    ;   $7DC6: speed         $7DD2: sword       $7DE1: weapons (group count)
+    ;   $7DF0: dexterity     $7DFC: dagger
+    ;
+    ;   $7D83: " LIFE FORCE 00"
+    HEX     7D A0 CC C9 C6 C5 A0 C6 CF D2 C3 C5 A0 B0 B0 FF
+    ;   $7D93: CR " STRENGTH  00"
+    HEX     8C A0 D3 D4 D2 C5 CE C7 D4 C8 A0 A0 B0 B0 FF
+    ;   $7DA2: VT "   WEAPONS  DUCATS  00000"
+    HEX     8B A0 A0 A0 D7 C5 C1 D0 CF CE D3 A0 A0
+    HEX     C4 D5 C3 C1 D4 D3 A0 A0 B0 B0 B0 B0 B0 FF
+    ;   $7DBD: CR " SPEED     00" VT
+    HEX     8C A0 D3 D0 C5 C5 C4 A0 A0 A0 A0 A0 B0 B0 8B FF
+    ;   $7DCD: " SWORD  00  ARMOR       0"
+    HEX     A0 D3 D7 CF D2 C4 A0 A0 B0 B0 A0 A0
+    HEX     C1 D2 CD CF D2 A0 A0 A0 A0 A0 A0 A0 B0 FF
+    ;   $7DE7: CR " DEXTERITY 00" VT
+    HEX     8C A0 C4 C5 D8 D4 C5 D2 C9 D4 D9 A0 B0 B0 8B FF
+    ;   $7DF7: " DAGGER 00"
+    HEX     A0 C4 C1 C7 C7 C5 D2 A0 B0 B0
+    ;   $7E01: SYN TAB "PRESS M TO CONTINUE" CR
+    HEX     16 89 D0 D2 C5 D3 D3 A0 CD A0 D4 CF
+    HEX     A0 C3 CF CE D4 C9 CE D5 C5 A0 8E
+    ;   $7E18: SYN TAB "PUSH BUTTON TO GO ON" CR
+    HEX     16 89 D0 D5 D3 C8 A0 C2 D5 D4 D4 CF
+    HEX     CE A0 D4 CF A0 C7 CF A0 CF CE 8E
+    ; (STATUS_BORDER_DATA follows immediately at $7E2F)
+@ %def STATS_TEMPLATE
+
 \chapter{Utility Routines}
 
 
@@ -16823,6 +17060,7 @@ The following root chunks produce the assembly files when tangled.
 <<print ctrl ab>>
 <<print string>>
 <<set cursor compressed>>
+<<display char stats>>
 <<step prng>>
 <<game init>>
 <<init stub>>
@@ -16834,6 +17072,7 @@ The following root chunks produce the assembly files when tangled.
 <<tune helpers>>
 <<play tone>>
 <<play low tone>>
+<<stats template data>>
 <<status border data>>
 <<status bar strings>>
 <<print font char data>>
