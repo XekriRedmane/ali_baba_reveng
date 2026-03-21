@@ -1,0 +1,11 @@
+services:
+  re:
+    build: .
+    image: ali-baba-re
+    volumes:
+      - .:/project/ali_baba_re
+    environment:
+      - ANTHROPIC_API_KEY
+      - GHIDRA_SERVER_URL=http://host.docker.internal:8089
+    stdin_open: true
+    tty: true
