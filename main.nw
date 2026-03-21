@@ -4205,14 +4205,10 @@ PRINT_STRING_ADDR       EQU     $BC     ; print string source pointer (2 bytes)
 @ %def PRINT_STRING_ADDR
 
 <<defines>>=
-BORDER_POS_HORIZ       EQU     $5E7B   ; 6 col/row pairs for horizontal border labels
-BORDER_POS_VERT_L      EQU     $5E87   ; 10 col/row pairs for vertical border labels (left)
-BORDER_POS_VERT_R      EQU     $5E9B   ; 10 col/row pairs for vertical border labels (right)
-BORDER_STR_HORIZ       EQU     $5EAF   ; horizontal border pattern string
 BORDER_STR_VERT_L      EQU     $5EC1   ; vertical border pattern string (left)
 BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
 BORDER_LOOP_CTR        EQU     $5DC3   ; loop counter for border label drawing
-@ %def BORDER_POS_HORIZ BORDER_POS_VERT_L BORDER_POS_VERT_R BORDER_STR_HORIZ BORDER_STR_VERT_L BORDER_STR_VERT_R BORDER_LOOP_CTR
+@ %def BORDER_STR_VERT_L BORDER_STR_VERT_R BORDER_LOOP_CTR
 
 <<draw border labels>>=
     ORG     $5CFD
@@ -4319,7 +4315,9 @@ each map border cell.  The 3-byte records are (icon, column, row):
 icon=\$00 draws the default border glyph; nonzero icons draw special
 decorations (e.g.\ doors, markers).
 
-<<border display data>>=
+@ Border animation state and position data, used by [[<<border animation>>]].
+
+<<border animation data>>=
     ORG     $5DBF
 BORDER_INITIAL_CHAR:
     DC.B    $A0               ; initial border character (space)
@@ -4385,30 +4383,37 @@ BORDER_POS_TABLE:
     DC.B    $00,$0B,$1A       ;  |
     DC.B    $00,$0B,$19       ;  |
     DC.B    $00,$0B,$18       ; /
+@ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE
 
-    ; --- UI text stream (referenced as UI_TEXT_STREAM from INIT_GAME_DISPLAY) ---
-    ; This is a concatenated display string parsed by TEXT_RENDERER.
-    ; It contains HRCG control codes, border label positions, frame
-    ; patterns, copyright text, and decorative font characters.
+@ The UI text stream is a concatenated display string parsed by
+[[TEXT_RENDERER]] during [[INIT_GAME_DISPLAY]].  It contains HRCG
+control codes, border label position tables (used by
+[[DRAW_BORDER_LABELS]]), the frame pattern, copyright text, and
+decorative font characters.
+
+<<ui text stream>>=
+    ORG     $5E55
     DC.B    $7D               ; HRCG reset to full screen
     DC.B    $80,$02           ; mode control
     ; Map viewport bounds (2 sets)
     DC.B    $2F,$00,$00,$01,$0C,$09,$00,$00,$02,$01,$02,$01,$00,$00
     DC.B    $2F,$83,$01,$14,$08,$05,$00,$06,$0F,$12,$14,$19,$00,$14
     DC.B    $08,$09,$05,$16,$05,$13
-    ; Border label positions (col/row pairs, referenced via EQUs:
-    ;   BORDER_POS_HORIZ=$5E7B, BORDER_POS_VERT_L=$5E87,
-    ;   BORDER_POS_VERT_R=$5E9B)
+    ; Border label positions (col/row pairs)
     DC.B    $7F
-    DC.B    $01,$09,$01,$0E,$01,$13       ; horizontal positions
+BORDER_POS_HORIZ:                     ; 6 col/row pairs for horizontal labels
+    DC.B    $01,$09,$01,$0E,$01,$13
     DC.B    $16,$09,$16,$0E,$16,$13
-    DC.B    $01,$0A,$01,$0B,$01,$0C,$01,$0D ; vertical left positions
+BORDER_POS_VERT_L:                    ; 10 col/row pairs for vertical labels (left)
+    DC.B    $01,$0A,$01,$0B,$01,$0C,$01,$0D
     DC.B    $01,$0F,$01,$12
-    DC.B    $16,$0A,$16,$0D,$16,$0F,$16,$12 ; vertical left (mirrored)
-    DC.B    $10,$0A,$10,$0D,$10,$0F,$10,$12 ; vertical right positions
+    DC.B    $16,$0A,$16,$0D,$16,$0F,$16,$12
+BORDER_POS_VERT_R:                    ; 10 col/row pairs for vertical labels (right)
+    DC.B    $10,$0A,$10,$0D,$10,$0F,$10,$12
     DC.B    $25,$0A,$25,$0D,$25,$0F
     DC.B    $25,$10,$25,$11,$25,$12
-    ; Border frame pattern (BORDER_STR_HORIZ=$5EAF)
+    ; Border frame pattern
+BORDER_STR_HORIZ:                     ; horizontal border pattern string
     DC.B    $11               ; length = 17
     HEX     F0 F1 F0 F1 F0 F1 F0 F1
     HEX     F0 F1 F0 F1 F0 F1 F0 F1
@@ -4428,7 +4433,7 @@ S_DECOR_ROW2:
 S_DECOR_ROW3:
     DC.B    $08
     HEX     F7 F8 F9 FA FB FC FD FE
-@ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE S_COPYRIGHT S_PRESS_SPACE_BOOT S_DECOR_ROW1 S_DECOR_ROW2 S_DECOR_ROW3
+@ %def BORDER_POS_HORIZ BORDER_POS_VERT_L BORDER_POS_VERT_R BORDER_STR_HORIZ S_COPYRIGHT S_PRESS_SPACE_BOOT S_DECOR_ROW1 S_DECOR_ROW2 S_DECOR_ROW3
 
 \subsection{Border animation handler (\$5B2A)}
 
@@ -18167,6 +18172,9 @@ The following root chunks produce the assembly files when tangled.
 <<EALDR VM macros>>
 <<zero page defines>>
 <<defines>>
+<<Macros>>
+<<zero page defines>>
+<<defines>>
 <<stub entry>>
 <<read data field>>
 <<attract loop>>
@@ -18275,7 +18283,8 @@ The following root chunks produce the assembly files when tangled.
 <<draw border labels>>
 <<draw border icons>>
 <<plot char>>
-<<border display data>>
+<<border animation data>>
+<<ui text stream>>
 <<input loop>>
 <<setup input>>
 <<draw input options>>
@@ -18447,9 +18456,6 @@ The following root chunks produce the assembly files when tangled.
 <<disk vm error accum>>
 <<disk vm saved state>>
 <<dos33 rwts>>
-<<Macros>>
-<<zero page defines>>
-<<defines>>
 @
 
 <<fontdata.asm>>=
