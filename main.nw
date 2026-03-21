@@ -4391,55 +4391,45 @@ BORDER_POS_TABLE:
     DC.B    $00,$0B,$19       ;  |
     DC.B    $00,$0B,$18       ; /
 
-    ; --- Display mode configuration ---
-BORDER_MODE_CONFIG:
-    DC.B    $7D               ; HRCG reset
-    DC.B    $80,$02           ; mode, value
-    ; Map viewport bounds (2 sets: normal and expanded)
-BORDER_VIEWPORT_A:
+    ; --- UI text stream (referenced as UI_TEXT_STREAM from INIT_GAME_DISPLAY) ---
+    ; This is a concatenated display string parsed by TEXT_RENDERER.
+    ; It contains HRCG control codes, border label positions, frame
+    ; patterns, copyright text, and decorative font characters.
+    DC.B    $7D               ; HRCG reset to full screen
+    DC.B    $80,$02           ; mode control
+    ; Map viewport bounds (2 sets)
     DC.B    $2F,$00,$00,$01,$0C,$09,$00,$00,$02,$01,$02,$01,$00,$00
-BORDER_VIEWPORT_B:
     DC.B    $2F,$83,$01,$14,$08,$05,$00,$06,$0F,$12,$14,$19,$00,$14
     DC.B    $08,$09,$05,$16,$05,$13
-
-    ; --- Icon position maps (column/row pairs for 3 display layers) ---
-BORDER_ICON_POS_A:
+    ; Border label positions (col/row pairs, referenced via EQUs:
+    ;   BORDER_POS_HORIZ=$5E7B, BORDER_POS_VERT_L=$5E87,
+    ;   BORDER_POS_VERT_R=$5E9B)
     DC.B    $7F
-    DC.B    $01,$09,$01,$0E,$01,$13  ; layer A: col $01
-    DC.B    $16,$09,$16,$0E,$16,$13  ; layer A: col $16
-BORDER_ICON_POS_B:
-    DC.B    $01,$0A,$01,$0B,$01,$0C,$01,$0D  ; layer B: col $01
+    DC.B    $01,$09,$01,$0E,$01,$13       ; horizontal positions
+    DC.B    $16,$09,$16,$0E,$16,$13
+    DC.B    $01,$0A,$01,$0B,$01,$0C,$01,$0D ; vertical left positions
     DC.B    $01,$0F,$01,$12
-    DC.B    $16,$0A,$16,$0D,$16,$0F,$16,$12  ; layer B: col $16
-BORDER_ICON_POS_C:
-    DC.B    $10,$0A,$10,$0D,$10,$0F,$10,$12  ; layer C: col $10
-    DC.B    $25,$0A,$25,$0D,$25,$0F           ; layer C: col $25
+    DC.B    $16,$0A,$16,$0D,$16,$0F,$16,$12 ; vertical left (mirrored)
+    DC.B    $10,$0A,$10,$0D,$10,$0F,$10,$12 ; vertical right positions
+    DC.B    $25,$0A,$25,$0D,$25,$0F
     DC.B    $25,$10,$25,$11,$25,$12
-
-    ; --- Border frame pattern ---
-BORDER_FRAME_PATTERN:
-    DC.B    $11                ; length
-    HEX     F0 F1 F0 F1 F0 F1 F0 F1 ; alternating frame chars
+    ; Border frame pattern (BORDER_STR_HORIZ=$5EAF)
+    DC.B    $11               ; length = 17
     HEX     F0 F1 F0 F1 F0 F1 F0 F1
-    DC.B    $F0,$02,$F0,$F1,$02,$F1,$F0 ; special frame ending
-
-    ; --- Copyright and prompt strings ---
-S_COPYRIGHT:
+    HEX     F0 F1 F0 F1 F0 F1 F0 F1
+    DC.B    $F0,$02,$F0,$F1,$02,$F1,$F0
+    ; Copyright string (s_COPYRIGHT=$5EC7 points past length byte)
     APSTR "COPYRIGHT 1982 STUART SMITH"
-S_PRESS_SPACE_BOOT:
+    ; Boot prompt (s_PRESS_SPACE=$5EE3 points past length byte)
     APSTR "PRESS SPACE BAR TO CONTINUE"
-
-    ; --- Border frame font characters (3 rows of glyphs) ---
-BORDER_FONT_ROW1:
-    DC.B    $07               ; 7 chars
+    ; Decorative border font rows (s_DECOR_ROW1/2/3)
+    DC.B    $07
     HEX     E8 E9 EA EB EC ED EE
-BORDER_FONT_ROW2:
-    DC.B    $08               ; 8 chars
+    DC.B    $08
     HEX     EF F0 F1 F2 F3 F4 F5 F6
-BORDER_FONT_ROW3:
-    DC.B    $08               ; 8 chars
+    DC.B    $08
     HEX     F7 F8 F9 FA FB FC FD FE
-@ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE BORDER_MODE_CONFIG BORDER_VIEWPORT_A BORDER_VIEWPORT_B BORDER_ICON_POS_A BORDER_ICON_POS_B BORDER_ICON_POS_C BORDER_FRAME_PATTERN S_COPYRIGHT S_PRESS_SPACE_BOOT BORDER_FONT_ROW1 BORDER_FONT_ROW2 BORDER_FONT_ROW3
+@ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE
 
 \subsection{Border animation handler (\$5B2A)}
 
