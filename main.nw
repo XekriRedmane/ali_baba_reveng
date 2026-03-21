@@ -4317,6 +4317,204 @@ DRAW_BORDER_ICONS:
     JMP     PLOT_CHAR
 @ %def DRAW_BORDER_ICONS
 
+\subsection{Border animation handler (\$5B2A)}
+
+[[GAME_ACTION_HANDLER]] at [[$5B2A]] is called via [[DISPATCH_VEC]]
+between tune notes.  It animates the game border by cycling through
+the [[BORDER_POS_TABLE]] entries, drawing icons at each border cell.
+
+The handler runs 3~passes per call (controlled by [[BORDER_ANIM_SAVE]]
+at [[$5DC1]]).  On pass~1, it calls [[ANIM_BORDER_ICONS_A]] ([[$5C0E]])
+which randomly places icons from [[$5E1F]] along the border.  On pass~0,
+it calls [[ANIM_BORDER_ICONS_B]] ([[$5C1A]]) which uses icons from
+[[$5DE9]].  On other passes, it iterates through the handler pointer
+table at [[BORDER_HANDLER_TABLE]].
+
+[[TICK_BORDER_ANIM]] at [[$5BE8]] advances the animation index through
+the border positions, wrapping from \$15 back to \$05.
+
+<<border animation>>=
+    ORG     $5B2A
+    SUBROUTINE GAME_ACTION_HANDLER_CODE
+
+    ; --- Main entry: 3-pass border animation loop ---
+.restart:
+    LDA     #$03
+    STA     BORDER_ANIM_SAVE  ; 3 passes
+    JSR     TICK_BORDER_ANIM  ; advance one position
+.new_pass:
+    LDX     #$04              ; start at handler pair 2
+    STX     $5DC3             ; handler index
+.handler_loop:
+    LDX     $5DC3
+    LDA     BORDER_HANDLER_TABLE,X ; \ load handler pointer
+    STA     $F6               ;  | into DISPATCH_VEC
+    INX                       ;  |
+    LDA     BORDER_HANDLER_TABLE,X ;  |
+    STA     $F7               ; /
+    DEC     $5DC3             ; \ next handler pair
+    DEC     $5DC3             ; /
+    JMP     TUNE_ADVANCE      ; play next note, returns via DISPATCH_VEC
+.check_pass:
+    LDA     $5DC3
+    BPL     .handler_loop     ; more handlers -> continue
+    DEC     BORDER_ANIM_SAVE  ; next pass
+    BMI     .restart          ; all passes done -> restart from top
+    LDA     BORDER_ANIM_SAVE
+    CMP     #$01
+    BEQ     .pass_0
+    BCS     .new_pass         ; pass 2 -> normal handlers
+    JSR     ANIM_BORDER_ICONS_A ; pass 1 -> random icon placement
+    JMP     .new_pass
+.pass_0:
+    JSR     ANIM_BORDER_ICONS_B ; pass 0 -> alternate icons
+    JMP     .new_pass
+
+    ; --- Handler A ($5B6D): draw from $5DE9/$5E04 tables ---
+BORDER_HANDLER_A:
+    LDA     #$E9
+    LDX     #$5D
+    JSR     DRAW_BORDER_ICON_LIST
+    LDA     #$04
+    LDX     #$5E
+    JSR     DRAW_BORDER_ICON_LIST
+    JMP     .check_pass
+
+    ; --- Handler C ($5B7E): draw from $5E1F/$5E3A tables ---
+BORDER_HANDLER_C:
+    LDA     #$1F
+    LDX     #$5E
+    JSR     DRAW_BORDER_ICON_LIST
+    LDA     #$3A
+    LDX     #$5E
+    JSR     DRAW_BORDER_ICON_LIST
+    JMP     .check_pass
+
+    ; --- Handler B ($5B8F): draw from $5DCB table (Y=$1B start) ---
+BORDER_HANDLER_B:
+    LDA     #$CB
+    LDX     #$5D
+    LDY     #$1B
+    JSR     DRAW_BORDER_ICON_ENTRY
+    JMP     .check_pass
+
+    ; --- Draw a list of border icons from (A/X) pointer ---
+DRAW_BORDER_ICON_LIST:
+    LDY     #$18              ; default: start at offset $18
+DRAW_BORDER_ICON_ENTRY:
+    STA     $BE               ; \ set pointer
+    STX     $BF               ; /
+    STY     $5DC2             ; save offset
+    LDA     #$00
+    STA     $5DC4             ; clear swap flag
+.icon_loop:
+    LDY     $5DC2             ; current offset
+    LDA     $5DC4             ; swap flag
+    BNE     .swap_restore     ; nonzero -> restore saved char
+    LDA     ($BE),Y           ; read icon from table
+    STA     $5DC4             ; save it
+    BEQ     .skip             ; zero -> skip (empty)
+    LDA     #$00
+    STA     ($BE),Y           ; clear table entry
+    JSR     DRAW_BORDER_CHAR_AT ; draw the icon
+    JMP     .skip
+.swap_restore:
+    STA     ($BE),Y           ; restore saved icon
+    JSR     DRAW_BORDER_CHAR_AT ; draw it
+    LDA     #$00
+    STA     $5DC4             ; clear swap flag
+.skip:
+    DEC     $5DC2             ; \ next entry (3 bytes per record)
+    DEC     $5DC2             ;  |
+    DEC     $5DC2             ; /
+    BPL     .icon_loop
+    RTS
+
+    ; --- Draw a single border character at position from table entry ---
+DRAW_BORDER_CHAR_AT:
+    STA     FONT_CHARNUM      ; set character to draw
+    INY
+    LDA     ($BE),Y           ; column
+    STA     $25               ; -> WNDWDTH (cursor column)
+    INY
+    LDA     ($BE),Y           ; row
+    STA     $24               ; -> WNDTOP (cursor row)
+    JMP     $749A             ; render font char
+
+    ; --- Tick border animation: advance index, draw next position ---
+TICK_BORDER_ANIM:
+    LDA     BORDER_ANIM_INDEX ; current position index
+    STA     BORDER_POS_TABLE+27 ; save to restore later ($5DE6)
+    LDY     BORDER_POS_TABLE+28 ; \ get col/row from next position
+    STY     $25               ;  |
+    LDY     BORDER_POS_TABLE+29 ;  |
+    STY     $24               ; /
+    STA     FONT_CHARNUM      ; draw border char
+    JSR     $749A
+    INC     BORDER_ANIM_INDEX ; advance index
+    LDA     BORDER_ANIM_INDEX
+    CMP     #$16              ; past end?
+    BCC     .tick_done
+    LDA     #$05              ; wrap to start
+    STA     BORDER_ANIM_INDEX
+.tick_done:
+    RTS
+
+    ; --- Random icon placement A (from $5E1F/$5E3A tables) ---
+ANIM_BORDER_ICONS_A:
+    LDA     #$02              ; \ random(2): pick table A or B
+    PHA                       ; /
+    LDX     #$06
+    LDA     #$1F
+    LDY     #$5E
+    JMP     .anim_shared
+
+    ; --- Random icon placement B (from $5DE9/$5DCB tables) ---
+ANIM_BORDER_ICONS_B:
+    LDA     #$04              ; \ random(4): pick position
+    PHA                       ; /
+    LDX     #$15
+    LDA     #$E9
+    LDY     #$5D
+.anim_shared:
+    STX     BORDER_INITIAL_CHAR ; save max index
+    STA     $BE               ; \ set pointer
+    STY     $BF               ; /
+    PLA
+    JSR     $1317             ; RANDOM_IN_RANGE
+    CMP     #$01
+    BEQ     .random_ok
+    BCC     .random_small
+    RTS                       ; > 1 -> skip (rare)
+.random_ok:
+    LDY     #$18
+    BNE     .do_place
+.random_small:
+    LDY     #$33
+.do_place:
+    LDX     BORDER_INITIAL_CHAR
+    LDA     BORDER_POS_TABLE,X ; read icon from border table
+    STA     FONT_CHARNUM
+    STA     ($BE),Y           ; store in target table
+    LDA     #$00
+    STA     BORDER_POS_TABLE,X ; clear source entry
+    INY
+    LDA     ($BE),Y           ; column
+    STA     $25
+    INY
+    LDA     ($BE),Y           ; row
+    STA     $24
+    JSR     $749A             ; render
+    LDA     #$00
+    STA     FONT_CHARNUM
+    LDX     BORDER_INITIAL_CHAR
+    LDA     BORDER_POS_TABLE+1,X ; \ restore cursor from
+    STA     $25               ;  | adjacent table entry
+    LDA     BORDER_POS_TABLE+2,X ;  |
+    STA     $24               ; /
+    JMP     $749A             ; render and return
+@ %def GAME_ACTION_HANDLER_CODE BORDER_HANDLER_A BORDER_HANDLER_B BORDER_HANDLER_C DRAW_BORDER_ICON_LIST DRAW_BORDER_ICON_ENTRY DRAW_BORDER_CHAR_AT TICK_BORDER_ANIM ANIM_BORDER_ICONS_A ANIM_BORDER_ICONS_B
+
 @ [[INIT_WORLD]] is a thin wrapper that passes a pointer to the world
 initialization data table ([[WORLD_INIT_DATA]] at [[$62B9]]) to the game
 setup routine [[INPUT_LOOP]].  Called once from [[GAME_INIT]] to
@@ -18080,6 +18278,7 @@ The following root chunks produce the assembly files when tangled.
 <<Location events>>
 <<mob data>>
 <<init game state>>
+<<border animation>>
 <<init game display>>
 <<draw border char>>
 <<draw border labels>>
