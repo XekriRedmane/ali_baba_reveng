@@ -16481,6 +16481,172 @@ ADD_PRICE_COMPONENT:
     RTS
 @ %def ADD_PRICE_COMPONENT
 
+@ \subsection{Shop buy effects (\$720B--\$7248)}
+
+When a player buys an item, the buy handler at [[$71AC]] dispatches
+through a function pointer in the shop data.  Five entry points
+(indexed 0--4) apply the purchased item's effect to the entity record
+at [[ENTITY_PTR]].  Each entry sets X (item type 0--4) and Y (target
+field offset: 7 or~9), then falls through to the common handler.
+
+The common handler loads a base value from the effect table at
+[[$7F6D]][X], adds [[LOCATION_STYLE\_BITS]] ([[$5A84]]), and stores
+the result at byte~Y of the entity record.  It then extracts bits~2--1
+of byte~5 (defense field) and adds that bonus to the same field.
+Finally it jumps to [[$7194]] (the browse handler, to continue
+shopping).
+
+<<defines>>=
+LOCATION_STYLE_BITS EQU     $5A84   ; location style (0-3), used as modifier
+SHOP_EFFECT_TABLE   EQU     $7F6D   ; 5-byte table of base effect values
+@ %def LOCATION_STYLE_BITS SHOP_EFFECT_TABLE
+
+<<shop buy effects>>=
+    ORG     $720B
+SHOP_BUY_EFFECT_0:
+    LDX     #$00
+    LDY     #$07
+    BNE     APPLY_SHOP_EFFECT  ; always taken
+
+SHOP_BUY_EFFECT_1:
+    LDX     #$01
+    LDY     #$07
+    BNE     APPLY_SHOP_EFFECT
+
+SHOP_BUY_EFFECT_2:
+    LDX     #$02
+    LDY     #$07
+    BNE     APPLY_SHOP_EFFECT
+
+SHOP_BUY_EFFECT_3:
+    LDX     #$03
+    LDY     #$09
+    BNE     APPLY_SHOP_EFFECT
+
+SHOP_BUY_EFFECT_4:
+    LDX     #$04
+    LDY     #$09
+    BNE     APPLY_SHOP_EFFECT
+
+APPLY_SHOP_EFFECT:
+    LDA     SHOP_EFFECT_TABLE,X ; base effect value
+    CLC
+    ADC     LOCATION_STYLE_BITS ; + location modifier
+    STA     (ENTITY_PTR),Y     ; store to entity field Y
+    TYA                        ; \ save target field offset
+    TAX                        ; / in X
+    LDY     #$05
+    LDA     (ENTITY_PTR),Y     ; byte 5 (defense)
+    ROR                        ; \ extract bits 2-1
+    ROR                        ;  | as bits 1-0
+    ROR                        ; /
+    AND     #$03               ; mask to 2 bits
+    PHA
+    TXA                        ; restore target field offset
+    TAY
+    PLA
+    CLC
+    ADC     (ENTITY_PTR),Y     ; add defense bonus
+    STA     (ENTITY_PTR),Y
+    JMP     $7194              ; return to browse handler
+@ %def SHOP_BUY_EFFECT_0 SHOP_BUY_EFFECT_1 SHOP_BUY_EFFECT_2 SHOP_BUY_EFFECT_3 SHOP_BUY_EFFECT_4 APPLY_SHOP_EFFECT
+
+@ \subsection{XP award (\$7249--\$72A6)}
+
+Five entry points (indexed 0--4) award experience points after combat
+actions.  Each sets X to the action type and falls through to the
+common handler.
+
+The common handler:
+\begin{itemize}
+\item Extracts the current level from byte~11 (bits~4--0) and saves
+  the upper bits (7--5).
+\item Extracts pending XP from byte~8 via [[EXTRACT\_PENDING\_XP]]
+  (bits~6--4 $\rightarrow$ 0--7) and adds it to the saved level.
+\item Loads the XP award from [[XP\_AWARD\_TABLE]][X], adds
+  [[LOCATION_STYLE\_BITS]], and stores to byte~8.
+\item Extracts the new pending XP, and if it exceeds the accumulated
+  level, subtracts 16 (\$10) from byte~8 repeatedly until it fits.
+\item Computes the remaining level (old level $-$ new pending XP) and
+  merges it with the saved upper bits back into byte~11.
+\item Jumps to [[$7194]] (browse handler).
+\end{itemize}
+
+<<defines>>=
+XP_AWARD_TABLE      EQU     $7FBE   ; 5-byte XP award values by action type
+@ %def XP_AWARD_TABLE
+
+<<xp award>>=
+    ORG     $7249
+XP_AWARD_0:
+    LDX     #$00
+    BEQ     AWARD_XP
+
+XP_AWARD_1:
+    LDX     #$01
+    BNE     AWARD_XP
+
+XP_AWARD_2:
+    LDX     #$02
+    BNE     AWARD_XP
+
+XP_AWARD_3:
+    LDX     #$03
+    BNE     AWARD_XP
+
+XP_AWARD_4:
+    LDX     #$04
+    BNE     AWARD_XP
+
+AWARD_XP:
+    SUBROUTINE AWARD_XP
+    LDY     #$0B
+    LDA     (ENTITY_PTR),Y     ; byte 11: flags|level
+    PHA
+    AND     #$1F               ; extract level (bits 4-0)
+    STA     $BA                ; save current level
+    PLA
+    AND     #$E0               ; save upper bits (7-5)
+    STA     (ENTITY_PTR),Y     ; clear level bits in record
+    LDY     #$08
+    LDA     (ENTITY_PTR),Y     ; byte 8: status|pending_xp|count
+    JSR     EXTRACT_PENDING_XP ; -> A = pending XP (0-7)
+    CLC
+    ADC     $BA                ; accumulated level = level + pending XP
+    STA     $BA
+    LDA     XP_AWARD_TABLE,X   ; XP award for this action type
+    CLC
+    ADC     LOCATION_STYLE_BITS ; + location modifier
+.clamp:
+    STA     (ENTITY_PTR),Y     ; store to byte 8
+    JSR     EXTRACT_PENDING_XP ; extract new pending XP
+    CMP     $BA                ; compare with accumulated level
+    BCC     .ok                ; pending < level -> ok
+    SEC
+    LDA     (ENTITY_PTR),Y     ; \ subtract $10 from byte 8
+    SBC     #$10               ;  | (reduce pending XP by 1)
+    JMP     .clamp             ; / store and retry
+
+.ok:
+    TAX                        ; save new pending XP
+    LDA     $BA
+    STX     $BA
+    SEC
+    SBC     $BA                ; remaining level = accumulated - pending
+    LDY     #$0B
+    ORA     (ENTITY_PTR),Y     ; merge with saved upper bits
+    STA     (ENTITY_PTR),Y
+    JMP     $7194              ; return to browse handler
+
+EXTRACT_PENDING_XP:
+    ROR                        ; \ extract bits 6-4
+    ROR                        ;  | shift right 4 positions
+    ROR                        ;  |
+    ROR                        ; /
+    AND     #$07               ; mask to 3 bits (0-7)
+    RTS
+@ %def XP_AWARD_0 XP_AWARD_1 XP_AWARD_2 XP_AWARD_3 XP_AWARD_4 AWARD_XP EXTRACT_PENDING_XP
+
 \chapter{Events and Scripting}
 
 
@@ -20141,6 +20307,8 @@ The following root chunks produce the assembly files when tangled.
 <<display shop>>
 <<advance shop ptr>>
 <<add price component>>
+<<shop buy effects>>
+<<xp award>>
 <<enter location>>
 <<draw map col>>
 <<draw map entities>>
