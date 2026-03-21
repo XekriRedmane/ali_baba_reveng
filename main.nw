@@ -4077,18 +4077,13 @@ INIT_GAME_STATE:
 the background from the text stream at [[UI_TEXT_STREAM]], draws
 2$\times$2 border characters, places text labels via
 [[DRAW_BORDER_LABELS]], adds corner decorations via [[DRAW_BORDER_ICONS]],
-and finishes with the copyright notice ([[s_COPYRIGHT]]) and ``press
-space bar'' prompt ([[s_PRESS_SPACE]]).  The decorative strings
-[[s_DECOR_ROW1]] through [[s_DECOR_ROW3]] are drawn on the right panel.
+and finishes with the copyright notice ([[S_COPYRIGHT]]) and ``press
+space bar'' prompt ([[S_PRESS_SPACE_BOOT]]).  The decorative strings
+[[S_DECOR_ROW1]] through [[S_DECOR_ROW3]] are drawn on the right panel.
 
 <<defines>>=
 UI_TEXT_STREAM          EQU     $5E55   ; text stream data for game UI background
-s_COPYRIGHT            EQU     $5EC7   ; "COPYRIGHT 1982 STUART SMITH"
-s_PRESS_SPACE          EQU     $5EE3   ; "PRESS SPACE BAR TO CONTINUE"
-s_DECOR_ROW1           EQU     $5EFF   ; decorative right-side row 1
-s_DECOR_ROW2           EQU     $5F07   ; decorative right-side row 2
-s_DECOR_ROW3           EQU     $5F10   ; decorative right-side row 3
-@ %def UI_TEXT_STREAM s_COPYRIGHT s_PRESS_SPACE s_DECOR_ROW1 s_DECOR_ROW2 s_DECOR_ROW3
+@ %def UI_TEXT_STREAM
 
 @ All character output in the game passes through [[ROM_COUT1]], the
 Apple~II ROM's character output routine at [[$FDED]].  When the HRCG is
@@ -4137,15 +4132,15 @@ INIT_GAME_DISPLAY:
     ; Print copyright at row 21, col 0
     STOB    #$15,TEXT_ROW
     STOB    #$00,TEXT_COL
-    LDX     #<s_COPYRIGHT
-    LDY     #>s_COPYRIGHT
+    LDX     #<S_COPYRIGHT
+    LDY     #>S_COPYRIGHT
     JSR     PRINT_STRING_AT_ADDR
 
     ; Print "PRESS SPACE BAR TO CONTINUE" at row 23, col 0
     STOB    #$17,TEXT_ROW
     STOB    #$00,TEXT_COL
-    LDX     #<s_PRESS_SPACE
-    LDY     #>s_PRESS_SPACE
+    LDX     #<S_PRESS_SPACE_BOOT
+    LDY     #>S_PRESS_SPACE_BOOT
     JSR     PRINT_STRING_AT_ADDR
 
     ; Switch to HRCG charset 5 for decorative chars
@@ -4157,20 +4152,20 @@ INIT_GAME_DISPLAY:
     ; Print decorative strings at col 30, rows 21-23
     STOB    #$15,TEXT_ROW
     STOB    #$1E,TEXT_COL
-    LDX     #<s_DECOR_ROW1
-    LDY     #>s_DECOR_ROW1
+    LDX     #<S_DECOR_ROW1
+    LDY     #>S_DECOR_ROW1
     JSR     PRINT_STRING_AT_ADDR
 
     INC     TEXT_ROW
     STOB    #$1E,TEXT_COL
-    LDX     #<s_DECOR_ROW2
-    LDY     #>s_DECOR_ROW2
+    LDX     #<S_DECOR_ROW2
+    LDY     #>S_DECOR_ROW2
     JSR     PRINT_STRING_AT_ADDR
 
     INC     TEXT_ROW
     STOB    #$1E,TEXT_COL
-    LDX     #<s_DECOR_ROW3
-    LDY     #>s_DECOR_ROW3
+    LDX     #<S_DECOR_ROW3
+    LDY     #>S_DECOR_ROW3
     JMP     PRINT_STRING_AT_ADDR
 @ %def INIT_GAME_DISPLAY
 @ [[DRAW_BORDER_CHAR]] is a helper for [[INIT_GAME_DISPLAY]].  It draws a
@@ -4418,18 +4413,22 @@ BORDER_POS_TABLE:
     HEX     F0 F1 F0 F1 F0 F1 F0 F1
     HEX     F0 F1 F0 F1 F0 F1 F0 F1
     DC.B    $F0,$02,$F0,$F1,$02,$F1,$F0
-    ; Copyright string (s_COPYRIGHT=$5EC7 points past length byte)
+    ; Copyright and prompt strings
+S_COPYRIGHT:
     APSTR "COPYRIGHT 1982 STUART SMITH"
-    ; Boot prompt (s_PRESS_SPACE=$5EE3 points past length byte)
+S_PRESS_SPACE_BOOT:
     APSTR "PRESS SPACE BAR TO CONTINUE"
-    ; Decorative border font rows (s_DECOR_ROW1/2/3)
+    ; Decorative border font rows
+S_DECOR_ROW1:
     DC.B    $07
     HEX     E8 E9 EA EB EC ED EE
+S_DECOR_ROW2:
     DC.B    $08
     HEX     EF F0 F1 F2 F3 F4 F5 F6
+S_DECOR_ROW3:
     DC.B    $08
     HEX     F7 F8 F9 FA FB FC FD FE
-@ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE
+@ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE S_COPYRIGHT S_PRESS_SPACE_BOOT S_DECOR_ROW1 S_DECOR_ROW2 S_DECOR_ROW3
 
 \subsection{Border animation handler (\$5B2A)}
 
