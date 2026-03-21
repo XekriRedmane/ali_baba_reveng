@@ -4324,7 +4324,7 @@ each map border cell.  The 3-byte records are (icon, column, row):
 icon=\$00 draws the default border glyph; nonzero icons draw special
 decorations (e.g.\ doors, markers).
 
-<<game data 5DBF>>=
+<<border display data>>=
     ORG     $5DBF
 BORDER_INITIAL_CHAR:
     DC.B    $A0               ; initial border character (space)
@@ -18286,7 +18286,7 @@ The following root chunks produce the assembly files when tangled.
 <<draw border labels>>
 <<draw border icons>>
 <<plot char>>
-<<game data 5DBF>>
+<<border display data>>
 <<input loop>>
 <<setup input>>
 <<draw input options>>
