@@ -24,7 +24,7 @@ CHUNKREF = re.compile(r"<<([-._  0-9A-Za-z]*)>>")
 # the ref and optional leading whitespace before the name.
 SPACECHUNKREF = re.compile(r"\s*<<\s*([-._ 0-9A-Za-z]*)>>")
 LABELPREFIXSTART = "PYNW"
-APSTR = re.compile(r'^(\s*)APSTR\s+"(.*)"\s*$')
+APSTR = re.compile(r'^(\s*)APSTR\s+"(.*)"(\s*;.*)?\s*$')
 ISDEF = re.compile(r"^@\s+%def.*$")
 DEFPREFIX = re.compile(r"^@\s+%def\s+")
 IDENT = re.compile(r"\b[a-zA-Z_]\w*\b")
@@ -774,10 +774,20 @@ class Weaver:
             m = APSTR.match(line.rstrip("\n"))
             if m:
                 indent = m.group(1)
-                text = m.group(2)
-                hex_bytes = [f"{len(text):02X}"]
-                for c in text:
-                    hex_bytes.append(f"{ord(c) | 0x80:02X}")
+                raw = m.group(2)
+                # Process \xNN escape sequences
+                text_bytes: list[int] = []
+                i = 0
+                while i < len(raw):
+                    if raw[i] == '\\' and i + 3 < len(raw) and raw[i+1] == 'x':
+                        text_bytes.append(int(raw[i+2:i+4], 16))
+                        i += 4
+                    else:
+                        text_bytes.append(ord(raw[i]))
+                        i += 1
+                hex_bytes = [f"{len(text_bytes):02X}"]
+                for b in text_bytes:
+                    hex_bytes.append(f"{b | 0x80:02X}")
                 new_lines.append(f"{indent}HEX {' '.join(hex_bytes)}\n")
                 modified = True
             else:

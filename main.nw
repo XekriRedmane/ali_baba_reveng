@@ -6329,121 +6329,97 @@ DISPLAY_CHAR_STATS:
 
     ; --- Clear digit positions in the stats template ---
     LDA     #$A0              ; space (high-bit ASCII)
-    STA     $7D90             ; life force digits
-    STA     $7DB7             ; \
-    STA     $7DB8             ;  | ducats digits
-    STA     $7DB9             ; /
-    STA     $7DD5             ; sword digits
-    STA     $7DFF             ; dagger digits
-    STA     $7D9F             ; strength digits
-    STA     $7DC9             ; speed digits
-    STA     $7DF3             ; dexterity digits
+    STA     STATS_LIFE        ; life force digits
+    STA     STATS_DUCATS      ; \
+    STA     STATS_DUCATS+1    ;  | ducats digits
+    STA     STATS_DUCATS+2    ; /
+    STA     STATS_SWORD       ; sword digits
+    STA     STATS_DAGGR       ; dagger digits
+    STA     STATS_STR         ; strength digits
+    STA     STATS_SPEED       ; speed digits
+    STA     STATS_DEXT        ; dexterity digits
 
     ; --- Format life force: field 6, bits 5-0 ---
     LDA     #$00
-    STA     $BD               ; high byte = 0
+    STA     NUM_VALUE+1                ; high byte = 0
     LDY     #$06
-    LDA     (ENTITY_PTR),Y    ; field 6
-    AND     #$3F              ; bits 5-0 = life force
-    STA     $BC               ; NUM_VALUE = life force
-    LDA     #$8D              ; \ output to $7D8D
-    STA     $BA               ;  | (LIFE FORCE area)
-    LDA     #$7D              ;  |
-    STA     $BB               ; /
+    LDA     (ENTITY_PTR),Y            ; field 6
+    AND     #$3F                       ; bits 5-0 = life force
+    STA     NUM_VALUE
+    STOW    STATS_LIFE_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format group count: field 8, bits 3-0 ---
     LDY     #$08
-    LDA     (ENTITY_PTR),Y    ; field 8
-    AND     #$0F              ; bits 3-0 = group count
-    STA     $BC
-    LDA     #$E1              ; \ output to $7DE1
-    STA     $BA               ;  | (WEAPONS area)
-    LDA     #$7D              ;  |
-    STA     $BB               ; /
+    LDA     (ENTITY_PTR),Y            ; field 8
+    AND     #$0F                       ; bits 3-0 = group count
+    STA     NUM_VALUE
+    STOW    STATS_WEAP_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format weapons: field 7, bits 3-0, plus 1 ---
     LDY     #$07
-    LDA     (ENTITY_PTR),Y    ; field 7
-    AND     #$0F              ; bits 3-0
+    LDA     (ENTITY_PTR),Y            ; field 7
+    AND     #$0F                       ; bits 3-0
     CLC
-    ADC     #$01              ; +1
-    STA     $BC
-    LDA     #$D2              ; \ output to $7DD2
-    STA     $BA               ;  | (SWORD area)
-    LDA     #$7D              ;  |
-    STA     $BB               ; /
+    ADC     #$01                       ; +1
+    STA     NUM_VALUE
+    STOW    STATS_SWORD_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format ducats: field 9, bits 3-0, plus 1 ---
     LDY     #$09
-    LDA     (ENTITY_PTR),Y    ; field 9
-    AND     #$0F              ; bits 3-0
+    LDA     (ENTITY_PTR),Y            ; field 9
+    AND     #$0F                       ; bits 3-0
     CLC
-    ADC     #$01              ; +1
-    STA     $BC
-    LDA     #$FC              ; \ output to $7DFC
-    STA     $BA               ;  | (DAGGER area)
-    LDA     #$7D              ;  |
-    STA     $BB               ; /
+    ADC     #$01                       ; +1
+    STA     NUM_VALUE
+    STOW    STATS_DAGGR_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format strength: field 5, bits 4-0 ---
     LDY     #$05
-    LDA     (ENTITY_PTR),Y    ; field 5
-    AND     #$1F              ; bits 4-0 = strength
-    STA     $BC
-    LDA     #$9C              ; \ output to $7D9C
-    STA     $BA               ;  | (STRENGTH area)
-    LDA     #$7D              ;  |
-    STA     $BB               ; /
+    LDA     (ENTITY_PTR),Y            ; field 5
+    AND     #$1F                       ; bits 4-0 = strength
+    STA     NUM_VALUE
+    STOW    STATS_STR_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format armor: field 12, bits 3-0 ---
     LDY     #$0C
-    LDA     (ENTITY_PTR),Y    ; field 12
-    AND     #$0F              ; bits 3-0
-    STA     $BC
-    LDA     #$C6              ; \ output to $7DC6
-    STA     $BA               ;  | (ARMOR area)
-    LDA     #$7D              ;  |
-    STA     $BB               ; /
+    LDA     (ENTITY_PTR),Y            ; field 12
+    AND     #$0F                       ; bits 3-0
+    STA     NUM_VALUE
+    STOW    STATS_SPEED_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format dexterity: field 11, bits 4-0 ---
     LDY     #$0B
-    LDA     (ENTITY_PTR),Y    ; field 11
-    AND     #$1F              ; bits 4-0 = dexterity
-    STA     $BC
-    LDA     #$F0              ; \ output to $7DF0
-    STA     $BA               ;  | (DEXTERITY area)
-    LDA     #$7D              ;  |
-    STA     $BB               ; /
+    LDA     (ENTITY_PTR),Y            ; field 11
+    AND     #$1F                       ; bits 4-0 = dexterity
+    STA     NUM_VALUE
+    STOW    STATS_DEXT_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format experience: fields 13-14 (16-bit) ---
     LDY     #$0D
-    LDA     (ENTITY_PTR),Y    ; field 13 (low byte)
-    STA     $BC
+    LDA     (ENTITY_PTR),Y            ; field 13 (low byte)
+    STA     NUM_VALUE
     INY
-    LDA     (ENTITY_PTR),Y    ; field 14 (high byte)
-    STA     $BD
-    LDA     #$B6              ; \ output to $7DB6
-    STA     $BA               ;  | (DUCATS area)
-    LDA     #$7D              ;  |
-    STA     $BB               ; /
+    LDA     (ENTITY_PTR),Y            ; field 14 (high byte)
+    STA     NUM_VALUE+1
+    STOW    STATS_DUCATS_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
-    ; --- Cosmetic: suppress leading "0" in experience ---
-    LDA     $7DB9             ; check ten-thousands digit
-    CMP     #$A0              ; space?
-    BNE     .show             ; no -> has 5 digits, show as-is
-    LDA     $7DBA             ; check thousands digit
+    ; --- Cosmetic: if hundreds digit is blank and tens is "0", blank it ---
+    LDA     STATS_DUCATS+2    ; hundreds digit
+    CMP     #$A0              ; blank (leading-zero suppressed)?
+    BNE     .show             ; no -> 3+ digits, show as-is
+    LDA     STATS_DUCATS+3    ; tens digit
     CMP     #$B0              ; "0"?
     BNE     .show             ; no -> show as-is
-    LDA     #$A0              ; replace leading "0" with space
-    STA     $7DBA
+    LDA     #$A0              ; replace "0" with blank
+    STA     STATS_DUCATS+3
 
     ; --- Display the stats ---
 .show:
@@ -6454,9 +6430,9 @@ DISPLAY_CHAR_STATS:
     LDA     #$00                       ;  | screen)
     STA     $24                        ; /
     LDA     #<STATS_TEMPLATE           ; \ print the stats template
-    STA     $BC                        ;  | string at $7D83
+    STA     PRINT_STRING_ADDR          ;  | string at $7D83
     LDA     #>STATS_TEMPLATE           ;  |
-    STA     $BD                        ; /
+    STA     PRINT_STRING_ADDR+1        ; /
     JSR     PRINT_STRING               ; display stats
     LDA     #$14                       ; \  cursor to column 20,
     STA     $25                        ;  | row 0
@@ -6497,40 +6473,84 @@ DISPLAY_CHAR_STATS:
 the formatted display layout with placeholder digits that
 [[NUM_TO_DECIMAL]] overwrites at runtime.
 
+@ [[NUM_TO_DECIMAL]] writes five digit positions starting from
+[[DECIMAL_OUT_PTR]] (ten-thousands, thousands, hundreds, tens, ones).
+Leading zeros are suppressed (the pre-cleared spaces remain).  These
+EQUs mark where each stat's ten-thousands position falls in the
+template, so that the rightmost digits land on the placeholder ``00''s.
+
+<<defines>>=
+STATS_LIFE_OUT      EQU     STATS_LIFE-3     ; $7D8D: life force output (2 digits at +3,+4)
+STATS_STR_OUT       EQU     STATS_STR-3      ; $7D9C: strength output
+STATS_DUCATS_OUT    EQU     STATS_DUCATS-1   ; $7DB6: ducats/experience output (5 digits at +0..+4)
+STATS_SPEED_OUT     EQU     STATS_SPEED-3    ; $7DC6: speed output
+STATS_SWORD_OUT     EQU     STATS_SWORD-3    ; $7DD2: sword output
+STATS_WEAP_OUT      EQU     STATS_WEAP       ; $7DE1: weapons/group count output
+STATS_DEXT_OUT      EQU     STATS_DEXT-3     ; $7DF0: dexterity output
+STATS_DAGGR_OUT     EQU     STATS_DAGGR-3    ; $7DFC: dagger output
+@ %def STATS_LIFE_OUT STATS_STR_OUT STATS_DUCATS_OUT STATS_SPEED_OUT STATS_SWORD_OUT STATS_WEAP_OUT STATS_DEXT_OUT STATS_DAGGR_OUT
+
 <<stats template data>>=
     ORG     $7D83
 STATS_TEMPLATE:
-    ; The stats template is a pre-formatted display string with
-    ; placeholder digits that NUM_TO_DECIMAL overwrites at runtime.
-    ; The routine writes to these absolute addresses:
-    ;   $7D8D: life force    $7D9C: strength    $7DB6: ducats (16-bit)
-    ;   $7DC6: speed         $7DD2: sword       $7DE1: weapons (group count)
-    ;   $7DF0: dexterity     $7DFC: dagger
-    ;
-    ;   $7D83: " LIFE FORCE 00"
-    HEX     7D A0 CC C9 C6 C5 A0 C6 CF D2 C3 C5 A0 B0 B0 FF
-    ;   $7D93: CR " STRENGTH  00"
-    HEX     8C A0 D3 D4 D2 C5 CE C7 D4 C8 A0 A0 B0 B0 FF
-    ;   $7DA2: VT "   WEAPONS  DUCATS  00000"
-    HEX     8B A0 A0 A0 D7 C5 C1 D0 CF CE D3 A0 A0
-    HEX     C4 D5 C3 C1 D4 D3 A0 A0 B0 B0 B0 B0 B0 FF
-    ;   $7DBD: CR " SPEED     00" VT
-    HEX     8C A0 D3 D0 C5 C5 C4 A0 A0 A0 A0 A0 B0 B0 8B FF
-    ;   $7DCD: " SWORD  00  ARMOR       0"
-    HEX     A0 D3 D7 CF D2 C4 A0 A0 B0 B0 A0 A0
-    HEX     C1 D2 CD CF D2 A0 A0 A0 A0 A0 A0 A0 B0 FF
-    ;   $7DE7: CR " DEXTERITY 00" VT
-    HEX     8C A0 C4 C5 D8 D4 C5 D2 C9 D4 D9 A0 B0 B0 8B FF
-    ;   $7DF7: " DAGGER 00"
-    HEX     A0 C4 C1 C7 C7 C5 D2 A0 B0 B0
-    ;   $7E01: SYN TAB "PRESS M TO CONTINUE" CR
-    HEX     16 89 D0 D2 C5 D3 D3 A0 CD A0 D4 CF
-    HEX     A0 C3 CF CE D4 C9 CE D5 C5 A0 8E
-    ;   $7E18: SYN TAB "PUSH BUTTON TO GO ON" CR
-    HEX     16 89 D0 D5 D3 C8 A0 C2 D5 D4 D4 CF
-    HEX     CE A0 D4 CF A0 C7 CF A0 CF CE 8E
+    ; Pascal-format string: length $7D (125 bytes), body $7D84-$7E00.
+    ; NUM_TO_DECIMAL writes 5 digit positions starting from each
+    ; STATS_*_OUT address.  $FF bytes are line separators.
+    DC.B    $7D               ; length = 125 bytes
+    ;   " LIFE FORCE 00"
+    HEX     A0 CC C9 C6 C5 A0 C6 CF D2 C3 C5 A0
+STATS_LIFE:                   ; $7D90
+    HEX     B0 B0
+    HEX     FF                ; --- separator ---
+    ;   CR " STRENGTH  00"
+    HEX     8C A0 D3 D4 D2 C5 CE C7 D4 C8 A0 A0
+STATS_STR:                    ; $7D9F
+    HEX     B0 B0
+    HEX     FF                ; --- separator ---
+    ;   VT "   WEAPONS  DUCATS  00000"
+    HEX     8B A0 A0 A0 D7 C5 C1 D0 CF CE D3
+    HEX     A0 A0 C4 D5 C3 C1 D4 D3 A0 A0
+STATS_DUCATS:                 ; $7DB7 (16-bit, 5 digits)
+    HEX     B0 B0 B0 B0 B0
+    HEX     FF                ; --- separator ---
+    ;   CR " SPEED     00" VT
+    HEX     8C A0 D3 D0 C5 C5 C4 A0 A0 A0 A0 A0
+STATS_SPEED:                  ; $7DC9
+    HEX     B0 B0
+    HEX     8B
+    HEX     FF                ; --- separator ---
+    ;   " SWORD  00  ARMOR       0"
+    HEX     A0 D3 D7 CF D2 C4 A0 A0
+STATS_SWORD:                  ; $7DD5
+    HEX     B0 B0
+    HEX     A0 A0 C1 D2 CD CF D2 A0 A0 A0
+STATS_WEAP:                   ; $7DE1 (group count)
+    HEX     A0 A0 A0 A0
+STATS_ARMOR:                  ; $7DE5
+    HEX     B0
+    HEX     FF                ; --- separator ---
+    ;   CR " DEXTERITY 00" VT
+    HEX     8C A0 C4 C5 D8 D4 C5 D2 C9 D4 D9 A0
+STATS_DEXT:                   ; $7DF3
+    HEX     B0 B0
+    HEX     8B
+    HEX     FF                ; --- separator ---
+    ;   " DAGGER 00"
+    HEX     A0 C4 C1 C7 C7 C5 D2 A0
+STATS_DAGGR:                  ; $7DFF
+    HEX     B0 B0
+@ %def STATS_TEMPLATE STATS_LIFE STATS_STR STATS_DUCATS STATS_SPEED STATS_SWORD STATS_WEAP STATS_ARMOR STATS_DEXT STATS_DAGGR
+
+@ The input prompt strings at [[$7E01]] and [[$7E18]] are separate
+Pascal strings displayed after the stats.
+
+<<stats template data>>=
+STATS_PROMPT_KEYBOARD:        ; $7E01
+    APSTR "\x09PRESS M TO CONTINUE \x0E" ; \x09=tab, \x0E=ctrl-E (HRCG clear to EOL)
+STATS_PROMPT_JOYSTICK:        ; $7E18
+    APSTR "\x09PUSH BUTTON TO GO ON\x0E" ; \x09=tab, \x0E=ctrl-E (HRCG clear to EOL)
     ; (STATUS_BORDER_DATA follows immediately at $7E2F)
-@ %def STATS_TEMPLATE
+@ %def STATS_PROMPT_KEYBOARD STATS_PROMPT_JOYSTICK
 
 \chapter{Utility Routines}
 
