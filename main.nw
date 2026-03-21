@@ -12485,11 +12485,26 @@ DROP_GOLD_TABLE:
     DC.W    MENU_DROP_GOLD_INIT
     ; rec0: DUCATS   rec1: # (inc)  rec2: @ (dec)
     ; rec3: DROP     rec4: KEEP ALL
-    HEX     01 2A 00 00 00 00 D9 7C A2 62
-    HEX     01 43 04 04 04 03 60 7B B3 62
-    HEX     01 45 04 04 02 04 62 7B AD 62
-    HEX     01 52 02 03 03 05 FA 7A B5 6F
-    HEX     01 69 02 03 04 04 F1 7C 31 1A
+    ; rec0: DUCATS (display only)
+    HEX     01 2A 00 00 00 00
+    DC.W    $7CD9              ; "DUCATS"
+    DC.W    MENU_DROP_GOLD     ; no-op (re-enter menu)
+    ; rec1: # (increase drop amount)
+    HEX     01 43 04 04 04 03
+    DC.W    $7B60              ; "#"
+    DC.W    MENU_DROP_INC
+    ; rec2: @ (decrease drop amount)
+    HEX     01 45 04 04 02 04
+    DC.W    $7B62              ; "@"
+    DC.W    MENU_DROP_DEC
+    ; rec3: DROP GOLD
+    HEX     01 52 02 03 03 05
+    DC.W    $7AFA              ; "DROP GOLD"
+    DC.W    DROP_GOLD_EXEC
+    ; rec4: KEEP ALL GOLD
+    HEX     01 69 02 03 04 04
+    DC.W    $7CF1              ; "KEEP ALL GOLD"
+    DC.W    MOVE_LOOP
 
 MENU_DROP_GOLD:
     LDX     #>DROP_GOLD_TABLE
@@ -12497,16 +12512,16 @@ MENU_DROP_GOLD:
     JMP     INPUT_LOOP
 
 MENU_DROP_GOLD_INIT:
-    JSR     $6F52              ; init drop amount display
+    JSR     INIT_DROP_DISPLAY  ; convert drop amount to decimal
     RTS
 
 MENU_DROP_INC:
     JSR     $6071              ; patch menu record
-    JMP     $6F72              ; increment drop amount
+    JMP     ADJ_DROP_INC       ; binary search: subtract step
 
 MENU_DROP_DEC:
     JSR     $6071              ; patch menu record
-    JMP     $6F76              ; decrement drop amount
+    JMP     ADJ_DROP_DEC       ; binary search: add step
 @ %def DROP_GOLD_TABLE MENU_DROP_GOLD MENU_DROP_GOLD_INIT MENU_DROP_INC MENU_DROP_DEC
 
 @ The save/load game menu at [[$62B9]].
@@ -16970,6 +16985,308 @@ SCAN_AND_REORDER:
     JMP     REORDER_CHAR
 @ %def SCAN_AND_REORDER
 
+@ \subsection{Flush pending XP (\$6EE9--\$6F16)}
+
+[[FLUSH_PENDING_XP]] extracts the pending XP field from byte~8 of the
+entity record at [[ENTITY_PTR]] and adds it to the level in byte~11.
+Byte~8 is a packed field:
+\begin{itemize}
+\item bits 6--4: pending XP (0--7)
+\item bit~7: status flag (preserved)
+\item bits 3--0: group count (cleared by this routine)
+\end{itemize}
+The routine clears the lower 7~bits of byte~8 (keeping only bit~7),
+extracts bits~6--4 as a 3-bit value (0--7), and adds it to byte~11
+(the level field).  If there was XP to flush, it displays message~\$2B.
+If the lower 7~bits were zero (no pending XP and no group members), it
+displays message~\$37 and returns to [[MOVE_LOOP]].
+
+<<flush pending xp>>=
+    ORG     $6EE9
+FLUSH_PENDING_XP:
+    SUBROUTINE FLUSH_PENDING_XP
+    LDY     #$08
+    LDA     (ENTITY_PTR),Y     ; byte 8: status|pending_xp|group_count
+    TAX                        ; save original
+    AND     #$80               ; keep only status flag (bit 7)
+    STA     (ENTITY_PTR),Y     ; clear pending XP and group count
+    TXA
+    AND     #$7F               ; strip status flag
+    BEQ     .no_xp             ; bits 6-0 all zero -> nothing to flush
+    ROR                        ; \ extract bits 6-4 (pending XP)
+    ROR                        ;  | shift right 4 positions
+    ROR                        ;  |
+    ROR                        ; /
+    AND     #$07               ; mask to 3 bits (0-7)
+    CLC
+    LDY     #$0B
+    ADC     (ENTITY_PTR),Y     ; add pending XP to level
+    STA     (ENTITY_PTR),Y     ; store updated level
+    JSR     SET_CURSOR_ROW21
+    LDA     #$2B               ; XP gained message
+    JMP     DISPLAY_MESSAGE
+
+.no_xp:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$37               ; no XP message
+    JSR     DISPLAY_MESSAGE
+    JMP     MOVE_LOOP
+@ %def FLUSH_PENDING_XP
+
+@ \subsection{Drop gold system (\$6F17--\$704C)}
+
+The drop gold system uses a binary search algorithm to let the player
+choose how much gold to drop.  Four variables track the state:
+\begin{itemize}
+\item [[DROP_AMOUNT\_LO]]/[[DROP_AMOUNT\_HI]]: the current drop amount
+\item [[DROP_STEP\_LO]]/[[DROP_STEP\_HI]]: the current binary search step
+\end{itemize}
+
+[[INIT_DROP_GOLD]] initializes the binary search.  It calls
+[[FIND_MSB]] on the entity's gold (bytes~\$0D/\$0E) to find the
+highest set bit, sets the drop amount to that power of~2, copies it
+to the step, halves the step, and enters the drop gold menu.
+If the entity has no gold, it displays message~\$2E and returns to
+the other options menu.
+
+<<defines>>=
+DROP_AMOUNT_LO      EQU     $5A7A   ; drop gold amount (low byte)
+DROP_AMOUNT_HI      EQU     $5A7B   ; drop gold amount (high byte)
+DROP_STEP_LO        EQU     $5A7C   ; binary search step (low byte)
+DROP_STEP_HI        EQU     $5A7D   ; binary search step (high byte)
+DROP_DISPLAY_BUF    EQU     $7CEB   ; 5-byte decimal display buffer
+@ %def DROP_AMOUNT_LO DROP_AMOUNT_HI DROP_STEP_LO DROP_STEP_HI DROP_DISPLAY_BUF
+
+<<init drop gold>>=
+    ORG     $6F17
+INIT_DROP_GOLD:
+    SUBROUTINE INIT_DROP_GOLD
+    LDA     #$00
+    STA     DROP_AMOUNT_LO
+    LDY     #$0E
+    LDA     (ENTITY_PTR),Y     ; gold high byte
+    JSR     FIND_MSB           ; X = highest set bit mask
+    STX     DROP_AMOUNT_HI
+    CPX     #$00
+    BNE     .has_gold
+    DEY                        ; Y = $0D
+    LDA     (ENTITY_PTR),Y     ; gold low byte
+    JSR     FIND_MSB
+    STX     DROP_AMOUNT_LO
+    BNE     .has_gold
+    JSR     SET_CURSOR_ROW21
+    LDA     #$2E               ; "no gold" message
+    JSR     DISPLAY_MESSAGE
+    JMP     MENU_OTHER_OPTIONS
+
+.has_gold:
+    LDA     DROP_AMOUNT_LO     ; \ copy amount to step
+    STA     DROP_STEP_LO       ;  |
+    LDA     DROP_AMOUNT_HI     ;  |
+    STA     DROP_STEP_HI       ; /
+    JSR     HALVE_STEP         ; step = amount / 2
+    JMP     MENU_DROP_GOLD     ; enter drop gold menu
+@ %def INIT_DROP_GOLD
+
+@ [[INIT_DROP_DISPLAY]] is the initialization callback for the drop gold
+menu.  It clears the 5-byte display buffer at [[DROP_DISPLAY_BUF]] and
+converts [[DROP_AMOUNT\_LO]]/[[DROP_AMOUNT\_HI]] to a decimal string
+via [[NUM_TO_DECIMAL]].
+
+<<init drop display>>=
+    ORG     $6F52
+INIT_DROP_DISPLAY:
+    SUBROUTINE INIT_DROP_DISPLAY
+    LDX     #$04
+    LDA     #$20               ; space
+.clear:
+    STA     DROP_DISPLAY_BUF,X
+    DEX
+    BPL     .clear
+    LDA     DROP_AMOUNT_LO
+    STA     $BC
+    LDA     DROP_AMOUNT_HI
+    STA     $BD
+    LDA     #<DROP_DISPLAY_BUF
+    STA     $BA
+    LDA     #>DROP_DISPLAY_BUF
+    STA     $BB
+    JSR     NUM_TO_DECIMAL
+    RTS
+@ %def INIT_DROP_DISPLAY
+
+@ [[ADJ_DROP_INC]] and [[ADJ_DROP_DEC]] are the handlers for the \# and
+@ keys in the drop gold menu.  They implement a binary search:
+\begin{itemize}
+\item \#~(X=3): subtract the step from the drop amount, then halve
+  the step.
+\item @~(X=4): add the step to the drop amount, halve the step, then
+  check if the amount exceeds the entity's actual gold.  If so, undo
+  by double-subtracting the step and switch to decrement mode.
+\end{itemize}
+If the step reaches zero, the search reinitializes via
+[[INIT_DROP_GOLD]].
+
+<<adj drop amount>>=
+    ORG     $6F72
+ADJ_DROP_INC:
+    LDX     #$03               ; # pressed
+    BNE     .entry
+
+ADJ_DROP_DEC:
+    LDX     #$04               ; @ pressed
+
+.entry:
+    LDA     #$00
+    CMP     DROP_STEP_LO
+    BNE     .nonzero
+    CMP     DROP_STEP_HI
+    BEQ     INIT_DROP_GOLD     ; step = 0 -> reinitialize
+
+.nonzero:
+    TXA
+    CMP     #$03
+    BEQ     .dec_amount        ; X=3 (#) -> subtract step
+
+    ; X=4 (@): add step, halve, check bounds
+    JSR     ADD_DROP
+    JSR     HALVE_STEP
+    LDY     #$0E
+    LDA     (ENTITY_PTR),Y     ; actual gold hi
+    CMP     DROP_AMOUNT_HI
+    BCC     .over_limit        ; drop > gold -> too much
+    BNE     .done              ; drop < gold -> ok
+    DEY
+    LDA     (ENTITY_PTR),Y     ; actual gold lo
+    CMP     DROP_AMOUNT_LO
+    BCS     .done              ; drop <= gold -> ok
+
+.over_limit:
+    JSR     SUB_DROP           ; undo: amount -= step
+    JSR     SUB_DROP           ; undo again (net: amount -= step)
+    LDX     #$04               ; switch to @ mode
+    BNE     .entry             ; retry with reduced step
+
+.dec_amount:
+    JSR     SUB_DROP           ; amount -= step
+    JSR     HALVE_STEP         ; step /= 2
+
+.done:
+    JMP     MENU_DROP_GOLD     ; re-enter drop gold menu
+@ %def ADJ_DROP_INC ADJ_DROP_DEC
+
+@ [[DROP_GOLD_EXEC]] is the handler for the ``DROP GOLD'' option in the
+drop gold menu.  It subtracts the drop amount from the entity's gold
+via [[MODIFY_CURRENT_STATS]], then generates a random multiplier
+(1--25) and subtracts it from the amount.  If gold remains, it
+displays message~\$2D and creates a gold drop event at the entity's
+position via [[UPDATE_EVENT_LIST]].  If the amount is zero or negative,
+it displays message~\$2C (gold lost/stolen) instead.
+
+<<drop gold exec>>=
+    ORG     $6FB5
+DROP_GOLD_EXEC:
+    SUBROUTINE DROP_GOLD_EXEC
+    LDA     DROP_AMOUNT_LO
+    STA     $BC
+    LDA     DROP_AMOUNT_HI
+    STA     $BD
+    LDY     #$00
+    STY     DROP_STEP_HI
+    JSR     MODIFY_CURRENT_STATS ; subtract gold from entity
+    LDA     #$19
+    JSR     RANDOM_IN_RANGE    ; random 0-24
+    STA     DROP_STEP_LO
+    INC     DROP_STEP_LO       ; step = 1-25
+    JSR     SET_CURSOR_ROW21
+    JSR     SUB_DROP           ; amount -= random step (gold lost)
+    LDA     DROP_AMOUNT_HI
+    BMI     .lost              ; negative -> all lost
+    BNE     .has_gold
+    LDA     DROP_AMOUNT_LO
+    BEQ     .lost              ; zero -> all lost
+
+.has_gold:
+    LDA     #$2D               ; gold dropped message
+    JSR     DISPLAY_MESSAGE
+    LDA     DROP_AMOUNT_LO
+    STA     $BC
+    LDA     DROP_AMOUNT_HI
+    STA     $BD
+    LDY     #$03
+    LDA     (ENTITY_PTR),Y     ; entity position
+    JSR     UPDATE_EVENT_LIST  ; create gold event on map
+    JMP     MOVE_LOOP
+
+.lost:
+    LDA     #$2C               ; gold lost message
+    JSR     DISPLAY_MESSAGE
+    JMP     MOVE_LOOP
+@ %def DROP_GOLD_EXEC
+
+@ \subsection{Arithmetic helpers (\$7005--\$704C)}
+
+[[FIND_MSB]] returns in~X the mask of the most significant set bit
+in~A.  It starts with X=\$80 (bit~7) and shifts A left through carry;
+if the carry is set, the current bit position is the MSB.  Otherwise
+it shifts X right and continues.
+
+[[ADD_DROP]] and [[SUB_DROP]] perform 16-bit addition and subtraction
+on the drop amount ([[DROP_AMOUNT\_LO]]/[[DROP_AMOUNT\_HI]]) using
+the step ([[DROP_STEP\_LO]]/[[DROP_STEP\_HI]]).
+
+[[HALVE_STEP]] divides the step by~2 via a 16-bit right shift.
+
+<<arithmetic helpers>>=
+    ORG     $7005
+FIND_MSB:
+    SUBROUTINE FIND_MSB
+    SEC
+    LDX     #$80               ; start with bit 7 mask
+.test:
+    ROL                        ; shift A left through carry
+    BCC     .next              ; bit was 0 -> try next
+    RTS                        ; bit was 1 -> X = mask
+.next:
+    PHA
+    TXA
+    LSR                        ; shift mask right
+    TAX
+    PLA
+    CLC
+    JMP     .test
+
+ADD_DROP:
+    CLC
+    LDA     DROP_AMOUNT_LO
+    ADC     DROP_STEP_LO
+    STA     DROP_AMOUNT_LO
+    LDA     DROP_AMOUNT_HI
+    ADC     DROP_STEP_HI
+    STA     DROP_AMOUNT_HI
+    RTS
+
+SUB_DROP:
+    SEC
+    LDA     DROP_AMOUNT_LO
+    SBC     DROP_STEP_LO
+    STA     DROP_AMOUNT_LO
+    LDA     DROP_AMOUNT_HI
+    SBC     DROP_STEP_HI
+    STA     DROP_AMOUNT_HI
+    RTS
+
+HALVE_STEP:
+    CLC
+    LDA     DROP_STEP_HI
+    ROR
+    STA     DROP_STEP_HI
+    LDA     DROP_STEP_LO
+    ROR
+    STA     DROP_STEP_LO
+    RTS
+@ %def FIND_MSB ADD_DROP SUB_DROP HALVE_STEP
+
 \section{Turn events}
 
 @ [[TRIGGER_SCENE_EVENT]] handles events in the [[$D2--$D4]] range of the
@@ -19813,6 +20130,12 @@ The following root chunks produce the assembly files when tangled.
 <<process scene groups>>
 <<load char to fa>>
 <<scan and reorder>>
+<<flush pending xp>>
+<<init drop gold>>
+<<init drop display>>
+<<adj drop amount>>
+<<drop gold exec>>
+<<arithmetic helpers>>
 <<modify char stats>>
 <<modify current stats>>
 <<display shop>>
