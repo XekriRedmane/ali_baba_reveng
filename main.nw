@@ -6147,59 +6147,10 @@ based on an average Apple II cycle time of [[0.98]] microseconds, this means
 that the frequency of the note played will be equal to [[510204 / (10X+31)]] Hz.
 See \href{https://6502disassembly.com/a2-rom/}{The Oft Misunderstood WAIT} for a derivation of average cycle time.
 
-<<tone>>=
-tone:
-    SUBROUTINE tone
-
-    LDY      #$0A          ; 2 cycles
-
-.outer_loop:
-    LDA      SPKR          ; 4 cycles
-
-.inner_loop:
-    ROL      DAT_00e3      ; 5 cycles
-    DEX                    ; 2 cycles
-    BNE      .inner_loop   ; 3 cycles
-
-    LDX      note_freq     ; 3 cycles
-    ROL      DAT_00e3      ; 5 cycles
-    ROR      DAT_00e3      ; 5 cycles
-    NOP                    ; 3 cycles
-    NOP                    ; 3 cycles
-    NOP                    ; 3 cycles
-    DEY                    ; 2 cycles
-    BNE      .outer_loop   ; 3 cycles
-
-    DEC      note_duration ; 5 cycles
-    BNE      tone          ; 3 cycles
-    RTS
-@ %def tone
-The [[high_tone]] routine does the same thing, but with shorter delays.
-The frequency of the note played by [[high_tone]] will be equal to
-[[510204 / (5X+12)]] Hz.
-
-
-<<high tone>>=
-high_tone:
-    SUBROUTINE high_tone
-
-    LDY      #$0A          ; 2 cycles
-
-.outer_loop:
-    LDA      SPKR          ; 4 cycles
-
-.inner_loop:
-    DEX                    ; 2 cycles
-    BNE      .inner_loop   ; 3 cycles
-
-    LDX      note_freq     ; 3 cycles
-    DEY                    ; 2 cycles
-    BNE      .outer_loop   ; 3 cycles
-
-    DEC      note_duration ; 5 cycles
-    BNE      high_tone     ; 3 cycles
-    RTS
-@ %def high_tone
+@ Note: the [[tone]] and [[high_tone]] routines referenced in the old
+song table documentation are identical to [[PLAY_NOISE]] (\$7A91) and
+[[PLAY_TONE]] (\$7A7F) respectively.  The names came from an earlier
+analysis before the tune player was fully understood.
 
 @ [[PLAY_TONE]] generates a square wave tone by toggling the Apple~II
 speaker at [[$C030]].  The outer loop runs 10~iterations (Y), each toggling
@@ -14997,13 +14948,13 @@ TUNE_1_COMBAT_HIT:
     DC.B    $1F               ; MARK2
     DC.B    $26               ; NORAND
     DC.B    $23               ; HIGH
-    DC.B    $C1,$05            ; NOTE $C1, dur $05
+    DC.B    $C1,$05            ; C5 (48ms)
     DC.B    $22               ; LOW
-    DC.B    $50,$06            ; NOTE $50, dur $06
-    DC.B    $3F,$08            ; NOTE $3F, dur $08
+    DC.B    $50,$06            ; Eb6 (24ms)
+    DC.B    $3F,$08            ; G6 (26ms)
     DC.B    $25               ; HIRAND
     DC.B    $23               ; HIGH
-    DC.B    $60,$10            ; NOTE $60, dur $10
+    DC.B    $60,$10            ; C6 (77ms)
     DC.B    $00               ; LOOP 0 (patched at runtime)
     DC.B    $24               ; END
 @ %def TUNE_1_COMBAT_HIT
@@ -15019,11 +14970,11 @@ TUNE_2_COMBAT_DAMAGE:
     DC.B    $25               ; HIRAND
     DC.B    $1F               ; MARK2
     DC.B    $22               ; LOW
-    DC.B    $3F,$05            ; NOTE $3F, dur $05
-    DC.B    $50,$04            ; NOTE $50, dur $04
-    DC.B    $80,$02            ; NOTE $80, dur $02
+    DC.B    $3F,$05            ; G6 (16ms)
+    DC.B    $50,$04            ; Eb6 (16ms)
+    DC.B    $80,$02            ; G5 (13ms)
     DC.B    $23               ; HIGH
-    DC.B    $C1,$04            ; NOTE $C1, dur $04
+    DC.B    $C1,$04            ; C5 (38ms)
     DC.B    $00               ; LOOP 0 (patched at runtime)
     DC.B    $24               ; END
 @ %def TUNE_2_COMBAT_DAMAGE
@@ -15046,121 +14997,121 @@ TUNE_3_ATTRACT:
     DC.B    $20               ; MARK1 (gosub target for GOTO1 at end)
     ; --- opening phrase (low then high) ---
     DC.B    $22               ; LOW
-    DC.B    $3F,$65            ; NOTE $3F, dur $65
+    DC.B    $3F,$65            ; G6 (324ms)
     DC.B    $23               ; HIGH
-    DC.B    $3F,$49            ; NOTE $3F, dur $49
-    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
-    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
-    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
-    DC.B    $3F,$5C            ; NOTE $3F, dur $5C
+    DC.B    $3F,$49            ; G6 (234ms)
+    DC.B    $3F,$8A            ; G6 (442ms)
+    DC.B    $3F,$8A            ; G6 (442ms)
+    DC.B    $3F,$8A            ; G6 (442ms)
+    DC.B    $3F,$5C            ; G6 (295ms)
     ; --- ascending arpeggio (loop 1x) ---
     DC.B    $1F               ; MARK2
     DC.B    $22               ; LOW
-    DC.B    $C1,$03            ; NOTE $C1, dur $03
-    DC.B    $80,$04            ; NOTE $80, dur $04
-    DC.B    $50,$06            ; NOTE $50, dur $06
-    DC.B    $3F,$08            ; NOTE $3F, dur $08
+    DC.B    $C1,$03            ; C5 (29ms)
+    DC.B    $80,$04            ; G5 (26ms)
+    DC.B    $50,$06            ; Eb6 (24ms)
+    DC.B    $3F,$08            ; G6 (26ms)
     DC.B    $23               ; HIGH
-    DC.B    $60,$0A            ; NOTE $60, dur $0A
-    DC.B    $50,$0C            ; NOTE $50, dur $0C
+    DC.B    $60,$0A            ; C6 (48ms)
+    DC.B    $50,$0C            ; Eb6 (48ms)
     ; --- melody ---
-    DC.B    $3F,$2E            ; NOTE $3F, dur $2E
-    DC.B    $47,$1B            ; NOTE $47, dur $1B
-    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
-    DC.B    $47,$1B            ; NOTE $47, dur $1B
-    DC.B    $50,$18            ; NOTE $50, dur $18
-    DC.B    $47,$1B            ; NOTE $47, dur $1B
-    DC.B    $50,$18            ; NOTE $50, dur $18
-    DC.B    $55,$17            ; NOTE $55, dur $17
-    DC.B    $50,$18            ; NOTE $50, dur $18
-    DC.B    $55,$17            ; NOTE $55, dur $17
-    DC.B    $60,$14            ; NOTE $60, dur $14
-    DC.B    $50,$18            ; NOTE $50, dur $18
-    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
-    DC.B    $35,$24            ; NOTE $35, dur $24
-    DC.B    $38,$22            ; NOTE $38, dur $22
-    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
-    DC.B    $3F,$E5            ; NOTE $3F, dur $E5
+    DC.B    $3F,$2E            ; G6 (147ms)
+    DC.B    $47,$1B            ; F6 (97ms)
+    DC.B    $3F,$1F            ; G6 (99ms)
+    DC.B    $47,$1B            ; F6 (97ms)
+    DC.B    $50,$18            ; Eb6 (97ms)
+    DC.B    $47,$1B            ; F6 (97ms)
+    DC.B    $50,$18            ; Eb6 (97ms)
+    DC.B    $55,$17            ; D6 (98ms)
+    DC.B    $50,$18            ; Eb6 (97ms)
+    DC.B    $55,$17            ; D6 (98ms)
+    DC.B    $60,$14            ; C6 (96ms)
+    DC.B    $50,$18            ; Eb6 (97ms)
+    DC.B    $3F,$1F            ; G6 (99ms)
+    DC.B    $35,$24            ; Bb6 (98ms)
+    DC.B    $38,$22            ; A6 (97ms)
+    DC.B    $3F,$1F            ; G6 (99ms)
+    DC.B    $3F,$E5            ; G6 (734ms)
     DC.B    $01               ; LOOP 1 (repeat arpeggio+melody once)
     ; --- second section ---
     DC.B    $22               ; LOW
-    DC.B    $C1,$03            ; NOTE $C1, dur $03
-    DC.B    $80,$04            ; NOTE $80, dur $04
+    DC.B    $C1,$03            ; C5 (29ms)
+    DC.B    $80,$04            ; G5 (26ms)
     DC.B    $23               ; HIGH
-    DC.B    $D9,$05            ; NOTE $D9, dur $05
+    DC.B    $D9,$05            ; Bb4 (54ms)
     DC.B    $22               ; LOW
-    DC.B    $50,$06            ; NOTE $50, dur $06
-    DC.B    $3F,$08            ; NOTE $3F, dur $08
+    DC.B    $50,$06            ; Eb6 (24ms)
+    DC.B    $3F,$08            ; G6 (26ms)
     DC.B    $23               ; HIGH
-    DC.B    $6C,$09            ; NOTE $6C, dur $09
-    DC.B    $50,$0C            ; NOTE $50, dur $0C
-    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
-    DC.B    $60,$14            ; NOTE $60, dur $14
-    DC.B    $50,$18            ; NOTE $50, dur $18
-    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
-    DC.B    $35,$24            ; NOTE $35, dur $24
-    DC.B    $38,$22            ; NOTE $38, dur $22
-    DC.B    $3F,$1F            ; NOTE $3F, dur $1F
-    DC.B    $3F,$5C            ; NOTE $3F, dur $5C
+    DC.B    $6C,$09            ; Bb5 (49ms)
+    DC.B    $50,$0C            ; Eb6 (48ms)
+    DC.B    $3F,$1F            ; G6 (99ms)
+    DC.B    $60,$14            ; C6 (96ms)
+    DC.B    $50,$18            ; Eb6 (97ms)
+    DC.B    $3F,$1F            ; G6 (99ms)
+    DC.B    $35,$24            ; Bb6 (98ms)
+    DC.B    $38,$22            ; A6 (97ms)
+    DC.B    $3F,$1F            ; G6 (99ms)
+    DC.B    $3F,$5C            ; G6 (295ms)
     ; --- bridge ---
-    DC.B    $C1,$0A            ; NOTE $C1, dur $0A
+    DC.B    $C1,$0A            ; C5 (96ms)
     DC.B    $22               ; LOW
-    DC.B    $50,$0C            ; NOTE $50, dur $0C
-    DC.B    $3F,$0F            ; NOTE $3F, dur $0F
+    DC.B    $50,$0C            ; Eb6 (48ms)
+    DC.B    $3F,$0F            ; G6 (48ms)
     DC.B    $23               ; HIGH
-    DC.B    $6C,$12            ; NOTE $6C, dur $12
-    DC.B    $72,$11            ; NOTE $72, dur $11
+    DC.B    $6C,$12            ; Bb5 (97ms)
+    DC.B    $72,$11            ; A5 (97ms)
     DC.B    $22               ; LOW
-    DC.B    $3F,$0F            ; NOTE $3F, dur $0F
-    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
-    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
+    DC.B    $3F,$0F            ; G6 (48ms)
+    DC.B    $3F,$8A            ; G6 (442ms)
+    DC.B    $3F,$8A            ; G6 (442ms)
     ; --- slow descending phrase ---
-    DC.B    $C1,$0F            ; NOTE $C1, dur $0F
-    DC.B    $A2,$12            ; NOTE $A2, dur $12
-    DC.B    $80,$17            ; NOTE $80, dur $17
+    DC.B    $C1,$0F            ; C5 (144ms)
+    DC.B    $A2,$12            ; Eb5 (145ms)
+    DC.B    $80,$17            ; G5 (147ms)
     DC.B    $23               ; HIGH
-    DC.B    $D9,$1B            ; NOTE $D9, dur $1B
+    DC.B    $D9,$1B            ; Bb4 (290ms)
     DC.B    $22               ; LOW
-    DC.B    $72,$1A            ; NOTE $72, dur $1A
-    DC.B    $80,$17            ; NOTE $80, dur $17
+    DC.B    $72,$1A            ; A5 (148ms)
+    DC.B    $80,$17            ; G5 (147ms)
     DC.B    $23               ; HIGH
-    DC.B    $C1,$1F            ; NOTE $C1, dur $1F
+    DC.B    $C1,$1F            ; C5 (297ms)
     DC.B    $22               ; LOW
-    DC.B    $50,$24            ; NOTE $50, dur $24
-    DC.B    $3F,$2E            ; NOTE $3F, dur $2E
+    DC.B    $50,$24            ; Eb6 (145ms)
+    DC.B    $3F,$2E            ; G6 (147ms)
     DC.B    $23               ; HIGH
-    DC.B    $6C,$36            ; NOTE $6C, dur $36
-    DC.B    $72,$34            ; NOTE $72, dur $34
+    DC.B    $6C,$36            ; Bb5 (292ms)
+    DC.B    $72,$34            ; A5 (297ms)
     DC.B    $22               ; LOW
-    DC.B    $3F,$2E            ; NOTE $3F, dur $2E
+    DC.B    $3F,$2E            ; G6 (147ms)
     ; --- long sustain + finale ---
     DC.B    $23               ; HIGH
-    DC.B    $60,$7A            ; NOTE $60, dur $7A
-    DC.B    $50,$92            ; NOTE $50, dur $92
-    DC.B    $3F,$B8            ; NOTE $3F, dur $B8
-    DC.B    $35,$D9            ; NOTE $35, dur $D9
-    DC.B    $38,$CE            ; NOTE $38, dur $CE
-    DC.B    $38,$67            ; NOTE $38, dur $67
-    DC.B    $3F,$5C            ; NOTE $3F, dur $5C
+    DC.B    $60,$7A            ; C6 (588ms)
+    DC.B    $50,$92            ; Eb6 (589ms)
+    DC.B    $3F,$B8            ; G6 (590ms)
+    DC.B    $35,$D9            ; Bb6 (589ms)
+    DC.B    $38,$CE            ; A6 (589ms)
+    DC.B    $38,$67            ; A6 (295ms)
+    DC.B    $3F,$5C            ; G6 (295ms)
     ; --- quick ascending run ---
     DC.B    $22               ; LOW
-    DC.B    $FF,$02            ; NOTE $FF, dur $02
-    DC.B    $AC,$03            ; NOTE $AC, dur $03
-    DC.B    $80,$04            ; NOTE $80, dur $04
+    DC.B    $FF,$02            ; G4 (25ms)
+    DC.B    $AC,$03            ; D5 (26ms)
+    DC.B    $80,$04            ; G5 (26ms)
     DC.B    $23               ; HIGH
-    DC.B    $CD,$05            ; NOTE $CD, dur $05
-    DC.B    $AC,$06            ; NOTE $AC, dur $06
+    DC.B    $CD,$05            ; B4 (51ms)
+    DC.B    $AC,$06            ; D5 (51ms)
     DC.B    $22               ; LOW
-    DC.B    $3F,$08            ; NOTE $3F, dur $08
+    DC.B    $3F,$08            ; G6 (26ms)
     DC.B    $23               ; HIGH
-    DC.B    $65,$0A            ; NOTE $65, dur $0A
-    DC.B    $55,$0B            ; NOTE $55, dur $0B
+    DC.B    $65,$0A            ; B5 (51ms)
+    DC.B    $55,$0B            ; D6 (47ms)
     ; --- closing sustained notes ---
-    DC.B    $3F,$C7            ; NOTE $3F, dur $C7
-    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
-    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
-    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
-    DC.B    $3F,$8A            ; NOTE $3F, dur $8A
+    DC.B    $3F,$C7            ; G6 (638ms)
+    DC.B    $3F,$8A            ; G6 (442ms)
+    DC.B    $3F,$8A            ; G6 (442ms)
+    DC.B    $3F,$8A            ; G6 (442ms)
+    DC.B    $3F,$8A            ; G6 (442ms)
     DC.B    $21               ; GOTO1 (loop back to MARK1)
 @ %def TUNE_3_ATTRACT
 
@@ -15172,21 +15123,21 @@ begins at [[$A3CE]], which is partway through script~4.  Both end at
     ORG     $A3C3
 TUNE_4_MOB_DEATH:
     DC.B    $23               ; HIGH
-    DC.B    $50,$3D            ; NOTE $50, dur $3D
-    DC.B    $47,$44            ; NOTE $47, dur $44
-    DC.B    $43,$90            ; NOTE $43, dur $90
-    DC.B    $47,$88            ; NOTE $47, dur $88
-    DC.B    $50,$79            ; NOTE $50, dur $79
+    DC.B    $50,$3D            ; Eb6 (246ms)
+    DC.B    $47,$44            ; F6 (245ms)
+    DC.B    $43,$90            ; Gb6 (490ms)
+    DC.B    $47,$88            ; F6 (489ms)
+    DC.B    $50,$79            ; Eb6 (489ms)
     ; --- script 5 entry point (NPC death, shorter suffix) ---
 TUNE_5_NPC_DEATH:
     DC.B    $23               ; HIGH
-    DC.B    $50,$3D            ; NOTE $50, dur $3D
-    DC.B    $47,$44            ; NOTE $47, dur $44
-    DC.B    $43,$48            ; NOTE $43, dur $48
-    DC.B    $35,$5A            ; NOTE $35, dur $5A
-    DC.B    $47,$44            ; NOTE $47, dur $44
-    DC.B    $43,$48            ; NOTE $43, dur $48
-    DC.B    $50,$79            ; NOTE $50, dur $79
+    DC.B    $50,$3D            ; Eb6 (246ms)
+    DC.B    $47,$44            ; F6 (245ms)
+    DC.B    $43,$48            ; Gb6 (245ms)
+    DC.B    $35,$5A            ; Bb6 (244ms)
+    DC.B    $47,$44            ; F6 (245ms)
+    DC.B    $43,$48            ; Gb6 (245ms)
+    DC.B    $50,$79            ; Eb6 (489ms)
     DC.B    $24               ; END
 @ %def TUNE_4_MOB_DEATH TUNE_5_NPC_DEATH
 
@@ -15195,21 +15146,21 @@ TUNE_5_NPC_DEATH:
 TUNE_6_COMBAT_AVOIDED:
     DC.B    $25               ; HIRAND
     DC.B    $22               ; LOW
-    DC.B    $80,$07            ; NOTE $80, dur $07
+    DC.B    $80,$07            ; G5 (45ms)
     DC.B    $23               ; HIGH
-    DC.B    $D9,$08            ; NOTE $D9, dur $08
-    DC.B    $AC,$0A            ; NOTE $AC, dur $0A
+    DC.B    $D9,$08            ; Bb4 (86ms)
+    DC.B    $AC,$0A            ; D5 (85ms)
     DC.B    $22               ; LOW
-    DC.B    $3F,$0E            ; NOTE $3F, dur $0E
+    DC.B    $3F,$0E            ; G6 (45ms)
     DC.B    $23               ; HIGH
-    DC.B    $6C,$10            ; NOTE $6C, dur $10
-    DC.B    $55,$15            ; NOTE $55, dur $15
-    DC.B    $3F,$1C            ; NOTE $3F, dur $1C
-    DC.B    $35,$21            ; NOTE $35, dur $21
-    DC.B    $29,$29            ; NOTE $29, dur $29
-    DC.B    $27,$2B            ; NOTE $27, dur $2B
-    DC.B    $27,$2B            ; NOTE $27, dur $2B
-    DC.B    $27,$50            ; NOTE $27, dur $50
+    DC.B    $6C,$10            ; Bb5 (87ms)
+    DC.B    $55,$15            ; D6 (90ms)
+    DC.B    $3F,$1C            ; G6 (90ms)
+    DC.B    $35,$21            ; Bb6 (90ms)
+    DC.B    $29,$29            ; D7 (87ms)
+    DC.B    $27,$2B            ; Eb7 (87ms)
+    DC.B    $27,$2B            ; Eb7 (87ms)
+    DC.B    $27,$50            ; Eb7 (162ms)
     DC.B    $24               ; END
 @ %def TUNE_6_COMBAT_AVOIDED
 
@@ -15218,11 +15169,11 @@ TUNE_6_COMBAT_AVOIDED:
 TUNE_10_ENCOUNTER:
     DC.B    $25               ; HIRAND
     DC.B    $23               ; HIGH
-    DC.B    $FA,$07            ; NOTE $FA, dur $07
-    DC.B    $D7,$08            ; NOTE $D7, dur $08
-    DC.B    $BE,$0A            ; NOTE $BE, dur $0A
-    DC.B    $AA,$0A            ; NOTE $AA, dur $0A
-    DC.B    $82,$0A            ; NOTE $82, dur $0A
+    DC.B    $FA,$07            ; Ab4 (87ms)
+    DC.B    $D7,$08            ; Bb4 (85ms)
+    DC.B    $BE,$0A            ; C5 (94ms)
+    DC.B    $AA,$0A            ; D5 (84ms)
+    DC.B    $82,$0A            ; G5 (65ms)
     DC.B    $24               ; END
 @ %def TUNE_10_ENCOUNTER
 
@@ -15231,28 +15182,28 @@ TUNE_10_ENCOUNTER:
 TUNE_7_ENTITY_INTERACTION:
     DC.B    $25               ; HIRAND
     DC.B    $23               ; HIGH
-    DC.B    $C1,$02            ; NOTE $C1, dur $02
-    DC.B    $C1,$02            ; NOTE $C1, dur $02
-    DC.B    $AC,$02            ; NOTE $AC, dur $02
+    DC.B    $C1,$02            ; C5 (19ms)
+    DC.B    $C1,$02            ; C5 (19ms)
+    DC.B    $AC,$02            ; D5 (17ms)
     DC.B    $22               ; LOW
-    DC.B    $72,$02            ; NOTE $72, dur $02
+    DC.B    $72,$02            ; A5 (11ms)
     DC.B    $23               ; HIGH
-    DC.B    $C1,$02            ; NOTE $C1, dur $02
-    DC.B    $C1,$02            ; NOTE $C1, dur $02
-    DC.B    $99,$06            ; NOTE $99, dur $06
+    DC.B    $C1,$02            ; C5 (19ms)
+    DC.B    $C1,$02            ; C5 (19ms)
+    DC.B    $99,$06            ; E5 (46ms)
     DC.B    $22               ; LOW
-    DC.B    $80,$04            ; NOTE $80, dur $04
+    DC.B    $80,$04            ; G5 (26ms)
     DC.B    $23               ; HIGH
-    DC.B    $C1,$03            ; NOTE $C1, dur $03
-    DC.B    $C1,$01            ; NOTE $C1, dur $01
-    DC.B    $C1,$02            ; NOTE $C1, dur $02
-    DC.B    $C1,$08            ; NOTE $C1, dur $08
-    DC.B    $AC,$01            ; NOTE $AC, dur $01
+    DC.B    $C1,$03            ; C5 (29ms)
+    DC.B    $C1,$01            ; C5 (10ms)
+    DC.B    $C1,$02            ; C5 (19ms)
+    DC.B    $C1,$08            ; C5 (77ms)
+    DC.B    $AC,$01            ; D5 (9ms)
     DC.B    $22               ; LOW
-    DC.B    $72,$01            ; NOTE $72, dur $01
+    DC.B    $72,$01            ; A5 (6ms)
     DC.B    $23               ; HIGH
-    DC.B    $C1,$03            ; NOTE $C1, dur $03
-    DC.B    $C1,$05            ; NOTE $C1, dur $05
+    DC.B    $C1,$03            ; C5 (29ms)
+    DC.B    $C1,$05            ; C5 (48ms)
     DC.B    $24               ; END
 @ %def TUNE_7_ENTITY_INTERACTION
 
@@ -15261,7 +15212,7 @@ TUNE_7_ENTITY_INTERACTION:
 TUNE_8_AI_TURN:
     DC.B    $26               ; NORAND
     DC.B    $22               ; LOW
-    DC.B    $3F,$12            ; NOTE $3F, dur $12
+    DC.B    $3F,$12            ; G6 (58ms)
     DC.B    $24               ; END
 @ %def TUNE_8_AI_TURN
 
@@ -15270,7 +15221,7 @@ TUNE_8_AI_TURN:
 TUNE_9_MENU_SELECTION:
     DC.B    $26               ; NORAND
     DC.B    $22               ; LOW
-    DC.B    $AC,$05            ; NOTE $AC, dur $05
+    DC.B    $AC,$05            ; D5 (43ms)
     DC.B    $24               ; END
 @ %def TUNE_9_MENU_SELECTION
 
@@ -15279,7 +15230,7 @@ TUNE_9_MENU_SELECTION:
 TUNE_11_MOVEMENT:
     DC.B    $26               ; NORAND
     DC.B    $23               ; HIGH
-    DC.B    $3F,$1E            ; NOTE $3F, dur $1E
+    DC.B    $3F,$1E            ; G6 (96ms)
     DC.B    $24               ; END
 @ %def TUNE_11_MOVEMENT
 
