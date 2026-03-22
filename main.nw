@@ -6580,17 +6580,18 @@ SOUND_DURATION          EQU     $E2     ; sound duration / tune parameter byte
 PLAY_HIGH_TONE:
     SUBROUTINE PLAY_HIGH_TONE
 
-.outer:
+.cycle:
     LDY     #$0A           ; 10 speaker toggles per cycle
 .toggle:
     LDA     $C030          ; toggle speaker
+.delay:
     DEX
-    BNE     .toggle        ; inner delay loop
+    BNE     .delay         ; inner delay loop (no toggle)
     LDX     SOUND_FREQ     ; reload pitch counter
     DEY
     BNE     .toggle        ; next toggle
     DEC     SOUND_DURATION ; repeat whole cycle
-    BNE     .outer
+    BNE     .cycle
     RTS
 @ %def PLAY_HIGH_TONE
 
@@ -6612,13 +6613,14 @@ TONE_PADDING            EQU     $E3     ; byte used for cycle padding in PLAY_LO
 PLAY_LOW_TONE:
     SUBROUTINE PLAY_LOW_TONE
 
-.outer:
+.cycle:
     LDY     #$0A           ; 10 toggles per cycle
 .toggle:
     LDA     $C030          ; toggle speaker
-    ROL     TONE_PADDING   ; \ cycle padding (5 cycles)
+.delay:
+    ROL     TONE_PADDING   ; cycle padding (5 cycles)
     DEX
-    BNE     .toggle        ; inner delay loop
+    BNE     .delay         ; inner delay loop (no toggle)
     LDX     SOUND_FREQ     ; reload pitch counter
     ROL     TONE_PADDING   ; \ more cycle padding
     ROR     TONE_PADDING   ; / (ROL+ROR cancels out)
@@ -6628,7 +6630,7 @@ PLAY_LOW_TONE:
     DEY
     BNE     .toggle        ; next toggle
     DEC     SOUND_DURATION ; repeat whole cycle
-    BNE     .outer
+    BNE     .cycle
     RTS
 @ %def PLAY_LOW_TONE
 Based on cycle times, these are the closest values for various notes. At the higher
@@ -11253,7 +11255,7 @@ SETUP_TEXT_POS_COL20:          ; $76D8 - original SETUP_TEXT_POS_COL20 entry
     SEC
     SBC     $24
     STA     $24
-    JSR     SET_TEXT_WINDOW
+    JSR     PRINT_CENTERED_PLUS_COL
     LDA     #$8B
     JMP     ROM_COUT1
 @ %def SETUP_TEXT_POS SETUP_TEXT_POS_COL20
