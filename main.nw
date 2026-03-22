@@ -14737,57 +14737,75 @@ SAVED_MOB_LINK      EQU     $5A75   ; temp: saved byte 2 of mob record
 <<attack eligibility>>=
     ORG     $155E
 SELECT_SOMEONE_ELSE:
-    JSR     NEXT_COLOCATED_MOB
-    JMP     MENU_ATTACK_TARGET
+    ; "SOMEONE ELSE" menu handler: advance to next colocated mob.
+    ; Input:  MOB_PTR — current mob
+    ; Output: jumps to MENU_ATTACK_TARGET
+    ; Clobbers: A, X, Y
+
+    JSR     NEXT_COLOCATED_MOB     ; advance to next mob
+    JMP     MENU_ATTACK_TARGET     ; re-enter target menu
 
 CHECK_ATTACK_ELIGIBLE:
     SUBROUTINE CHECK_ATTACK_ELIGIBLE
-    LDA     ENTITY_PTR         ; \ copy ENTITY_PTR to TARGET_REC
-    STA     TARGET_REC         ;  | and MOB_PTR
-    STA     MOB_PTR            ;  |
-    LDA     ENTITY_PTR+1       ;  |
-    STA     TARGET_REC+1       ;  |
-    STA     MOB_PTR+1          ; /
+    ; Check if a hostile mob is at the entity's position.
+    ;
+    ; Input:  ENTITY_PTR — entity to check
+    ; Output: C=1 hostile found (MOB_PTR set to it)
+    ;         C=0 no hostile at position
+    ; Modifies: MOB_PTR, TARGET_REC
+    ; Clobbers: A, X, Y
 
+    LDA     ENTITY_PTR             ; \ copy ENTITY_PTR
+    STA     TARGET_REC             ;  | to TARGET_REC
+    STA     MOB_PTR                ;  | and MOB_PTR
+    LDA     ENTITY_PTR+1           ;  |
+    STA     TARGET_REC+1           ;  |
+    STA     MOB_PTR+1              ; /
 .scan:
     JSR     FIND_MOB_AT_SAME_POS
-    LDA     ENTITY_PTR         ; \ check if pointer changed
-    CMP     MOB_PTR            ;  |
-    BNE     .found             ;  |
-    LDA     ENTITY_PTR+1       ;  |
-    CMP     MOB_PTR+1          ;  |
-    BEQ     .none              ; / same pointer -> no target found
-
+    LDA     ENTITY_PTR             ; \ check if pointer changed
+    CMP     MOB_PTR                ;  |
+    BNE     .found                 ;  |
+    LDA     ENTITY_PTR+1           ;  |
+    CMP     MOB_PTR+1              ;  |
+    BEQ     .none                  ; / same pointer -> none found
 .found:
-    JSR     CHECK_HOSTILE
+    JSR     CHECK_HOSTILE          ; A=0 if friendly
     CMP     #$00
-    BEQ     .scan              ; not hostile -> keep scanning
-    SEC                        ; hostile found at same position
+    BEQ     .scan                  ; not hostile -> keep scanning
+    SEC                            ; hostile found
     RTS
-
 .none:
-    CLC                        ; no hostile at same position
+    CLC                            ; no hostile found
     RTS
 
 NEXT_COLOCATED_MOB:
     SUBROUTINE NEXT_COLOCATED_MOB
-    LDY     #$02
-    LDA     (MOB_PTR),Y        ; byte 2 = next link
-    STA     SAVED_MOB_LINK     ; save current link
+    ; Advance MOB_PTR to the next valid NPC at the same position.
+    ;
+    ; Input:  MOB_PTR — current mob
+    ; Output: A=1 valid target found, A=0 no new mob
+    ;         MOB_PTR updated if found
+    ; Modifies: MOB_PTR, SAVED_MOB_LINK
+    ; Clobbers: A, X, Y
+
+    LDY     #MFIELD_NEXT           ; byte 2: next link
+    LDA     (MOB_PTR),Y
+    STA     SAVED_MOB_LINK         ; save current link
 .retry:
     JSR     FIND_MOB_AT_SAME_POS
-    LDY     #$02
-    LDA     (MOB_PTR),Y        ; byte 2 of new mob
-    CMP     SAVED_MOB_LINK     ; same link as before?
-    BNE     .check             ; different -> check validity
-    LDA     #$00               ; no new mob found
+    LDY     #MFIELD_NEXT           ; byte 2: new mob's link
+    LDA     (MOB_PTR),Y
+    CMP     SAVED_MOB_LINK         ; same as saved?
+    BNE     .check                 ; different -> check validity
+    LDA     #$00                   ; wrapped around, none found
     RTS
 .check:
-    LDY     #$04
-    LDA     (MOB_PTR),Y        ; byte 4 = appearance
-    CMP     #NPC_APPEARANCE_MIN               ; >= $15 = valid target
-    BCC     .retry             ; too low -> try next mob
-    LDA     #$01               ; valid target found
+    LDY     #MFIELD_APPEARANCE     ; byte 4: appearance
+    LDA     (MOB_PTR),Y
+    CMP     #NPC_APPEARANCE_MIN    ; >= $15 = valid NPC target?
+    BCC     .retry                 ; below threshold -> skip
+    LDA     #$01                   ; valid target found
     RTS
 @ %def SELECT_SOMEONE_ELSE CHECK_ATTACK_ELIGIBLE NEXT_COLOCATED_MOB
 
