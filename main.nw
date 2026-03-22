@@ -15023,23 +15023,46 @@ RESOLVE_ATTACK:
 .mob_attack:
     JMP     MOB_ATTACK
 @ %def RESOLVE_ATTACK
-@ [[PLAYER_ATTACK]] resolves an attack initiated by the player character.  It
-first computes the combat strength via [[CALC_COMBAT_STRENGTH]], displays the
-attacker's name and a strength-based descriptor through [[MAP_VALUE_TO_STRING]],
-then copies [[MOB_PTR]] to [[ENTITY_REC]] and classifies the target entity.
-The tune player is invoked with tune~2 and the combat strength as a
-parameter.  If the target's byte~1 is~\$FE (marked dead/empty), the routine
-falls through to event-slot processing.  Otherwise it checks whether the
-target's byte~2 flags indicate an activated event: if the high bits are~\$C0,
-the low sub-type determines how to handle it---small values trigger a scene,
-larger values result in the slot being cleared.  For non-event targets, a
-hit roll compares a random number (0--12) against the combat strength; if the
-roll is at or above the strength, the attack is ``immune'' (blocked).  A
-successful hit sets bit~6 of the target's byte~1 (marking damage taken),
-redraws the entity at its position, plays tune~\$0C, and displays a
-hit confirmation.  The routine also handles locked containers: if the target
-has a type flag and the player's strength is below the required threshold,
-the attack is blocked with message~\$10.
+@ \subsection{Player attack resolution (\$1751)}
+
+[[PLAYER_ATTACK]] resolves an attack initiated by the player character.
+The routine computes combat strength, classifies the target, and then
+branches into one of several resolution paths depending on the target's
+type and state.
+
+\paragraph{Setup.}
+The routine computes the attacker's combat strength via
+[[CALC_COMBAT_STRENGTH]], displays the attacker's name followed by
+a strength-based descriptor from [[MAP_VALUE_TO_STRING]], copies
+[[MOB_PTR]] to [[ENTITY_REC]], and plays tune~2 with the combat
+strength as a parameter.
+
+\paragraph{Target classification.}
+The target entity is classified by examining its record fields:
+\begin{itemize}
+\item If byte~1 is~\$FE (dead/empty), the routine falls through to
+      event-slot processing.
+\item If byte~2 has high bits equal to~\$C0, the target is an
+      activated event slot.  Small sub-type values trigger a scene;
+      larger values clear the slot.
+\item Otherwise the target is a normal entity and the routine
+      proceeds to attack resolution.
+\end{itemize}
+
+\paragraph{Locked containers.}
+If the target has a type flag indicating a locked container and the
+player's strength is below the required threshold, the attack is
+blocked with message~\$10.
+
+\paragraph{Hit roll.}
+For normal targets, a random number 0--12 is compared against the
+combat strength:
+\begin{itemize}
+\item Roll $\ge$ strength: attack blocked (``immune'').
+\item Roll $<$ strength: hit confirmed --- bit~6 of byte~1 is set
+      (damage taken), the entity is redrawn, tune~\$0C plays, and a
+      hit confirmation is displayed.
+\end{itemize}
 
 <<player attack>>=
     ORG     $1751
@@ -15145,20 +15168,31 @@ PLAYER_ATTACK:
     LDA     #MSG_HEAVY_ROCK
     JMP     DISPLAY_MESSAGE
 @ %def PLAYER_ATTACK
-@ [[MOB_ATTACK]] resolves an attack from a mob against the current character.
-The structure mirrors [[PLAYER_ATTACK]]: compute combat strength, display the
-attacker name and strength descriptor, print the target's name, play tune
-type~2 with the strength value, and call [[DISPATCH_ON_MODE]] for any
-mode-specific behavior.  The key difference is in the defense calculation: the
-routine reads byte~8 of the target ([[MOB_PTR]]) and uses its low 4~bits as a
-defense value.  If defense is zero, the full combat strength is applied via
-[[COPY_F4_TO_F6_AND_SET]].  Otherwise, the routine subtracts defense from
-strength: a negative or zero result means the attack is absorbed, with message
-indices \$19/\$1A (``blocked'' variants) or~\$34 for critical blocks when HP is
-below~3.  A positive remainder after subtraction becomes the effective damage,
-displayed with message \$17 or \$18 depending on whether byte~8's sign bit is
-set.  For player characters (field~4 below~\$15), the scene combat flag is
-cleared to signal that the player is under attack.
+@ \subsection{Mob attack resolution (\$1860)}
+
+[[MOB_ATTACK]] resolves an attack from a mob against the current
+character.  The overall structure mirrors [[PLAYER_ATTACK]]: compute
+combat strength, display names, play tune~2, and call
+[[DISPATCH_ON_MODE]].
+
+\paragraph{Defense calculation.}
+The key difference from [[PLAYER_ATTACK]] is in defense handling.
+The routine reads byte~8 of the target (via [[MOB_PTR]]) and uses
+its low 4~bits as a defense value:
+\begin{itemize}
+\item Defense $= 0$: full combat strength applied via
+      [[COPY_F4_TO_F6_AND_SET]].
+\item Defense $> 0$: subtracted from strength.  A zero or negative
+      result means the attack is absorbed, with message \$19/\$1A
+      (``blocked'') or~\$34 for critical blocks when HP $<$ 3.
+\item Positive remainder becomes effective damage, displayed with
+      message \$17 or \$18 depending on byte~8's sign bit.
+\end{itemize}
+
+\paragraph{Player character special case.}
+For player characters (appearance below [[NPC_APPEARANCE_MIN]]),
+[[SCENE_COMBAT_FLAG]] is cleared to signal that the player is under
+attack.
 
 <<defines>>=
 SCENE_COMBAT_FLAG       EQU     $423A   ; nonzero = combat pending
@@ -15227,24 +15261,43 @@ MOB_ATTACK:
     LDA     COMBAT_STRENGTH
     JMP     COPY_F4_TO_F6_AND_SET
 @ %def MOB_ATTACK
-@ [[APPLY_DAMAGE]] is the central damage-resolution routine.  It takes a
-damage amount in~A and the target character's record pointer in [[EFFECT_REC]].
-The routine first computes a message index by counting the leading zero bits of
-the damage value (using repeated ROR), which maps larger damage to lower
-message indices---producing increasingly alarming descriptions as damage rises.
-It then invokes the [[TUNE_PLAYER]] with tune~4 to play the
-damage sound effect.  The actual HP reduction follows: field~6 of the
-target record holds hit points in its low six bits (with flags in the upper
-two), and the damage is subtracted.  If HP drops to zero or below, execution
-falls into the death handler, which sets a death flag in field~15, re-sorts
-the character out of its group with [[REORDER_CHAR]], zeroes the character's
-gold via [[MODIFY_CHAR_STATS]], calls [[UPDATE_EVENT_LIST]] to process any
-death-triggered events, and redraws the map position.  The death message itself
-is chosen randomly: a 1-in-3 chance of one message, otherwise a coin flip
-between two alternatives.  If the character survives, the routine checks the
-remaining HP and displays a status message: ``badly hurt'' below~3, ``wounded''
-below~8, or ``scratched'' at~8 or above.  Characters below~3~HP also get the
-restricted flag set in field~15, limiting their actions on subsequent turns.
+@ \subsection{Damage application (\$106F)}
+
+[[APPLY_DAMAGE]] is the central damage-resolution routine.  It takes
+a damage amount in~A and the target record pointer in [[EFFECT_REC]].
+
+\paragraph{Damage description.}
+The routine computes a message index by counting the leading zero
+bits of the damage value (via repeated ROR).  Larger damage maps to
+lower indices, producing increasingly alarming descriptions.
+Tune~4 (damage sound) is played.
+
+\paragraph{HP reduction.}
+Field~6 of the target record holds HP in bits~5--0 (with flags in
+bits~7--6).  The damage is subtracted.  If HP drops to zero or
+below, execution falls into the death handler.
+
+\paragraph{Death handler.}
+When a character dies:
+\begin{itemize}
+\item Death flag set in field~15.
+\item Character re-sorted out of group via [[REORDER_CHAR]].
+\item Gold zeroed via [[MODIFY_CHAR_STATS]].
+\item [[UPDATE_EVENT_LIST]] processes death-triggered events.
+\item Map position redrawn.
+\end{itemize}
+The death message is chosen randomly: 1-in-3 chance of one variant,
+otherwise a coin flip between two alternatives.
+
+\paragraph{Survival status.}
+If the character survives, a status message is displayed based on
+remaining HP:
+\begin{itemize}
+\item Below~3: ``badly hurt'' --- the restricted flag is set in
+      field~15, limiting actions on subsequent turns.
+\item Below~8: ``wounded.''
+\item 8~or above: ``scratched.''
+\end{itemize}
 
 <<defines>>=
 DAMAGE_AMOUNT       EQU     $5A10   ; damage to apply / new HP after subtraction
