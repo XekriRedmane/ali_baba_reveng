@@ -16894,96 +16894,102 @@ DISPLAY_SHOP:
     RTS
 .do_shop:
     STOW    SHOP_TABLE,SHOP_DATA_PTR
-    LDY     #SHOP_TYPE_FIELD
-    LDA     (ENTITY_REC),Y     ; shop type ($D5=weapons, $D6=armor)
+    LDY     #SHOP_TYPE_FIELD       ; shop type ($D5=weapons, $D6=armor)
+    LDA     (ENTITY_REC),Y
     SEC
-    SBC     #$D5               ; record index (0 or 1)
+    SBC     #$D5                   ; record index (0 or 1)
     TAX
 .count_loop:
     DEX
     BMI     .counted
-    JSR     ADVANCE_SHOP_PTR   ; skip to selected record
+    JSR     ADVANCE_SHOP_PTR       ; skip to selected record
     JMP     .count_loop
 .counted:
-    LDY     #SHOP_AVAIL_FIELD
-    LDA     (ENTITY_REC),Y     ; item availability bitmask
+    LDY     #SHOP_AVAIL_FIELD      ; item validity bitmask
+    LDA     (ENTITY_REC),Y
     STA     SHOP_VALID_MASK
     JSR     SET_CURSOR_ROW21
-    LDY     #SHOP_SCENE_OFFSET
+    LDY     #SHOP_SCENE_OFFSET     ; display shop scene
     LDA     (SHOP_DATA_PTR),Y
     JSR     SCENE_LOOP
     JSR     LOAD_CHAR_NAME_PTR
     JSR     SETUP_CHAR_SPRITE
+
+    ; --- iterate through item slots ---
 .item_start:
-    STOB    #$80,SHOP_ITEM_MASK
-    STOB    #$00,SHOP_ITEM_OFFSET
+    STOB    #$80,SHOP_ITEM_MASK    ; start at slot 0 (bit 7)
+    STOB    #$00,SHOP_ITEM_OFFSET  ; start at record offset 0
 .item_loop:
-    LDA     SHOP_VALID_MASK
+    LDA     SHOP_VALID_MASK        ; check if current slot is valid
     AND     SHOP_ITEM_MASK
     BNE     .show_item
     JMP     .next_item
+
+    ; --- display one item ---
 .show_item:
-    STOB    #$00,SHOP_PRICE
+    STOB    #$00,SHOP_PRICE        ; clear price accumulator
     STA     SHOP_PRICE_HI
-    LDY     SHOP_ITEM_OFFSET
+    LDY     SHOP_ITEM_OFFSET       ; Y = offset + 4 (price byte)
     INY
     INY
     INY
-    INY                        ; Y = SHOP_ITEM_OFFSET + 4
-    LDA     LOCATION_STYLE     ; extract bits 7-6: location tier (0-3)
-    ROL2                       ; \ rotate bits 7-6 down to bits 1-0
-    ROL2                       ; /
-    AND     #$03               ; mask to 2 bits
-    TAX                        ; X = price multiplier (loop count)
+    INY
+    LDA     LOCATION_STYLE         ; \ extract bits 7-6: location tier (0-3)
+    ROL2                           ;  | rotate down to bits 1-0
+    ROL2                           ;  |
+    AND     #$03                   ; /
+    TAX                            ; X = tier (price loop count)
     STA     LOCATION_STYLE_BITS
 .price_loop:                       ; price = base_price * (tier + 1)
     JSR     ADD_PRICE_COMPONENT
     DEX
     BPL     .price_loop
-    LDA     #$20               ; fill with spaces
-    LDX     #$04
-.clear1:                       ; clear price field in "PAY 000000 FOR"
-    STA     SHOP_PRICE_DIGITS,X
-    DEX
-    BPL     .clear1
-    LDX     #$13
-.clear2:                       ; clear item name field after "FOR "
-    STA     SHOP_ITEM_NAME,X
-    DEX
-    BPL     .clear2
+    LDA     #$20                   ; \ clear price and item name fields
+    LDX     #$04                   ;  | in "PAY 000000 FOR" string
+.clear1:                           ;  |
+    STA     SHOP_PRICE_DIGITS,X    ;  |
+    DEX                            ;  |
+    BPL     .clear1                ;  |
+    LDX     #$13                   ;  |
+.clear2:                           ;  |
+    STA     SHOP_ITEM_NAME,X       ;  |
+    DEX                            ;  |
+    BPL     .clear2                ; /
     MOVB    SHOP_PRICE,PRINT_STRING_ADDR
     MOVB    SHOP_PRICE_HI,PRINT_STRING_ADDR+1
     STOW    SHOP_PRICE_DIGITS,$BA
-    JSR     NUM_TO_DECIMAL     ; write price digits
-    LDY     SHOP_ITEM_OFFSET   ; \ copy item name string address
-    INY                        ;  | from shop record (+2/+3)
-    INY                        ;  | into PRINT_STRING_ADDR
-    LDA     (SHOP_DATA_PTR),Y ;  |
-    STA     PRINT_STRING_ADDR  ;  |
-    INY                        ;  |
-    LDA     (SHOP_DATA_PTR),Y ;  |
-    STA     PRINT_STRING_ADDR+1; /
-    LDY     #$00               ; \ copy item name into "PAY ... FOR" string
-    LDA     (PRINT_STRING_ADDR),Y ;  | Y = string length
-    TAY                        ;  |
-    TAX                        ;  |
-    DEX                        ;  | X = length - 1 (dest index)
-.copy_name:                    ;  |
-    LDA     (PRINT_STRING_ADDR),Y ;  |
-    STA     SHOP_ITEM_NAME,X   ;  |
-    DEY                        ;  |
-    DEX                        ;  |
-    BPL     .copy_name         ; /
-    JMP     START_GAME_INPUT
+    JSR     NUM_TO_DECIMAL         ; write price digits
+    LDY     SHOP_ITEM_OFFSET       ; \ copy item name string address
+    INY                            ;  | from shop record (+2/+3)
+    INY                            ;  | into PRINT_STRING_ADDR
+    LDA     (SHOP_DATA_PTR),Y      ;  |
+    STA     PRINT_STRING_ADDR      ;  |
+    INY                            ;  |
+    LDA     (SHOP_DATA_PTR),Y      ;  |
+    STA     PRINT_STRING_ADDR+1    ; /
+    LDY     #$00                   ; \ copy item name into display string
+    LDA     (PRINT_STRING_ADDR),Y  ;  | Y = string length
+    TAY                            ;  |
+    TAX                            ;  |
+    DEX                            ;  | X = length - 1 (dest index)
+.copy_name:                        ;  |
+    LDA     (PRINT_STRING_ADDR),Y  ;  |
+    STA     SHOP_ITEM_NAME,X       ;  |
+    DEY                            ;  |
+    DEX                            ;  |
+    BPL     .copy_name             ; /
+    JMP     START_GAME_INPUT       ; enter buy/browse/no-sale menu
+
+    ; --- advance to next slot ---
 .next_item:
     CLC
-    LDA     SHOP_ITEM_MASK
+    LDA     SHOP_ITEM_MASK         ; rotate mask right
     ROR
-    BCC     .more_items
-    JMP     .item_start
+    BCC     .more_items            ; didn't carry out -> more slots
+    JMP     .item_start            ; carried out -> restart
 .more_items:
     STA     SHOP_ITEM_MASK
-    LDA     SHOP_ITEM_OFFSET
+    LDA     SHOP_ITEM_OFFSET       ; advance offset by 5
     ADC     #$05
     STA     SHOP_ITEM_OFFSET
     JMP     .item_loop
