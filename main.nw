@@ -3901,6 +3901,9 @@ MFIELD_ATTACK       EQU     $07     ; byte 7: attack stat
 MFIELD_XP           EQU     $08     ; byte 8: status (7) | pending XP (6-4) | group count (3-0)
 MFIELD_DEFENSE      EQU     $09     ; byte 9: defense stat
 MFIELD_LEVEL        EQU     $0B     ; byte 11: class/faction (7-5) | level (4-0)
+MFIELD_LEVEL_ENC    EQU     $0C     ; byte 12: level encoding (hi nib = XP mult, lo nib = base)
+MFIELD_GOLD_LO      EQU     $0D     ; byte 13: gold counter low byte
+MFIELD_GOLD_HI      EQU     $0E     ; byte 14: gold counter high byte
 MFIELD_CHAR         EQU     $00     ; byte 0: display character
 MFIELD_FLAGS        EQU     $0F     ; byte 15: status flags (bit 2 = combat engaged)
 @ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_MOB_TYPE MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL
@@ -16119,36 +16122,53 @@ low damage to ``scratches'' and high damage to ``devastating blow.''
 
 <<map value to string>>=
     ORG     $11FC
-    SUBROUTINE MAP_VALUE_TO_STRING
-; Maps A to string table index, walks linked list from $803A
 MAP_VALUE_TO_STRING:
-    BAMI    #$08,.use_as_is
-    BAPL    #$10,.high_range
-    ROR
-    AND     #$03
-    ORA     #$08
+    SUBROUTINE MAP_VALUE_TO_STRING
+    ; Map a damage/effect value to a verb string and display it.
+    ;
+    ; Input:  A = numeric value (damage level)
+    ; Output: displays the corresponding verb string
+    ;
+    ; Behavior:
+    ;   Values 0-7 map directly to string indices 0-7.
+    ;   Values 8-15 compress to indices 8-11.
+    ;   Values 16+ compress to indices 12-15.
+    ;   Walks the ATTACK_VERB_STRINGS list to find the
+    ;   Nth entry and prints it via PRINT_BOTTOM_CENTERED.
+    ;
+    ; Modifies: PRINT_STRING_ADDR
+    ; Clobbers: A, X, Y
+
+    ; --- map value to string index ---
+    BAMI    #$08,.use_as_is        ; < 8 -> use directly
+    BAPL    #$10,.high_range       ; < 16 -> mid range
+    ROR                            ; \ compress bits 2-1
+    AND     #$03                   ;  | to 2-bit index
+    ORA     #$08                   ; / -> index 8-11
     BNE     .use_as_is
 .high_range:
-    ROR
-    ROR
-    AND     #$03
-    ORA     #$0C
+    ROR                            ; \ compress bits 4-3
+    ROR                            ;  | to 2-bit index
+    AND     #$03                   ;  |
+    ORA     #$0C                   ; / -> index 12-15
 .use_as_is:
-    TAX
-    STOW    $803A,PRINT_STRING_ADDR
+    TAX                            ; X = string index
+
+    ; --- walk string list to Xth entry ---
+    STOW    ATTACK_VERB_STRINGS,PRINT_STRING_ADDR
     LDY     #$00
 .loop:
     DEX
-    BNE     .next
-    JMP     PRINT_BOTTOM_CENTERED
+    BNE     .next                  ; not there yet
+    JMP     PRINT_BOTTOM_CENTERED  ; print and return
 .next:
-    SEC
-    LDA     (PRINT_STRING_ADDR),Y
-    ADC     PRINT_STRING_ADDR
-    STA     PRINT_STRING_ADDR
-    LDA     #$00
-    ADC     PRINT_STRING_ADDR+1
-    STA     PRINT_STRING_ADDR+1
+    SEC                            ; \ advance ptr by length + 1
+    LDA     (PRINT_STRING_ADDR),Y  ;  | (length byte)
+    ADC     PRINT_STRING_ADDR      ;  |
+    STA     PRINT_STRING_ADDR      ;  |
+    LDA     #$00                   ;  |
+    ADC     PRINT_STRING_ADDR+1    ;  |
+    STA     PRINT_STRING_ADDR+1    ; /
     BNE     .loop
 @ %def MAP_VALUE_TO_STRING
 @ [[AUTO_HEAL]] provides passive healing for characters between combat turns.
@@ -16170,38 +16190,46 @@ HEAL_NOTIFIED       EQU     $5A16   ; auto heal: nonzero = already printed heal 
     ORG     $143F
 AUTO_HEAL:
     SUBROUTINE AUTO_HEAL
-    ; Auto-heal: if HP < $28, randomly attempt healing via $1482.
-    ; Loops while PRNG_OUTPUT >= $50 (still injured). Shows message $21
-    ; if player heals for the first time.
-    LDY     #$06
+    ; Randomly restore HP for injured entities.
+    ;
+    ; Input:  ENTITY_PTR — entity record
+    ; Behavior:
+    ;   If HP (byte 6, bits 5-0) < 40, 50% chance to start
+    ;   healing.  Loops incrementing HP while PRNG >= $50.
+    ;   For player characters (appearance < $15), displays
+    ;   MSG_REGAIN_CONSC the first time.
+    ; Modifies: HEAL_NOTIFIED, entity byte 6
+    ; Clobbers: A, X, Y
+
+    LDY     #MFIELD_MOB_TYPE       ; byte 6: HP in bits 5-0
     LDA     (ENTITY_PTR),Y
-    AND     #$3F
-    BAMI    #$28,.do_heal
+    AND     #$3F                   ; isolate HP
+    BAMI    #$28,.do_heal          ; HP < 40 -> try healing
     RTS
 .do_heal:
     LDA     #$01
-    JSR     RANDOM_IN_RANGE
-    BANE    #$00,.start_heal
+    JSR     RANDOM_IN_RANGE        ; 50% chance
+    BANE    #$00,.start_heal       ; nonzero -> proceed
     RTS
 .start_heal:
-    STOB    #$00,HEAL_NOTIFIED
+    STOB    #$00,HEAL_NOTIFIED     ; clear notification flag
 .heal_loop:
-    JSR     INCREMENT_HP
+    JSR     INCREMENT_HP           ; +1 HP
     JSR     STEP_PRNG
     LDA     PRNG_OUTPUT
-    BAPL    #$50,.heal_loop
-    LDY     #$04
+    BAPL    #$50,.heal_loop        ; keep healing while PRNG < $50
+    LDY     #MFIELD_APPEARANCE     ; check if player character
     LDA     (ENTITY_PTR),Y
-    BALT    #$15,.player
+    BALT    #$15,.player           ; appearance < $15 -> player
 .done:
     RTS
 .player:
-    LDA     HEAL_NOTIFIED
+    LDA     HEAL_NOTIFIED          ; already notified?
     BNE     .done
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #MSG_REGAIN_CONSC
+    LDA     #MSG_REGAIN_CONSC      ; "struggles back to consciousness"
     JMP     DISPLAY_MESSAGE
 @ %def AUTO_HEAL
 @ [[INCREMENT_HP]] adds~1 to the entity's field~6 (which holds HP in its low
@@ -16216,19 +16244,31 @@ mob's name and displaying message~\$22, and sets [[HEAL_NOTIFIED]] to prevent
     ORG     $1482
 INCREMENT_HP:
     SUBROUTINE INCREMENT_HP
-    LDY     #$06
+    ; Add 1 to entity's HP; notify when HP reaches 3.
+    ;
+    ; Input:  ENTITY_PTR — entity record
+    ; Behavior:
+    ;   Increments byte 6 (HP in bits 5-0).  When HP
+    ;   reaches exactly 3 (no longer "badly hurt"), prints
+    ;   the entity name and sets HEAL_NOTIFIED = $22
+    ;   (which also serves as the message number for
+    ;   DISPLAY_MESSAGE via fall-through).
+    ; Modifies: entity byte 6, HEAL_NOTIFIED
+    ; Clobbers: A, Y
+
+    LDY     #MFIELD_MOB_TYPE       ; byte 6: HP in bits 5-0
     LDA     (ENTITY_PTR),Y
     CLC
-    ADC     #$01
+    ADC     #$01                   ; HP += 1
     STA     (ENTITY_PTR),Y
-    AND     #$3F
-    BAEQ    #$03,.notify
+    AND     #$3F                   ; isolate HP
+    BAEQ    #$03,.notify           ; HP == 3 -> threshold crossed
     RTS
 .notify:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    STOB    #$22,HEAL_NOTIFIED
+    STOB    #$22,HEAL_NOTIFIED     ; mark notified (A=$22 = message)
     JMP     DISPLAY_MESSAGE
 @ %def INCREMENT_HP
 @ [[MODIFY_CHAR_STATS]] is the low-level gold modification routine.  It
@@ -16242,95 +16282,107 @@ progression, comparing accumulated thresholds against the character's gold
 (fields~13--14) to determine the appropriate level encoding.
 
 <<defines>>=
-STAT_LEVEL_BITS EQU     $5A7F   ; level bits during stat modification
-@ %def STAT_LEVEL_BITS
+STAT_SCALE          EQU     $5A7E   ; strength-derived level threshold step
+STAT_LEVEL_BITS     EQU     $5A7F   ; level bits during stat modification
+@ %def STAT_SCALE STAT_LEVEL_BITS
 
 <<modify char stats>>=
     ORG     $704D
 MODIFY_CHAR_STATS:
     SUBROUTINE MODIFY_CHAR_STATS
-    ; Add or subtract gold from char record at (EFFECT_REC).
-    ; Y=0: subtract NUM_VALUE/NUM_VALUE+1 from field 13/14
-    ; Y!=0: add NUM_VALUE/NUM_VALUE+1 to field 13/14
-    ; Then recompute field 12 (level/XP encoding).
+    ; Modify gold and recompute level encoding.
+    ;
+    ; Input:  EFFECT_REC     — pointer to entity record
+    ;         NUM_VALUE+0/+1 — 16-bit gold amount
+    ;         Y              — 0 = subtract, nonzero = add
+    ;
+    ; Output: bytes $0D/$0E (gold) updated,
+    ;         byte $0C (level encoding) recomputed
+    ;
+    ; Modifies: STAT_SCALE, STAT_LEVEL_BITS, $BA, $BB
+    ; Clobbers: A, X, Y
+
+    ; --- add or subtract gold ---
     BYEQ    #$00,.subtract
-    LDY     #$0D
-    LDA     (EFFECT_REC),Y
-    CLC
-    ADC     NUM_VALUE
-    STA     (EFFECT_REC),Y
-    INY
-    LDA     (EFFECT_REC),Y
-    ADC     NUM_VALUE+1
-    STA     (EFFECT_REC),Y
+    LDY     #MFIELD_GOLD_LO        ; \ add NUM_VALUE to gold
+    LDA     (EFFECT_REC),Y         ;  |
+    CLC                            ;  |
+    ADC     NUM_VALUE              ;  |
+    STA     (EFFECT_REC),Y         ;  |
+    INY                            ;  | Y = MFIELD_GOLD_HI
+    LDA     (EFFECT_REC),Y         ;  |
+    ADC     NUM_VALUE+1            ;  |
+    STA     (EFFECT_REC),Y         ; /
     JMP     .aftermath
 .subtract:
-    LDY     #$0D
-    SEC
-    LDA     (EFFECT_REC),Y
-    SBC     NUM_VALUE
-    STA     (EFFECT_REC),Y
-    INY
-    LDA     (EFFECT_REC),Y
-    SBC     NUM_VALUE+1
-    STA     (EFFECT_REC),Y
+    LDY     #MFIELD_GOLD_LO        ; \ subtract NUM_VALUE from gold
+    SEC                            ;  |
+    LDA     (EFFECT_REC),Y         ;  |
+    SBC     NUM_VALUE              ;  |
+    STA     (EFFECT_REC),Y         ;  |
+    INY                            ;  | Y = MFIELD_GOLD_HI
+    LDA     (EFFECT_REC),Y         ;  |
+    SBC     NUM_VALUE+1            ;  |
+    STA     (EFFECT_REC),Y         ; /
+
+    ; --- recompute level encoding from gold and strength ---
 .aftermath:
-    LDY     #$05
-    LDA     (EFFECT_REC),Y
-    ROL2
-    ROL
-    AND     #$F8
-    STA     $5A7E
-    LDY     #$0C
-    LDA     (EFFECT_REC),Y
-    PHA
-    AND     #$0F
-    TAX
-    PLA
-    ROR
-    ROR
-    ROR
-    ROR
-    AND     #$0F
-    TAY
+    LDY     #MFIELD_STRENGTH       ; \ compute threshold step
+    LDA     (EFFECT_REC),Y         ;  | from strength (bits 4-0)
+    ROL2                           ;  | shift left 3 bits
+    ROL                            ;  |
+    AND     #$F8                   ;  |
+    STA     STAT_SCALE             ; /
+    LDY     #MFIELD_LEVEL_ENC      ; \ unpack current level encoding
+    LDA     (EFFECT_REC),Y         ;  |
+    PHA                            ;  |
+    AND     #$0F                   ;  | X = low nibble (base level)
+    TAX                            ;  |
+    PLA                            ;  |
+    ROR                            ;  | \ extract high nibble
+    ROR                            ;  |  | (XP multiplier)
+    ROR                            ;  |  |
+    ROR                            ;  | /
+    AND     #$0F                   ;  |
+    TAY                            ; / Y = high nibble
 .decy:
-    DEY
-    BMI     .done_cnt
-    INX
-    BPL     .decy
+    DEY                            ; \ add high nibble to base level
+    BMI     .done_cnt              ;  |
+    INX                            ;  |
+    BPL     .decy                  ; /
 .done_cnt:
-    INY
-    STY     STAT_LEVEL_BITS
-    STY     $BA
-    STY     $BB
+    INY                            ; Y = 0
+    STY     STAT_LEVEL_BITS        ; init level bits accumulator
+    STY     $BA                    ; \ init 16-bit threshold
+    STY     $BB                    ; / accumulator to 0
 .outer_loop:
-    LDY     #$0E
-    BXEQ    #$00,.store_final
-    CLC
-    LDA     $BA
-    ADC     $5A7E
-    STA     $BA
-    BCC     .no_carry
-    INC     $BB
+    LDY     #MFIELD_GOLD_HI
+    BXEQ    #$00,.store_final      ; no levels remain -> store
+    CLC                            ; \ add STAT_SCALE to threshold
+    LDA     $BA                    ;  |
+    ADC     STAT_SCALE             ;  |
+    STA     $BA                    ;  |
+    BCC     .no_carry              ;  |
+    INC     $BB                    ; /
 .no_carry:
-    LDA     (EFFECT_REC),Y
-    BALT    $BB,.store_final
-    BNE     .next_iter
-    DEY
-    LDA     (EFFECT_REC),Y
-    BALT    $BA,.store_final
+    LDA     (EFFECT_REC),Y         ; gold high byte
+    BALT    $BB,.store_final       ; gold_hi < threshold_hi -> done
+    BNE     .next_iter             ; gold_hi > threshold_hi -> next
+    DEY                            ; Y = MFIELD_GOLD_LO
+    LDA     (EFFECT_REC),Y         ; gold low byte
+    BALT    $BA,.store_final       ; gold_lo < threshold_lo -> done
 .next_iter:
-    DEX
-    CLC
-    LDA     STAT_LEVEL_BITS
-    ADC     #$10
-    STA     STAT_LEVEL_BITS
+    DEX                            ; one fewer level
+    CLC                            ; \ advance level bits by $10
+    LDA     STAT_LEVEL_BITS        ;  | (one level in high nibble)
+    ADC     #$10                   ;  |
+    STA     STAT_LEVEL_BITS        ; /
     BNE     .outer_loop
 .store_final:
-    TXA
-    ORA     STAT_LEVEL_BITS
-    LDY     #$0C
-    STA     (EFFECT_REC),Y
+    TXA                            ; remaining levels = low nibble
+    ORA     STAT_LEVEL_BITS        ; merge with level bits
+    LDY     #MFIELD_LEVEL_ENC
+    STA     (EFFECT_REC),Y         ; store recomputed encoding
     RTS
 @ %def MODIFY_CHAR_STATS
 @ [[MODIFY_CURRENT_STATS]] copies [[ENTITY_PTR]] into [[EFFECT_REC]] and
@@ -16342,10 +16394,15 @@ setting up the effect record pointer.
 <<modify current stats>>=
     ORG     $70D4
 MODIFY_CURRENT_STATS:
-    SUBROUTINE SCROLL_STATUS_LINE
-    ; Copy ENTITY_PTR/ENTITY_PTR+1 -> EFFECT_REC/EFFECT_REC+1, JMP $704D (treasure lookup)
-    MOVW    ENTITY_PTR,EFFECT_REC
-    JMP     MODIFY_CHAR_STATS
+    SUBROUTINE MODIFY_CURRENT_STATS
+    ; Wrapper: modify stats for the current entity.
+    ;
+    ; Input:  ENTITY_PTR — current entity
+    ;         NUM_VALUE  — amount, Y — direction (see MODIFY_CHAR_STATS)
+    ; Clobbers: A, X, Y
+
+    MOVW    ENTITY_PTR,EFFECT_REC  ; copy entity ptr to effect rec
+    JMP     MODIFY_CHAR_STATS      ; tail-call
 @ %def MODIFY_CURRENT_STATS
 
 \chapter{NPC AI}
