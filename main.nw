@@ -16906,6 +16906,10 @@ SHOP_ITEM_MASK      EQU     $5A80   ; shop: bitmask for current item ($80 rotati
 SHOP_ITEM_OFFSET EQU    $5A85   ; offset into shop item table (5 per item)
 @ %def SHOP_PRICE SHOP_PRICE_HI SHOP_ITEM_MASK SHOP_ITEM_OFFSET
 
+<<zero page defines>>=
+SHOP_DATA_PTR           EQU     $E6     ; ZP pointer to current shop item record (2 bytes)
+@ %def SHOP_DATA_PTR
+
 <<display shop>>=
     ORG     $70DF
 DISPLAY_SHOP:
@@ -16916,7 +16920,7 @@ DISPLAY_SHOP:
     BEQ     .do_shop
     RTS
 .do_shop:
-    STOW    SHOP_ITEM_TABLE,$E6
+    STOW    SHOP_ITEM_TABLE,SHOP_DATA_PTR
     LDY     #$01
     LDA     (ENTITY_REC),Y
     SEC
@@ -16933,7 +16937,7 @@ DISPLAY_SHOP:
     STA     $5A83
     JSR     SET_CURSOR_ROW21
     LDY     #$28
-    LDA     ($E6),Y
+    LDA     (SHOP_DATA_PTR),Y
     JSR     SCENE_LOOP
     JSR     LOAD_CHAR_NAME_PTR
     JSR     SETUP_CHAR_SPRITE
@@ -16981,10 +16985,10 @@ DISPLAY_SHOP:
     LDY     SHOP_ITEM_OFFSET
     INY
     INY
-    LDA     ($E6),Y
+    LDA     (SHOP_DATA_PTR),Y
     STA     PRINT_STRING_ADDR
     INY
-    LDA     ($E6),Y
+    LDA     (SHOP_DATA_PTR),Y
     STA     PRINT_STRING_ADDR+1
     LDY     #$00
     LDA     (PRINT_STRING_ADDR),Y
@@ -17012,7 +17016,7 @@ DISPLAY_SHOP:
     JMP     .item_loop
 @ %def DISPLAY_SHOP
 @ [[ADVANCE_SHOP_PTR]] adds~\$29 (41 bytes---the size of one shop data
-record) to the pointer at~\$E6/\$E7, advancing it to the next shop entry in
+record) to [[SHOP_DATA_PTR]], advancing it to the next shop entry in
 the data table.
 
 <<advance shop ptr>>=
@@ -17020,11 +17024,11 @@ the data table.
 ADVANCE_SHOP_PTR:
     SUBROUTINE ADVANCE_SHOP_PTR
     CLC
-    LDA     $E6
+    LDA     SHOP_DATA_PTR
     ADC     #$29
-    STA     $E6
+    STA     SHOP_DATA_PTR
     BCC     .done
-    INC     $E7
+    INC     SHOP_DATA_PTR+1
 .done:
     RTS
 @ %def ADVANCE_SHOP_PTR
@@ -17038,7 +17042,7 @@ style.
 ADD_PRICE_COMPONENT:
     SUBROUTINE ADD_PRICE_COMPONENT
     CLC
-    LDA     ($E6),Y
+    LDA     (SHOP_DATA_PTR),Y
     ADC     SHOP_PRICE
     STA     SHOP_PRICE
     BCC     .done
