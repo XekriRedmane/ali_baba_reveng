@@ -10528,58 +10528,68 @@ HANDLER_PTR             EQU     $BC     ; entity type handler address (2 bytes)
 
 <<classify entity type>>=
     ORG     $116B
-    SUBROUTINE CLASSIFY_ENTITY_TYPE
-; Sets HANDLER_PTR/HANDLER_PTR+1 to handler address based on entity type at (ENTITY_REC)
 CLASSIFY_ENTITY_TYPE:
+    SUBROUTINE CLASSIFY_ENTITY_TYPE
+    ; Classify entity at ENTITY_REC and set HANDLER_PTR.
+    ;
+    ; Input:  ENTITY_REC — pointer to entity record
+    ; Output: HANDLER_PTR — handler address for entity type
+    ;
+    ; Behavior:
+    ;   Decision tree on pointer value and byte 1/2 fields.
+    ;   9 distinct handler addresses for empty slots, mobs,
+    ;   shops, map features, treasure, and event types.
+    ; Clobbers: A, X, Y
+
     LDA     #$00
-    BANE    ENTITY_REC+1,.not_zero_page
-    BANE    ENTITY_REC,.type_C3
-.type_E4:                      ; $1175 - reused by backward BMI from $1198
-    STOW    $7FE4,HANDLER_PTR
+    BANE    ENTITY_REC+1,.not_zero_page ; high byte nonzero -> entity
+    BANE    ENTITY_REC,.type_C3    ; low byte nonzero -> ZP pointer
+.type_E4:
+    STOW    $7FE4,HANDLER_PTR      ; null pointer handler
     RTS
-.type_C3:                      ; $117E - reused by JMP from $11F9
-    STOW    $7FC3,HANDLER_PTR
+.type_C3:
+    STOW    $7FC3,HANDLER_PTR      ; ZP pointer handler
     RTS
 .not_zero_page:
-    LDY     #$01
+    LDY     #MFIELD_TYPE           ; byte 1: entity type
     LDA     (ENTITY_REC),Y
-    BMI     .check_ranges
-.type_FC:                      ; $118D - reused by backward BMI from $11F5
-    STOW    $7FFC,HANDLER_PTR
+    BMI     .check_ranges          ; bit 7 set -> check ranges
+.type_FC:
+    STOW    $7FFC,HANDLER_PTR      ; positive type handler
     RTS
 .check_ranges:
-    BAMI    #$C0,.type_E4
-    BAPL    #$D2,.check_d5
-    STOW    $7FD3,HANDLER_PTR
+    BAMI    #$C0,.type_E4          ; < $C0 -> null handler
+    BAPL    #$D2,.check_d5         ; >= $D2 -> check next
+    STOW    $7FD3,HANDLER_PTR      ; $C0-$D1 handler
     RTS
 .check_d5:
-    BAPL    #$D5,.check_fe
-    STOW    $8016,HANDLER_PTR
+    BAPL    #$D5,.check_fe         ; >= $D5 -> check event
+    STOW    $8016,HANDLER_PTR      ; $D2-$D4 handler
     RTS
 .check_fe:
-    BAEQ    #$FE,.type_fe_entry
-    STOW    $8028,HANDLER_PTR
+    BAEQ    #EVENT_EMPTY,.type_fe_entry ; $FE -> event classification
+    STOW    $8028,HANDLER_PTR      ; $D5-$FD handler
     RTS
 .type_fe_entry:
-    LDY     #$02
+    LDY     #MFIELD_NEXT           ; byte 2: event data
     LDA     (ENTITY_REC),Y
     TAX
-    AND     #$1F
-    BNE     .check_c0_bits
-    STOW    $8003,HANDLER_PTR
+    AND     #STRENGTH_MASK         ; bits 4-0
+    BNE     .check_c0_bits         ; nonzero -> check class bits
+    STOW    $8003,HANDLER_PTR      ; strength = 0 handler
     RTS
 .check_c0_bits:
     TXA
-    AND     #$C0
-    BANE    #$C0,.check_1b
-.type_F0:                      ; $11DA - reused by backward BEQ from $11F7
-    STOW    $7FF0,HANDLER_PTR
+    AND     #FLAGS_CLASS_MASK      ; bits 7-6
+    BANE    #FLAGS_CLASS_MASK,.check_1b ; both set -> check further
+.type_F0:
+    STOW    $7FF0,HANDLER_PTR      ; class != $C0 handler
     RTS
 .check_1b:
     TXA
-    AND     #$1F
-    BAPL    #$1B,.check_1d
-    STOW    $7FCA,HANDLER_PTR
+    AND     #STRENGTH_MASK
+    BAPL    #$1B,.check_1d         ; >= $1B -> check $1D
+    STOW    $7FCA,HANDLER_PTR      ; < $1B handler
     RTS
 .check_1d:
     BAMI    #$1D,.type_FC
@@ -10600,22 +10610,27 @@ quotient is nonzero, 32 is added to index into the next font group.
     ORG     $0CF7
 APPEARANCE_TO_FONTCHAR:
     SUBROUTINE APPEARANCE_TO_FONTCHAR
+    ; Convert appearance index to font character number.
+    ;
+    ; Input:  A = appearance index
+    ; Output: A = font character number, Y = font group (appearance / 21)
+    ;         A preserved on carry-through paths
 
-    LDY      #$00     ; Y = quotient (font group)
+    LDY      #$00                  ; Y = font group counter
 .loop:
     CLC
-    ADC      #$EB     ; A -= 21 (unsigned: $EB = 256-21)
-    BCC      .done    ; underflow -> done dividing
-    INY               ; group++
-    BCS      .loop    ; always taken
+    ADC      #$EB                  ; subtract 21 (256-21)
+    BCC      .done                 ; underflow -> done
+    INY                            ; next group
+    BCS      .loop                 ; always taken
 .done:
-    ADC      #$16     ; restore remainder+1 (carry clear, so +22)
-    BALT    #$05,.low ; remainder >= 5?
-    RTS               ; yes -> return as-is (chars 5-21)
+    ADC      #$16                  ; restore remainder+1 (carry clear)
+    BALT    #$05,.low              ; remainder >= 5 -> return as-is
+    RTS
 .low:
-    BYEQ    #$00,.ret ; yes -> return as-is (chars 1-4)
+    BYEQ    #$00,.ret              ; group 0 -> return (chars 1-4)
     CLC
-    ADC      #$20     ; add 32 -> next font group (chars 33-36)
+    ADC      #$20                  ; add 32 -> next font range
 .ret:
     RTS
 @ %def APPEARANCE_TO_FONTCHAR
@@ -10639,28 +10654,38 @@ Three cases based on the pointer value:
     ORG     $0C7E
 GET_ENTITY_FONTCHAR:
     SUBROUTINE GET_ENTITY_FONTCHAR
+    ; Determine font character for entity at ENTITY_REC.
+    ;
+    ; Input:  ENTITY_REC — pointer to entity record
+    ; Output: FONT_CHARNUM set, FONT_CHARSET = 1
+    ;
+    ; Behavior:
+    ;   Null pointer -> BLINK_ALT_CHAR.  Mob (bit 7) -> appearance
+    ;   lookup.  Character -> top 2 bits of byte 1 select glyph.
+    ; Clobbers: A, Y
 
-    STOB    #$01,FONT_CHARSET ; custom font
+    STOB    #$01,FONT_CHARSET      ; select custom font
     LDA     #$00
-    BANE    ENTITY_REC+1,.has_entity ; non-zero -> entity exists
-    BANE    ENTITY_REC,.low_only     ; low != 0 -> partial pointer
+    BANE    ENTITY_REC+1,.has_entity
+    BANE    ENTITY_REC,.low_only
 .empty:
-    MOVB    BLINK_ALT_CHAR,FONT_CHARNUM ;  empty cell -> blink char
-    RTS                              ; /
+    MOVB    BLINK_ALT_CHAR,FONT_CHARNUM ; empty cell
+    RTS
 .low_only:
-    MOVB    DEFAULT_CHAR,FONT_CHARNUM ;  $BE!=0, ENTITY_REC+1=0 -> default char
-    RTS                              ; /
+    MOVB    DEFAULT_CHAR,FONT_CHARNUM ; ZP-only pointer
+    RTS
 .has_entity:
     LDA     ENTITY_REC+1
-    BAPL    #$80,.mob ; bit 7 set?
+    BAPL    #$80,.mob              ; bit 7 set -> mob record
+
     ; --- character record ---
-    LDY     #$01
-    LDA     (ENTITY_REC),Y           ; byte 1 of character record
-    AND     #$C0                     ; top 2 bits
-    BAEQ    #$C0,.both_bits          ; -> detailed check
-    BAEQ    #$40,.bit6               ; bit 6 only -> char $1C
-    BPL     .empty                   ; bit 7 only -> blink alt char
-    LDA     #$1B                     ; neither bit -> char $1B
+    LDY     #MFIELD_TYPE           ; byte 1: type/class
+    LDA     (ENTITY_REC),Y
+    AND     #FLAGS_CLASS_MASK      ; top 2 bits
+    BAEQ    #FLAGS_CLASS_MASK,.both_bits
+    BAEQ    #$40,.bit6             ; bit 6 only -> $1C
+    BPL     .empty                 ; neither -> empty
+    LDA     #$1B                   ; bit 7 only -> $1B
     BNE     .store
 .bit6:
     LDA     #$1C
@@ -10668,31 +10693,33 @@ GET_ENTITY_FONTCHAR:
     STA     FONT_CHARNUM
     RTS
 .both_bits:
-    LDA     (ENTITY_REC),Y           ; reload byte 1
-    BAEQ    #$FE,.check_byte2        ; $FE -> check byte 2
+    LDA     (ENTITY_REC),Y        ; reload type byte
+    BAEQ    #EVENT_EMPTY,.check_byte2 ; $FE -> check byte 2
     BAMI    #$D5,.lt_d5
-    LDA     #$1D                     ; >= $D5 -> char $1D
+    LDA     #$1D                   ; >= $D5 -> $1D
     JMP     .store
 .lt_d5:
     BAMI    #$D2,.lt_d2
-    LDA     #$18                     ; $D2-$D4 -> char $18
+    LDA     #$18                   ; $D2-$D4 -> $18
     JMP     .store
 .lt_d2:
-    LDA     #$1A                     ; < $D2 -> char $1A
+    LDA     #$1A                   ; < $D2 -> $1A
     JMP     .store
 .check_byte2:
-    LDY     #$02
-    LDA     (ENTITY_REC),Y           ; byte 2
-    AND     #$1F                     ; low 5 bits
-    BEQ     .empty                   ; zero -> blink alt char
-    JMP     .store                   ; non-zero -> use as charnum
+    LDY     #MFIELD_NEXT           ; byte 2: event data
+    LDA     (ENTITY_REC),Y
+    AND     #STRENGTH_MASK         ; low 5 bits
+    BEQ     .empty                 ; zero -> empty
+    JMP     .store                 ; nonzero -> use as charnum
+
+    ; --- mob record ---
 .mob:
-    MOVB    ENTITY_REC,MOB_DATA_PTR ;  MOB_DATA_PTR = ENTITY_REC with bit 7 cleared
-    LDA     ENTITY_REC+1             ;  |
-    AND     #$7F                     ;  |
-    STA     MOB_DATA_PTR+1           ; /
-    LDY     #$04
-    LDA     (MOB_DATA_PTR),Y         ; byte 4 = appearance
+    MOVB    ENTITY_REC,MOB_DATA_PTR ; \ set up mob pointer
+    LDA     ENTITY_REC+1            ;  | (clear bit 7)
+    AND     #$7F                    ;  |
+    STA     MOB_DATA_PTR+1          ; /
+    LDY     #MFIELD_APPEARANCE     ; byte 4: appearance
+    LDA     (MOB_DATA_PTR),Y
     JSR     APPEARANCE_TO_FONTCHAR
     JMP     .store
 @ %def GET_ENTITY_FONTCHAR
