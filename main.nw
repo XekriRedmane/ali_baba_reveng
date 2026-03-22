@@ -16916,7 +16916,7 @@ DISPLAY_SHOP:
     BEQ     .do_shop
     RTS
 .do_shop:
-    STOW    $7EDD,$E6
+    STOW    SHOP_ITEM_TABLE,$E6
     LDY     #$01
     LDA     (ENTITY_REC),Y
     SEC
