@@ -7378,6 +7378,110 @@ EXTENDED_ENTITY_DATA:
     HEX     01 69 00 01 03 00 13 3C 00 14 19 5D
 @ %def EXTENDED_ENTITY_DATA
 
+@ \subsection{Small gap fills}
+
+The following HEX chunks fill byte-level gaps between documented
+routines.  They represent undocumented code and data awaiting detailed
+analysis.
+
+<<fill 0D5E>>=
+    ORG     $0D5E
+    HEX     AD 8C 5A F0 0C AD 00 5A D0 10 20 58 0D CE 8C 5A
+    HEX     60 20 36 0D 20 1E 0D 4C 5E 0D A2 0C 20 81 0D CA
+    HEX     D0 FA 60 AD 8C 5A F0 03 CE 8C 5A 60
+<<fill 1979>>=
+    ORG     $1979
+    HEX     A5 F8 85 BC A5 F9 85 BD 20 B1 0E C9 00 D0 01 60
+    HEX     A0 03 B1 F4 20 DB 13 C9 01 D0 01 60 10 03 A9 02
+    HEX     60 A9 00 60
+<<fill 4000>>=
+    ORG     $4000
+    HEX     80 4C 05 9F A0 A6 9A C9 B0
+<<fill 5F5E>>=
+    ORG     $5F5E
+    HEX     E4 A3
+<<fill 6071>>=
+    ORG     $6071
+    HEX     98 48 A0 01 AD AB 5A 91 C0 68 A8 60
+<<fill 71AC>>=
+    ORG     $71AC
+    HEX     A0 0E B1 F8 CD 82 5A 90 0A D0 13 88 B1 F8 CD 81
+    HEX     5A B0 0B 20 BE 76 A9 31 20 1E 76 4C 94 71 AD 81
+    HEX     5A 85 BC AD 82 5A 85 BD A0 00 20 D4 70 20 BE 76
+    HEX     A9 26 20 1E 76 AC 85 5A B1 E6 85 BC C8 B1 E6 85
+    HEX     BD 6C BC 00
+<<fill 755E>>=
+    ORG     $755E
+    HEX     AD 00 C0 10 2E AA AD 00 5A D0 3B 8A A2 04 DD 82
+    HEX     75 F0 0F DD 87 75 F0 0A DD 8C 75 F0 05 CA 10 EE
+    HEX     30 16 8A 60 A0 C9 CD CA CB 8D E9 ED EA EB 9B 8B
+    HEX     8A 88 95 AD 00 5A D0 0E A9
+<<fill 7598>>=
+    ORG     $7598
+    HEX     8D 10 C0 60 AD 61 C0 10 F5 A9 00 60 20 F7 75 A2
+    HEX     00 20 1E FB AD FE 75 20 06 76 8D FE 75 20 F7 75
+    HEX     A2 01 20 1E FB AD
+<<fill 75BF>>=
+    ORG     $75BF
+    HEX     75 20 06 76 8D
+<<fill 75C5>>=
+    ORG     $75C5
+    HEX     75 C9 01 F0 19 30 0C AD FE 75 C9 01 D0 21 A2 01
+    HEX     4C 80 75 AD FE 75 C9 01 D0 15 A2 02 D0 F2 AD FE
+    HEX     75 C9 01 F0 0A 10 04 A2 04 D0 E5 A2 03 D0 E1 4C
+    HEX     9C 75 AD AE 7A 20 A8 FC 60 01 01 1A 1D 1D 03 03
+    HEX     06 AA 98 4A 4A 4A DD 00 76 B0 0B DD 03 76 B0 03
+    HEX     A9 02 60 A9 01 60 A9 00 60
+<<fill 793F>>=
+    ORG     $793F
+    HEX     AD 02 5A 20 53 10 A0 01 B1 BE C9
+<<fill 794B>>=
+    ORG     $794B
+    HEX     D0 01 60 A0 05 B1 BE 29 7F 91 BE EE 02 5A D0 E4
+<<fill 80E5>>=
+    ORG     $80E5
+    HEX     80 02 23 C1 04 00 24 C1 04 00 24 09 A4 32 A4 37
+    HEX     A4 FC A3 3C A4 24 1F 26 23 C1 05 22 50 06 3F 08
+    HEX     25 23 60 10 00 24 25 1F 22 3F 05 50 04 80 02 23
+    HEX     C1 04 00 24 81 C8 E7 6D 9D 81 28 EB 6D A8 81 64
+    HEX     EF 6D BB 81 08
+<<fill 812B>>=
+    ORG     $812B
+    HEX     ED ED EF E6 FD ED EF
+<<fill 92A5>>=
+    ORG     $92A5
+    HEX     4C B4 92
+<<fill A6B3>>=
+    ORG     $A6B3
+    HEX     5D 41 4E C4 00
+<<fill A725>>=
+    ORG     $A725
+    HEX     BD 43 50 D8 00 0E DC 43 50 D9 00 0E BC 44 45 C3
+    HEX     00 AA BE 44 45 D8 10 00 CA 44 45 D9 10 00 88 45
+    HEX     4F D2 00
+<<fill A749>>=
+    ORG     $A749
+    HEX     3D 49 4E C3 00 AA DE 49 4E D8 10 00 E8 49 4E D9
+    HEX     10 00 C8 4A 4D D0 01 08 3C 4A 53 D2 00 08 10 4C
+    HEX     44 C1 00
+<<fill A76D>>=
+    ORG     $A76D
+    HEX     9D 4C 44 D8 02 4E 9E 4C 44 D9 00 AE 9C 4C 53 D2
+    HEX     04 AA 3E 4E 4F D0 10 00 EA 4F 52 C1 00
+<<fill A78B>>=
+    ORG     $A78B
+    HEX     FD 50 48 C1 10 00 48 50 48 D0 10 00 08 50 4C C1
+    HEX     10 00 68 50 4C D0 10 00 28 52 4F CC 04 AA 1E 52
+    HEX     4F D2 04 AA 5E 52 54 C9 10 00 40 52 54 D3 10 00
+    HEX     60 53 42 C3 00
+<<fill A8CE>>=
+    ORG     $A8CE
+    HEX     00 00 01 00 03 33 33 32 33 13 A5 13 02 15 02 00
+    HEX     A3 1C 32 00 4C 14 00 BD C9 00 C0 04 00 3C 80 00
+<<fill A8EF>>=
+    ORG     $A8EF
+    HEX     14 00
+
 @ Game string data at [[$7EDD]]--[[$80A3]]: equipment names (swords,
 daggers, armor), map object descriptions (walls, doors, treasure
 chests), attack verb strings (``JABS'' through ``LAMBASTES''),
@@ -20744,6 +20848,7 @@ The following root chunks produce the assembly files when tangled.
 <<anim tick and wait>>
 <<timed wait>>
 <<call rom wait>>
+<<fill 0D5E>>
 <<print mob name>>
 <<colrow to pos>>
 <<num to decimal>>
@@ -20790,6 +20895,7 @@ The following root chunks produce the assembly files when tangled.
 <<mob attack>>
 <<select combat target>>
 <<get entity threat>>
+<<fill 1979>>
 <<load target ptr>>
 <<game turn loop>>
 <<commit move>>
@@ -20808,6 +20914,7 @@ The following root chunks produce the assembly files when tangled.
 <<dispatch on mode>>
 <<orphaned encounter handler>>
 <<zeroed hires page>>
+<<fill 4000>>
 <<Location data>>
 <<Location names>>
 <<Location events>>
@@ -20826,6 +20933,7 @@ The following root chunks produce the assembly files when tangled.
 <<copyright string>>
 <<boot display strings>>
 <<input loop>>
+<<fill 5F5E>>
 <<setup input>>
 <<draw input options>>
 <<calc record ptr>>
@@ -20838,6 +20946,7 @@ The following root chunks produce the assembly files when tangled.
 <<clear input buffer>>
 <<render input buffer>>
 <<copy record data>>
+<<fill 6071>>
 <<game input table>>
 <<teardown input>>
 <<get input table ptr>>
@@ -20915,6 +21024,7 @@ The following root chunks produce the assembly files when tangled.
 <<modify char stats>>
 <<modify current stats>>
 <<display shop>>
+<<fill 71AC>>
 <<advance shop ptr>>
 <<add price component>>
 <<shop buy effects>>
@@ -20929,6 +21039,10 @@ The following root chunks produce the assembly files when tangled.
 <<draw blink alt>>
 <<draw blink char>>
 <<check combat eligibility>>
+<<fill 755E>>
+<<fill 7598>>
+<<fill 75BF>>
+<<fill 75C5>>
 <<display message>>
 <<scroll status line>>
 <<clear map>>
@@ -20949,6 +21063,8 @@ The following root chunks produce the assembly files when tangled.
 <<init stub>>
 <<init hrcg>>
 <<set text window upper left>>
+<<fill 793F>>
+<<fill 794B>>
 <<tune player>>
 <<tune action indirect>>
 <<tune advance>>
@@ -20964,9 +21080,12 @@ The following root chunks produce the assembly files when tangled.
 <<print font char data>>
 <<tune pointer table>>
 <<tune bytecode>>
+<<fill 80E5>>
+<<fill 812B>>
 <<game data 8133>>
 <<game data 82B5>>
 <<font data>>
+<<fill 92A5>>
 <<hrcg init>>
 <<hrcg version string>>
 <<hrcg params>>
@@ -21008,8 +21127,15 @@ The following root chunks produce the assembly files when tangled.
 <<cold restart>>
 <<pointer helpers>>
 <<display and dos data>>
+<<fill A6B3>>
 <<entity item tables>>
+<<fill A725>>
+<<fill A749>>
+<<fill A76D>>
+<<fill A78B>>
 <<extended entity data>>
+<<fill A8CE>>
+<<fill A8EF>>
 <<runtime data area>>
 <<disk read field>>
 <<verify data field>>
