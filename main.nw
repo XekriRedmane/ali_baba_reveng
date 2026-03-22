@@ -15562,21 +15562,29 @@ EVENT_PTR               EQU     $BE     ; event list entry pointer (2 bytes)
     ORG     $1C01
 HANDLE_ENCOUNTER:
     SUBROUTINE HANDLE_ENCOUNTER
+    ; Process encounter when stepping on an event cell.
+    ;
+    ; Input:  EVENT_PTR — event list entry (3 bytes)
+    ;         ENTITY_PTR — character stepping on event
+    ; Behavior:
+    ;   Type < $40: random encounter with avoidance check.
+    ;   Type >= $40: specific encounter with position update.
+    ; Clobbers: A, X, Y
 
     ; --- random encounter path (event type $00-$3F) ---
     LDA     #$00
-    JSR     SET_CHAR_STATE             ; set char field 15 state to 0
-    LDY     #$01
-    LDA     (EVENT_PTR),Y              ; event byte 1 = type
-    BAPL    #$40,.specific ; type >= $40 -> specific encounter
-    LDA     #$14
-    JSR     RANDOM_IN_RANGE            ; random(20)
+    JSR     SET_CHAR_STATE             ; state = idle
+    LDY     #EVFIELD_TYPE
+    LDA     (EVENT_PTR),Y              ; event type byte
+    BAPL    #$40,.specific             ; >= $40 -> specific encounter
+    LDA     #$14                       ; range = 20
+    JSR     RANDOM_IN_RANGE
     STA     PRNG_OUTPUT
-    LDY     #$05
-    LDA     (ENTITY_PTR),Y             ; char field 5
-    AND     #$1F                       ; low 5 bits = avoidance stat
-    BAMI    PRNG_OUTPUT,.roll_type ; stat < random -> encounter happens
-    JMP     .avoided                   ; stat >= random -> avoid encounter
+    LDY     #MFIELD_STRENGTH
+    LDA     (ENTITY_PTR),Y            ; char strength field
+    AND     #STRENGTH_MASK             ; bits 4-0 = avoidance stat
+    BAMI    PRNG_OUTPUT,.roll_type     ; stat < random -> encounter
+    JMP     .avoided                   ; stat >= random -> avoid
 .roll_type:
     JSR     STEP_PRNG
     LDA     #$74
@@ -15591,14 +15599,14 @@ HANDLE_ENCOUNTER:
 
     ; --- specific encounter path (type >= $40) ---
 .specific:
-    LDY     #$00
-    LDA     (EVENT_PTR),Y              ; event byte 0 = position
+    LDY     #EVFIELD_POSITION
+    LDA     (EVENT_PTR),Y              ; event position byte
     STA     EVENT_POS
-    LDA     #$01
-    JSR     SET_CHAR_STATE             ; set state 1
-    LDY     #$01
+    LDA     #$01                       ; state = engaged
+    JSR     SET_CHAR_STATE
+    LDY     #EVFIELD_TYPE
     LDA     (EVENT_PTR),Y
-    AND     #$3F                       ; low 6 bits = encounter ID
+    AND     #FLAGS_STATUS_MASK         ; low 6 bits = encounter ID
     BNE     .have_id
     JSR     STEP_PRNG                  ; ID 0 -> derive from PRNG
     LDA     PRNG_OUTPUT
@@ -15610,8 +15618,8 @@ HANDLE_ENCOUNTER:
     STA     ACTIVE_CHAR                ; store encounter ID
     ROR
     BCC     .no_clear
-    LDY     #$04
-    LDA     (ENTITY_PTR),Y             ; char field 4
+    LDY     #MFIELD_APPEARANCE
+    LDA     (ENTITY_PTR),Y             ; char appearance
     BMI     .no_clear
     BAMI    #$2A,.no_clear
     BAPL    #$3F,.no_clear
@@ -15624,7 +15632,7 @@ HANDLE_ENCOUNTER:
     MOVB    $7ABE,WAIT_LOOP_COUNT
     JSR     REORDER_CURRENT_CHAR
     JSR     TIMED_WAIT
-    LDY     #$03
+    LDY     #MFIELD_POSITION
     LDA     EVENT_DEST_POS
     STA     (ENTITY_PTR),Y             ; update char packed position
     LDA     ACTIVE_CHAR
@@ -15683,8 +15691,18 @@ at the same position, displays an encounter message (\$1F), and ends the turn.
     ORG     $1E5A
 HANDLE_MOB_ENCOUNTER:
     SUBROUTINE HANDLE_MOB_ENCOUNTER
-    ; Mob encounter on movement: check flee chance, commit move,
-    ; check encounter type, walk group for combat.
+    ; Handle mob-on-mob movement encounter with flee mechanics.
+    ;
+    ; Input:  ENTITY_PTR — moving character
+    ;         CURRENT_COL/ROW — destination
+    ; Behavior:
+    ;   Evaluates threat at destination. If hostiles present,
+    ;   computes flee threshold from strength vs threat.
+    ;   If character doesn't flee, commits move and checks
+    ;   for combat encounters.
+    ; Clobbers: A, X, Y
+
+    ; --- evaluate threat at destination ---
     STOB    #$00,ADJACENT_THREAT
     MOVW    ENTITY_PTR,TARGET_REC
     LDA     CURRENT_COL
@@ -15692,58 +15710,66 @@ HANDLE_MOB_ENCOUNTER:
     JSR     COLROW_TO_POS
     JSR     SUM_HOSTILE_AT_POS
     LDA     ADJACENT_THREAT
-    BEQ     .no_flee
-    LDY     #$05
+    BEQ     .no_flee               ; no hostiles -> skip flee
+
+    ; --- compute flee threshold ---
+    LDY     #MFIELD_STRENGTH
     LDA     (ENTITY_PTR),Y
-    AND     #$1F
+    AND     #STRENGTH_MASK         ; strength (bits 4-0)
     CLC
-    ADC     #$10
+    ADC     #$10                   ; courage = strength + $10
     SEC
-    SBC     ADJACENT_THREAT
-    BMI     .clamp_low
-    BAMI    #$1D,.in_range
-    LDA     #$1C
+    SBC     ADJACENT_THREAT        ; minus adjacent threat
+    BMI     .clamp_low             ; negative -> clamp
+    BAMI    #$1D,.in_range         ; < $1D -> use as-is
+    LDA     #$1C                   ; clamp high to $1C
     BNE     .in_range
 .clamp_low:
-    LDA     #$04
+    LDA     #$04                   ; clamp low to $04
 .in_range:
-    ASL
-    ASL
-    ORA     #$03
+    ASL                            ; \ threshold *= 4
+    ASL                            ; /
+    ORA     #$03                   ; set low 2 bits
     TAX
+
+    ; --- flee roll ---
     JSR     STEP_PRNG
     TXA
-    BAPL    PRNG_OUTPUT,.no_flee
+    BAPL    PRNG_OUTPUT,.no_flee   ; threshold >= random -> hold
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #MSG_FLYING_TACKLE
+    LDA     #MSG_FLYING_TACKLE     ; "leaps into a flying tackle"
     JSR     DISPLAY_MESSAGE
-    MOVB    TURN_START_COL,CURRENT_COL
+    MOVB    TURN_START_COL,CURRENT_COL ; reset to start
     MOVB    TURN_START_ROW,CURRENT_ROW
-    JMP     END_TURN
+    JMP     END_TURN               ; fled
+
+    ; --- no flee: commit move and check encounter ---
 .no_flee:
     JSR     COMMIT_MOVE
-    LDY     #$03
+    LDY     #MFIELD_POSITION
     LDA     (ENTITY_PTR),Y
     JSR     CHECK_ENCOUNTER
     LDA     ENCOUNTER_RESULT
-    BAPL    #$02,.hostile
+    BAPL    #$02,.hostile          ; result >= 2 -> hostile
     JSR     CHECK_THREATS_HERE
-    BAEQ    #$01,.one_threat
+    BAEQ    #$01,.one_threat       ; exactly 1 -> continue
     JMP     END_TURN
 .one_threat:
     JMP     MOVE_LOOP
+
+    ; --- hostile: restrict co-located group members ---
 .hostile:
     JSR     FIRST_GROUP_MEMBER
 .walk_group:
     LDA     MOB_PTR+1
-    BEQ     .group_done
-    LDY     #$03
+    BEQ     .group_done            ; null -> end of list
+    LDY     #MFIELD_POSITION
     LDA     (ENTITY_PTR),Y
-    CMP     (MOB_PTR),Y
+    CMP     (MOB_PTR),Y            ; same position?
     BNE     .next_member
-    JSR     SET_TARGET_RESTRICTED
+    JSR     SET_TARGET_RESTRICTED  ; restrict member
 .next_member:
     JSR     NEXT_GROUP_MEMBER
     JMP     .walk_group
@@ -15751,7 +15777,7 @@ HANDLE_MOB_ENCOUNTER:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #MSG_UNCONSCIOUS
+    LDA     #MSG_UNCONSCIOUS       ; "is unconscious"
     JSR     DISPLAY_MESSAGE
     JMP     END_TURN
 @ %def HANDLE_MOB_ENCOUNTER
