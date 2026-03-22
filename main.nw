@@ -16967,12 +16967,12 @@ DISPLAY_SHOP:
     INY
     INY
     INY
-    LDA     LOCATION_STYLE
-    ROL2
-    ROL2
-    AND     #$03
-    TAX
-    STA     $5A84
+    LDA     LOCATION_STYLE     ; extract bits 7-6: location tier (0-3)
+    ROL2                       ; \ rotate bits 7-6 down to bits 1-0
+    ROL2                       ; /
+    AND     #$03               ; mask to 2 bits
+    TAX                        ; X = price multiplier (loop count)
+    STA     LOCATION_STYLE_BITS
 .price_loop:
     JSR     ADD_PRICE_COMPONENT
     DEX
