@@ -14573,6 +14573,9 @@ called with~2 to record the new state.
 ; ---------------------------------------------------------------
 ENTER_COMBAT_STATE:
     SUBROUTINE ENTER_COMBAT_STATE
+    ; Transition entity to combat-ready state (state 2).
+    ; Checks encounter, clears/sets restricted flag.
+    ; Clobbers: A, Y
     JSR     CHECK_ENCOUNTER         ; evaluate encounter at position
     JSR     CLEAR_RESTRICTED        ; start with restriction cleared
     LDA     #$02
@@ -14604,6 +14607,9 @@ willingness check and damage calculation take place.
 ; ---------------------------------------------------------------
 START_COMBAT:
     SUBROUTINE START_COMBAT
+    ; Enter active attack (state 3) and resolve attack.
+    ; Input: TARGET_PTR_LO/HI = pre-selected target
+    ; Clobbers: A, X, Y
     LDA     #$03                    ; state 3 = attacking
     JSR     SET_CHAR_STATE
     JSR     LOAD_TARGET_PTR         ; TARGET_REC <- target address
@@ -14665,6 +14671,10 @@ to see what entity occupies that square.
     ORG     $14EA
 FIND_ATTACK_TARGET:
     SUBROUTINE FIND_ATTACK_TARGET
+    ; Convert direction col/row to position, find entity, dispatch.
+    ; Input: CURRENT_COL/ROW = target square
+    ; Output: IS_PLAYER_TURN set, MOB_PTR loaded, jumps to RESOLVE_ATTACK
+    ; Clobbers: A, X, Y
     LDA     CURRENT_COL
     LDY     CURRENT_ROW
     JSR     COLROW_TO_POS      ; A = map position
@@ -14724,6 +14734,9 @@ ATTACK_NAME_BUF     EQU     $7C9B   ; 20-byte buffer for attack target name
     ORG     $1537
 INIT_ATTACK_DISPLAY:
     SUBROUTINE INIT_ATTACK_DISPLAY
+    ; Copy target name to ATTACK_NAME_BUF for menu display.
+    ; Input: MOB_PTR = target entity
+    ; Clobbers: A, X, Y
     LDY     #$00
     LDA     (MOB_PTR),Y        ; byte 0 = record pointer lo
     STA     $BC
@@ -15519,6 +15532,10 @@ the X~register as a temporary.
 ; ---------------------------------------------------------------
 APPLY_DAMAGE_TO_CURRENT:
     SUBROUTINE APPLY_DAMAGE_TO_CURRENT
+    ; Apply damage A to entity at ENTITY_PTR.
+    ; Input: A = damage amount
+    ; Output: copies ENTITY_PTR to EFFECT_REC, jumps to APPLY_DAMAGE
+    ; Clobbers: X
     TAX                             ; save damage amount in X
     MOVW    ENTITY_PTR,EFFECT_REC   ; target <- current entity
     TXA                             ; restore damage amount
@@ -15809,6 +15826,11 @@ EVENT_SLOT_BYTE EQU     $5A59   ; saved byte 2 of event slot (type+value)
     ORG     $1D4D
 HANDLE_EVENT_SLOT:
     SUBROUTINE HANDLE_EVENT_SLOT
+    ; Process event tile interaction.
+    ; Input: EVENT_PTR = event entry, ENTITY_PTR = character
+    ; Behavior: branches on event byte 2 top bits for
+    ;   activated events, locked objects, and treasure.
+    ; Clobbers: A, X, Y
     ; Handle empty slot interaction: treasure pickup, traps,
     ; and event activation.
     LDA     #$00
@@ -15932,6 +15954,8 @@ with an event slot that requires a higher strength or special item.
 ; SHOW_LOCKED_MSG — display locked/blocked message, reset to idle
 SHOW_LOCKED_MSG:
     SUBROUTINE SHOW_LOCKED_MSG
+    ; Display "locked container" message and reset state.
+    ; Clobbers: A, Y
     JSR     SET_CURSOR_ROW21        ; position cursor
     JSR     PRINT_MOB_NAME          ; print blocking entity name
     JSR     SCROLL_STATUS_LINE
@@ -15950,6 +15974,8 @@ so they cannot simply walk away.
 ; SET_TARGET_RESTRICTED — pin mob at current position
 SET_TARGET_RESTRICTED:
     SUBROUTINE SET_TARGET_RESTRICTED
+    ; Set restricted flag (bit 2) on entity at MOB_PTR byte 15.
+    ; Clobbers: A, Y
     LDY     #MFIELD_FLAGS           ; byte 15: status flags
     LDA     (MOB_PTR),Y
     ORA     #$04                    ; set bit 2 = combat engaged
@@ -15980,6 +16006,8 @@ no-op stub for external callers at [[$4A1F]] and [[$4BE4]].
 ; ORPHANED_ENCOUNTER_HANDLER — dead code from earlier build
 ORPHANED_ENCOUNTER_HANDLER:
     SUBROUTINE ORPHANED_ENCOUNTER_HANDLER
+    ; Dead code: unreachable encounter handler with stale addresses.
+    ; Clobbers: A, X, Y
 ; ---------------------------------------------------------------
 ; DEAD CODE -- orphaned encounter handler ($1F19-$1FFF)
 ;
