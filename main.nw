@@ -13423,7 +13423,7 @@ ALT_INPUT_TABLE:
     ; rec1: BUY SOMETHING ELSE
     HEX     01 2D 01 03 00 00
     DC.W    $7D23              ; "BUY SOMETHING ELSE"
-    DC.W    $7194              ; browse handler
+    DC.W    BROWSE_HANDLER     ; browse: advance to next item
     ; rec2: NO SALE
     HEX     01 55 02 01 00 00
     DC.W    $7D36              ; "NO SALE"
@@ -16907,6 +16907,7 @@ DISPLAY_SHOP:
     ;   SHOP_PRICE, SHOP_PRICE_HI, LOCATION_STYLE_BITS,
     ;   SHOP_PRICE_DIGITS, SHOP_ITEM_NAME, PRINT_STRING_ADDR
     ; Clobbers: A, X, Y
+
     LDA     CHAR_AI_MODE
     BEQ     .do_shop
     RTS
@@ -17125,7 +17126,7 @@ APPLY_SHOP_EFFECT:
     CLC
     ADC     (ENTITY_PTR),Y     ; add defense bonus
     STA     (ENTITY_PTR),Y
-    JMP     $7194              ; return to browse handler
+    JMP     BROWSE_HANDLER     ; return to browse handler
 @ %def SHOP_BUY_EFFECT_0 SHOP_BUY_EFFECT_1 SHOP_BUY_EFFECT_2 SHOP_BUY_EFFECT_3 SHOP_BUY_EFFECT_4 APPLY_SHOP_EFFECT
 
 @ \subsection{XP award (\$7249--\$72A6)}
@@ -17153,6 +17154,19 @@ The common handler:
 XP_AWARD_TABLE      EQU     $7FBE   ; 5-byte XP award values by action type
 @ %def XP_AWARD_TABLE
 
+<<defines>>=
+ENTITY_LEVEL_FIELD      EQU     $0B     ; entity record byte 11: flags (7-5) | level (4-0)
+ENTITY_XP_FIELD         EQU     $08     ; entity record byte 8: status|pending_xp|count
+LEVEL_MASK              EQU     $1F     ; mask for level bits 4-0 in byte 11
+LEVEL_FLAG_MASK         EQU     $E0     ; mask for flag bits 7-5 in byte 11
+PENDING_XP_UNIT         EQU     $10     ; one pending XP unit in byte 8 (bit 4)
+BROWSE_HANDLER          EQU     $7194   ; shop browse: advance to next item
+@ %def ENTITY_LEVEL_FIELD ENTITY_XP_FIELD LEVEL_MASK LEVEL_FLAG_MASK PENDING_XP_UNIT BROWSE_HANDLER
+
+<<zero page defines>>=
+XP_ACCUM                EQU     $BA     ; accumulated level during XP award (scratch)
+@ %def XP_ACCUM
+
 <<xp award>>=
     ORG     $7249
 XP_AWARD_0:
@@ -17177,50 +17191,73 @@ XP_AWARD_4:
 
 AWARD_XP:
     SUBROUTINE AWARD_XP
-    LDY     #$0B
-    LDA     (ENTITY_PTR),Y     ; byte 11: flags|level
-    PHA
-    AND     #$1F               ; extract level (bits 4-0)
-    STA     $BA                ; save current level
-    PLA
-    AND     #$E0               ; save upper bits (7-5)
-    STA     (ENTITY_PTR),Y     ; clear level bits in record
-    LDY     #$08
-    LDA     (ENTITY_PTR),Y     ; byte 8: status|pending_xp|count
-    JSR     EXTRACT_PENDING_XP ; -> A = pending XP (0-7)
-    CLC
-    ADC     $BA                ; accumulated level = level + pending XP
-    STA     $BA
-    LDA     XP_AWARD_TABLE,X   ; XP award for this action type
-    CLC
-    ADC     LOCATION_STYLE_BITS ; + location modifier
-.clamp:
-    STA     (ENTITY_PTR),Y     ; store to byte 8
-    JSR     EXTRACT_PENDING_XP ; extract new pending XP
-    CMP     $BA                ; compare with accumulated level
-    BCC     .ok                ; pending < level -> ok
-    SEC
-    LDA     (ENTITY_PTR),Y     ; \ subtract $10 from byte 8
-    SBC     #$10               ;  | (reduce pending XP by 1)
-    JMP     .clamp             ; / store and retry
+    ; Award experience points after a shop buy action.
+    ;
+    ; Inputs:
+    ;   X              — action type index (0-4), set by entry points
+    ;   ENTITY_PTR     — pointer to entity receiving the XP
+    ;   XP_AWARD_TABLE — base XP values indexed by action type
+    ;   LOCATION_STYLE_BITS — location tier modifier (0-3)
+    ;
+    ; Behavior:
+    ;   Extracts current level and pending XP from entity record.
+    ;   Adds the award value (table[X] + tier) to byte 8, then
+    ;   clamps so pending XP does not exceed the accumulated level.
+    ;   Writes the updated level back to byte 11 and jumps to the
+    ;   browse handler.
+    ;
+    ; Modifies:
+    ;   ENTITY_PTR bytes 8 and 11, XP_ACCUM
+    ; Clobbers: A, X, Y
 
+    ; --- extract current level and pending XP ---
+    LDY     #ENTITY_LEVEL_FIELD    ; byte 11: flags|level
+    LDA     (ENTITY_PTR),Y
+    PHA
+    AND     #LEVEL_MASK            ; level (bits 4-0)
+    STA     XP_ACCUM
+    PLA
+    AND     #LEVEL_FLAG_MASK       ; preserve flag bits (7-5)
+    STA     (ENTITY_PTR),Y         ; clear level in record
+    LDY     #ENTITY_XP_FIELD       ; byte 8: status|pending_xp|count
+    LDA     (ENTITY_PTR),Y
+    JSR     EXTRACT_PENDING_XP     ; A = pending XP (0-7)
+    CLC
+    ADC     XP_ACCUM               ; accumulated = level + pending
+    STA     XP_ACCUM
+
+    ; --- add XP award and clamp ---
+    LDA     XP_AWARD_TABLE,X       ; base XP for action type
+    CLC
+    ADC     LOCATION_STYLE_BITS    ; + location tier modifier
+.clamp:
+    STA     (ENTITY_PTR),Y         ; write to byte 8
+    JSR     EXTRACT_PENDING_XP     ; extract new pending XP
+    CMP     XP_ACCUM               ; exceeds accumulated level?
+    BCC     .ok                    ; no -> done
+    SEC                            ; \ yes -> reduce by one XP unit
+    LDA     (ENTITY_PTR),Y         ;  |
+    SBC     #PENDING_XP_UNIT       ;  |
+    JMP     .clamp                 ; / retry
+
+    ; --- write updated level back ---
 .ok:
-    TAX                        ; save new pending XP
-    LDA     $BA
-    STX     $BA
+    TAX                            ; X = new pending XP
+    LDA     XP_ACCUM
+    STX     XP_ACCUM
     SEC
-    SBC     $BA                ; remaining level = accumulated - pending
-    LDY     #$0B
-    ORA     (ENTITY_PTR),Y     ; merge with saved upper bits
+    SBC     XP_ACCUM               ; remaining level = accumulated - pending
+    LDY     #ENTITY_LEVEL_FIELD    ; merge with saved flag bits
+    ORA     (ENTITY_PTR),Y
     STA     (ENTITY_PTR),Y
-    JMP     $7194              ; return to browse handler
+    JMP     BROWSE_HANDLER
 
 EXTRACT_PENDING_XP:
-    ROR                        ; \ extract bits 6-4
-    ROR                        ;  | shift right 4 positions
-    ROR                        ;  |
-    ROR                        ; /
-    AND     #$07               ; mask to 3 bits (0-7)
+    ROR                            ; \ extract bits 6-4 of A
+    ROR                            ;  | shift right 4 positions
+    ROR                            ;  |
+    ROR                            ; /
+    AND     #$07                   ; mask to 3 bits (0-7)
     RTS
 @ %def XP_AWARD_0 XP_AWARD_1 XP_AWARD_2 XP_AWARD_3 XP_AWARD_4 AWARD_XP EXTRACT_PENDING_XP
 

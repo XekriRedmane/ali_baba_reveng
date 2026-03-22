@@ -71,3 +71,4 @@ The routine DISPLAY_SHOP ($70DF) in main.nw is the reference example of a fully 
 - Do NOT add EQUs for ROM addresses ($C000-$FFFF) or well-known Apple II constants unless they improve clarity.
 - When creating EQUs, place them in `<<defines>>=` or `<<zero page defines>>=` chunks just before the routine's chunk, following chunk placement rules.
 - If a raw address is used in only one routine and has no broader meaning, a comment may be better than an EQU.
+- **dasm EQU values are always addresses.** For immediate-mode constants (masks, sizes, offsets), define the EQU without `#` (e.g., `LEVEL_MASK EQU $1F`) and use `#` on the instruction (e.g., `AND #LEVEL_MASK`). Never put `#` in the EQU value — dasm ignores it and the instruction will assemble as zero-page addressing instead of immediate.
