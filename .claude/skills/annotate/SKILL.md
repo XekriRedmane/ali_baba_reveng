@@ -22,10 +22,10 @@ For every raw hex address or constant in the routine:
 2. **Data addresses** (`LDA $XXXX`, `STA $XXXX`, etc.): check if an EQU exists. If not and the address appears meaningful (game state, display buffer, etc.), create one with a descriptive name.
 3. **Immediate constants** (`LDA #$XX`, `LDY #$XX`, `CMP #$XX`): if the value has a known meaning (field offset, bitmask, record size, character code), create an EQU. Define the EQU WITHOUT `#` (e.g., `LEVEL_MASK EQU $1F`) and use `#` on the instruction (e.g., `AND #LEVEL_MASK`).
 4. **Record field offsets**: ANY `LDY #imm` followed by `LDA (ptr),Y` or `STA (ptr),Y` is a record field access. The immediate value MUST have a named field offset EQU. Determine the record type from the pointer (CHAR_PTR → `CFIELD_*`, ENTITY_PTR/MOB_PTR/ENTITY_REC → `MFIELD_*`, EVENT_PTR → `EVFIELD_*`, SHOP_DATA_PTR → shop record offsets). Group all field offset EQUs for the same record type together in a central `<<defines>>=` chunk. Check if an offset EQU already exists before creating a new one. When `INY`/`DEY` adjusts Y to reach another field, comment which field Y now points to.
-5. **Indirect addressing** (`LDA ($XX),Y`): check if the ZP pointer has an EQU name.
-6. **Indexed addressing** (`STA $XXXX,X`): check if the base address has an EQU name.
-
-For new EQUs, follow the zero-page aliasing convention: when a ZP address is used for different purposes in different subsystems, define a context-specific EQU name and only use it in the relevant code.
+5. **Bitmasks**: ANY `AND #$XX` or `ORA #$XX` instruction MUST have a named EQU for the mask value. Name it after the field it operates on (e.g., `HP_MASK`, `STRENGTH_MASK`, `FLAGS_CLASS_MASK`). Group masks for the same byte together with their field offset EQU. If a mask and its complement both appear (e.g., `#$C0` and `#$3F` on byte 15), define both. Check if a mask EQU already exists before creating a new one — reuse it if the same mask applies to the same field.
+6. **Zero-page scratch**: ANY `STA $XX` or `LDA $XX` where `$XX` is a zero-page address without an existing EQU MUST get a context-specific alias. Name it after its purpose in the routine (e.g., `AI_SCRATCH`, `SAVED_CHAR`, `DIST_COL`). Follow the zero-page aliasing convention: the same ZP address used for different purposes in different subsystems gets different EQU names.
+7. **Indirect addressing** (`LDA ($XX),Y`): check if the ZP pointer has an EQU name.
+8. **Indexed addressing** (`STA $XXXX,X`): check if the base address has an EQU name.
 
 ### Pass 2: Add inline comments and align
 
