@@ -11187,7 +11187,7 @@ INCR_GROUP_COUNT:
 .not_null:
     LDY     #$04              ; \
     LDA     (TARGET_REC),Y    ;  | bail if byte 4 of (TARGET_REC) >= $15
-    BALT    #$15,.ok ;  ($15+ = inactive/dead)
+    BALT    #NPC_APPEARANCE_MIN,.ok ;  ($15+ = inactive/dead)
     RTS                       ; /
 .ok:
     LDY     #$08              ; \
@@ -14785,7 +14785,7 @@ NEXT_COLOCATED_MOB:
 .check:
     LDY     #$04
     LDA     (MOB_PTR),Y        ; byte 4 = appearance
-    CMP     #$15               ; >= $15 = valid target
+    CMP     #NPC_APPEARANCE_MIN               ; >= $15 = valid target
     BCC     .retry             ; too low -> try next mob
     LDA     #$01               ; valid target found
     RTS
@@ -15087,7 +15087,7 @@ MOB_ATTACK:
     JSR     TUNE_PLAYER
     LDY     #$04
     LDA     (ENTITY_PTR),Y
-    BAGE    #$15,.npc
+    BAGE    #NPC_APPEARANCE_MIN,.npc
     STOB    #$00,SCENE_COMBAT_FLAG
 .npc:
     JSR     DISPATCH_ON_MODE
@@ -15217,7 +15217,7 @@ APPLY_DAMAGE:
     LDY     #$04
     LDA     (EFFECT_REC),Y    ; field 4
     LDX     #$08              ; tune 4: mob death effect
-    BALT    #$15,.skip_flag
+    BALT    #NPC_APPEARANCE_MIN,.skip_flag
     LDY     #$0F
     LDA     (EFFECT_REC),Y
     ORA     #$10              ; set death flag
@@ -16094,7 +16094,7 @@ PICK_RANDOM_MEMBER:
     LDY     #MFIELD_APPEARANCE     ; byte 4: appearance index
     LDA     (MOB_PTR),Y
     BMI     .next                  ; bit 7 set -> dead/invalid, skip
-    BAPL    #$15,.next             ; >= $15 -> NPC, skip
+    BAPL    #NPC_APPEARANCE_MIN,.next             ; >= $15 -> NPC, skip
     DEX
     BNE     .next                  ; not Nth yet
     RTS                            ; found
@@ -16220,7 +16220,7 @@ AUTO_HEAL:
     BAPL    #$50,.heal_loop        ; keep healing while PRNG < $50
     LDY     #MFIELD_APPEARANCE     ; check if player character
     LDA     (ENTITY_PTR),Y
-    BALT    #$15,.player           ; appearance < $15 -> player
+    BALT    #NPC_APPEARANCE_MIN,.player           ; appearance < $15 -> player
 .done:
     RTS
 .player:
@@ -16505,7 +16505,7 @@ AI_CHOOSE_TARGET:
     LDY     #MFIELD_APPEARANCE     ; \ adjust appearance (remove NPC flag)
     LDA     (ENTITY_PTR),Y         ;  |
     SEC                            ;  |
-    SBC     #$15                   ;  |
+    SBC     #NPC_APPEARANCE_MIN                   ;  |
     STA     (ENTITY_PTR),Y         ; /
     LDY     #MFIELD_FLAGS          ; \ copy class bits (7-6) from source
     LDA     (MOB_PTR),Y            ;  | to entity's flags field
@@ -17361,6 +17361,7 @@ PENDING_XP_UNIT         EQU     $10     ; byte 8: one pending XP unit (bit 4)
 FLAGS_CLASS_MASK        EQU     $C0     ; byte 15: mask for class bits 7-6
 FLAGS_STATUS_MASK       EQU     $3F     ; byte 15: mask for status bits 5-0
 MOB_TYPE_MASK           EQU     $3F     ; byte 6: mask for mob type bits 5-0
+NPC_APPEARANCE_MIN      EQU     $15     ; appearance >= $15 = NPC, < $15 = player character
 @ %def LEVEL_MASK LEVEL_FLAG_MASK PENDING_XP_UNIT
 
 <<zero page defines>>=
