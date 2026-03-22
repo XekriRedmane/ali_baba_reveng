@@ -17611,6 +17611,12 @@ SHOP_ITEM_NAME          EQU     S_PAY_FOR+16 ; 20-byte item name field after "FO
     ORG     $71F0
 ADVANCE_SHOP_PTR:
     SUBROUTINE ADVANCE_SHOP_PTR
+    ; Advance SHOP_DATA_PTR to the next shop record.
+    ;
+    ; Input:  SHOP_DATA_PTR — current record
+    ; Output: SHOP_DATA_PTR += SHOP_RECORD_SIZE (41 bytes)
+    ; Clobbers: A
+
     CLC
     LDA     SHOP_DATA_PTR
     ADC     #SHOP_RECORD_SIZE
@@ -17629,6 +17635,12 @@ style.
     ORG     $71FC
 ADD_PRICE_COMPONENT:
     SUBROUTINE ADD_PRICE_COMPONENT
+    ; Add one price byte from shop record to SHOP_PRICE.
+    ;
+    ; Input:  Y = offset into shop record, SHOP_DATA_PTR
+    ; Output: SHOP_PRICE += (SHOP_DATA_PTR),Y
+    ; Clobbers: A
+
     CLC
     LDA     (SHOP_DATA_PTR),Y
     ADC     SHOP_PRICE
