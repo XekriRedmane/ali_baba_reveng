@@ -7503,7 +7503,7 @@ Each record contains five 5-byte item slots at offsets \$00, \$05,
 \$0A, \$0F, and~\$14.  Each slot holds a 2-byte buy-effect handler
 address, a 2-byte item name string pointer, and a 1-byte
 price-per-unit value.  The entity's bitmask (byte~2, stored in
-[[$5A83]]) determines which slots are displayed; unused slots contain
+[[SHOP_VALID_MASK]]) determines which slots are displayed; unused slots contain
 display format data.  Bytes \$19--\$27 hold additional items or
 display format strings.  Byte~\$28 is the shop scene number (passed
 to [[SCENE_LOOP]] when entering the shop).
@@ -16944,7 +16944,7 @@ DISPLAY_SHOP:
 .counted:
     LDY     #SHOP_AVAIL_FIELD
     LDA     (ENTITY_REC),Y     ; item availability bitmask
-    STA     $5A83
+    STA     SHOP_VALID_MASK
     JSR     SET_CURSOR_ROW21
     LDY     #SHOP_SCENE_OFFSET
     LDA     (SHOP_DATA_PTR),Y
@@ -16955,7 +16955,7 @@ DISPLAY_SHOP:
     STOB    #$80,SHOP_ITEM_MASK
     STOB    #$00,SHOP_ITEM_OFFSET
 .item_loop:
-    LDA     $5A83
+    LDA     SHOP_VALID_MASK
     AND     SHOP_ITEM_MASK
     BNE     .show_item
     JMP     .next_item
@@ -17033,8 +17033,9 @@ table.
 SHOP_RECORD_SIZE        EQU     $29     ; size of one shop record (41 bytes)
 SHOP_SCENE_OFFSET       EQU     $28     ; offset of scene number within shop record
 SHOP_TYPE_FIELD         EQU     $01     ; entity record byte 1: shop type ($D5=weapons, $D6=armor)
-SHOP_AVAIL_FIELD        EQU     $02     ; entity record byte 2: item availability bitmask
-@ %def SHOP_RECORD_SIZE SHOP_SCENE_OFFSET SHOP_TYPE_FIELD SHOP_AVAIL_FIELD
+SHOP_AVAIL_FIELD        EQU     $02     ; entity record byte 2: item validity bitmask
+SHOP_VALID_MASK         EQU     $5A83   ; copy of item validity bitmask during shop display
+@ %def SHOP_RECORD_SIZE SHOP_SCENE_OFFSET SHOP_TYPE_FIELD SHOP_AVAIL_FIELD SHOP_VALID_MASK
 
 <<advance shop ptr>>=
     ORG     $71F0
