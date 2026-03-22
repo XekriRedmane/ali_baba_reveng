@@ -14463,68 +14463,89 @@ COMBAT_STRENGTH EQU     $5A78   ; result of CALC_COMBAT_STRENGTH
 
 <<calc combat strength>>=
     ORG     $16E0
-    SUBROUTINE CALC_COMBAT_STRENGTH
-; Calculates combat strength using RANDOM_IN_RANGE
 CALC_COMBAT_STRENGTH:
+    SUBROUTINE CALC_COMBAT_STRENGTH
+    ; Compute effective attack power for the current combatant.
+    ;
+    ; Input:  ENTITY_PTR — attacker, MOB_PTR — target
+    ;         IS_PLAYER_TURN, CHAR_AI_MODE
+    ; Output: COMBAT_STRENGTH (0-$1F)
+    ;
+    ; Behavior:
+    ;   Same position -> melee (MFIELD_DEFENSE), else ranged
+    ;   (MFIELD_ATTACK).  Low nibble rolled twice and summed.
+    ;   Player-controlled on mob's turn: fumble check (roll
+    ;   against $0D or $50; zero = fumble with +0..9 bonus).
+    ;
+    ; Modifies: COMBAT_STRENGTH, may mark stat field $81
+    ; Clobbers: A, X, Y
+
+    ; --- select melee or ranged stat ---
     LDA     IS_PLAYER_TURN
-    BAEQ    #$01,.use_y7
-    LDY     #$03
+    BAEQ    #$01,.use_ranged       ; not player turn -> ranged
+    LDY     #MFIELD_POSITION
     LDA     (MOB_PTR),Y
     CMP     (ENTITY_PTR),Y
-    BNE     .use_y7
-    LDY     #$09
-    BNE     .got_y
-.use_y7:
-    LDY     #$07
-.got_y:
-    TYA
+    BNE     .use_ranged            ; different pos -> ranged
+    LDY     #MFIELD_DEFENSE        ; same pos -> melee
+    BNE     .got_field
+.use_ranged:
+    LDY     #MFIELD_ATTACK         ; ranged stat
+.got_field:
+
+    ; --- roll base combat strength ---
+    TYA                            ; save field index
     PHA
     LDA     (ENTITY_PTR),Y
-    AND     #$0F
+    AND     #DEFENSE_HALF_MASK     ; low nibble = base
     TAX
-    JSR     RANDOM_IN_RANGE
+    JSR     RANDOM_IN_RANGE        ; first roll
     STA     COMBAT_STRENGTH
     TXA
-    JSR     RANDOM_IN_RANGE
-    SEC
+    JSR     RANDOM_IN_RANGE        ; second roll
+    SEC                            ; +1 via carry
     ADC     COMBAT_STRENGTH
     STA     COMBAT_STRENGTH
+
+    ; --- fumble check (player-controlled, mob's turn) ---
     LDA     CHAR_AI_MODE
-    BEQ     .check_5a74
-.exit_pla:                     ; $1712 - reused by backward BNE from $1717
+    BEQ     .check_turn
+.exit_pla:
     PLA
     RTS
-.check_5a74:
+.check_turn:
     LDA     IS_PLAYER_TURN
-    BNE     .exit_pla
+    BNE     .exit_pla              ; player's turn -> no fumble
     PLA
-    TAY
-    TAX
+    TAY                            ; Y = field index
+    TAX                            ; X = saved for later
     LDA     (ENTITY_PTR),Y
-    AND     #$80
+    AND     #TARGET_BIT7_MASK      ; test stat high bit
     BNE     .use_50
-    LDA     #$0D
+    LDA     #$0D                   ; bit 7 clear: 1-in-13
     BNE     .do_random
 .use_50:
-    LDA     #$50
+    LDA     #$50                   ; bit 7 set: 1-in-80
 .do_random:
     JSR     RANDOM_IN_RANGE
-    BAEQ    #$00,.missed
+    BAEQ    #$00,.fumbled          ; zero = fumble
     RTS
-.missed:
+
+    ; --- fumble: mark field, show scene, add bonus ---
+.fumbled:
     TXA
     TAY
-    LDA     #$81
+    LDA     #$81                   ; fumble marker
     STA     (ENTITY_PTR),Y
     JSR     SET_CURSOR_ROW21
-    LDA     #$01
+    LDA     #$01                   ; scene 1: fumble
     JSR     SCENE_LOOP
-    LDA     #$0A
+    LDA     #$0A                   ; bonus range 0-9
     JSR     RANDOM_IN_RANGE
     SEC
     ADC     COMBAT_STRENGTH
-    BALT    #$1F,.cap_ok
-    LDA     #$1F
+    BALT    #$1F,.cap_ok           ; under cap?
+    LDA     #$1F                   ; clamp to $1F
 .cap_ok:
     STA     COMBAT_STRENGTH
     RTS
