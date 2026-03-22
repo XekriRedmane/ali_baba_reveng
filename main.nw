@@ -3887,12 +3887,12 @@ EFIELD_NEXT         EQU     $02     ; byte 2: next link pointer (linked list)
 EFIELD_POSITION     EQU     $03     ; byte 3: map position (packed col/row)
 EFIELD_APPEARANCE   EQU     $04     ; byte 4: appearance index (font char lookup)
 EFIELD_STRENGTH     EQU     $05     ; byte 5: bits 4-0 = strength (mob) / bits 4-1 = defense (char)
-EFIELD_EVENT_PTR    EQU     $06     ; bytes 6-7: pointer to event list (2 bytes)
-EFIELD_ATTACK       EQU     $07     ; byte 7: attack stat (swords, clubs set this)
+EFIELD_EVENTS       EQU     $06     ; byte 6: event list pointer lo (CHAR_PTR records)
+EFIELD_ATTACK       EQU     $07     ; byte 7: attack stat (ENTITY_PTR) / event ptr hi (CHAR_PTR)
 EFIELD_XP           EQU     $08     ; byte 8: status (7) | pending XP (6-4) | group count (3-0)
 EFIELD_DEFENSE      EQU     $09     ; byte 9: defense stat (armor, daggers, shivs set this)
 EFIELD_LEVEL        EQU     $0B     ; byte 11: class/faction (7-5) | level (4-0)
-@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR EFIELD_STRENGTH EFIELD_EVENT_PTR EFIELD_ATTACK EFIELD_XP EFIELD_DEFENSE EFIELD_LEVEL
+@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR EFIELD_STRENGTH EFIELD_EVENTS EFIELD_ATTACK EFIELD_XP EFIELD_DEFENSE EFIELD_LEVEL
 
 <<game init>>=
     ORG     $78C7
@@ -16823,7 +16823,7 @@ FIND_NEAREST_EVENT:
     ; Clobbers: A, X, Y
 
     STOB    #$7F,NEAREST_DIST      ; initial min = 127
-    LDWIY    CHAR_PTR,#EFIELD_EVENT_PTR,EVENT_PTR ; load event list pointer
+    LDWIY    CHAR_PTR,#EFIELD_EVENTS,EVENT_PTR ; load event list pointer
     JMP     .check_end
 
     ; --- evaluate one event ---
