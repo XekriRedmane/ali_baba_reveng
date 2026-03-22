@@ -15902,7 +15902,7 @@ SELECT_COMBAT_TARGET:
     BAEQ    #$00,.skip_high        ; not hostile -> skip
     LDY     #MFIELD_STRENGTH
     LDA     (MOB_PTR),Y
-    AND     #$1F                   ; strength (bits 4-0)
+    AND     #STRENGTH_MASK         ; strength (bits 4-0)
     BAMI    BEST_THREAT,.skip_high ; not stronger -> skip
     STA     BEST_THREAT            ; new best
     MOVB    MOB_PTR,TARGET_PTR_LO
@@ -17292,6 +17292,7 @@ XP_AWARD_TABLE      EQU     $7FBE   ; 5-byte XP award values by action type
 <<defines>>=
     ; (ENTITY_LEVEL_FIELD and ENTITY_XP_FIELD removed; use MFIELD_LEVEL and MFIELD_XP)
 LEVEL_MASK              EQU     $1F     ; mask for level bits 4-0 in byte 11
+STRENGTH_MASK           EQU     $1F     ; mask for strength bits 4-0 in byte 5
 LEVEL_FLAG_MASK         EQU     $E0     ; mask for flag bits 7-5 in byte 11
 PENDING_XP_UNIT         EQU     $10     ; one pending XP unit in byte 8 (bit 4)
 @ %def LEVEL_MASK LEVEL_FLAG_MASK PENDING_XP_UNIT
