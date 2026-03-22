@@ -7493,31 +7493,22 @@ analysis.
 This region contains interleaved lookup tables and string data used
 by the shop, combat, and entity display systems.
 
-\paragraph{Equipment lookup table (\$7EDD--\$7F2C).}
-Ten records containing embedded string pointers into the weapon and
-armor strings that follow.  Each record holds a stat modifier, a
-handler address in the \$72xx page, and a 2-byte pointer to the
-item's name string.  Accessed via indirect pointer arithmetic from
-entity/shop records (no direct absolute-addressed xrefs).
+\paragraph{Shop item table (\$7EDD--\$7F2E).}
+Ten records for purchasable items.  Each has a 2-byte buy-effect
+handler address ([[SHOP_BUY_EFFECT_0]]--[[SHOP_BUY_EFFECT_4]] for
+weapons, [[XP_AWARD_0]]--[[XP_AWARD_4]] for armor), a 2-byte pointer
+to the item's name string, and a 1-byte price value.  Between some
+records are embedded display format strings (high-ASCII digits and
+separators used by the shop price renderer).  The tail at
+\$7F1F--\$7F2E contains additional price format data indexed
+from~\$7951.
 
-\paragraph{Weapon names (\$7F2D--\$7F6C).}
-Five length-prefixed high-ASCII weapon name strings:
-AN IRON SWORD, A STEEL SWORD, AN OAK CLUB, A STEEL DAGGER, A SHIV.
-
-\paragraph{Shop effect table (\$7F6D--\$7F71).}
-5-byte table of base effect values indexed by item type
-([[SHOP_EFFECT_TABLE]], documented via EQU).
-
-\paragraph{Armor names (\$7F72--\$7FBD).}
-Five length-prefixed armor name strings:
-PLATE ARMOR, RITHMIL PLATE ARMOR, CHAIN MAIL, RITHMIL CHAIN MAIL,
-LEATHER ARMOR.  The substring ``CHAIN MAIL'' at \$7FA9 is referenced
-directly by 6~callers in [[CLASSIFY_ENTITY_TYPE]] (\$1178--\$11ED)
-for entity name display.
-
-\paragraph{XP award table (\$7FBE--\$7FC2).}
-5-byte table of XP award values indexed by action type
-([[XP_AWARD_TABLE]], documented via EQU).
+\paragraph{Item name strings (\$7F2F--\$7FBD).}
+Ten length-prefixed high-ASCII item name strings (5~weapons,
+5~armor), interleaved with the [[SHOP_EFFECT_TABLE]] (5~bytes at
+\$7F6D) and the [[XP_AWARD_TABLE]] (5~bytes at \$7FBE).
+The substring ``CHAIN MAIL'' at \$7FA9 is referenced directly by
+6~callers in [[CLASSIFY_ENTITY_TYPE]] (\$1178--\$11ED).
 
 \paragraph{Map object names (\$7FC3--\$8039).}
 Eight length-prefixed strings for map tile descriptions:
@@ -7533,41 +7524,88 @@ SMITES, WHOPS, WHACKS, BASHES, WHOMPS, WALLOPS, SMASHES,
 CLOBBERS, LAMBASTES.  The table base at \$807D is referenced from
 the attack display routine at \$7E2E.
 
-<<equipment lookup table>>=
+<<shop item table>>=
     ORG     $7EDD
-EQUIPMENT_LOOKUP:
-    ; 10 records: handler(2), string_ptr(2), stat_value(1), ...
-    HEX     0B 72 2F 7F 0A 11 72 3D 7F 32 B7 C5 A0 AE A0 17
-    HEX     72 4B 7F 03 B2 AE A0 A0 AE 1D 72 57 7F 0F 23 72
-    HEX     66 7F 0A B6 A0 B4 A0 C6 32 49 72 72 7F 50 4D 72
-    HEX     7E 7F C8 51 72 92 7F 28 55 72 9D 7F 64 59 72 B0
-    HEX     7F 08 A0 B5 CF AE B5 A0 CB CC B1 CD D0 AF B1 C1 B9
-@ %def EQUIPMENT_LOOKUP
+SHOP_ITEM_TABLE:
+    ; --- Weapon records ---
+    ; rec0: AN IRON SWORD (price $0A)
+    DC.W    SHOP_BUY_EFFECT_0
+    DC.W    S_IRON_SWORD
+    DC.B    $0A
+    ; rec1: A STEEL SWORD (price $32)
+    DC.W    SHOP_BUY_EFFECT_1
+    DC.W    S_STEEL_SWORD
+    DC.B    $32
+    ; display format: "7E . "
+    HEX     B7 C5 A0 AE A0
+    ; rec2: AN OAK CLUB (price $03)
+    DC.W    SHOP_BUY_EFFECT_2
+    DC.W    S_OAK_CLUB
+    DC.B    $03
+    ; display format: "2.  ."
+    HEX     B2 AE A0 A0 AE
+    ; rec3: A STEEL DAGGER (price $0F)
+    DC.W    SHOP_BUY_EFFECT_3
+    DC.W    S_STEEL_DAGGER
+    DC.B    $0F
+    ; rec4: A SHIV (price $0A)
+    DC.W    SHOP_BUY_EFFECT_4
+    DC.W    S_SHIV
+    DC.B    $0A
+    ; display format: "6 4 F2"
+    HEX     B6 A0 B4 A0 C6 32
+    ; --- Armor records ---
+    ; rec5: PLATE ARMOR (price $50)
+    DC.W    XP_AWARD_0
+    DC.W    S_PLATE_ARMOR
+    DC.B    $50
+    ; rec6: RITHMIL PLATE ARMOR (price $C8)
+    DC.W    XP_AWARD_1
+    DC.W    S_RITHMIL_PLATE
+    DC.B    $C8
+    ; rec7: CHAIN MAIL (price $28)
+    DC.W    XP_AWARD_2
+    DC.W    S_CHAIN_MAIL
+    DC.B    $28
+    ; rec8: RITHMIL CHAIN MAIL (price $64)
+    DC.W    XP_AWARD_3
+    DC.W    S_RITHMIL_CHAIN
+    DC.B    $64
+    ; rec9: LEATHER ARMOR (price $08)
+    DC.W    XP_AWARD_4
+    DC.W    S_LEATHER_ARMOR
+    DC.B    $08
+    ; display format: " 5O.5 KL1MP/1A93"
+    HEX     A0 B5 CF AE B5 A0 CB CC B1 CD D0 AF B1 C1 B9 33
+@ %def SHOP_ITEM_TABLE
 
-<<weapon names>>=
-    ORG     $7F2E
-WEAPON_NAMES:
-    DC.B    $33                ; ??? (precedes first weapon string)
+<<item name strings>>=
+    ORG     $7F2F
+S_IRON_SWORD:
     APSTR   "AN IRON SWORD"
+S_STEEL_SWORD:
     APSTR   "A STEEL SWORD"
+S_OAK_CLUB:
     APSTR   "AN OAK CLUB"
+S_STEEL_DAGGER:
     APSTR   "A STEEL DAGGER"
+S_SHIV:
     APSTR   "A SHIV"
-@ %def WEAPON_NAMES
-
-<<armor names>>=
-    ORG     $7F6D
-ARMOR_NAMES:
     ; SHOP_EFFECT_TABLE (5 bytes): base effect values by item type
     HEX     07 88 84 83 06
+S_PLATE_ARMOR:
     APSTR   "PLATE ARMOR"
+S_RITHMIL_PLATE:
     APSTR   "RITHMIL PLATE ARMOR"
+S_CHAIN_MAIL:
     APSTR   "CHAIN MAIL"
+S_RITHMIL_CHAIN:
     APSTR   "RITHMIL CHAIN MAIL"
+S_LEATHER_ARMOR:
     APSTR   "LEATHER ARMOR"
     ; XP_AWARD_TABLE (5 bytes): XP by action type
     HEX     75 35 53 23 21
-@ %def ARMOR_NAMES
+@ %def S_IRON_SWORD S_STEEL_SWORD S_OAK_CLUB S_STEEL_DAGGER S_SHIV S_PLATE_ARMOR S_RITHMIL_PLATE S_CHAIN_MAIL S_RITHMIL_CHAIN S_LEATHER_ARMOR
 
 <<map object names>>=
     ORG     $7FC3
@@ -21227,9 +21265,8 @@ The following root chunks produce the assembly files when tangled.
 <<status border data>>
 <<press space string>>
 <<press button string>>
-<<equipment lookup table>>
-<<weapon names>>
-<<armor names>>
+<<shop item table>>
+<<item name strings>>
 <<map object names>>
 <<attack verb strings>>
 <<print font char data>>
