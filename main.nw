@@ -7137,11 +7137,19 @@ HRCG_LIBRARY_TAIL:
     HEX     68 AA 68 A8 68 60 84 AA 85 AB 48 98
 @ %def HRCG_LIBRARY_TAIL
 
-@ Display frame data and DOS strings (\$A5BC--\$A6B1): border frame
-patterns (spaces, T, F, S characters for the map display border),
-DOS error strings (``NEXT OBJECT FILE NAME IS'', ``SOURCE FILE:'',
-``OOPS! DOS ERROR! CODE=''), and a 6502 addressing mode descriptor
-table used by the disassembler/monitor.
+@ Display frame data and DOS strings (\$A5BC--\$A6B1), four sub-regions:
+\begin{itemize}
+\item \$A5BC--\$A5FB: border frame patterns (T/F/S/dash characters).
+  Referenced from map display at [[$128F]]/[[$1298]] via
+  [[LDX \$A5C8,Y]].
+\item \$A5FC--\$A62B: numeric display data (``7 300'', ``7 900'',
+  ``5 D0'' patterns).  [[$A600]] tested via [[BIT]] from [[$5412]].
+\item \$A62C--\$A67B: DOS-era strings (``NEXT OBJECT FILE NAME IS'',
+  ``SOURCE FILE:'', ``OOPS! DOS ERROR! CODE='') --- likely vestiges
+  of the Applesoft development environment, no direct runtime refs.
+\item \$A67C--\$A6B1: addressing mode descriptors and a short routine
+  at [[$A6A8]] called from disk I/O at [[$B689]].
+\end{itemize}
 
 <<display and dos data>>=
     ORG     $A5BC
