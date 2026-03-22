@@ -16446,9 +16446,10 @@ AI_TARGET_POS   EQU     $5A71   ; AI target position (set by AI_CHOOSE_TARGET)
 the strongest hostile mob found during the group iteration.
 
 <<zero page defines>>=
+AI_SCRATCH              EQU     $BA     ; scratch byte in AI_CHOOSE_TARGET
 AI_BEST_POS             EQU     $BE     ; best hostile position in ai_choose_target
 AI_BEST_STR             EQU     $BF     ; best hostile strength in ai_choose_target
-@ %def AI_BEST_POS AI_BEST_STR
+@ %def AI_SCRATCH AI_BEST_POS AI_BEST_STR
 
 <<defines>>=
 AI_TARGET_ROW       EQU     $5A73   ; AI target row (from POS_TO_COLROW)
@@ -16506,13 +16507,13 @@ AI_CHOOSE_TARGET:
     SEC                            ;  |
     SBC     #$15                   ;  |
     STA     (ENTITY_PTR),Y         ; /
-    LDY     #MFIELD_FLAGS          ; \ copy high 2 bits of source flags
+    LDY     #MFIELD_FLAGS          ; \ copy class bits (7-6) from source
     LDA     (MOB_PTR),Y            ;  | to entity's flags field
-    AND     #$C0                   ;  |
-    STA     $BA                    ;  |
+    AND     #FLAGS_CLASS_MASK      ;  |
+    STA     AI_SCRATCH             ;  |
     LDA     (ENTITY_PTR),Y         ;  |
-    AND     #$3F                   ;  |
-    ORA     $BA                    ;  |
+    AND     #FLAGS_STATUS_MASK     ;  | keep status bits (5-0)
+    ORA     AI_SCRATCH             ;  | merge class bits from source
     STA     (ENTITY_PTR),Y         ; /
     LDY     #CFIELD_XP             ; \ increment party size in group record
     LDA     (CHAR_PTR),Y           ;  |
@@ -16528,12 +16529,12 @@ AI_CHOOSE_TARGET:
 .simple_target:
     LDY     #MFIELD_STRENGTH       ; strength (bits 4-0)
     LDA     (ENTITY_PTR),Y
-    AND     #$1F
-    STA     $BA
+    AND     #STRENGTH_MASK
+    STA     AI_SCRATCH
     INY                            ; Y = MFIELD_MOB_TYPE
     LDA     (ENTITY_PTR),Y        ; mob type (bits 5-0)
-    AND     #$3F
-    BAPL    $BA,.use_encounter     ; mob type >= strength -> seek encounter
+    AND     #MOB_TYPE_MASK
+    BAPL    AI_SCRATCH,.use_encounter ; mob type >= strength -> seek encounter
     STOB    #$00,AI_TARGET_POS     ; no target
     JMP     .done
 .use_encounter:
@@ -17357,6 +17358,9 @@ HP_MASK                 EQU     $3F     ; byte 6: mask for HP bits 5-0
 LEVEL_MASK              EQU     $1F     ; byte 11: mask for level bits 4-0
 LEVEL_FLAG_MASK         EQU     $E0     ; byte 11: mask for flag bits 7-5
 PENDING_XP_UNIT         EQU     $10     ; byte 8: one pending XP unit (bit 4)
+FLAGS_CLASS_MASK        EQU     $C0     ; byte 15: mask for class bits 7-6
+FLAGS_STATUS_MASK       EQU     $3F     ; byte 15: mask for status bits 5-0
+MOB_TYPE_MASK           EQU     $3F     ; byte 6: mask for mob type bits 5-0
 @ %def LEVEL_MASK LEVEL_FLAG_MASK PENDING_XP_UNIT
 
 <<zero page defines>>=
