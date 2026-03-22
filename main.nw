@@ -16789,42 +16789,68 @@ found.  The winning position is returned in~A and stored at~\$5A13 for the AI
 to use as a movement target.
 
 <<defines>>=
-NEAREST_DIST        EQU     $5A14   ; find nearest event: current minimum distance
-@ %def NEAREST_DIST
+NEAREST_DIST        EQU     $5A14   ; current minimum distance during event search
+NEAREST_POS         EQU     $5A13   ; position of nearest event found
+CANDIDATE_POS       EQU     $5A15   ; position of event being evaluated
+EVENT_RECORD_SIZE   EQU     $03     ; size of one event list entry (3 bytes)
+EVENT_ACTIVATED     EQU     $C0     ; event type threshold: >= $C0 = already activated
+EVENT_EMPTY         EQU     $FE     ; event list: empty slot marker
+EVENT_END           EQU     $FF     ; event list: end-of-list marker
+@ %def NEAREST_DIST NEAREST_POS CANDIDATE_POS EVENT_RECORD_SIZE EVENT_ACTIVATED EVENT_EMPTY EVENT_END
 
 <<find nearest event>>=
     ORG     $138D
 FIND_NEAREST_EVENT:
     SUBROUTINE FIND_NEAREST_EVENT
-    ; Find nearest non-activated event (byte 1 < $C0) by Manhattan distance
-    ; Returns position in A ($5A13)
-    STOB    #$7F,NEAREST_DIST ; initial min distance
-    LDWIY    CHAR_PTR,#$06,EVENT_PTR ; event list pointer low
+    ; Find the nearest non-activated event to the current entity.
+    ;
+    ; Input:  ENTITY_PTR  — entity whose position to measure from
+    ;         CHAR_PTR+6  — pointer to event list
+    ;
+    ; Output: A = packed position of nearest event
+    ;
+    ; Behavior:
+    ;   Walks the 3-byte event list (position, type, data).  Skips
+    ;   activated events (type >= $C0) and empty slots ($FE).  For
+    ;   each candidate, computes Manhattan distance and keeps the
+    ;   closest.
+    ;
+    ; Modifies: NEAREST_DIST, NEAREST_POS, CANDIDATE_POS, EVENT_PTR
+    ; Clobbers: A, X, Y
+
+    STOB    #$7F,NEAREST_DIST      ; initial min = 127
+    LDWIY    CHAR_PTR,#$06,EVENT_PTR ; load event list pointer
     JMP     .check_end
+
+    ; --- evaluate one event ---
 .eval:
     LDY     #$01
-    LDA     (EVENT_PTR),Y      ; event byte 1 = type
-    BAGE    #$C0,.advance ; >= $C0 -> activated, skip
+    LDA     (EVENT_PTR),Y          ; event type byte
+    BAGE    #EVENT_ACTIVATED,.advance ; activated -> skip
     LDY     #$00
-    LDA     (EVENT_PTR),Y      ; event byte 0 = position
-    STA     $5A15
-    JSR     MANHATTAN_DISTANCE ; Manhattan distance
-    BAPL    NEAREST_DIST,.advance ; not closer
-    STA     NEAREST_DIST       ; new minimum
-    MOVB    $5A15,$5A13 ; record position
+    LDA     (EVENT_PTR),Y          ; event position byte
+    STA     CANDIDATE_POS
+    JSR     MANHATTAN_DISTANCE
+    BAPL    NEAREST_DIST,.advance  ; not closer -> skip
+    STA     NEAREST_DIST           ; new minimum distance
+    MOVB    CANDIDATE_POS,NEAREST_POS ; record its position
+
+    ; --- advance to next entry ---
 .advance:
     LDA     EVENT_PTR
     CLC
-    ADC     #$03               ; next 3-byte entry
+    ADC     #EVENT_RECORD_SIZE     ; next 3-byte entry
     STA     EVENT_PTR
     BCC     .check_end
     INC     EVENT_PTR+1
+
+    ; --- check list termination ---
 .check_end:
     LDY     #$00
     LDA     (EVENT_PTR),Y
-    BAEQ    #$FE,.advance      ; $FE = empty slot, skip
-    BANE    #$FF,.eval         ; $FF = end of list
-    LDA     $5A13              ; return nearest position
+    BAEQ    #EVENT_EMPTY,.advance  ; empty slot -> skip
+    BANE    #EVENT_END,.eval       ; not end -> evaluate
+    LDA     NEAREST_POS            ; return nearest position
     RTS
 @ %def FIND_NEAREST_EVENT
 @ [[MANHATTAN_DISTANCE]] computes the taxicab distance between a given packed
