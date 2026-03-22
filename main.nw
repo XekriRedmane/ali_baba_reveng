@@ -15108,104 +15108,122 @@ combat strength:
     ORG     $1751
 PLAYER_ATTACK:
     SUBROUTINE PLAYER_ATTACK
+    ; Resolve player-initiated attack on target entity.
+    ;
+    ; Input:  MOB_PTR — target, ENTITY_PTR — attacker
+    ; Behavior:
+    ;   Computes combat strength, classifies target (dead/event/
+    ;   normal), rolls hit (0-12 vs strength), handles locked
+    ;   containers and event slot processing.
+    ; Clobbers: A, X, Y
+
+    ; --- setup: strength, name, tune ---
     JSR     CALC_COMBAT_STRENGTH
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
     LDA     COMBAT_STRENGTH
-    JSR     MAP_VALUE_TO_STRING
+    JSR     MAP_VALUE_TO_STRING    ; strength descriptor
     JSR     SCROLL_STATUS_LINE
-    MOVW    MOB_PTR,ENTITY_REC
+    MOVW    MOB_PTR,ENTITY_REC     ; ENTITY_REC = target
     JSR     CLASSIFY_ENTITY_TYPE
     JSR     PRINT_BOTTOM_CENTERED
     LDY     COMBAT_STRENGTH
-    LDX     #$02                ; tune 1: combat hit effect
+    LDX     #$02                   ; tune 1: combat hit
     JSR     TUNE_PLAYER
-    LDY     #$01
-    LDA     (MOB_PTR),Y
-    BAEQ    #$FE,.check_event
-    BALT    #$40,.roll_hit
+
+    ; --- target classification ---
+    LDY     #MFIELD_TYPE
+    LDA     (MOB_PTR),Y           ; target type byte
+    BAEQ    #EVENT_EMPTY,.check_event ; $FE = dead/empty
+    BALT    #$40,.roll_hit         ; < $40 = normal entity
 .immune:
     JSR     DISPATCH_ON_MODE
     JSR     SCROLL_STATUS_LINE
-    LDA     #MSG_TOUCHED
+    LDA     #MSG_TOUCHED           ; "as soon as it is touched"
     JMP     DISPLAY_MESSAGE
+
+    ; --- hit roll ---
 .roll_hit:
-    LDA     #$0D
+    LDA     #$0D                   ; range 0-12
     JSR     RANDOM_IN_RANGE
-    BAGE    COMBAT_STRENGTH,.immune
+    BAGE    COMBAT_STRENGTH,.immune ; roll >= strength: miss
     JSR     DISPATCH_ON_MODE
-    LDY     #$01
-    LDA     (ENTITY_REC),Y
-    ORA     #$40
-    STA     (ENTITY_REC),Y
-    DEY
+    LDY     #MFIELD_TYPE           ; \ set damage-taken flag (bit 6)
+    LDA     (ENTITY_REC),Y         ;  |
+    ORA     #$40                   ;  |
+    STA     (ENTITY_REC),Y         ; /
+    DEY                            ; Y = MFIELD_CHAR (byte 0)
     LDA     (ENTITY_REC),Y
     JSR     POS_TO_COLROW
     STY     FONT_ROW
     STA     FONT_COL
     JSR     GET_ENTITY_FONTCHAR
-    JSR     RENDER_FONT_CHAR
-    LDX     #$0C              ; tune 6: combat avoided effect
+    JSR     RENDER_FONT_CHAR       ; redraw entity
+    LDX     #$0C                   ; tune 6: hit confirmed
     JSR     TUNE_PLAYER
     JSR     SET_CURSOR_ROW21
-    LDA     #MSG_INSERT_DISK
+    LDA     #MSG_INSERT_DISK       ; hit confirmation
     JMP     DISPLAY_MESSAGE
+
+    ; --- event slot processing ---
 .check_event:
-    LDY     #$02
+    LDY     #MFIELD_NEXT           ; byte 2: event data
     LDA     (MOB_PTR),Y
     TAX
-    AND     #$C0
-    BANE    #$C0,.check_type
+    AND     #FLAGS_CLASS_MASK      ; isolate activation bits
+    BANE    #FLAGS_CLASS_MASK,.check_type ; $C0 = activated event
     TXA
-    AND     #$1F
-    BAPL    #$1D,.immune
+    AND     #STRENGTH_MASK         ; sub-type (bits 4-0)
+    BAPL    #$1D,.immune           ; >= $1D: immune
     JSR     PROCESS_ENTITY_SCRIPT
     JSR     SET_CURSOR_ROW21
-    LDA     #$02
+    LDA     #$02                   ; scene 2
     JMP     SCENE_LOOP
+
+    ; --- container / locked object ---
 .check_type:
-    BAEQ    #$00,.immune
+    BAEQ    #$00,.immune           ; no activation: immune
     LDA     COMBAT_STRENGTH
-    BAPL    #$0A,.strong_enough
+    BAPL    #$0A,.strong_enough    ; strength >= 10: can open
     TXA
-    BAPL    #$80,.blocked
+    BAPL    #$80,.blocked          ; bit 7: locked container
     LDA     COMBAT_STRENGTH
-    BAMI    #$04,.blocked
+    BAMI    #$04,.blocked          ; strength < 4: too weak
 .strong_enough:
     TXA
-    AND     #$1F
-    BAMI    #$1F,.take_item
-    STX     $BA
-    DEC     $BA
-    LDA     $BA
-    LDY     #$02
-    STA     (MOB_PTR),Y
-    LDX     #$0E              ; tune 7: entity interaction
+    AND     #STRENGTH_MASK         ; sub-type (bits 4-0)
+    BAMI    #STRENGTH_MASK,.take_item ; sub-type = max: take item
+    STX     $BA                    ; \ decrement counter
+    DEC     $BA                    ;  |
+    LDA     $BA                    ;  |
+    LDY     #MFIELD_NEXT           ;  |
+    STA     (MOB_PTR),Y            ; / store decremented event byte
+    LDX     #$0E                   ; tune 7: interaction
     JSR     TUNE_PLAYER
     JSR     DISPATCH_ON_MODE
-    LDY     #$00
+    LDY     #MFIELD_CHAR           ; byte 0: display char
     LDA     (MOB_PTR),Y
-    JSR     DRAW_CHAR_AT_POS
+    JSR     DRAW_CHAR_AT_POS       ; redraw at position
     JSR     SET_CURSOR_ROW21
 .show_found:
-    LDA     #MSG_TOPPLES
+    LDA     #MSG_TOPPLES           ; "the sculpture topples over"
     JSR     DISPLAY_MESSAGE
     JMP     EVENT_PRNG_CHECK
 .take_item:
     JSR     PROCESS_ENTITY_SCRIPT
     JSR     SET_CURSOR_ROW21
-    LDY     #$02
+    LDY     #MFIELD_NEXT           ; byte 2: event data
     LDA     (MOB_PTR),Y
-    AND     #$1F
-    BAPL    #$1B,.show_found
-    LDA     #$03
+    AND     #STRENGTH_MASK         ; sub-type
+    BAPL    #$1B,.show_found       ; >= $1B: show found
+    LDA     #$03                   ; scene 3
     JSR     SCENE_LOOP
     JMP     EVENT_PRNG_CHECK
 .blocked:
     JSR     DISPATCH_ON_MODE
     JSR     SET_CURSOR_ROW21
-    LDA     #MSG_HEAVY_ROCK
+    LDA     #MSG_HEAVY_ROCK        ; "a heavy piece of rock"
     JMP     DISPLAY_MESSAGE
 @ %def PLAYER_ATTACK
 @ \subsection{Mob attack resolution (\$1860)}
@@ -15243,63 +15261,84 @@ MOB_DEFENSE     EQU     $5A79   ; mob defense value (low 4 bits of mob byte 8)
     ORG     $1860
 MOB_ATTACK:
     SUBROUTINE MOB_ATTACK
+    ; Resolve a mob's attack against the current character.
+    ;
+    ; Input:  ENTITY_PTR — target, MOB_PTR — attacker
+    ; Behavior:
+    ;   Computes strength, compares vs defense (byte 8 low 4 bits).
+    ;   Defense=0: full damage. Strength>defense: partial hit.
+    ;   Strength<=defense: absorbed (or critical if HP<3).
+    ; Modifies: COMBAT_STRENGTH, MOB_DEFENSE, SCENE_COMBAT_FLAG
+    ; Clobbers: A, X, Y
+
+    ; --- setup: strength, names, tune ---
     JSR     CALC_COMBAT_STRENGTH
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
     LDA     COMBAT_STRENGTH
-    JSR     MAP_VALUE_TO_STRING
+    JSR     MAP_VALUE_TO_STRING    ; strength descriptor
     JSR     SCROLL_STATUS_LINE
-    JSR     PRINT_MEMBER_NAME
+    JSR     PRINT_MEMBER_NAME      ; defender name
     LDY     COMBAT_STRENGTH
-    LDX     #$02              ; tune 1: combat hit effect
+    LDX     #$02                   ; tune 1: combat hit
     JSR     TUNE_PLAYER
-    LDY     #$04
+
+    ; --- player character special case ---
+    LDY     #MFIELD_APPEARANCE
     LDA     (ENTITY_PTR),Y
-    BAGE    #NPC_APPEARANCE_MIN,.npc
-    STOB    #$00,SCENE_COMBAT_FLAG
+    BAGE    #NPC_APPEARANCE_MIN,.npc ; NPC -> skip
+    STOB    #$00,SCENE_COMBAT_FLAG  ; player under attack
 .npc:
     JSR     DISPATCH_ON_MODE
-    LDY     #$08
+
+    ; --- read defense from byte 8 ---
+    LDY     #MFIELD_XP             ; byte 8: status/XP/count
     LDA     (MOB_PTR),Y
-    STA     MOB_DEFENSE
-    AND     #$0F
-    BANE    #$00,.has_strength
-    LDA     COMBAT_STRENGTH
+    STA     MOB_DEFENSE            ; save full byte
+    AND     #DEFENSE_HALF_MASK     ; low 4 bits = defense
+    BANE    #$00,.has_defense
+    LDA     COMBAT_STRENGTH        ; defense=0: full damage
     JMP     COPY_F4_TO_F6_AND_SET
-.has_strength:
+
+    ; --- compare strength vs defense ---
+.has_defense:
     JSR     SCROLL_STATUS_LINE
-    LDX     #$17
+    LDX     #$17                   ; msg $17 (sign bit set)
     LDA     MOB_DEFENSE
     BMI     .negative
-    LDX     #$18
+    LDX     #$18                   ; msg $18 (sign bit clear)
 .negative:
     LDA     MOB_DEFENSE
-    AND     #$0F
+    AND     #DEFENSE_HALF_MASK     ; isolate defense
     STA     MOB_DEFENSE
     LDA     COMBAT_STRENGTH
     SEC
-    SBC     MOB_DEFENSE
-    BEQ     .weak_hit
-    BPL     .partial
-.weak_hit:
+    SBC     MOB_DEFENSE            ; strength - defense
+    BEQ     .absorbed
+    BPL     .partial               ; positive -> partial hit
+
+    ; --- absorbed: attack blocked ---
+.absorbed:
+    INX                            ; $17->$19 or $18->$1A
     INX
-    INX
-    LDY     #$06
+    LDY     #MFIELD_MOB_TYPE       ; byte 6: HP
     LDA     (MOB_PTR),Y
-    AND     #$3F
-    BAMI    #$03,.critical
+    AND     #HP_MASK
+    BAMI    #$03,.critical         ; HP < 3 -> critical block
     TXA
-    JMP     DISPLAY_MESSAGE
+    JMP     DISPLAY_MESSAGE        ; "blocked" message
 .critical:
-    LDA     #MSG_ENOUGH
+    LDA     #MSG_ENOUGH            ; "ENOUGH IS ENOUGH!"
     JMP     DISPLAY_MESSAGE
+
+    ; --- partial hit: remainder = effective damage ---
 .partial:
-    STA     COMBAT_STRENGTH
+    STA     COMBAT_STRENGTH        ; save remainder
     TXA
-    JSR     DISPLAY_MESSAGE
+    JSR     DISPLAY_MESSAGE        ; "hit" message
     LDA     COMBAT_STRENGTH
-    JMP     COPY_F4_TO_F6_AND_SET
+    JMP     COPY_F4_TO_F6_AND_SET  ; apply partial damage
 @ %def MOB_ATTACK
 @ \subsection{Damage application (\$106F)}
 
@@ -15347,102 +15386,118 @@ DAMAGE_AMOUNT       EQU     $5A10   ; damage to apply / new HP after subtraction
     ORG     $106F
 APPLY_DAMAGE:
     SUBROUTINE APPLY_DAMAGE
-    ; Apply damage A to char at (EFFECT_REC).
-    ; Subtracts from field 6 (HP). Displays damage message,
-    ; plays tune. If HP drops to 0: death handling.
-    AND     #$1F
-    STA     DAMAGE_AMOUNT     ; damage amount
+    ; Apply damage to entity at (EFFECT_REC).
+    ;
+    ; Input:  A = raw damage, EFFECT_REC = target record
+    ; Behavior:
+    ;   Masks damage to 5 bits, displays severity message,
+    ;   subtracts from HP (byte 6 bits 5-0).  If HP <= 0:
+    ;   death handler.  If survives: status message by HP tier.
+    ; Modifies: DAMAGE_AMOUNT, entity bytes 6/15, ACTIVE_CHAR
+    ; Clobbers: A, X, Y
+
+    ; --- damage message selection ---
+    AND     #STRENGTH_MASK         ; mask to 5-bit damage
+    STA     DAMAGE_AMOUNT
     JSR     SET_CURSOR_ROW21
     LDA     DAMAGE_AMOUNT
-    LDX     #$03
+    LDX     #$03                   ; base message index
 .ror_loop:
-    INX
+    INX                            ; next severity tier
     CLC
-    ROR
-    BNE     .ror_loop         ; count leading zeros -> message index
+    ROR                            ; count leading zeros
+    BNE     .ror_loop
     TXA
-    JSR     DISPLAY_MESSAGE   ; show damage message
+    JSR     DISPLAY_MESSAGE        ; show damage descriptor
+
+    ; --- HP reduction ---
     LDY     DAMAGE_AMOUNT
-    LDX     #$04              ; tune 2: combat damage effect
+    LDX     #$04                   ; tune 2: damage sound
     JSR     TUNE_PLAYER
-    LDY     #$06
-    LDA     (EFFECT_REC),Y    ; field 6 (HP + flags)
-    TAX
-    AND     #$3F              ; HP only
+    LDY     #MFIELD_MOB_TYPE       ; byte 6: HP + flags
+    LDA     (EFFECT_REC),Y
+    TAX                            ; save original byte
+    AND     #HP_MASK               ; isolate HP (bits 5-0)
     SEC
-    SBC     DAMAGE_AMOUNT     ; HP - damage
-    BCC     .dead             ; underflow -> dead
-    BEQ     .dead             ; zero -> dead
-    STA     DAMAGE_AMOUNT     ; new HP
+    SBC     DAMAGE_AMOUNT          ; HP - damage
+    BCC     .dead                  ; underflow -> dead
+    BEQ     .dead                  ; zero -> dead
+    STA     DAMAGE_AMOUNT          ; save remaining HP
     TXA
-    AND     #$C0              ; preserve high bits
+    AND     #FLAGS_CLASS_MASK      ; preserve flags (bits 7-6)
     ORA     DAMAGE_AMOUNT
-    STA     (EFFECT_REC),Y    ; store updated field 6
+    STA     (EFFECT_REC),Y         ; store updated byte 6
+
+    ; --- survival status ---
     JSR     SET_CURSOR_ROW21
     LDA     DAMAGE_AMOUNT
-    BAPL    #$03,.check8
-    LDY     #$0F
-    LDA     (EFFECT_REC),Y    ; field 15
-    AND     #$F8
-    ORA     #$04              ; set restricted flag
-    STA     (EFFECT_REC),Y
+    BAPL    #$03,.check8           ; HP >= 3: check next tier
+    LDY     #MFIELD_FLAGS          ; \ set restricted flag
+    LDA     (EFFECT_REC),Y         ;  |
+    AND     #$F8                   ;  | clear low 3 bits
+    ORA     #FLAGS_ENGAGED_BIT     ;  | set bit 2
+    STA     (EFFECT_REC),Y         ; /
     JSR     PRINT_ENTITY_NAME
-    LDA     #MSG_FEELING_WEAK
-    JSR     DISPLAY_MESSAGE   ; "badly hurt" message
+    LDA     #MSG_FEELING_WEAK      ; "is feeling rather weak"
+    JSR     DISPLAY_MESSAGE
     RTS
 .check8:
-    BAPL    #$08,.ge8
+    BAPL    #$08,.ge8              ; HP >= 8: minor
     JSR     PRINT_ENTITY_NAME
-    LDA     #MSG_LOTS_OF_FIGHT
-    JMP     DISPLAY_MESSAGE   ; "wounded" message
+    LDA     #MSG_LOTS_OF_FIGHT     ; "still has lots of fight"
+    JMP     DISPLAY_MESSAGE
 .ge8:
     JSR     PRINT_ENTITY_NAME
-    LDA     #MSG_HIT_WALL
-    JMP     DISPLAY_MESSAGE   ; "scratched" message
+    LDA     #MSG_HIT_WALL          ; "just a scratch"
+    JMP     DISPLAY_MESSAGE
 
-    ; --- character dies ---
+    ; --- death handler ---
 .dead:
-    LDY     #$04
-    LDA     (EFFECT_REC),Y    ; field 4
-    LDX     #$08              ; tune 4: mob death effect
-    BALT    #NPC_APPEARANCE_MIN,.skip_flag
-    LDY     #$0F
+    LDY     #MFIELD_APPEARANCE     ; byte 4: appearance
     LDA     (EFFECT_REC),Y
-    ORA     #$10              ; set death flag
-    STA     (EFFECT_REC),Y
-    LDX     #$0A              ; tune 5: NPC death effect
+    LDX     #$08                   ; tune 4: player death
+    BALT    #NPC_APPEARANCE_MIN,.skip_flag ; < $15: player
+    LDY     #MFIELD_FLAGS          ; \ set death flag (bit 4)
+    LDA     (EFFECT_REC),Y         ;  |
+    ORA     #$10                   ;  |
+    STA     (EFFECT_REC),Y         ; /
+    LDX     #$0A                   ; tune 5: NPC death
 .skip_flag:
     TXA
-    PHA
+    PHA                            ; save tune index
     JSR     PRINT_ENTITY_NAME
+
+    ; --- random death message ---
     LDA     #$03
-    JSR     RANDOM_IN_RANGE   ; random(3)
+    JSR     RANDOM_IN_RANGE        ; random(3)
     BAEQ    #$00,.rand0
-    LDA     #$0E
+    LDA     #$0E                   ; death variant A
     BNE     .show_death
 .rand0:
     LDA     #$02
-    JSR     RANDOM_IN_RANGE   ; random(2)
+    JSR     RANDOM_IN_RANGE        ; random(2)
     CLC
-    ADC     #$27              ; message $27 or $28
+    ADC     #$27                   ; message $27 or $28
 .show_death:
-    JSR     DISPLAY_MESSAGE   ; death message
+    JSR     DISPLAY_MESSAGE        ; death message
     PLA
     TAX
-    JSR     TUNE_PLAYER     ; death tune
+    JSR     TUNE_PLAYER            ; death tune
+
+    ; --- death cleanup ---
     STOB    #$00,ACTIVE_CHAR
     MOVB    CURRENT_PLAYER,SOURCE_CHAR
     MOVW    EFFECT_REC,TARGET_REC
-    JSR     REORDER_CHAR      ; cleanup
-    LDWIY    EFFECT_REC,#$0D,TARGET_REC ; gold low
-    LDY     #$00
-    JSR     MODIFY_CHAR_STATS ; subtract gold (Y=0 -> subtract)
-    LDY     #$03
+    JSR     REORDER_CHAR           ; remove from group
+    LDWIY    EFFECT_REC,#MFIELD_GOLD_LO,TARGET_REC
+    LDY     #$00                   ; Y=0: subtract mode
+    JSR     MODIFY_CHAR_STATS      ; zero out gold
+    LDY     #MFIELD_POSITION
     LDA     (EFFECT_REC),Y
-    JSR     UPDATE_EVENT_LIST ; handle death at position
-    LDY     #$03
+    JSR     UPDATE_EVENT_LIST      ; process death events
+    LDY     #MFIELD_POSITION
     LDA     (EFFECT_REC),Y
-    JMP     DRAW_CHAR_AT_POS  ; redraw position
+    JMP     DRAW_CHAR_AT_POS       ; redraw and return
 @ %def APPLY_DAMAGE
 @ [[APPLY_DAMAGE_TO_CURRENT]] is a convenience wrapper that copies
 [[ENTITY_PTR]] into [[EFFECT_REC]] and tail-calls [[APPLY_DAMAGE]] with the
