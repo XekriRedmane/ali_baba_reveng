@@ -16955,14 +16955,14 @@ DISPLAY_SHOP:
     MOVB    SHOP_PRICE_HI,PRINT_STRING_ADDR+1
     STOW    SHOP_PRICE_DIGITS,$BA
     JSR     NUM_TO_DECIMAL     ; write price digits
-    LDY     SHOP_ITEM_OFFSET
-    INY
-    INY
-    LDA     (SHOP_DATA_PTR),Y
-    STA     PRINT_STRING_ADDR
-    INY
-    LDA     (SHOP_DATA_PTR),Y
-    STA     PRINT_STRING_ADDR+1
+    LDY     SHOP_ITEM_OFFSET   ; \ copy item name string address
+    INY                        ;  | from shop record (+2/+3)
+    INY                        ;  | into PRINT_STRING_ADDR
+    LDA     (SHOP_DATA_PTR),Y ;  |
+    STA     PRINT_STRING_ADDR  ;  |
+    INY                        ;  |
+    LDA     (SHOP_DATA_PTR),Y ;  |
+    STA     PRINT_STRING_ADDR+1; /
     LDY     #$00
     LDA     (PRINT_STRING_ADDR),Y
     TAY
