@@ -14143,26 +14143,32 @@ character's record, which appears to be a ``combat engaged'' flag.
     ORG     $0E25
 CHECK_ENCOUNTER:
     SUBROUTINE CHECK_ENCOUNTER
+    ; Check for hostile encounter at entity's position.
+    ;
+    ; Input:  A = position (passed to FIND_ENTITY_AT_POS)
+    ; Output: ENCOUNTER_RESULT = 0 (none), 1 (friendly), 2 (hostile)
+    ;         MOB_PTR = encountered mob (if found)
+    ; Clobbers: A, X, Y
 
-    JSR     FIND_ENTITY_AT_POS   ; look up char -> ENTITY_REC/ENTITY_REC+1
+    JSR     FIND_ENTITY_AT_POS     ; -> ENTITY_REC
     LDA     ENTITY_REC+1
-    BAEQ    #$00,.none           ; null pointer -> return 0
-    BAMI    #$80,.none ; not a mob (bit 7 clear) -> return 0
-    AND     #$7F                 ; clear mob flag
-    STA     MOB_PTR+1            ; \ MOB_PTR/MOB_PTR+1 = mob data pointer
-    MOVB    ENTITY_REC,MOB_PTR
+    BAEQ    #$00,.none             ; no entity found
+    BAMI    #$80,.none             ; bit 7 clear = character, skip
+    AND     #$7F                   ; strip mob flag
+    STA     MOB_PTR+1              ; \ set up mob pointer
+    MOVB    ENTITY_REC,MOB_PTR     ; /
 .search:
-    MOVW    MOB_PTR,TARGET_REC ; TARGET_REC/TARGET_REC+1 = current mob pointer
-    JSR     FIND_MOB_AT_SAME_POS ; find next mob at same position
-    BAMI    #$01,.none ; 0 = no co-located mob -> return 0
-    BEQ     .friendly            ; 1 = found (wrapped) -> return 1
-    LDY     #$06                 ; result >= 2: found ahead
-    LDA     (MOB_PTR),Y          ; byte 6 of found mob
-    AND     #$3F                 ; bits 5-0
-    BALT    #$03,.search ; active mob type?
-    JSR     CHECK_HOSTILE        ; compare factions
-    BAEQ    #$00,.search         ; same faction -> skip
-    STOB    #$02,ENCOUNTER_RESULT ; enemy found -> return 2
+    MOVW    MOB_PTR,TARGET_REC     ; save current mob as reference
+    JSR     FIND_MOB_AT_SAME_POS   ; find next mob at same position
+    BAMI    #$01,.none             ; 0 = none found
+    BEQ     .friendly              ; 1 = wrapped (same faction)
+    LDY     #MFIELD_MOB_TYPE       ; result >= 2: found ahead
+    LDA     (MOB_PTR),Y
+    AND     #MOB_TYPE_MASK         ; bits 5-0 = mob type
+    BALT    #$03,.search           ; type < 3 = inactive, skip
+    JSR     CHECK_HOSTILE
+    BAEQ    #$00,.search           ; same faction -> skip
+    STOB    #$02,ENCOUNTER_RESULT  ; hostile encounter
     RTS
 .none:
     LDA     #$00
@@ -14205,37 +14211,44 @@ COLOCATE_WRAPPED        EQU     $5A22   ; 1 if wrapped, 2 if ahead
     ORG     $0E6C
 FIND_MOB_AT_SAME_POS:
     SUBROUTINE FIND_MOB_AT_SAME_POS
+    ; Walk mob linked list for next mob at same map position.
+    ;
+    ; Input:  MOB_PTR — starting mob, CHAR_PTR — group head
+    ; Output: A=0 none found, A=1 found (wrapped), A=2 found (ahead)
+    ;         MOB_PTR updated to found mob
+    ; Modifies: COLOCATE_POS, COLOCATE_LINK, COLOCATE_WRAPPED
+    ; Clobbers: A, Y
 
-    LDY     #$03
-    LDA     (MOB_PTR),Y             ; byte 3 = position of current mob
+    LDY     #MFIELD_POSITION       ; save starting mob's position
+    LDA     (MOB_PTR),Y
     STA     COLOCATE_POS
-    DEY
-    LDA     (MOB_PTR),Y             ; byte 2 = next link of current mob
+    DEY                            ; Y = MFIELD_NEXT
+    LDA     (MOB_PTR),Y            ; save next-link as stop condition
     STA     COLOCATE_LINK
-    STY     COLOCATE_WRAPPED        ; $5A22 = 2 (found ahead)
+    STY     COLOCATE_WRAPPED       ; init = 2 (found ahead)
 .check_link:
-    BANE    #$00,.resolve           ; has next -> follow it
-    LDY     #$01
-    STY     COLOCATE_WRAPPED        ; wrapped to start
-    INY                             ; Y = 2
-    LDA     (CHAR_PTR),Y            ; byte 2 of group head = first mob
+    BANE    #$00,.resolve          ; valid link -> follow
+    LDY     #$01                   ; \ wrap to first mob
+    STY     COLOCATE_WRAPPED       ;  | mark as wrapped (1)
+    INY                            ;  | Y = CFIELD_NEXT
+    LDA     (CHAR_PTR),Y           ; / first mob from group head
 .resolve:
-    JSR     GET_MOB_DATA            ; A = mob index -> MOB_DATA_PTR/MOB_DATA_PTR+1
-    LDY     #$02
-    LDA     (MOB_DATA_PTR),Y        ; byte 2 of resolved mob
-    BANE    COLOCATE_LINK,.not_self ; same next-link as original?
-    LDA     #$00                    ; full circle -> not found
+    JSR     GET_MOB_DATA           ; A -> MOB_DATA_PTR
+    LDY     #MFIELD_NEXT
+    LDA     (MOB_DATA_PTR),Y       ; this mob's next-link
+    BANE    COLOCATE_LINK,.not_self ; differs from start -> not self
+    LDA     #$00                   ; full circle -> not found
     RTS
 .not_self:
-    INY                             ; Y = 3
-    LDA     (MOB_DATA_PTR),Y        ; byte 3 = position
-    BAEQ    COLOCATE_POS,.found     ; same position as original?
-    DEY                             ; Y = 2
-    LDA     (MOB_DATA_PTR),Y        ; follow next link
+    INY                            ; Y = MFIELD_POSITION
+    LDA     (MOB_DATA_PTR),Y
+    BAEQ    COLOCATE_POS,.found    ; same position -> found
+    DEY                            ; Y = MFIELD_NEXT
+    LDA     (MOB_DATA_PTR),Y       ; follow next link
     JMP     .check_link
 .found:
-    MOVW    MOB_DATA_PTR,MOB_PTR ; update MOB_PTR/MOB_PTR+1 to found mob
-    LDA     COLOCATE_WRAPPED        ; return 1 (wrapped) or 2 (ahead)
+    MOVW    MOB_DATA_PTR,MOB_PTR   ; update MOB_PTR to found mob
+    LDA     COLOCATE_WRAPPED       ; return 1 (wrapped) or 2 (ahead)
     RTS
 @ %def FIND_MOB_AT_SAME_POS
 Determines whether two mobs are hostile to each other by comparing their
@@ -14267,21 +14280,26 @@ HOSTILE_Y               EQU     $5A25   ; saved Y from first GET_HOSTILITY
     ORG     $0EB1
 CHECK_HOSTILE:
     SUBROUTINE CHECK_HOSTILE
+    ; Compare faction hostility of two entities.
+    ;
+    ; Input:  MOB_PTR — first entity, TARGET_REC — second entity
+    ; Output: A=1 hostile to each other, A=0 same faction
+    ; Clobbers: A, Y
 
-    LDY     #$04
-    LDA     (MOB_PTR),Y            ; byte 4 of found mob (appearance)
+    LDY     #MFIELD_APPEARANCE     ; byte 4: appearance
+    LDA     (MOB_PTR),Y            ; first entity appearance
     STA     HOSTILE_APP
-    LDA     (TARGET_REC),Y         ; byte 4 of original mob (appearance)
-    JSR     APPEARANCE_TO_FONTCHAR ; -> A=remainder, Y=group
-    JSR     GET_HOSTILITY          ; -> Y=0 (friendly) or 1 (hostile)
+    LDA     (TARGET_REC),Y         ; second entity appearance
+    JSR     APPEARANCE_TO_FONTCHAR ; -> Y = font group
+    JSR     GET_HOSTILITY          ; -> Y = hostility flag
     STA     HOSTILE_A
     STY     HOSTILE_Y
-    LDA     HOSTILE_APP            ; appearance of found mob
+    LDA     HOSTILE_APP            ; first entity appearance
     JSR     APPEARANCE_TO_FONTCHAR
     JSR     GET_HOSTILITY
-    BYNE    HOSTILE_Y,.different   ; different sides -> hostile
+    BYNE    HOSTILE_Y,.different   ; different factions -> hostile
     BYEQ    #$00,.same             ; both friendly -> same side
-    BANE    HOSTILE_A,.different   ; different -> hostile to each other
+    BANE    HOSTILE_A,.different   ; both hostile, different sub -> hostile
 .same:
     LDA     #$00
     RTS
@@ -14297,11 +14315,16 @@ groups 3--6 are hostile (Y$\leftarrow$1).  The value in~[[A]] is preserved.
     ORG     $0EE3
 GET_HOSTILITY:
     SUBROUTINE GET_HOSTILITY
+    ; Classify font group as friendly or hostile.
+    ;
+    ; Input:  Y = font group (appearance / 21)
+    ; Output: Y=0 friendly (groups 0-2, 7), Y=1 hostile (groups 3-6)
+    ;         A preserved
 
-    CPY     #$03           ; factions 0-2 = friendly
+    CPY     #$03                   ; groups 0-2 = friendly
     BCC     .friendly
-    BYEQ    #$07,.friendly ; faction 7 = friendly
-    LDY     #$01           ; factions 3-6 = hostile
+    BYEQ    #$07,.friendly         ; group 7 = friendly
+    LDY     #$01                   ; groups 3-6 = hostile
     RTS
 .friendly:
     LDY     #$00
@@ -14339,48 +14362,61 @@ ADJACENT_POS            EQU     $5A27   ; saved position for adjacency check
     ORG     $0EF1
 CHECK_ADJACENT_THREATS:
     SUBROUTINE CHECK_ADJACENT_THREATS
+    ; Sum hostile strength in 4 cardinal directions, compare
+    ; against entity's defense.
+    ;
+    ; Input:  A = map position, ENTITY_PTR = character
+    ; Output: A=1 safe (defense >= threat), A=0 overwhelmed
+    ;         ADJACENT_THREAT = total hostile strength
+    ; Clobbers: A, X, Y
 
-    STA     ADJACENT_POS       ; save target position
-    STOB    #$00,ADJACENT_THREAT ; clear threat accumulator
-    MOVW    ENTITY_PTR,TARGET_REC ; TARGET_REC/TARGET_REC+1 = character record pointer
-    LDA     ADJACENT_POS       ; reload position
-    BEQ     .skip_left         ; position 0 -> no left neighbor
+    STA     ADJACENT_POS           ; save center position
+    STOB    #$00,ADJACENT_THREAT   ; clear threat accumulator
+    MOVW    ENTITY_PTR,TARGET_REC
+
+    ; --- check left ---
+    LDA     ADJACENT_POS
+    BEQ     .skip_left             ; pos 0 -> no left
     SEC
-    SBC     #$01               ; position - 1
-    JSR     SUM_HOSTILE_AT_POS ; check left
+    SBC     #$01                   ; pos - 1
+    JSR     SUM_HOSTILE_AT_POS
 .skip_left:
+    ; --- check right ---
     LDA     ADJACENT_POS
-    BAEQ    #$C7,.skip_right   ; -> no right neighbor
+    BAEQ    #$C7,.skip_right       ; pos 199 -> no right
     CLC
-    ADC     #$01               ; position + 1
-    JSR     SUM_HOSTILE_AT_POS ; check right
+    ADC     #$01                   ; pos + 1
+    JSR     SUM_HOSTILE_AT_POS
 .skip_right:
+    ; --- check up ---
     LDA     ADJACENT_POS
-    BMI     .do_up             ; >= 128 -> always has up neighbor
-    BAMI    #$14,.skip_up ; < 20?
+    BMI     .do_up                 ; >= 128 -> has up
+    BAMI    #MAP_WIDTH,.skip_up    ; row 0 -> no up
 .do_up:
     SEC
-    SBC     #$14               ; position - 20
-    JSR     SUM_HOSTILE_AT_POS ; check up
+    SBC     #MAP_WIDTH             ; pos - 20
+    JSR     SUM_HOSTILE_AT_POS
 .skip_up:
+    ; --- check down ---
     LDA     ADJACENT_POS
-    BPL     .do_down           ; < 128 -> always has down neighbor
-    BAPL    #$B4,.skip_down ; >= 180?
+    BPL     .do_down               ; < 128 -> has down
+    BAPL    #$B4,.skip_down        ; row 9 -> no down
 .do_down:
     CLC
-    ADC     #$14               ; position + 20
-    JSR     SUM_HOSTILE_AT_POS ; check down
+    ADC     #MAP_WIDTH             ; pos + 20
+    JSR     SUM_HOSTILE_AT_POS
 .skip_down:
-    LDY     #$05
-    LDA     (ENTITY_PTR),Y     ; byte 5 of character record
-    ROR                        ; \ bits 4-1 -> defense value
-    AND     #$0F               ; /
-    BAPL    ADJACENT_THREAT,.safe ; compare with threat total
-    LDA     #$00
-    RTS                        ; return 0 = overwhelmed
+    ; --- compare defense vs threat ---
+    LDY     #MFIELD_STRENGTH       ; byte 5: defense in bits 4-1
+    LDA     (ENTITY_PTR),Y
+    ROR                            ; shift bits 4-1 to 3-0
+    AND     #DEFENSE_HALF_MASK
+    BAPL    ADJACENT_THREAT,.safe  ; defense >= threat -> safe
+    LDA     #$00                   ; overwhelmed
+    RTS
 .safe:
-    LDA     #$01
-    RTS                        ; return 1 = safe
+    LDA     #$01                   ; safe
+    RTS
 @ %def CHECK_ADJACENT_THREATS
 Finds all hostile mobs at a given map position and adds their strength
 to the threat accumulator [[$5A26]].  Input: [[A]]~= position,
@@ -14395,33 +14431,39 @@ For each mob found at the position, checks hostility via
     ORG     $0F49
 SUM_HOSTILE_AT_POS:
     SUBROUTINE SUM_HOSTILE_AT_POS
+    ; Sum hostile mob strength at a position into ADJACENT_THREAT.
+    ;
+    ; Input:  A = map position, TARGET_REC = reference entity
+    ;         ADJACENT_THREAT = running total
+    ; Output: ADJACENT_THREAT updated (capped at $7F)
+    ; Clobbers: A, X, Y
 
-    JSR     FIND_ENTITY_AT_POS   ; A = position -> ENTITY_REC/ENTITY_REC+1
+    JSR     FIND_ENTITY_AT_POS     ; -> ENTITY_REC
     LDA     ENTITY_REC+1
-    BEQ     .done                ; null -> nothing here
-    BAMI    #$80,.done ; not a mob -> skip
-    AND     #$7F                 ; clear mob flag
-    STA     MOB_PTR+1            ; \ MOB_PTR/MOB_PTR+1 = mob data pointer
-    MOVB    ENTITY_REC,MOB_PTR
+    BEQ     .done                  ; no entity
+    BAMI    #$80,.done             ; bit 7 clear = character, skip
+    AND     #$7F                   ; strip mob flag
+    STA     MOB_PTR+1              ; \ set up mob pointer
+    MOVB    ENTITY_REC,MOB_PTR     ; /
 .check_mob:
-    JSR     CHECK_HOSTILE        ; is this mob hostile to (TARGET_REC)?
-    BAEQ    #$00,.next           ; not hostile -> skip
-    LDY     #$0F
-    LDA     (MOB_PTR),Y          ; byte $0F of mob
-    AND     #$04                 ; bit 2 = combat engaged flag
-    BNE     .next                ; already in combat -> skip
-    LDY     #$05
-    LDA     (MOB_PTR),Y          ; byte 5 of mob
-    AND     #$1F                 ; bits 4-0 = strength
+    JSR     CHECK_HOSTILE
+    BAEQ    #$00,.next             ; not hostile -> skip
+    LDY     #MFIELD_FLAGS          ; byte 15: status flags
+    LDA     (MOB_PTR),Y
+    AND     #FLAGS_ENGAGED_BIT     ; bit 2: already in combat?
+    BNE     .next                  ; yes -> skip
+    LDY     #MFIELD_STRENGTH       ; byte 5: strength
+    LDA     (MOB_PTR),Y
+    AND     #STRENGTH_MASK         ; bits 4-0
     CLC
-    ADC     ADJACENT_THREAT      ; accumulate threat
+    ADC     ADJACENT_THREAT        ; accumulate
     BPL     .store
-    LDA     #$7F                 ; clamp to 127
+    LDA     #$7F                   ; cap at 127
 .store:
     STA     ADJACENT_THREAT
 .next:
-    JSR     FIND_MOB_AT_SAME_POS ; find next mob at same position
-    BAEQ    #$02,.check_mob      ; more mobs -> check them too
+    JSR     FIND_MOB_AT_SAME_POS   ; next mob at same position
+    BAEQ    #$02,.check_mob        ; found -> check it
 .done:
     RTS
 @ %def SUM_HOSTILE_AT_POS
@@ -14435,11 +14477,16 @@ present at that position.
     ORG     $645F
 CHECK_THREATS_HERE:
     SUBROUTINE CHECK_THREATS_HERE
-    ; Check adjacent threats at current col/row position.
+    ; Check adjacent threats at current cursor position.
+    ;
+    ; Input:  CURRENT_COL/ROW, ENTITY_PTR
+    ; Output: A=1 safe, A=0 overwhelmed (see CHECK_ADJACENT_THREATS)
+    ; Clobbers: A, X, Y
+
     LDA     CURRENT_COL
     LDY     CURRENT_ROW
-    JSR     COLROW_TO_POS
-    JMP     CHECK_ADJACENT_THREATS
+    JSR     COLROW_TO_POS          ; pack to position byte
+    JMP     CHECK_ADJACENT_THREATS ; tail-call
 @ %def CHECK_THREATS_HERE
 
 \section{Combat resolution}
