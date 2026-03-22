@@ -19074,11 +19074,11 @@ TUNE_ACTION_VEC   EQU     $5A93   ; action handler vector (2 bytes)
     STOW    PLAY_HIGH_TONE,TUNE_ACTION_VEC
     JMP     TUNE_ADVANCE
 
-.cmd_24:                            ; LOW ($22): action vector -> PLAY_LOW_TONE
+.cmd_22:                            ; LOW ($22): action vector -> PLAY_LOW_TONE
     STOW    PLAY_LOW_TONE,TUNE_ACTION_VEC
     JMP     TUNE_ADVANCE
 
-.cmd_22:                            ; END ($24): return from tune
+.cmd_24:                            ; END ($24): return from tune
     RTS
 
 .cmd_21:                            ; GOTO1 ($21): jump to saved address
