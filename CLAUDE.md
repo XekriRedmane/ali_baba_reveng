@@ -255,6 +255,14 @@ Page offset: F   8   1   9   2   A   3   B   4   C   5   D   6   E   7   0
 15. Write scripts >100 lines to files, not heredocs
 16. When renaming identifiers, watch for prefix collisions (use word-boundary regex)
 17. Before debugging assembly errors, check if they existed before your changes (`git stash` and test)
+18. Branch label placement: compute the byte offset from the branch instruction in the reference binary BEFORE placing the label. Most disassembly errors are labels on the wrong instruction (off by one instruction). Count bytes: branch_target = branch_addr + 2 + signed_offset.
+19. Fall-through entry points: when multiple entry points share code (e.g., direction handlers), don't assume each has its own "undo" instruction. The next entry point's operation often IS the undo via fall-through.
+20. Retry vs fail: on data comparison mismatches (CMP + BNE), check whether the reference branches to a retry loop or to SEC/RTS (immediate fail). Signature/checksum mismatches typically fail immediately, not retry.
+21. Self-modifying storage: bytes used as runtime storage (STY $XXXX / STA $XXXX) must emit their disk-image initial values, not the runtime-initialized values. Always check the reference binary for the actual byte.
+22. Shared branch targets across routines: if two routines branch to the same `.label` (e.g., a shared `.fail`), they must share the same SUBROUTINE scope. Don't add a SUBROUTINE directive to the second routine.
+23. Code/data boundaries: when a data byte coincides with a code address, verify whether the instruction at that address is real (referenced by branches/calls) or if the actual code entry is one byte later. Check callers/xrefs.
+24. Before using an EQU label for an address, verify the address matches by checking the reference binary bytes. Wrong EQU substitution (e.g., $5AA7 vs $5AA5) produces correct assembly but wrong bytes.
+25. "Padding" bytes between routines may be real code or data with specific values. Always check the reference binary — never assume $00 or $A0.
 
 ### Verification Checklist
 
