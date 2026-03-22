@@ -16887,8 +16887,26 @@ SHOP_DATA_PTR           EQU     $E6     ; ZP pointer to current shop item record
     ORG     $70DF
 DISPLAY_SHOP:
     SUBROUTINE DISPLAY_SHOP
-    ; Shop/store display: iterate through item bitmask,
-    ; show prices and names for available items.
+    ; Display the shop menu for a trading post entity.
+    ;
+    ; Inputs:
+    ;   CHAR_AI_MODE   — if nonzero, returns immediately (AI can't shop)
+    ;   ENTITY_REC     — pointer to shop entity record:
+    ;                     +SHOP_TYPE_FIELD: shop type ($D5=weapons, $D6=armor)
+    ;                     +SHOP_AVAIL_FIELD: item validity bitmask
+    ;   LOCATION_STYLE — bits 7-6 encode location tier (0-3), scales prices
+    ;
+    ; Behavior:
+    ;   Selects the shop record from SHOP_TABLE, displays the shop scene,
+    ;   then iterates 8 item slots.  For each valid slot (per bitmask),
+    ;   computes price = base_price * (tier + 1), formats the
+    ;   "PAY nnnnnn FOR [item]" string, and enters START_GAME_INPUT.
+    ;
+    ; Modifies:
+    ;   SHOP_DATA_PTR, SHOP_VALID_MASK, SHOP_ITEM_MASK, SHOP_ITEM_OFFSET,
+    ;   SHOP_PRICE, SHOP_PRICE_HI, LOCATION_STYLE_BITS,
+    ;   SHOP_PRICE_DIGITS, SHOP_ITEM_NAME, PRINT_STRING_ADDR
+    ; Clobbers: A, X, Y
     LDA     CHAR_AI_MODE
     BEQ     .do_shop
     RTS
