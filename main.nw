@@ -12876,11 +12876,11 @@ DROP_GOLD_TABLE:
     ; rec1: # (increase drop amount)
     HEX     01 43 04 04 04 03
     DC.W    $7B60              ; "#"
-    DC.W    MENU_DROP_INC
+    DC.W    MENU_DROP_DEC
     ; rec2: @ (decrease drop amount)
     HEX     01 45 04 04 02 04
     DC.W    $7B62              ; "@"
-    DC.W    MENU_DROP_DEC
+    DC.W    MENU_DROP_INC
     ; rec3: DROP GOLD
     HEX     01 52 02 03 03 05
     DC.W    $7AFA              ; "DROP GOLD"
@@ -19728,7 +19728,7 @@ RESIDENT_DISPATCH_FETCH:
     LDA     RESIDENT_DISPATCH_TABLE,X
     STA     resident_jmp+1           ; self-modify: JMP low byte
 resident_jmp:
-    JMP     RESIDENT_DECODE_DISPATCH ; self-modified -> $07xx
+    JMP     $07E0              ; self-modified: low byte patched from dispatch table
 @ %def RESIDENT_DISPATCH
 Opcode \$00 handler---the resident interpreter's GOTO instruction.
 Decodes an address and redirects execution there.
