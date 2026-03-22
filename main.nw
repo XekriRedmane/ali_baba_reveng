@@ -9709,18 +9709,19 @@ SCENE_LOOP:
     STA     SCENE_NUMBER                    ; set new scene number
     JMP     .display                        ; continue
 
+.done:
+    JSR     SET_TEXT_WINDOW_BOTTOM
+    LDA     #$00
+    STA     LOCATION_POS                    ; clear location flags
+    STA     LOCATION_STYLE
+    JSR     ENTER_LOCATION                  ; redraw map if location changed
+    JMP     RESTORE_ZP_POINTERS             ; restore and return
+
 .exit:
     JSR     SET_TEXT_WINDOW_BOTTOM
     LDA     #$1B
     JSR     DISPLAY_MESSAGE                 ; display message (mode off)
-                                    ; fall through to .done
-
-.done:
-    JSR     SET_TEXT_WINDOW_BOTTOM
-    STOB    #$00,LOCATION_POS ;  clear location flags
-    STA     LOCATION_STYLE                  ; /
-    JSR     ENTER_LOCATION                  ; redraw map if location changed
-    JMP     RESTORE_ZP_POINTERS             ; restore and return
+    JMP     .done
 @ %def SCENE_LOOP
 Loads scene-specific data from disk into the [[$5C00]] region.  The disk
 read calls [[DISK_READ_FIELD]] at [[$B300]], which enters the disk~VM
@@ -9926,11 +9927,14 @@ ENTER_LOCATION:
     RTS
 .changed:
     STA     LOCATION_POS
-    JSR     GET_MOB_DATA
-    JSR     SET_TEXT_WINDOW
+    JSR     ANIM_TICK_AND_WAIT
+    JSR     SET_TEXT_WINDOW_BOTTOM
     JSR     CLEAR_MAP
-    STOW    $5A15,ENTITY_PTR
-    JSR     MANHATTAN_DISTANCE
+    LDA     #$15
+    STA     ENTITY_PTR
+    LDA     #$5A
+    STA     ENTITY_PTR+1
+    JSR     FIND_NEAREST_EVENT
     STA     EVENT_POS
     LDY     #$05
     LDA     (CHAR_PTR),Y
@@ -10185,7 +10189,7 @@ DRAW_MAP_ENTITIES:
     STOB    #$01,FONT_CHARSET ; custom font
     LDY     #$04
     LDA     (MOB_PTR),Y
-    JSR     GET_ENTITY_FONTCHAR
+    JSR     APPEARANCE_TO_FONTCHAR
     STA     FONT_CHARNUM
     BYEQ    #$00,.mob_blink
     LDY     #$0C
@@ -10194,7 +10198,7 @@ DRAW_MAP_ENTITIES:
     BEQ     .mob_anim
 .mob_blink:
     JSR     SET_CURSOR_ROW21
-    JSR     DRAW_BLINK_CHAR
+    JSR     PRINT_MEMBER_NAME
     JSR     DRAW_MAP_ICON_B
     JMP     .mob_done
 .mob_anim:
