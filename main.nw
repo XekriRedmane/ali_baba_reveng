@@ -3891,6 +3891,7 @@ CFIELD_EVENTS       EQU     $06     ; bytes 6-7: pointer to event list (2 bytes)
 CFIELD_XP           EQU     $08     ; byte 8: status (7) | pending XP (6-4) | group count (3-0)
 
     ; --- Mob data record field offsets (16-byte, via ENTITY_PTR/MOB_PTR) ---
+MFIELD_TYPE         EQU     $01     ; byte 1: entity type/class (for CLASSIFY_ENTITY_TYPE)
 MFIELD_NEXT         EQU     $02     ; byte 2: next link pointer
 MFIELD_POSITION     EQU     $03     ; byte 3: map position (packed col/row)
 MFIELD_APPEARANCE   EQU     $04     ; byte 4: appearance index
@@ -16769,8 +16770,8 @@ EVALUATE_DIRECTION:
     RTS                            ; bit 7 set -> player char, no penalty
 
 .mob:
-    LDY     #$01
-    LDA     (ENTITY_REC),Y        ; entity byte 1 (type)
+    LDY     #MFIELD_TYPE
+    LDA     (ENTITY_REC),Y        ; entity type/class byte
     BAGE    #$80,.ge80
     LDY     #$03                   ; type < $80: friendly mob
     JMP     INC_MOB_COUNTERS
