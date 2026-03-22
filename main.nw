@@ -16794,8 +16794,8 @@ EVALUATE_DIRECTION:
 
     ; --- event entity: check lock status ---
 .geD8:
-    INY                            ; Y = 2
-    LDA     (ENTITY_REC),Y        ; entity byte 2
+    INY                            ; Y = MFIELD_NEXT (byte 2: event data for type >= $D8)
+    LDA     (ENTITY_REC),Y
     BAGE    #$40,.safe
     LDY     #$07                   ; locked event: heavy penalty
     JMP     INC_MOB_COUNTERS
