@@ -16594,96 +16594,141 @@ AI_DIRECTION    EQU     $5A6F   ; current direction being evaluated / random ran
 DIR_SCORES      EQU     $5A6A   ; array of 5 direction scores (indexed 0-4)
 @ %def AI_TEST_POS AI_DIRECTION DIR_SCORES
 
+<<defines>>=
+MAP_WIDTH           EQU     $14     ; map grid width (20 columns)
+AI_RANDOM_NORMAL    EQU     $06     ; randomization range for normal AI
+AI_RANDOM_PHASE4    EQU     $0F     ; randomization range for phase 4 AI
+@ %def MAP_WIDTH AI_RANDOM_NORMAL AI_RANDOM_PHASE4
+
+<<zero page defines>>=
+AI_MIN_SCORE        EQU     $BA     ; best (lowest) score during direction selection
+AI_BEST_DIR         EQU     $BB     ; direction index with best score
+@ %def AI_MIN_SCORE AI_BEST_DIR
+
 <<npc move ai>>=
     ORG     $6742
 NPC_MOVE_AI:
     SUBROUTINE NPC_MOVE_AI
-    ; NPC movement AI: evaluate 4 directions + stay, pick best
-    ; direction based on distance to target and randomized scoring.
+    ; Choose a movement direction for an NPC entity.
+    ;
+    ; Input:  ENTITY_PTR     — entity to move
+    ;         CHAR_AI_MODE   — AI mode ($04 = forced movement)
+    ;         AI_TARGET_POS  — desired target position (0 = none)
+    ;         AI_PREV_DIR    — previous direction (penalized to avoid loops)
+    ;
+    ; Output: A = chosen direction index (0-4)
+    ;         AI_PREV_DIR updated
+    ;
+    ; Behavior:
+    ;   Initializes DIR_SCORES for 5 options (stay + 4 directions).
+    ;   Evaluates each direction via EVALUATE_DIRECTION, which penalizes
+    ;   walls, entities, and non-improving moves.  Scores are scaled,
+    ;   randomized, and the lowest-scoring direction is chosen.  The
+    ;   result is XOR-encoded to produce a direction value.
+    ;
+    ; Modifies: DIR_SCORES, AI_DIRECTION, AI_TEST_POS, AI_BEST_DIST,
+    ;           AI_SAVED_POS, AI_MIN_SCORE, AI_BEST_DIR, AI_PREV_DIR
+    ; Clobbers: A, X, Y
+
     JSR     ANIM_TICK_AND_WAIT
+
+    ; --- check if AI should run ---
     LDA     CHAR_AI_MODE
-    BAEQ    #$04,.do_ai
+    BAEQ    #$04,.do_ai            ; mode 4 = forced movement
     LDA     AI_TARGET_POS
-    BANE    #$00,.do_ai
-    RTS
+    BANE    #$00,.do_ai            ; has target -> run AI
+    RTS                            ; no target, not forced -> skip
+
+    ; --- initialize direction scores ---
 .do_ai:
-    STOB    #$00,$5A6B
-    STA     $5A6C
-    STA     $5A6D
-    STA     $5A6E
-    STOB    #$0A,DIR_SCORES
+    STOB    #$00,DIR_SCORES+1      ; \ clear scores for 4 directions
+    STA     DIR_SCORES+2           ;  |
+    STA     DIR_SCORES+3           ;  |
+    STA     DIR_SCORES+4           ; /
+    STOB    #$0A,DIR_SCORES        ; stay score = 10 (mild penalty)
     LDA     AI_TARGET_POS
     JSR     MANHATTAN_DISTANCE
-    STA     $5A68
+    STA     AI_BEST_DIST           ; current distance to target
     BAEQ    #$00,.no_target
-    STOB    #$13,DIR_SCORES
+    STOB    #$13,DIR_SCORES        ; stay score = 19 (strong penalty if has target)
 .no_target:
-    LDX     AI_PREV_DIR
-    BEQ     .no_prev
-    INC     DIR_SCORES,X
-    INC     DIR_SCORES,X
-    INC     DIR_SCORES,X
+    LDX     AI_PREV_DIR            ; \ penalize previous direction (+3)
+    BEQ     .no_prev               ;  | to avoid back-and-forth loops
+    INC     DIR_SCORES,X           ;  |
+    INC     DIR_SCORES,X           ;  |
+    INC     DIR_SCORES,X           ; /
 .no_prev:
-    STOB    #$01,AI_DIRECTION
-    LDY     #$03
+
+    ; --- evaluate 4 directions ---
+    STOB    #$01,AI_DIRECTION      ; direction 1: up
+    LDY     #MFIELD_POSITION
     LDA     (ENTITY_PTR),Y
     SEC
-    SBC     #$14
+    SBC     #MAP_WIDTH             ; position - 20 = one row up
     STA     AI_TEST_POS
     JSR     EVALUATE_DIRECTION
-    INC     AI_DIRECTION
+
+    INC     AI_DIRECTION           ; direction 2: down
     LDA     AI_TEST_POS
     CLC
-    ADC     #$28
+    ADC     #MAP_WIDTH*2           ; position + 20 = one row down (from up)
     STA     AI_TEST_POS
     JSR     EVALUATE_DIRECTION
-    INC     AI_DIRECTION
+
+    INC     AI_DIRECTION           ; direction 3: left
     LDA     AI_TEST_POS
     SEC
-    SBC     #$15
+    SBC     #MAP_WIDTH+1           ; back to center, then -1 = one col left
     STA     AI_TEST_POS
     JSR     EVALUATE_DIRECTION
-    INC     AI_DIRECTION
-    INC     AI_TEST_POS
-    INC     AI_TEST_POS
+
+    INC     AI_DIRECTION           ; direction 4: right
+    INC     AI_TEST_POS            ; \ position + 2 = one col right (from left)
+    INC     AI_TEST_POS            ; /
     JSR     EVALUATE_DIRECTION
-    STOB    #$06,AI_DIRECTION
+
+    ; --- scale scores and add randomness ---
+    STOB    #AI_RANDOM_NORMAL,AI_DIRECTION ; reuse AI_DIRECTION as random range
     LDA     CHAR_AI_MODE
     BANE    #$04,.not_phase4
-    STOB    #$0F,AI_DIRECTION
+    STOB    #AI_RANDOM_PHASE4,AI_DIRECTION ; wider randomness in phase 4
 .not_phase4:
     LDX     #$04
     CLC
 .score_loop:
-    LDA     DIR_SCORES,X
-    ROL2
+    LDA     DIR_SCORES,X           ; \ scale score x4
+    ROL2                           ; /
     STA     DIR_SCORES,X
-    LDA     AI_DIRECTION
+    LDA     AI_DIRECTION           ; random range
     JSR     RANDOM_IN_RANGE
     CLC
-    ADC     DIR_SCORES,X
+    ADC     DIR_SCORES,X           ; add random offset
     STA     DIR_SCORES,X
     DEX
     BPL     .score_loop
-    STOB    #$7F,$BA
+
+    ; --- find direction with lowest score ---
+    STOB    #$7F,AI_MIN_SCORE      ; initial min = 127
     LDX     #$04
 .find_min:
     LDA     DIR_SCORES,X
-    BAGE    $BA,.not_lower
-    STA     $BA
-    STX     $BB
+    BAGE    AI_MIN_SCORE,.not_lower
+    STA     AI_MIN_SCORE           ; new minimum
+    STX     AI_BEST_DIR            ; record direction
 .not_lower:
     DEX
     BPL     .find_min
-    LDA     $BB
+
+    ; --- encode direction index to movement value ---
+    LDA     AI_BEST_DIR
     BAPL    #$03,.ge3
-    EOR     #$03
+    EOR     #$03                   ; directions 0-2: XOR 3
     BPL     .store_dir
 .ge3:
-    EOR     #$07
+    EOR     #$07                   ; directions 3-4: XOR 7
 .store_dir:
-    STA     AI_PREV_DIR
-    LDA     $BB
+    STA     AI_PREV_DIR            ; save for next turn's bias
+    LDA     AI_BEST_DIR            ; return direction index
     RTS
 @ %def NPC_MOVE_AI
 @ [[EVALUATE_DIRECTION]] scores a single candidate direction for the NPC
