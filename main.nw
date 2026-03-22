@@ -18815,127 +18815,143 @@ TRAP_TYPE           EQU     $5A58   ; treasure trap: random trap type (0-3)
     ORG     $646B
 PICKUP_TREASURE:
     SUBROUTINE PICKUP_TREASURE
+    ; Handle treasure chest pickup from event data.
+    ;
+    ; Input:  EVENT_PTR  -- 3-byte event entry
+    ;         ENTITY_PTR -- current character
+    ; Output: event slot marked empty ($FE)
+    ; Behavior:
+    ;   - Clears char turn state, commits move
+    ;   - Byte 1 < $C9: normal treasure
+    ;     (subtract $C0 for index, byte 2 =
+    ;     quantity, add to inventory if room)
+    ;   - Byte 1 >= $C9, != $D1: trapped chest
+    ;     (4 trap types: HP loss, counter dec,
+    ;     gold zeroed; scene $36-$39)
+    ;   - Byte 1 = $D1: special chest (scene
+    ;     $0B, inc fields 5+11, 1/3 bonus)
+    ; Clobbers: A, X, Y
 
     LDA     #$00
-    JSR     SET_CHAR_STATE          ; set char field 15 state to 0
-    MOVW    EVENT_PTR,MOB_PTR ; copy event ptr -> MOB_PTR/MOB_PTR+1
+    JSR     SET_CHAR_STATE          ; clear char turn state
+    MOVW    EVENT_PTR,MOB_PTR       ; copy EVENT_PTR -> MOB_PTR
     JSR     COMMIT_MOVE             ; commit move
     LDY     #$01
-    LDA     (MOB_PTR),Y             ; event byte 1 = treasure type
-    BAPL    #$C9,.trapped ; >= $C9 -> trapped chest or special
+    LDA     (MOB_PTR),Y            ; event byte 1 = treasure type
+    BAPL    #$C9,.trapped           ; >= $C9 -> trapped or special
     SEC
     SBC     #$C0                    ; $C0-$C8: treasure index 0-8
     STA     NUM_VALUE+1
 .rejoin:
     LDY     #$02
-    LDA     (MOB_PTR),Y             ; event byte 2 = quantity
+    LDA     (MOB_PTR),Y            ; event byte 2 = quantity
     STA     NUM_VALUE
     LDY     #$01
-    JSR     MODIFY_CURRENT_STATS    ; look up treasure data
-    LDY     #$04
-    LDA     (ENTITY_PTR),Y          ; char field 4
-    BAGE    #$15,.mark_used ; inventory full -> skip pickup
-    JSR     CLEAR_STATUS_SLOTS      ; add item to inventory
+    JSR     MODIFY_CURRENT_STATS   ; apply treasure to stats
+    LDY     #MFIELD_APPEARANCE
+    LDA     (ENTITY_PTR),Y         ; char field 4 = appearance
+    BAGE    #$15,.mark_used        ; inventory full -> skip
+    JSR     CLEAR_STATUS_SLOTS     ; clear display slots
     STOW    $7BAB,$BA
-    JSR     NUM_TO_DECIMAL          ; format quantity
-    LDWIY    ENTITY_PTR,#$0D,NUM_VALUE ; char field 13 (gold low)
+    JSR     NUM_TO_DECIMAL         ; format quantity
+    LDWIY    ENTITY_PTR,#MFIELD_GOLD_LO,NUM_VALUE ; gold low
     STOW    $7BCC,$BA
-    JSR     NUM_TO_DECIMAL          ; format gold amount
+    JSR     NUM_TO_DECIMAL         ; format gold amount
     JSR     SET_CURSOR_ROW21
     STOW    $7B84,NUM_VALUE
-    JSR     CLEAR_AND_DISPLAY       ; display pickup message
+    JSR     CLEAR_AND_DISPLAY      ; display pickup message
 .mark_used:
     LDY     #$00
-    LDA     #$FE                    ; mark event slot as empty
+    LDA     #$FE                   ; mark event slot empty
     STA     (MOB_PTR),Y
     RTS
 
     ; --- trapped chest (type >= $C9) ---
 .trapped:
     BANE    #$D1,.not_d1
-    JMP     .handle_d1              ; $D1: special chest
+    JMP     .handle_d1             ; $D1: special chest
 .not_d1:
     LDA     #$06
-    JSR     RANDOM_IN_RANGE         ; random(6)
-    AND     #$03                    ; trap type 0-3
+    JSR     RANDOM_IN_RANGE        ; random(6)
+    AND     #$03                   ; trap type 0-3
     STA     TRAP_TYPE
-    LDY     #$04
-    LDA     (ENTITY_PTR),Y          ; char field 4
+    LDY     #MFIELD_APPEARANCE
+    LDA     (ENTITY_PTR),Y        ; char field 4 = appearance
     BMI     .apply_trap
     BAPL    #$15,.apply_trap
     JSR     SET_CURSOR_ROW21
     LDA     #$36
     CLC
-    ADC     TRAP_TYPE               ; scene $36 + trap type
-    JSR     SCENE_LOOP              ; show trap scene
+    ADC     TRAP_TYPE              ; scene $36 + trap type
+    JSR     SCENE_LOOP             ; show trap scene
 .apply_trap:
     LDA     TRAP_TYPE
-    BAMI    #$01,.trap0 ; trap 0: lose 1-5 HP
-    BEQ     .trap1                  ; trap 1: lose 2-9 HP
-    BAEQ    #$02,.trap2             ; trap 2: decrement counter
-    BNE     .trap3                  ; trap 3: zero gold
+    BAMI    #$01,.trap0            ; trap 0: lose 1-5 HP
+    BEQ     .trap1                 ; trap 1: lose 2-9 HP
+    BAEQ    #$02,.trap2            ; trap 2: decrement counter
+    BNE     .trap3                 ; trap 3: zero gold
 .trap0:
     LDA     #$05
     JSR     RANDOM_IN_RANGE
     CLC
-    ADC     #$01                    ; 1-5 damage
+    ADC     #$01                   ; 1-5 damage
     JSR     APPLY_DAMAGE_TO_CURRENT
     JMP     .after_trap
 .trap1:
     LDA     #$08
     JSR     RANDOM_IN_RANGE
     CLC
-    ADC     #$02                    ; 2-9 damage
+    ADC     #$02                   ; 2-9 damage
     JSR     APPLY_DAMAGE_TO_CURRENT
     JMP     .after_trap
 .trap2:
-    LDY     #$0B
-    LDA     (ENTITY_PTR),Y          ; char field 11
+    LDY     #MFIELD_LEVEL
+    LDA     (ENTITY_PTR),Y        ; char field 11 = level
     AND     #$1F
-    BEQ     .after_trap             ; already zero
+    BEQ     .after_trap            ; already zero
     LDA     (ENTITY_PTR),Y
     SEC
-    SBC     #$01                    ; decrement
+    SBC     #$01                   ; decrement low 5 bits
     STA     (ENTITY_PTR),Y
     JMP     .after_trap
 .trap3:
-    LDY     #$0D
+    LDY     #MFIELD_GOLD_LO
     LDA     #$00
-    STA     (ENTITY_PTR),Y          ; zero gold low
+    STA     (ENTITY_PTR),Y        ; zero gold low
     INY
-    STA     (ENTITY_PTR),Y          ; zero gold high
+    STA     (ENTITY_PTR),Y        ; zero gold high
 .after_trap:
-    LDY     #$02
-    LDA     (ENTITY_PTR),Y          ; char field 2 = room
+    LDY     #MFIELD_NEXT
+    LDA     (ENTITY_PTR),Y        ; char field 2 = room
     BAEQ    CURRENT_ROOM,.same_room ; current room?
     DEY
-    LDA     (MOB_PTR),Y             ; event byte 1
+    LDA     (MOB_PTR),Y           ; event byte 1
     SEC
-    SBC     #$09                    ; step back 9 in treasure table
+    SBC     #$09                   ; step back 9 in type
     STA     (MOB_PTR),Y
     RTS
 .same_room:
     DEY
-    LDA     (MOB_PTR),Y             ; event byte 1
+    LDA     (MOB_PTR),Y           ; event byte 1
     SEC
-    SBC     #$C9                    ; convert to treasure index
+    SBC     #$C9                   ; convert to treasure index
     STA     NUM_VALUE+1
-    JMP     .rejoin                 ; loop: process next treasure
+    JMP     .rejoin                ; process as normal treasure
 
     ; --- special chest $D1 ---
 .handle_d1:
     LDA     #$0B
-    JSR     SCENE_LOOP              ; show scene $0B
-    JSR     INC_FIELD5_COUNTER
-    JSR     INC_FIELD_COUNTER
+    JSR     SCENE_LOOP             ; show scene $0B
+    JSR     INC_FIELD5_COUNTER     ; inc field 5 counter
+    JSR     INC_FIELD_COUNTER      ; inc field 11 counter
     LDA     #$03
-    JSR     RANDOM_IN_RANGE         ; random(3)
+    JSR     RANDOM_IN_RANGE        ; random(3)
     BAEQ    #$00,.lucky
-    RTS                             ; 2/3 chance: nothing
+    RTS                            ; 2/3 chance: nothing
 .lucky:
     LDA     #$0C
-    JSR     SCENE_LOOP              ; show bonus scene $0C
-    JMP     .mark_used              ; mark event used
+    JSR     SCENE_LOOP             ; show bonus scene $0C
+    JMP     .mark_used             ; mark event used
 @ %def PICKUP_TREASURE
 @ [[INC_FIELD5_COUNTER]] and [[INC_FIELD_COUNTER]] increment a 5-bit counter
 packed into the low bits of a character record field.  The first entry point
@@ -18950,22 +18966,28 @@ are preserved by the addition as long as the low field does not overflow past
     ORG     $657B
 INC_FIELD5_COUNTER:
     SUBROUTINE INC_FIELD5_COUNTER
-    ; Increment char field 5 low 5 bits (capped at $1F)
-    LDY     #$05
+    ; Increment a 5-bit counter in a char record field.
+    ;
+    ; Entry: INC_FIELD5_COUNTER -- field 5 (MFIELD_STRENGTH)
+    ;        INC_FIELD_COUNTER  -- field 11 (MFIELD_LEVEL)
+    ; Input:  ENTITY_PTR -- current character
+    ; Output: field low 5 bits incremented (capped at 31)
+    ; Clobbers: A, X, Y
+
+    LDY     #MFIELD_STRENGTH       ; field 5
     JMP     .body
 INC_FIELD_COUNTER:
-    ; Increment char field Y low 5 bits (capped at $1F)
-    LDY     #$0B
+    LDY     #MFIELD_LEVEL          ; field 11
 .body:
     LDA     (ENTITY_PTR),Y
     TAX
-    AND     #$1F
-    BANE    #$1F,.inc
+    AND     #$1F                   ; isolate low 5 bits
+    BANE    #$1F,.inc              ; already at max?
     RTS
 .inc:
     CLC
     TXA
-    ADC     #$01
+    ADC     #$01                   ; increment full byte
     STA     (ENTITY_PTR),Y
     RTS
 @ %def INC_FIELD5_COUNTER INC_FIELD_COUNTER
@@ -18979,12 +19001,18 @@ previous interaction.
     ORG     $6593
 CLEAR_STATUS_SLOTS:
     SUBROUTINE CLEAR_AND_DISPLAY
-    ; Clear 5 bytes at $7BAB-$7BAF and $7BCC-$7BD0 (spaces)
-    LDA     #$20
-    LDX     #$04
+    ; Clear two 5-byte display buffer regions.
+    ;
+    ; Input:  none
+    ; Output: $7BAB-$7BAF and $7BCC-$7BD0
+    ;         filled with spaces ($20)
+    ; Clobbers: A, X
+
+    LDA     #$20                   ; space character
+    LDX     #$04                   ; 5 bytes (index 4..0)
 .loop:
-    STA     $7BAB,X
-    STA     $7BCC,X
+    STA     $7BAB,X                ; quantity display slot
+    STA     $7BCC,X                ; gold display slot
     DEX
     BPL     .loop
     RTS
@@ -18997,9 +19025,17 @@ from scratch rather than continuing a previous multi-part display sequence.
     ORG     $65A1
 CLEAR_AND_DISPLAY:
     SUBROUTINE MODIFY_CURRENT_STATS
-    ; Clear $5A57 and JMP $764A (display message)
-    STOB    #$00,$5A57
-    JMP     DISPLAY_MESSAGE_LOOP
+    ; Clear message state and display message.
+    ;
+    ; Input:  NUM_VALUE -- message address
+    ; Output: none (displays message)
+    ; Behavior:
+    ;   - Zeroes MSG_LINE_COUNT ($5A57)
+    ;   - Tail-calls DISPLAY_MESSAGE_LOOP
+    ; Clobbers: A, X, Y
+
+    STOB    #$00,MSG_LINE_COUNT    ; reset line counter
+    JMP     DISPLAY_MESSAGE_LOOP   ; display message
 @ %def CLEAR_AND_DISPLAY
 @ [[UPDATE_EVENT_LIST]] maintains the character's event list when treasure is
 dropped or an event is spawned at a map position.  It takes a position in~A
@@ -19017,64 +19053,74 @@ reached with no room, it displays message~\$2A (``event list full'').
     ORG     $1260
 UPDATE_EVENT_LIST:
     SUBROUTINE UPDATE_EVENT_LIST
-    ; Update event list for position A with value NUM_VALUE/NUM_VALUE+1.
-    ; If NUM_VALUE/NUM_VALUE+1 = 0, return immediately.
-    ; Scans 3-byte event entries at ($FA)[6..7]:
-    ;   $FF = end of list -> display message $2A
-    ;   $FE = empty slot -> insert new entry
-    ;   matching pos + type $C0-$D0 -> add to existing entry
-    ;   else -> advance to next entry
-    STA     $BA             ; save position
+    ; Insert or update a 3-byte event entry.
+    ;
+    ; Input:  A          -- map position
+    ;         NUM_VALUE   -- value low byte
+    ;         NUM_VALUE+1 -- value high byte
+    ;         CHAR_PTR   -- char record (fields
+    ;                       6-7 = event list ptr)
+    ; Output: event list updated in place
+    ; Behavior:
+    ;   - If value = 0, returns immediately
+    ;   - Scans 3-byte entries via CFIELD_EVENTS:
+    ;     $FF = end -> msg $2A (list full)
+    ;     $FE = empty -> insert new entry
+    ;     same pos + type $C0-$D0 -> add value
+    ;     else -> advance to next entry
+    ; Clobbers: A, Y
+
+    STA     $BA                    ; save position
     LDA     #$00
     BANE    NUM_VALUE,.has_value
     BANE    NUM_VALUE+1,.has_value
     RTS
 .has_value:
-    LDWIY    CHAR_PTR,#$06,EVENT_PTR ; event list pointer low
+    LDWIY    CHAR_PTR,#CFIELD_EVENTS,EVENT_PTR ; event list ptr
 .scan:
     LDY     #$00
-    LDA     (EVENT_PTR),Y   ; entry byte 0 = position
+    LDA     (EVENT_PTR),Y          ; byte 0 = position
     BANE    #$FF,.not_end
     JSR     SET_CURSOR_ROW21
     LDA     #MSG_ARMOR_WORTHLESS
-    JMP     DISPLAY_MESSAGE ; "event list full" message
+    JMP     DISPLAY_MESSAGE        ; list full message
 .not_end:
     BANE    #$FE,.check_match
     ; Empty slot: insert new entry
     LDA     $BA
-    STA     (EVENT_PTR),Y   ; byte 0 = position
+    STA     (EVENT_PTR),Y          ; byte 0 = position
     INY
     LDA     NUM_VALUE+1
     AND     #$07
-    ORA     #$C0            ; byte 1 = type + high bits
+    ORA     #$C0                   ; byte 1 = type | high bits
     STA     (EVENT_PTR),Y
     INY
     LDA     NUM_VALUE
-    STA     (EVENT_PTR),Y   ; byte 2 = value low
+    STA     (EVENT_PTR),Y          ; byte 2 = value low
     RTS
 .check_match:
-    BANE    $BA,.next       ; same position?
+    BANE    $BA,.next              ; same position?
     INY
-    LDA     (EVENT_PTR),Y   ; byte 1 = type
-    BPL     .next           ; not activated
-    BAMI    #$C0,.next ; below $C0
-    BAPL    #$D1,.next ; above $D0
+    LDA     (EVENT_PTR),Y          ; byte 1 = type
+    BPL     .next                  ; not activated
+    BAMI    #$C0,.next             ; below $C0
+    BAPL    #$D1,.next             ; above $D0
     ; Add to existing entry
     CLC
     LDA     NUM_VALUE
     INY
-    ADC     (EVENT_PTR),Y   ; byte 2 += value low
+    ADC     (EVENT_PTR),Y          ; byte 2 += value low
     STA     (EVENT_PTR),Y
     DEY
     LDA     NUM_VALUE+1
     AND     #$07
-    ADC     (EVENT_PTR),Y   ; byte 1 += value high (with carry)
+    ADC     (EVENT_PTR),Y          ; byte 1 += value high
     STA     (EVENT_PTR),Y
     RTS
 .next:
     CLC
     LDA     EVENT_PTR
-    ADC     #$03            ; next 3-byte entry
+    ADC     #$03                   ; next 3-byte entry
     STA     EVENT_PTR
     BCC     .no_carry
     INC     EVENT_PTR+1
@@ -19092,8 +19138,16 @@ failure).  Both paths print the mob's name before the message for context.
     ORG     $1231
 CHECK_CAN_LEAVE:
     SUBROUTINE CHECK_CAN_LEAVE
-    ; Check hostility threshold: if PRNG_OUTPUT >= $40, show message $1C
-    ; and return 1; else show message $1D and return 0.
+    ; PRNG check whether entity can leave area.
+    ;
+    ; Input:  MOB_PTR -- mob whose name to print
+    ; Output: A = 1 (can leave), A = 0 (blocked)
+    ; Behavior:
+    ;   - Steps PRNG; if output >= $40 (~75%):
+    ;     prints mob name + msg $1C, returns 1
+    ;   - Otherwise: msg $1D, returns 0
+    ; Clobbers: A, X, Y
+
     JSR     STEP_PRNG
     LDA     PRNG_OUTPUT
     BAPL    #$40,.pass
@@ -19102,17 +19156,17 @@ CHECK_CAN_LEAVE:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #MSG_ESCAPE_FAIL
+    LDA     #MSG_ESCAPE_FAIL       ; "fails to escape"
     JSR     DISPLAY_MESSAGE
-    LDA     #$01
+    LDA     #$01                   ; success
     RTS
 .fail:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #MSG_TACKLE_FAIL
+    LDA     #MSG_TACKLE_FAIL       ; "fails to tackle"
     JSR     DISPLAY_MESSAGE
-    LDA     #$00
+    LDA     #$00                   ; failure
     RTS
 @ %def CHECK_CAN_LEAVE
 
