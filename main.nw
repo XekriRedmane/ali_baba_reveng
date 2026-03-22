@@ -3901,6 +3901,7 @@ MFIELD_ATTACK       EQU     $07     ; byte 7: attack stat
 MFIELD_XP           EQU     $08     ; byte 8: status (7) | pending XP (6-4) | group count (3-0)
 MFIELD_DEFENSE      EQU     $09     ; byte 9: defense stat
 MFIELD_LEVEL        EQU     $0B     ; byte 11: class/faction (7-5) | level (4-0)
+MFIELD_CHAR         EQU     $00     ; byte 0: display character
 MFIELD_FLAGS        EQU     $0F     ; byte 15: status flags (bit 2 = combat engaged)
 @ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_MOB_TYPE MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL
 
@@ -15873,62 +15874,81 @@ GET_ENTITY_THREAT:
 
 <<select combat target>>=
     ORG     $18E4
-    SUBROUTINE SELECT_COMBAT_TARGET
-; Selects combat target based on CHAR_AI_MODE (3 paths: <3, 3-4, >=5)
 SELECT_COMBAT_TARGET:
+    SUBROUTINE SELECT_COMBAT_TARGET
+    ; Select a combat target for the current AI entity.
+    ;
+    ; Input:  CHAR_AI_MODE  — AI behavior mode (0-5+)
+    ;         ENTITY_PTR    — current entity record
+    ;         STEPS_TAKEN   — steps taken this turn
+    ;
+    ; Output: A = 1: target found (TARGET_PTR_LO/HI set)
+    ;         A = 2: engage combat (no specific target)
+    ;         A = 4: safe (no threats)
+    ;
+    ; Modifies: BEST_THREAT, TARGET_PTR_LO, TARGET_PTR_HI
+    ; Clobbers: A, X, Y
+
+    ; --- dispatch on AI mode ---
     LDA     CHAR_AI_MODE
-    BAMI    #$03,.path_low
-    BAMI    #$05,.path_mid
+    BAMI    #$03,.path_low         ; mode < 3 -> check encounter/threats
+    BAMI    #$05,.path_mid         ; mode 3-4 -> pick highest-threat mob
+
+    ; --- path high (mode >= 5): pick strongest mob ---
     JSR     FIRST_GROUP_MEMBER
     STOB    #$00,BEST_THREAT
 .loop_high:
     JSR     GET_ENTITY_THREAT
-    BAEQ    #$00,.skip_high
-    LDY     #$05
+    BAEQ    #$00,.skip_high        ; not hostile -> skip
+    LDY     #MFIELD_STRENGTH
     LDA     (MOB_PTR),Y
-    AND     #$1F
-    BAMI    BEST_THREAT,.skip_high
-    STA     BEST_THREAT
+    AND     #$1F                   ; strength (bits 4-0)
+    BAMI    BEST_THREAT,.skip_high ; not stronger -> skip
+    STA     BEST_THREAT            ; new best
     MOVB    MOB_PTR,TARGET_PTR_LO
     MOVB    MOB_PTR+1,TARGET_PTR_HI
 .skip_high:
     JSR     NEXT_GROUP_MEMBER
     LDA     #$00
-    BANE    MOB_PTR+1,.loop_high
-    BAEQ    BEST_THREAT,.path_low
-    LDA     #$01
+    BANE    MOB_PTR+1,.loop_high   ; more members -> continue
+    BAEQ    BEST_THREAT,.path_low  ; no target -> fall through
+    LDA     #$01                   ; target found
     RTS
+
+    ; --- path low (mode < 3): check encounter and threats ---
 .path_low:
     LDA     #$00
-    BANE    STEPS_TAKEN,.ret_2
-    LDY     #$03
-    LDA     (ENTITY_PTR),Y
+    BANE    STEPS_TAKEN,.ret_2     ; already moved -> engage
+    LDY     #MFIELD_POSITION
+    LDA     (ENTITY_PTR),Y        ; entity's map position
     JSR     CHECK_ENCOUNTER
     LDA     #$02
-    BAEQ    ENCOUNTER_RESULT,.ret_2
+    BAEQ    ENCOUNTER_RESULT,.ret_2 ; encounter found -> engage
     JSR     CHECK_THREATS_HERE
-    BANE    #$01,.ret_2
-    LDA     #$04
+    BANE    #$01,.ret_2            ; threats present -> engage
+    LDA     #$04                   ; safe
     RTS
 .ret_2:
-    LDA     #$02
+    LDA     #$02                   ; engage combat
     RTS
+
+    ; --- path mid (mode 3-4): pick highest-threat mob ---
 .path_mid:
     STOB    #$00,BEST_THREAT
     JSR     FIRST_GROUP_MEMBER
 .loop_mid:
     JSR     GET_ENTITY_THREAT
-    BAEQ    BEST_THREAT,.skip_mid
-    BMI     .skip_mid
-    STA     BEST_THREAT
+    BAEQ    BEST_THREAT,.skip_mid  ; threat == 0 -> skip
+    BMI     .skip_mid              ; negative threat -> skip
+    STA     BEST_THREAT            ; new best threat
     MOVB    MOB_PTR,TARGET_PTR_LO
     MOVB    MOB_PTR+1,TARGET_PTR_HI
 .skip_mid:
     JSR     NEXT_GROUP_MEMBER
     LDA     #$00
-    BANE    MOB_PTR+1,.loop_mid
-    BAEQ    BEST_THREAT,.path_low
-    LDA     #$01
+    BANE    MOB_PTR+1,.loop_mid    ; more members -> continue
+    BAEQ    BEST_THREAT,.path_low  ; no target -> fall through
+    LDA     #$01                   ; target found
     RTS
 @ %def SELECT_COMBAT_TARGET
 @ [[LOAD_TARGET_PTR]] copies the pre-selected combat target address from
@@ -15941,9 +15961,15 @@ before entering [[RESOLVE_ATTACK]].
     ORG     $199D
 LOAD_TARGET_PTR:
     SUBROUTINE LOAD_TARGET_PTR
+    ; Load the pre-selected combat target into MOB_PTR.
+    ;
+    ; Input:  TARGET_PTR_LO/HI — saved target from SELECT_COMBAT_TARGET
+    ; Output: MOB_PTR = target pointer, IS_PLAYER_TURN = 0
+    ; Clobbers: A
+
     MOVB    TARGET_PTR_LO,MOB_PTR
     MOVB    TARGET_PTR_HI,MOB_PTR+1
-    STOB    #$00,IS_PLAYER_TURN
+    STOB    #$00,IS_PLAYER_TURN    ; AI's turn (not player)
     RTS
 @ %def LOAD_TARGET_PTR
 @ [[PROCESS_ENTITY_SCRIPT]] temporarily removes an entity from the map, runs
@@ -15955,21 +15981,34 @@ position with [[DRAW_CHAR_AT_POS]].  This is used during event interactions
 where the entity needs to be temporarily invisible---for example, when opening
 a chest.
 
+<<zero page defines>>=
+SAVED_CHAR              EQU     $BA     ; scratch: saved entity display character
+@ %def SAVED_CHAR
+
 <<process entity script>>=
     ORG     $1849
-    SUBROUTINE PROCESS_ENTITY_SCRIPT
-; Saves entity char, marks as $FE, plays tune $0E, dispatches, restores
 PROCESS_ENTITY_SCRIPT:
-    LDY     #$00
-    LDA     (MOB_PTR),Y
-    STA     $BA
-    LDA     #$FE
+    SUBROUTINE PROCESS_ENTITY_SCRIPT
+    ; Temporarily hide an entity, play a tune, then restore it.
+    ;
+    ; Input:  MOB_PTR — entity record to process
+    ; Behavior:
+    ;   Saves display char (byte 0), marks slot empty ($FE),
+    ;   plays interaction tune, dispatches animation, then
+    ;   restores and redraws the entity.
+    ; Modifies: SAVED_CHAR, MOB_PTR byte 0
+    ; Clobbers: A, X, Y
+
+    LDY     #MFIELD_CHAR           ; \ save display character
+    LDA     (MOB_PTR),Y            ;  |
+    STA     SAVED_CHAR             ; /
+    LDA     #EVENT_EMPTY           ; mark slot empty ($FE)
     STA     (MOB_PTR),Y
-    LDX     #$0E              ; tune 7: entity interaction
+    LDX     #$0E                   ; tune index: entity interaction
     JSR     TUNE_PLAYER
     JSR     DISPATCH_ON_MODE
-    LDA     $BA
-    JMP     DRAW_CHAR_AT_POS
+    LDA     SAVED_CHAR             ; restore saved character
+    JMP     DRAW_CHAR_AT_POS       ; redraw at entity position
 @ %def PROCESS_ENTITY_SCRIPT
 @ [[COPY_F4_TO_F6_AND_SET]] copies [[MOB_PTR]] into [[EFFECT_REC]] and
 tail-calls [[APPLY_DAMAGE]] with the damage amount in~A.  This is the
@@ -15979,12 +16018,17 @@ mob at [[MOB_PTR]]---used during mob-on-player combat.
 
 <<copy f4 to f6 and set>>=
     ORG     $1432
-    SUBROUTINE COPY_F4_TO_F6_AND_SET
-; Copies MOB_PTR/MOB_PTR+1 -> EFFECT_REC/EFFECT_REC+1, then JMP APPLY_DAMAGE with A
 COPY_F4_TO_F6_AND_SET:
-    TAX
-    MOVW    MOB_PTR,EFFECT_REC
-    TXA
+    SUBROUTINE COPY_F4_TO_F6_AND_SET
+    ; Apply damage to the mob at MOB_PTR.
+    ;
+    ; Input:  A = damage amount, MOB_PTR = target mob
+    ; Output: EFFECT_REC = MOB_PTR, jumps to APPLY_DAMAGE
+    ; Clobbers: X
+
+    TAX                            ; save damage value
+    MOVW    MOB_PTR,EFFECT_REC     ; copy target pointer
+    TXA                            ; restore damage value
     JMP     APPLY_DAMAGE
 @ %def COPY_F4_TO_F6_AND_SET
 @ [[ADD_WILLINGNESS]] is a tiny helper that adds~A (signed) to the
@@ -15996,6 +16040,12 @@ calculation and inlining each addition would waste significant code space.
     ORG     $169B
 ADD_WILLINGNESS:
     SUBROUTINE ADD_WILLINGNESS
+    ; Add A to the combat willingness accumulator.
+    ;
+    ; Input:  A = willingness delta (signed)
+    ; Output: COMBAT_WILLINGNESS += A
+    ; Clobbers: A
+
     CLC
     ADC     COMBAT_WILLINGNESS
     STA     COMBAT_WILLINGNESS
@@ -16015,30 +16065,42 @@ empty, both bytes of [[MOB_PTR]] are zeroed as a ``not found'' sentinel.
     ORG     $12D0
 PICK_RANDOM_MEMBER:
     SUBROUTINE PICK_RANDOM_MEMBER
-    ; Pick a random eligible group member (field 4 in $00-$14 range)
-    ; Uses ($FA)[8] as group size, calls RANDOM_IN_RANGE to pick Nth
+    ; Pick a random player character from the current group.
+    ;
+    ; Input:  CHAR_PTR — group leader's character record
+    ; Output: MOB_PTR  — selected member (zeroed if empty group)
+    ;
+    ; Behavior:
+    ;   Reads group size from CFIELD_XP (byte 8 bits 3-0), picks
+    ;   a random index, then walks the linked list skipping dead
+    ;   (bit 7 set) and NPC (appearance >= $15) members until the
+    ;   Nth eligible member is found.  Retries if random index = 0.
+    ;
+    ; Modifies: MOB_PTR
+    ; Clobbers: A, X, Y
+
 .loop:
-    LDY     #$08
-    LDA     (CHAR_PTR),Y    ; group size
-    BEQ     .zero           ; empty group
-    JSR     RANDOM_IN_RANGE ; random(size)
-    BAEQ    #$00,.loop      ; 0 -> retry
-    TAX                     ; X = count down to Nth member
+    LDY     #CFIELD_XP             ; byte 8: group count in bits 3-0
+    LDA     (CHAR_PTR),Y
+    BEQ     .zero                  ; empty group
+    JSR     RANDOM_IN_RANGE        ; random(size)
+    BAEQ    #$00,.loop             ; 0 -> retry
+    TAX                            ; X = count down to Nth
     JSR     FIRST_GROUP_MEMBER
 .check:
-    LDY     #$04
-    LDA     (MOB_PTR),Y     ; member field 4
-    BMI     .next           ; negative -> skip
-    BAPL    #$15,.next ; >= $15 -> skip
+    LDY     #MFIELD_APPEARANCE     ; byte 4: appearance index
+    LDA     (MOB_PTR),Y
+    BMI     .next                  ; bit 7 set -> dead/invalid, skip
+    BAPL    #$15,.next             ; >= $15 -> NPC, skip
     DEX
-    BNE     .next           ; not Nth yet
-    RTS                     ; found: MOB_PTR/MOB_PTR+1 points to member
+    BNE     .next                  ; not Nth yet
+    RTS                            ; found
 .next:
     JSR     NEXT_GROUP_MEMBER
     JMP     .check
 .zero:
-    STA     MOB_PTR         ; clear pointer
-    STA     MOB_PTR+1
+    STA     MOB_PTR                ; \ clear pointer (A=0 from BEQ)
+    STA     MOB_PTR+1              ; /
     RTS
 @ %def PICK_RANDOM_MEMBER
 
@@ -16286,155 +16348,6 @@ MODIFY_CURRENT_STATS:
     JMP     MODIFY_CHAR_STATS
 @ %def MODIFY_CURRENT_STATS
 
-<<Hit chance>>=
-(15AB)
-.compute_to_hit:
-    JSR      SET_BLINK_TARGET
-    LDA      IS_PLAYER_TURN
-    BANE    #$01,.mob
-    STOB    #$1C,TO_HIT
-    JMP      .roll
-
-.mob:
-    ; Base chance = dexterity (-1)
-    LDY      #$0B
-    LDA      (MOB_PTR?),Y
-    TAX
-    AND      #$1F
-    STA      TO_HIT
-    TXA
-
-    ; If DEX bit 5 set, clear DEX bit 4
-    ; and add 75% to chance.
-    AND      #$20
-    BEQ      LAB_15d6
-    TXA
-    AND      #$EF
-    STA      (MOB_PTR?),Y
-    LDA      #$18
-    JSR      add_to_to_hit
-
-LAB_15d6:
-    ; If opponent DEX bit 6 set,
-    ; subtract 12.5% (particularly difficult
-    ; to hit).
-    LDA      (THING_PTR?),Y
-    TAY
-    AND      #$40
-    BEQ      LAB_15e2
-    LDA      #$FC
-    JSR      add_to_to_hit
-
-LAB_15e2:
-    ; If opponent DEX bit 7 set,
-    ; add 25% (extremely easy to hit).
-    TYA
-    AND      #$80
-    BEQ      .check_thing_f
-    LDA      #$08
-    JSR      add_to_to_hit
-
-.check_thing_f:
-    ; If opponent F bit 2 set,
-    ; add 18.75% (down: unconscious, in hand to hand combat,
-    ; or resting)
-    LDY      #$0F
-    LDA      (THING_PTR?),Y
-    TAX
-    AND      #$04
-    BEQ      LAB_15fa
-    LDA      #$06
-    JSR      add_to_to_hit
-
-LAB_15fa:
-    ; If opponent F bits 1,0 < 1
-    ; add 9.375% (currently resting)
-    TXA
-    AND      #$03
-    BAPL    #$01,LAB_1609
-    LDA      #$03
-    JSR      add_to_to_hit
-    JMP      .check_thing_6
-
-LAB_1609:
-    ; subtract 3.125% ("running" -- bugged?)
-    BNE      LAB_1613
-    LDA      #$FF
-    JSR      add_to_to_hit
-    JMP      .check_thing_6
-
-LAB_1613:
-    ; If opponent F bits 1,0 == 3
-    ; subtract 9.375% (opponent is defending)
-    BANE    #$03,.check_thing_6
-    LDA      #$FD
-    JSR      add_to_to_hit
-
-.check_thing_6:
-    ; If opponent CON <= 3
-    ; add 75%.
-    LDY      #$06
-    LDA      (THING_PTR?),Y
-    AND      #$3F
-    BAGE    #$03,LAB_162b
-    LDA      #$18
-    JSR      add_to_to_hit
-
-LAB_162b:
-    ; If mob[3] == thing[3]...
-    LDY      #$03
-    LDA      (MOB_PTR?),Y
-    CMP     (THING_PTR?),Y
-    BNE     .limit_to_hit
-
-    ; add Thing[STR]/2 & 0x0F - Mob[STR]/2 & 0x0F
-    LDY      #$05
-    LDA      (THING_PTR?),Y
-    ROR
-    AND      #$0F
-    STA      DAT_5a77
-    LDA      (MOB_PTR?),Y
-    ROR
-    AND      #$0F
-    SEC
-    SBC      DAT_5a77
-    JSR      add_to_to_hit
-
-.limit_to_hit:
-    LDA      TO_HIT
-    BPL      .adjust_for_automatic_fail
-    STOB    #$00,TO_HIT
-    JMP      .roll
-
-.adjust_for_automatic_fail:
-    BAMI    #$1F,.roll
-    STOB    #$1E,TO_HIT
-
-.roll:
-    LDA      #$1F
-    JSR      get_random
-    BAMI    TO_HIT,.do_hit
-    BEQ      .do_hit
-    JSR      clear_row_21
-    JSR      print_name_of_actor
-    JSR      scroll_status_window_up
-    STOW    $7CD2,DATA_PTR2
-    JSR      print_centered_row_23
-    JSR      scroll_status_window_up
-    LDA      #$01
-    BAEQ    IS_PLAYER_TURN,.do_blink
-    JSR      print_thing_name_centered_row_23
-.do_blink:
-    JSR      blink
-    RTS
-.do_hit:
-    LDA      IS_PLAYER_TURN
-    BEQ      .hit_mob
-    JMP      hit_nonmob?
-.hit_mob:
-    JMP      hit_mob?
-@
-
 \chapter{NPC AI}
 
 @ [[AI_CHOOSE_TARGET]] is the decision-making hub for NPC and mob turns.  It
@@ -16473,11 +16386,8 @@ the strongest hostile mob found during the group iteration.
 
 <<zero page defines>>=
 AI_BEST_POS             EQU     $BE     ; best hostile position in ai_choose_target
-@ %def AI_BEST_POS
-
-<<zero page defines>>=
 AI_BEST_STR             EQU     $BF     ; best hostile strength in ai_choose_target
-@ %def AI_BEST_STR
+@ %def AI_BEST_POS AI_BEST_STR
 
 <<defines>>=
 AI_TARGET_ROW       EQU     $5A73   ; AI target row (from POS_TO_COLROW)
