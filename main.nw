@@ -4151,7 +4151,11 @@ in the status window.
 <<press space string>>=
     ORG     $7E97
 S_PRESS_SPACE:
-    APSTR   "  PRESS SPACE BAR TO CONTINUE   "
+    ; Length $22 (34): CR + "  PRESS SPACE BAR TO CONTINUE   " + CLR
+    DC.B    $22,$8C
+    HEX     A0 A0 D0 D2 C5 D3 D3 A0 D3 D0 C1 C3 C5 A0 C2 C1
+    HEX     D2 A0 D4 CF A0 C3 CF CE D4 C9 CE D5 C5 A0 A0 A0
+    DC.B    $8B
 @ %def S_PRESS_SPACE
 
 <<init game display>>=
@@ -11129,9 +11133,13 @@ REORDER_CURRENT_CHAR:
 @ %def REORDER_CURRENT_CHAR
 
 <<press button string>>=
-    ORG     $7EB8
+    ORG     $7EBA
 S_PRESS_BUTTON:
-    APSTR   "  PRESS THE BUTTON TO CONTINUE  "
+    ; Length $22 (34): CR + "  PRESS THE BUTTON TO CONTINUE  " + CLR
+    DC.B    $22,$8C
+    HEX     A0 A0 D0 D2 C5 D3 D3 A0 D4 C8 C5 A0 C2 D5 D4 D4
+    HEX     CF CE A0 D4 CF A0 C3 CF CE D4 C9 CE D5 C5 A0 A0
+    DC.B    $8B
 @ %def S_PRESS_BUTTON
 
 \begin{center}
