@@ -15,9 +15,9 @@ When annotating all routines in a section or subsection:
 1. Find the section boundaries by **line number**: search for the `\section{...}` or `\subsection{...}` header, then find the NEXT `\section` or `\subsection` (at the same or higher level). The range is ALL lines between these two headers. Do NOT use the address range in the subsection title as the boundary — the title is just a summary and may not cover all routines in the subsection.
 2. List ALL routines (ORG + `@ %def` pairs) within the line range. Print the list and verify it is complete before proceeding.
 3. Skip routines that already have plate comments (a `;` comment block with `; Input:` or `; Behavior:` immediately after SUBROUTINE).
-4. Launch **parallel agents** (one per routine, or group small related routines into one agent). Each agent receives the routine source and the annotation rules, and returns proposed replacement text.
-5. Review all agent results, normalize comment style, and merge into main.nw.
-6. Assemble and verify after all changes.
+4. Launch **parallel sub-agents** (one per routine, or group small related routines). Each sub-agent receives the routine source text as INPUT and returns PROPOSED REPLACEMENT TEXT. Sub-agents must **NOT edit the file directly** — they only return text. This prevents concurrent clobbering when multiple agents run in parallel on the same file.
+5. Collect all sub-agent results. The parent (you) applies each replacement **sequentially** to main.nw, normalizing comment style as needed.
+6. Assemble and verify after all changes are applied.
 
 ## Instructions
 
