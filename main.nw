@@ -16977,21 +16977,21 @@ DISPLAY_SHOP:
     JSR     ADD_PRICE_COMPONENT
     DEX
     BPL     .price_loop
-    LDA     #$20
+    LDA     #$20               ; fill with spaces
     LDX     #$04
-.clear1:
-    STA     $7D04,X
+.clear1:                       ; clear price field in "PAY 000000 FOR"
+    STA     SHOP_PRICE_DIGITS,X
     DEX
     BPL     .clear1
     LDX     #$13
-.clear2:
-    STA     $7D0F,X
+.clear2:                       ; clear item name field after "FOR "
+    STA     SHOP_ITEM_NAME,X
     DEX
     BPL     .clear2
     MOVB    SHOP_PRICE,PRINT_STRING_ADDR
     MOVB    SHOP_PRICE_HI,PRINT_STRING_ADDR+1
-    STOW    $7D04,$BA
-    JSR     NUM_TO_DECIMAL
+    STOW    SHOP_PRICE_DIGITS,$BA
+    JSR     NUM_TO_DECIMAL     ; write price digits
     LDY     SHOP_ITEM_OFFSET
     INY
     INY
@@ -17035,7 +17035,9 @@ SHOP_SCENE_OFFSET       EQU     $28     ; offset of scene number within shop rec
 SHOP_TYPE_FIELD         EQU     $01     ; entity record byte 1: shop type ($D5=weapons, $D6=armor)
 SHOP_AVAIL_FIELD        EQU     $02     ; entity record byte 2: item validity bitmask
 SHOP_VALID_MASK         EQU     $5A83   ; copy of item validity bitmask during shop display
-@ %def SHOP_RECORD_SIZE SHOP_SCENE_OFFSET SHOP_TYPE_FIELD SHOP_AVAIL_FIELD SHOP_VALID_MASK
+SHOP_PRICE_DIGITS       EQU     $7D04   ; 6-byte price field in "PAY 000000 FOR" string
+SHOP_ITEM_NAME          EQU     $7D0F   ; 20-byte item name field after "FOR " in pay string
+@ %def SHOP_RECORD_SIZE SHOP_SCENE_OFFSET SHOP_TYPE_FIELD SHOP_AVAIL_FIELD SHOP_VALID_MASK SHOP_PRICE_DIGITS SHOP_ITEM_NAME
 
 <<advance shop ptr>>=
     ORG     $71F0
