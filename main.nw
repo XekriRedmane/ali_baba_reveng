@@ -17291,10 +17291,10 @@ XP_AWARD_TABLE      EQU     $7FBE   ; 5-byte XP award values by action type
 
 <<defines>>=
     ; (ENTITY_LEVEL_FIELD and ENTITY_XP_FIELD removed; use MFIELD_LEVEL and MFIELD_XP)
-LEVEL_MASK              EQU     $1F     ; mask for level bits 4-0 in byte 11
-STRENGTH_MASK           EQU     $1F     ; mask for strength bits 4-0 in byte 5
-LEVEL_FLAG_MASK         EQU     $E0     ; mask for flag bits 7-5 in byte 11
-PENDING_XP_UNIT         EQU     $10     ; one pending XP unit in byte 8 (bit 4)
+STRENGTH_MASK           EQU     $1F     ; byte 5: mask for strength bits 4-0
+LEVEL_MASK              EQU     $1F     ; byte 11: mask for level bits 4-0
+LEVEL_FLAG_MASK         EQU     $E0     ; byte 11: mask for flag bits 7-5
+PENDING_XP_UNIT         EQU     $10     ; byte 8: one pending XP unit (bit 4)
 @ %def LEVEL_MASK LEVEL_FLAG_MASK PENDING_XP_UNIT
 
 <<zero page defines>>=
