@@ -16792,11 +16792,14 @@ to use as a movement target.
 NEAREST_DIST        EQU     $5A14   ; current minimum distance during event search
 NEAREST_POS         EQU     $5A13   ; position of nearest event found
 CANDIDATE_POS       EQU     $5A15   ; position of event being evaluated
+    ; --- Event record field offsets (3-byte entries) ---
+EVFIELD_POSITION    EQU     $00     ; byte 0: packed map position
+EVFIELD_TYPE        EQU     $01     ; byte 1: event type (>= $C0 = activated)
 EVENT_RECORD_SIZE   EQU     $03     ; size of one event list entry (3 bytes)
 EVENT_ACTIVATED     EQU     $C0     ; event type threshold: >= $C0 = already activated
 EVENT_EMPTY         EQU     $FE     ; event list: empty slot marker
 EVENT_END           EQU     $FF     ; event list: end-of-list marker
-@ %def NEAREST_DIST NEAREST_POS CANDIDATE_POS EVENT_RECORD_SIZE EVENT_ACTIVATED EVENT_EMPTY EVENT_END
+@ %def NEAREST_DIST NEAREST_POS CANDIDATE_POS EVFIELD_POSITION EVFIELD_TYPE EVENT_RECORD_SIZE EVENT_ACTIVATED EVENT_EMPTY EVENT_END
 
 <<find nearest event>>=
     ORG     $138D
@@ -16824,10 +16827,10 @@ FIND_NEAREST_EVENT:
 
     ; --- evaluate one event ---
 .eval:
-    LDY     #$01
+    LDY     #EVFIELD_TYPE
     LDA     (EVENT_PTR),Y          ; event type byte
     BAGE    #EVENT_ACTIVATED,.advance ; activated -> skip
-    LDY     #$00
+    LDY     #EVFIELD_POSITION
     LDA     (EVENT_PTR),Y          ; event position byte
     STA     CANDIDATE_POS
     JSR     MANHATTAN_DISTANCE
@@ -16846,7 +16849,7 @@ FIND_NEAREST_EVENT:
 
     ; --- check list termination ---
 .check_end:
-    LDY     #$00
+    LDY     #EVFIELD_POSITION
     LDA     (EVENT_PTR),Y
     BAEQ    #EVENT_EMPTY,.advance  ; empty slot -> skip
     BANE    #EVENT_END,.eval       ; not end -> evaluate
