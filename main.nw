@@ -16931,19 +16931,19 @@ DISPLAY_SHOP:
     RTS
 .do_shop:
     STOW    SHOP_TABLE,SHOP_DATA_PTR
-    LDY     #$01
-    LDA     (ENTITY_REC),Y
+    LDY     #SHOP_TYPE_FIELD
+    LDA     (ENTITY_REC),Y     ; shop type ($D5=weapons, $D6=armor)
     SEC
-    SBC     #$D5
+    SBC     #$D5               ; record index (0 or 1)
     TAX
 .count_loop:
     DEX
     BMI     .counted
-    JSR     ADVANCE_SHOP_PTR
+    JSR     ADVANCE_SHOP_PTR   ; skip to selected record
     JMP     .count_loop
 .counted:
-    LDY     #$02
-    LDA     (ENTITY_REC),Y
+    LDY     #SHOP_AVAIL_FIELD
+    LDA     (ENTITY_REC),Y     ; item availability bitmask
     STA     $5A83
     JSR     SET_CURSOR_ROW21
     LDY     #SHOP_SCENE_OFFSET
@@ -17032,7 +17032,9 @@ table.
 <<defines>>=
 SHOP_RECORD_SIZE        EQU     $29     ; size of one shop record (41 bytes)
 SHOP_SCENE_OFFSET       EQU     $28     ; offset of scene number within shop record
-@ %def SHOP_RECORD_SIZE SHOP_SCENE_OFFSET
+SHOP_TYPE_FIELD         EQU     $01     ; entity record byte 1: shop type ($D5=weapons, $D6=armor)
+SHOP_AVAIL_FIELD        EQU     $02     ; entity record byte 2: item availability bitmask
+@ %def SHOP_RECORD_SIZE SHOP_SCENE_OFFSET SHOP_TYPE_FIELD SHOP_AVAIL_FIELD
 
 <<advance shop ptr>>=
     ORG     $71F0
