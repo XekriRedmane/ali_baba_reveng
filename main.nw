@@ -6720,6 +6720,132 @@ STATS_DEXT_OUT      EQU     STATS_DEXT-3     ; $7DF0: dexterity output
 STATS_DAGGR_OUT     EQU     STATS_DAGGR-3    ; $7DFC: dagger output
 @ %def STATS_LIFE_OUT STATS_STR_OUT STATS_DUCATS_OUT STATS_SPEED_OUT STATS_SWORD_OUT STATS_WEAP_OUT STATS_DEXT_OUT STATS_DAGGR_OUT
 
+@ \subsection{Game configuration and menu strings (\$7AAC--\$7D82)}
+
+The region \$7AAC--\$7D82 contains game configuration variables and
+the complete set of menu option display strings.
+
+\paragraph{Configuration variables (\$7AAC--\$7ADB).}
+Includes blink delay ([[BLINK_DELAY]]), animation frame tables
+([[ANIM_WAIT_TABLE]], [[ANIM_FRAME_TABLE]]), map tile defaults
+([[TILE_DEFAULT_TAB]], [[TILE_FILL_TAB]], [[TILE_BLINK_TAB]]),
+save/load parameters ([[SLOT_NUMBER]], [[GAME_DISK_SLOTS]],
+[[SAVE_TRACK_BASE]], [[DISK_SIGNATURE]]), and other runtime state
+--- all documented via EQU labels elsewhere.
+
+\paragraph{Menu strings (\$7ADC--\$7D82).}
+Length-prefixed high-ASCII strings for all menu options: action menus
+(MOVE, ATTACK, REST, DEFEND), combat (direction labels, target names),
+shop (PAY/BUY/NO SALE), settings (SOUND, SPEED, DANGER), character
+management (ADD SOMEONE, RETIRE, DROP GOLD/ARMOR), save/load
+(CONTINUE GAME, BEGIN NEW GAME, scenario disk options), and treasure
+chest messages.  Several strings contain mutable fields: digit
+placeholders in ``CONTINUE GAME NUMBER NN'' ([[S_CONTINUE_TENS]]/
+[[S_CONTINUE_ONES]]), ``SAVE GAME IN SLOT NUMBER 00'', and
+``PAY 000000 FOR'' (price display), plus the 20-byte name buffer
+at [[ATTACK_NAME_BUF]] and drop amount display at
+[[DROP_DISPLAY_BUF]].
+
+<<game config and menu strings>>=
+    ORG     $7AAC
+GAME_CONFIG_DATA:
+    ; Configuration variables ($7AAC-$7ADB) — see EQU labels
+    HEX     2D 50 C8 03 00 32 23 17 0C 05 00 02 02 04 09 13
+    HEX     05 02 20 04 01 25 2C 00 00 01 11 13 01 1A 11 00
+    HEX     C1 CC C9 64 2C 2C 2C 2C 25 2A 20 29 00 00 00 00
+
+MENU_OPTION_STRINGS:
+    ; Menu option strings ($7ADC-$7D82) — length-prefixed high ASCII
+    ; $7ADC: "DROP ARMOR"
+    HEX     0A C4 D2 CF D0 A0 C1 D2 CD CF D2
+    ; $7AE7: "RETIRE"
+    HEX     06 D2 C5 D4 C9 D2 C5
+    ; $7AEE: "ADD SOMEONE"
+    HEX     0B C1 C4 C4 A0 D3 CF CD C5 CF CE C5
+    ; $7AFA: "DROP GOLD"
+    HEX     09 C4 D2 CF D0 A0 C7 CF CC C4
+    ; $7B04: "SOUND IS ON "
+    HEX     0C D3 CF D5 CE C4 A0 C9 D3 A0 CF CE A0
+    ; $7B11: "SAVE GAME"
+    HEX     09 D3 C1 D6 C5 A0 C7 C1 CD C5
+    ; $7B1B: "DANGER :   "
+    HEX     0B C4 C1 CE C7 C5 D2 A0 BA A0 A0 A0
+    ; $7B27: "TO THIS ROOM"
+    HEX     0C D4 CF A0 D4 C8 C9 D3 A0 D2 CF CF CD
+    ; $7B34: "TO ALI BABA'S HOME"
+    HEX     12 D4 CF A0 C1 CC C9 A0 C2 C1 C2 C1 A7 D3 A0 C8 CF CD C5
+    ; $7B47: "ADD 1  .  .5 FL~ XA 5 rB" (with name buffer at $7B4B)
+    HEX     18 C1 C4 C4 A0 B1 A0 A0 AE A0 A0 AE B5 A0 C6 CC FE A0 D8 C1 A0 B5 A0 F2 C2
+    ; $7B60: "#"
+    HEX     01 A3
+    ; $7B62: "@"
+    HEX     01 C0
+    ; $7B64: " "
+    HEX     01 A0
+    ; $7B66: "SEE YOUR LOT"
+    HEX     0C D3 C5 C5 A0 D9 CF D5 D2 A0 CC CF D4
+    ; $7B73: "REST"
+    HEX     04 D2 C5 D3 D4
+    ; $7B78: "DEFEND"
+    HEX     06 C4 C5 C6 C5 CE C4
+    ; $7B7F: "STOP"
+    HEX     04 D3 D4 CF D0
+    ; $7B84: "THE TREASURE CHEST OPENS UP"
+    HEX     1B D4 C8 C5 A0 D4 D2 C5 C1 D3 D5 D2 C5 A0 C3 C8 C5 D3 D4 A0 CF D0 C5 CE D3 A0 D5 D0
+    ; $7BA0: "TO REVEAL   L k0 GOLD DUCATS."
+    HEX     1D D4 CF A0 D2 C5 D6 C5 C1 CC A0 A0 A0 CC A0 EB B0 A0 C7 CF CC C4 A0 C4 D5 C3 C1 D4 D3 AE
+    ; $7BBE: "YOU NOW HAVE  dOR 0 DUCATS."
+    HEX     1B D9 CF D5 A0 CE CF D7 A0 C8 C1 D6 C5 A0 A0 E4 CF D2 A0 B0 A0 C4 D5 C3 C1 D4 D3 AE
+    ; $7BDA: $00 separator
+    HEX     00
+    ; $7BDB: "CONTINUE GAME NUMBER NN"
+    HEX     17 C3 CF CE D4 C9 CE D5 C5 A0 C7 C1 CD C5 A0 CE D5 CD C2 C5 D2 A0 CE CE
+    ; $7BF3: "BEGIN NEW GAME"
+    HEX     0E C2 C5 C7 C9 CE A0 CE C5 D7 A0 C7 C1 CD C5
+    ; $7C02: "USE PREVIOUSLY FORMATTED SCENARIO DISK"
+    HEX     26 D5 D3 C5 A0 D0 D2 C5 D6 C9 CF D5 D3 CC D9 A0 C6 CF D2 CD C1 D4 D4 C5 C4 A0 D3 C3 C5 CE C1 D2 C9 CF A0 C4 C9 D3 CB
+    ; $7C29: "FORMAT AND USE NEW SCENARIO DISK"
+    HEX     20 C6 CF D2 CD C1 D4 A0 C1 CE C4 A0 D5 D3 C5 A0 CE C5 D7 A0 D3 C3 C5 CE C1 D2 C9 CF A0 C4 C9 D3 CB
+    ; $7C4A: "CANCEL REQUEST"
+    HEX     0E C3 C1 CE C3 C5 CC A0 D2 C5 D1 D5 C5 D3 D4
+    ; $7C59: "ATTACK ABOVE YOU"
+    HEX     10 C1 D4 D4 C1 C3 CB A0 C1 C2 CF D6 C5 A0 D9 CF D5
+    ; $7C6A: "ATTACK LEFT"
+    HEX     0B C1 D4 D4 C1 C3 CB A0 CC C5 C6 D4
+    ; $7C76: "ATTACK RIGHT"
+    HEX     0C C1 D4 D4 C1 C3 CB A0 D2 C9 C7 C8 D4
+    ; $7C83: "ATTACK BELOW YOU"
+    HEX     10 C1 D4 D4 C1 C3 CB A0 C2 C5 CC CF D7 A0 D9 CF D5
+    ; $7C94: "ATTACK " + 20-byte name buffer at $7C9B
+    HEX     1B C1 D4 D4 C1 C3 CB A0 B5 E9 BC A5 A0 D3 C9 C2 C3 CD A0 A0 D4 B1 A0 A0 A0 A0 A0 C9
+    ; $7CB0: "ATTACK SOMEONE ELSE"
+    HEX     13 C1 D4 D4 C1 C3 CB A0 D3 CF CD C5 CF CE C5 A0 C5 CC D3 C5
+    ; $7CC4: "CANCEL ATTACK"
+    HEX     0D C3 C1 CE C3 C5 CC A0 C1 D4 D4 C1 C3 CB
+    ; $7CD2: "MISSES"
+    HEX     06 CD C9 D3 D3 C5 D3
+    ; $7CD9: "DUCATS TO DROP :  " + display buf at $7CEB
+    HEX     17 C4 D5 C3 C1 D4 D3 A0 D4 CF A0 C4 D2 CF D0 A0 BA A0 A0 B4 CC A0 BA B0
+    ; $7CF1: "KEEP ALL GOLD"
+    HEX     0D CB C5 C5 D0 A0 C1 CC CC A0 C7 CF CC C4
+    ; $7CFF: "PAY 000000 FOR " + item display area
+    HEX     23 D0 C1 D9 A0 B0 B0 B0 B0 B0 B0 A0 C6 CF D2 A0 A0 DF A0 A0 A0 A0 D9 A0 E0 A0 A0 A0 C2 B7 A0 B1 C5 A0 C1 F5
+    ; $7D23: "BUY SOMETHING ELSE"
+    HEX     12 C2 D5 D9 A0 D3 CF CD C5 D4 C8 C9 CE C7 A0 C5 CC D3 C5
+    ; $7D36: "NO SALE"
+    HEX     07 CE CF A0 D3 C1 CC C5
+    ; $7D3E: "ATTACK"
+    HEX     06 C1 D4 D4 C1 C3 CB
+    ; $7D45: "OTHER OPTIONS"
+    HEX     0D CF D4 C8 C5 D2 A0 CF D0 D4 C9 CF CE D3
+    ; $7D53: "MOVE"
+    HEX     04 CD CF D6 C5
+    ; $7D58: "GAME SPEED : 0"
+    HEX     0E C7 C1 CD C5 A0 D3 D0 C5 C5 C4 A0 BA A0 B0
+    ; $7D67: "SAVE GAME IN SLOT NUMBER 00"
+    HEX     1B D3 C1 D6 C5 A0 C7 C1 CD C5 A0 C9 CE A0 D3 CC CF D4 A0 CE D5 CD C2 C5 D2 A0 B0 B0
+@ %def GAME_CONFIG_DATA MENU_OPTION_STRINGS
+
 <<stats template data>>=
     ORG     $7D83
 STATS_TEMPLATE:
@@ -20829,6 +20955,7 @@ The following root chunks produce the assembly files when tangled.
 <<tune helpers>>
 <<play tone>>
 <<play low tone>>
+<<game config and menu strings>>
 <<stats template data>>
 <<status border data>>
 <<press space string>>
