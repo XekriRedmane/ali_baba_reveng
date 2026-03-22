@@ -9873,8 +9873,8 @@ SETUP_SCENE_DISPLAY:
     LDX     #$10                ; tune 8: AI turn effect
     JSR     TUNE_PLAYER
 .not_ai:
-    JSR     DRAW_CHAR_AT_POS
     JSR     SETUP_CHAR_SPRITE
+    JSR     LOAD_CHAR_NAME_PTR
     LDA     AI_WAIT_FLAG
     ROL
     STA     WAIT_LOOP_COUNT
