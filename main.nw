@@ -17007,6 +17007,7 @@ DISPLAY_SHOP:
     JMP     START_GAME_INPUT       ; enter buy/browse/no-sale menu
 
     ; --- advance to next slot ---
+BROWSE_HANDLER:                        ; entry from "BUY SOMETHING ELSE" menu
 .next_item:
     CLC
     LDA     SHOP_ITEM_MASK         ; rotate mask right
@@ -17019,7 +17020,7 @@ DISPLAY_SHOP:
     ADC     #$05
     STA     SHOP_ITEM_OFFSET
     JMP     .item_loop
-@ %def DISPLAY_SHOP
+@ %def DISPLAY_SHOP BROWSE_HANDLER
 @ [[ADVANCE_SHOP_PTR]] adds [[SHOP_RECORD_SIZE]] (41 bytes) to
 [[SHOP_DATA_PTR]], advancing it to the next shop entry in the data
 table.
@@ -17166,8 +17167,7 @@ XP_AWARD_TABLE      EQU     $7FBE   ; 5-byte XP award values by action type
 LEVEL_MASK              EQU     $1F     ; mask for level bits 4-0 in byte 11
 LEVEL_FLAG_MASK         EQU     $E0     ; mask for flag bits 7-5 in byte 11
 PENDING_XP_UNIT         EQU     $10     ; one pending XP unit in byte 8 (bit 4)
-BROWSE_HANDLER          EQU     $7194   ; shop browse: advance to next item
-@ %def LEVEL_MASK LEVEL_FLAG_MASK PENDING_XP_UNIT BROWSE_HANDLER
+@ %def LEVEL_MASK LEVEL_FLAG_MASK PENDING_XP_UNIT
 
 <<zero page defines>>=
 XP_ACCUM                EQU     $BA     ; accumulated level during XP award (scratch)
