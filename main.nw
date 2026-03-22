@@ -16585,7 +16585,7 @@ AI_CHOOSE_TARGET:
     BAEQ    #$00,.skip5            ; not hostile -> skip
     LDY     #MFIELD_STRENGTH
     LDA     (MOB_PTR),Y
-    AND     #$1F                   ; strength (bits 4-0)
+    AND     #STRENGTH_MASK         ; strength (bits 4-0)
     BAMI    AI_BEST_STR,.skip5     ; not stronger -> skip
     STA     AI_BEST_STR            ; new max strength
     LDY     #MFIELD_POSITION
