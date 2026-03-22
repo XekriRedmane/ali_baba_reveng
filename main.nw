@@ -7603,67 +7603,134 @@ ATTACK_VERB_STRINGS:
     APSTR   "LAMBASTES"
 @ %def ATTACK_VERB_STRINGS
 
-@ Duplicate weapon/armor/object string table at [[$8133]]--[[$82B3]],
-prefixed with 6~bytes of font rendering data.  This copy is used by the
-``See Your Lot'' display and other routines that need item names.
+@ \subsection{Duplicate item/combat strings (\$8133--\$82B4)}
 
-<<game data 8133>>=
+The region \$8133--\$82B4 is a second copy of the equipment and combat
+string data, used by the ``See Your Lot'' display and entity
+classification routines.
+
+\paragraph{HRCG control prefix (\$8133--\$8138).}
+6~bytes of HRCG font rendering control data preceding the string table.
+
+\paragraph{Duplicate string table (\$8139--\$82AE).}
+Byte-for-byte copy of \$7F2E--\$80A3 (weapon names, shop effect table,
+armor names, XP award table, map object names, attack verb strings).
+The address \$8154 is written from \$4681 (entity setup), and \$82A5
+is tested via BIT from \$A29E (relocated block).  The attack verb
+subtable at \$82AD is indexed from \$7162 and \$71CE (combat display).
+
+\paragraph{HRCG control tail (\$82AF--\$82B4).}
+6~bytes of HRCG control string continuation.
+
+<<hrcg control prefix>>=
     ORG     $8133
-GAME_DATA_8133:
-    ; Font rendering data (6 bytes)
+HRCG_CTRL_PREFIX:
     HEX     F7 FD ED E6 ED FD
-    ; Weapon strings (same as $7F2D)
-    HEX     33 0D C1 CE A0 C9 D2 CF CE A0 D3 D7 CF D2 C4 0D
-    HEX     C1 A0 D3 D4 C5 C5 CC A0 D3 D7 CF D2 C4 0B C1 CE
-    HEX     A0 CF C1 CB A0 C3 CC D5 C2 0E C1 A0 D3 D4 C5 C5
-    HEX     CC A0 C4 C1 C7 C7 C5 D2 06 C1 A0 D3 C8 C9 D6
-    ; Armor strings
-    HEX     07 88 84 83 06 0B D0 CC C1 D4 C5 A0 C1 D2 CD CF
-    HEX     D2 13 D2 C9 D4 C8 CD C9 CC A0 D0 CC C1 D4 C5 A0
-    HEX     C1 D2 CD CF D2 0A C3 C8 C1 C9 CE A0 CD C1 C9 CC
-    HEX     12 D2 C9 D4 C8 CD C9 CC A0 C3 C8 C1 C9 CE A0 CD
-    HEX     C1 C9 CC 0D CC C5 C1 D4 C8 C5 D2 A0 C1 D2 CD CF
-    ; XP table + map object strings
-    HEX     D2 75 35 53 23 21 06 C1 A0 D7 C1 CC CC 08 C1 A0
-    HEX     D3 D4 C1 D4 D5 C5 10 C1 A0 D4 D2 C5 C1 D3 D5 D2
-    HEX     C5 A0 C3 C8 C5 D3 D4 0B C5 CD D0 D4 D9 A0 D3 D0
-    HEX     C1 C3 C5 0B C1 CE A0 C9 CC CC D5 D3 C9 CF CE 06
-    HEX     C1 A0 C4 CF CF D2 12 C1 CE A0 C9 CE D6 C9 D3 C9
-    HEX     C2 CC C5 A0 D7 C1 CC CC A1 11 D3 CF CD C5 A0 D2
-    HEX     D5 CE C5 A0 D7 D2 C9 D4 C9 CE C7 11 C1 A0 D4 D2
-    HEX     C1 C4 C9 CE C7 A0 CF D5 D4 D0 CF D3 D4
+@ %def HRCG_CTRL_PREFIX
+
+<<duplicate item strings>>=
+    ORG     $8139
+ITEM_STRINGS_COPY:
+    ; Duplicate of $7F2E-$80A3 (374 bytes)
+    ; Weapon names
+    DC.B    $33
+    APSTR   "AN IRON SWORD"
+    APSTR   "A STEEL SWORD"
+    APSTR   "AN OAK CLUB"
+    APSTR   "A STEEL DAGGER"
+    APSTR   "A SHIV"
+    ; Shop effect table (5 bytes)
+    HEX     07 88 84 83 06
+    ; Armor names
+    APSTR   "PLATE ARMOR"
+    APSTR   "RITHMIL PLATE ARMOR"
+    APSTR   "CHAIN MAIL"
+    APSTR   "RITHMIL CHAIN MAIL"
+    APSTR   "LEATHER ARMOR"
+    ; XP award table (5 bytes)
+    HEX     75 35 53 23 21
+    ; Map object names
+    APSTR   "A WALL"
+    APSTR   "A STATUE"
+    APSTR   "A TREASURE CHEST"
+    APSTR   "EMPTY SPACE"
+    APSTR   "AN ILLUSION"
+    APSTR   "A DOOR"
+    APSTR   "AN INVISIBLE WALL!"
+    APSTR   "SOME RUNE WRITING"
+    APSTR   "A TRADING OUTPOST"
     ; Attack verb strings
-    HEX     04 CA C1 C2 D3 05 D0 CF CB C5 D3 04 C8 C9 D4 D3
-    HEX     06 C3 CC CF D5 D4 D3 06 D0 CF D5 CE C4 D3 06 D3
-    HEX     CD C1 C3 CB D3 06 D3 CD C9 D4 C5 D3 05 D7 C8 CF
-    HEX     D0 D3 06 D7 C8 C1 C3 CB D3 06 C2 C1 D3 C8 C5 D3
-    HEX     06 D7 C8 CF CD D0 D3 07 D7 C1 CC CC CF D0 D3 07
-    HEX     D3 CD C1 D3 C8 C5 D3 08 C3 CC CF C2 C2 C5 D2 D3
-    HEX     09 CC C1 CD C2 C1 D3 D4 C5 D3
-    ; HRCG control string fragment
-    HEX     09 81 B1 82 DB
-@ %def GAME_DATA_8133
+    APSTR   "JABS"
+    APSTR   "POKES"
+    APSTR   "HITS"
+    APSTR   "CLOUTS"
+    APSTR   "POUNDS"
+    APSTR   "SMACKS"
+    APSTR   "SMITES"
+    APSTR   "WHOPS"
+    APSTR   "WHACKS"
+    APSTR   "BASHES"
+    APSTR   "WHOMPS"
+    APSTR   "WALLOPS"
+    APSTR   "SMASHES"
+    APSTR   "CLOBBERS"
+    APSTR   "LAMBASTES"
+@ %def ITEM_STRINGS_COPY
 
-@ Data at [[$82B5]]--[[$83A4]]: HRCG control string continuation,
-duplicate tune pointer table fragment, duplicate tune bytecode
-(scripts 1--2), and border/icon bitmap data.
+<<hrcg control tail>>=
+    ORG     $82AF
+HRCG_CTRL_TAIL:
+    HEX     09 81 B1 82 DB FF
+@ %def HRCG_CTRL_TAIL
 
-<<game data 82B5>>=
+@ \subsection{HRCG data and border bitmaps (\$82B5--\$83A4)}
+
+\paragraph{HRCG control continuation (\$82B5--\$82BE).}
+10~bytes of HRCG mode/address control data.
+
+\paragraph{Tune pointer table copy (\$82BF--\$82D0).}
+Duplicate of the tune pointer table at [[$80AE]], mapping tune
+indices to bytecode addresses in the \$A3xx--\$A4xx range.
+
+\paragraph{Tune bytecodes copy (\$82D1--$82EF, \$82F0--\$8305).}
+Two copies of tune scripts 1--2 (combat hit / combat damage),
+followed by a second tune pointer fragment.
+
+\paragraph{Border/icon bitmap data (\$831A--\$83A4).}
+139~bytes of hi-res bitmap patterns for border decorations and
+map icons.  The address \$838D is indexed from \$7101 (border
+rendering).
+
+<<hrcg control continuation>>=
     ORG     $82B5
-GAME_DATA_82B5:
-    ; HRCG control string continuation
+HRCG_CTRL_CONT:
     HEX     83 ED ED 84 D1 82 D2 82 E2 82
-    ; Duplicate tune pointer table ($82BF = copy of $80AE data)
+@ %def HRCG_CTRL_CONT
+
+<<tune table copy>>=
+    ORG     $82BF
+TUNE_TABLE_COPY:
+    ; Duplicate tune pointer table (9 entries)
     HEX     00 A3 C3 A3 CE A3 DE A3 09 A4 32 A4 37 A4 FC A3
     HEX     3C A4
-    ; Duplicate tune bytecodes (scripts 1 and 2)
+@ %def TUNE_TABLE_COPY
+
+<<tune bytecodes copy>>=
+    ORG     $82D1
+TUNE_BYTECODES_COPY:
+    ; Scripts 1-2 (combat hit, combat damage) — copy 1
     HEX     24 1F 26 23 C1 05 22 50 06 3F 08 25 23 60 10 00
     HEX     24 25 1F 22 3F 05 50 04 80 02 23 C1 04 00 24
-    ; Second copy of tune pointer table + bytecodes
+    ; Tune pointer fragment + scripts 1-2 — copy 2
     HEX     A3 09 A4 32 A4 37 A4 FC A3 3C A4
     HEX     24 1F 26 23 C1 05 22 50 06 3F 08 25 23 60 10 00
     HEX     24 25 1F 22 3F 05 50 04 80 02 23 C1 04 00 24
-    ; Border/icon bitmap data
+@ %def TUNE_BYTECODES_COPY
+
+<<border bitmap data>>=
+    ORG     $831A
+BORDER_BITMAP_DATA:
+    ; Hi-res bitmap patterns for border decorations and map icons
     HEX     2A 2A 2A 2A 2A 50 54 44 44 54 50 40 40 02 02 08
     HEX     08 02 02 00 00 41 55 40 40 54 04 04 05 20 2A 00
     HEX     00 0A 08 08 28 40 40 50 50 50 54 54 54 00 00 02
@@ -7673,7 +7740,7 @@ GAME_DATA_82B5:
     HEX     1F 0F 19 30 00 00 00 00 00 00 00 D0 D0 00 00 00
     HEX     00 00 00 00 00 A0 A0 A8 A0 A0 D0 88 00 00 00 81
     HEX     80 00 00 81 00 2A 2A 2A 2A 2A 2A
-@ %def GAME_DATA_82B5
+@ %def BORDER_BITMAP_DATA
 
 \chapter{Utility Routines}
 
@@ -21170,8 +21237,13 @@ The following root chunks produce the assembly files when tangled.
 <<tune bytecode>>
 <<fill 80E5>>
 <<fill 812B>>
-<<game data 8133>>
-<<game data 82B5>>
+<<hrcg control prefix>>
+<<duplicate item strings>>
+<<hrcg control tail>>
+<<hrcg control continuation>>
+<<tune table copy>>
+<<tune bytecodes copy>>
+<<border bitmap data>>
 <<font data>>
 <<fill 92A5>>
 <<hrcg init>>
