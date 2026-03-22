@@ -3881,7 +3881,14 @@ LOCATION_POS        EQU     $5A55   ; current location position (triggers redraw
 LOCATION_STYLE      EQU     $5A56   ; current map style (from record field 5, bits 0-6)
 CURRENT_PLAYER      EQU     $5A02   ; current player index (1-based)
 ENTITY_PTR          EQU     $F8     ; entity record pointer (2 bytes, $F8/$F9)
-@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR
+
+    ; --- Entity record field offsets ---
+EFIELD_STRENGTH     EQU     $05     ; byte 5: bits 4-0 = strength (mob) / bits 4-1 = defense (char)
+EFIELD_ATTACK       EQU     $07     ; byte 7: attack stat (swords, clubs set this)
+EFIELD_XP           EQU     $08     ; byte 8: status (7) | pending XP (6-4) | group count (3-0)
+EFIELD_DEFENSE      EQU     $09     ; byte 9: defense stat (armor, daggers, shivs set this)
+EFIELD_LEVEL        EQU     $0B     ; byte 11: class/faction (7-5) | level (4-0)
+@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR EFIELD_STRENGTH EFIELD_ATTACK EFIELD_XP EFIELD_DEFENSE EFIELD_LEVEL
 
 <<game init>>=
     ORG     $78C7
@@ -17083,42 +17090,42 @@ SHOP_EFFECT_TABLE   EQU     $7F6D   ; 5-byte table of base effect values
     ORG     $720B
 SHOP_BUY_EFFECT_0:
     LDX     #$00
-    LDY     #$07
-    BNE     APPLY_SHOP_EFFECT  ; always taken
+    LDY     #EFIELD_ATTACK     ; attack stat (swords, clubs)
+    BNE     APPLY_SHOP_EFFECT
 
 SHOP_BUY_EFFECT_1:
     LDX     #$01
-    LDY     #$07
+    LDY     #EFIELD_ATTACK
     BNE     APPLY_SHOP_EFFECT
 
 SHOP_BUY_EFFECT_2:
     LDX     #$02
-    LDY     #$07
+    LDY     #EFIELD_ATTACK
     BNE     APPLY_SHOP_EFFECT
 
 SHOP_BUY_EFFECT_3:
     LDX     #$03
-    LDY     #$09
+    LDY     #EFIELD_DEFENSE    ; defense stat (armor, daggers, shivs)
     BNE     APPLY_SHOP_EFFECT
 
 SHOP_BUY_EFFECT_4:
     LDX     #$04
-    LDY     #$09
+    LDY     #EFIELD_DEFENSE
     BNE     APPLY_SHOP_EFFECT
 
 APPLY_SHOP_EFFECT:
     LDA     SHOP_EFFECT_TABLE,X ; base effect value
     CLC
-    ADC     LOCATION_STYLE_BITS ; + location modifier
-    STA     (ENTITY_PTR),Y     ; store to entity field Y
+    ADC     LOCATION_STYLE_BITS ; + location tier modifier
+    STA     (ENTITY_PTR),Y     ; store to weapon/armor field
     TYA                        ; \ save target field offset
     TAX                        ; / in X
-    LDY     #$05
-    LDA     (ENTITY_PTR),Y     ; byte 5 (defense)
+    LDY     #EFIELD_STRENGTH
+    LDA     (ENTITY_PTR),Y     ; strength/defense byte
     ROR                        ; \ extract bits 2-1
     ROR                        ;  | as bits 1-0
     ROR                        ; /
-    AND     #$03               ; mask to 2 bits
+    AND     #$03               ; mask to 2 bits (defense bonus)
     PHA
     TXA                        ; restore target field offset
     TAY
@@ -17155,13 +17162,12 @@ XP_AWARD_TABLE      EQU     $7FBE   ; 5-byte XP award values by action type
 @ %def XP_AWARD_TABLE
 
 <<defines>>=
-ENTITY_LEVEL_FIELD      EQU     $0B     ; entity record byte 11: flags (7-5) | level (4-0)
-ENTITY_XP_FIELD         EQU     $08     ; entity record byte 8: status|pending_xp|count
+    ; EFIELD_LEVEL and EFIELD_XP replaced by EFIELD_LEVEL and EFIELD_XP
 LEVEL_MASK              EQU     $1F     ; mask for level bits 4-0 in byte 11
 LEVEL_FLAG_MASK         EQU     $E0     ; mask for flag bits 7-5 in byte 11
 PENDING_XP_UNIT         EQU     $10     ; one pending XP unit in byte 8 (bit 4)
 BROWSE_HANDLER          EQU     $7194   ; shop browse: advance to next item
-@ %def ENTITY_LEVEL_FIELD ENTITY_XP_FIELD LEVEL_MASK LEVEL_FLAG_MASK PENDING_XP_UNIT BROWSE_HANDLER
+@ %def LEVEL_MASK LEVEL_FLAG_MASK PENDING_XP_UNIT BROWSE_HANDLER
 
 <<zero page defines>>=
 XP_ACCUM                EQU     $BA     ; accumulated level during XP award (scratch)
@@ -17211,7 +17217,7 @@ AWARD_XP:
     ; Clobbers: A, X, Y
 
     ; --- extract current level and pending XP ---
-    LDY     #ENTITY_LEVEL_FIELD    ; byte 11: flags|level
+    LDY     #EFIELD_LEVEL    ; byte 11: flags|level
     LDA     (ENTITY_PTR),Y
     PHA
     AND     #LEVEL_MASK            ; level (bits 4-0)
@@ -17219,7 +17225,7 @@ AWARD_XP:
     PLA
     AND     #LEVEL_FLAG_MASK       ; preserve flag bits (7-5)
     STA     (ENTITY_PTR),Y         ; clear level in record
-    LDY     #ENTITY_XP_FIELD       ; byte 8: status|pending_xp|count
+    LDY     #EFIELD_XP       ; byte 8: status|pending_xp|count
     LDA     (ENTITY_PTR),Y
     JSR     EXTRACT_PENDING_XP     ; A = pending XP (0-7)
     CLC
@@ -17247,7 +17253,7 @@ AWARD_XP:
     STX     XP_ACCUM
     SEC
     SBC     XP_ACCUM               ; remaining level = accumulated - pending
-    LDY     #ENTITY_LEVEL_FIELD    ; merge with saved flag bits
+    LDY     #EFIELD_LEVEL    ; merge with saved flag bits
     ORA     (ENTITY_PTR),Y
     STA     (ENTITY_PTR),Y
     JMP     BROWSE_HANDLER
