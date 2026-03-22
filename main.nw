@@ -3889,6 +3889,7 @@ CFIELD_APPEARANCE   EQU     $04     ; byte 4: appearance index
 CFIELD_STYLE        EQU     $05     ; byte 5: location style (bits 6-0)
 CFIELD_EVENTS       EQU     $06     ; bytes 6-7: pointer to event list (2 bytes)
 CFIELD_XP           EQU     $08     ; byte 8: status (7) | pending XP (6-4) | group count (3-0)
+CFIELD_FACTION_MASK EQU     $60     ; bits 6-5 of byte 5: faction identifier
 
     ; --- Mob data record field offsets (16-byte, via ENTITY_PTR/MOB_PTR) ---
 MFIELD_TYPE         EQU     $01     ; byte 1: entity type/class (for CLASSIFY_ENTITY_TYPE)
@@ -3906,7 +3907,7 @@ MFIELD_GOLD_LO      EQU     $0D     ; byte 13: gold counter low byte
 MFIELD_GOLD_HI      EQU     $0E     ; byte 14: gold counter high byte
 MFIELD_CHAR         EQU     $00     ; byte 0: display character
 MFIELD_FLAGS        EQU     $0F     ; byte 15: status flags (bit 2 = combat engaged)
-@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_MOB_TYPE MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL
+@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP CFIELD_FACTION_MASK MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_MOB_TYPE MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL
 
 <<game init>>=
     ORG     $78C7
@@ -17910,45 +17911,53 @@ EVENT_THRESHOLD         EQU     $4239   ; random event probability threshold (~7
     ORG     $65A9
 RANDOM_EVENTS:
     SUBROUTINE RANDOM_EVENTS
-    ; Between-round random event dispatcher.  Each step rolls PRNG and
-    ; compares against the event threshold at $4239 (~7% chance).
-    ; Cascading: the deeper it goes, the more events fire at once.
-    JSR     STEP_PRNG
+    ; ---- RANDOM_EVENTS ----
+    ; Cascading random event dispatcher.
+    ; Called between rounds to generate world activity.
+    ;
+    ; Input:  EVENT_THRESHOLD ($4239) = probability cutoff (~7%)
+    ; Output: fires 0-10 events depending on PRNG rolls
+    ; Clobbers: A, X, Y, CHAR_PTR, MOB_PTR, CHAR_INDEX, FACTION_MASK
+    ;
+    ; Each step rolls PRNG; if roll < threshold, the event fires
+    ; AND the next step is tested.  Step 6 inverts the test: if
+    ; roll >= threshold, a burst of 4 spawns + faction scene fires.
+    JSR     STEP_PRNG               ; step 1: mob event
     LDA     PRNG_OUTPUT
     BAPL    EVENT_THRESHOLD,.ev2
-    JSR     EVENT_PICK_MOB           ; event type 1
+    JSR     EVENT_PICK_MOB
 .ev2:
-    JSR     STEP_PRNG
+    JSR     STEP_PRNG               ; step 2: char event
     LDA     PRNG_OUTPUT
     BAPL    EVENT_THRESHOLD,.ev3
-    JSR     EVENT_PICK_CHAR          ; event type 2
+    JSR     EVENT_PICK_CHAR
 .ev3:
-    JSR     STEP_PRNG
+    JSR     STEP_PRNG               ; step 3: faction scene
     LDA     PRNG_OUTPUT
     BAPL    EVENT_THRESHOLD,.ev4
-    JSR     EVENT_FACTION_SCENE      ; event type 3
+    JSR     EVENT_FACTION_SCENE
 .ev4:
-    JSR     STEP_PRNG
+    JSR     STEP_PRNG               ; step 4: spawn mob
     LDA     PRNG_OUTPUT
     BAPL    EVENT_THRESHOLD,.ev5
-    JSR     EVENT_SPAWN_MOB          ; event type 4a
+    JSR     EVENT_SPAWN_MOB
 .ev5:
-    JSR     STEP_PRNG
+    JSR     STEP_PRNG               ; step 5: spawn mob
     LDA     PRNG_OUTPUT
     BAPL    EVENT_THRESHOLD,.ev6
-    JSR     EVENT_SPAWN_MOB          ; event type 4b
+    JSR     EVENT_SPAWN_MOB
 .ev6:
-    JSR     STEP_PRNG
+    JSR     STEP_PRNG               ; step 6: burst gate (inverted)
     LDA     PRNG_OUTPUT
     BAMI    EVENT_THRESHOLD,.burst
-    RTS                              ; no more events this round
+    RTS                             ; no burst this round
 .burst:
-    JSR     EVENT_SPAWN_MOB          ; event burst: 4 + special + tail
+    JSR     EVENT_SPAWN_MOB         ; burst: 4 spawns + faction scene
     JSR     EVENT_SPAWN_MOB
     JSR     EVENT_SPAWN_MOB
     JSR     EVENT_SPAWN_MOB
     JSR     PICK_RANDOM_CHAR
-    JMP     EVENT_FACTION_SCENE_CONT ; tail into EVENT_FACTION_SCENE second half
+    JMP     EVENT_FACTION_SCENE_CONT
 @ %def RANDOM_EVENTS
 
 @ The individual event handlers are short routines that select a random target
@@ -17961,8 +17970,13 @@ the selected character's event list looking for triggerable entries.
     ORG     $660D
 EVENT_PICK_MOB:
     SUBROUTINE EVENT_PICK_CHAR
-    ; Random event: pick a random mob, then process its char events.
-    JSR     PICK_RANDOM_MOB
+    ; ---- EVENT_PICK_MOB ----
+    ; Select a random mob group (weighted by size) and process its events.
+    ;
+    ; Input:  TOTAL_MOB_COUNT = total mob population
+    ; Output: CHAR_PTR -> selected mob's char record
+    ; Clobbers: A, X, Y, CHAR_INDEX, MOB_PTR, DATA_PTR
+    JSR     PICK_RANDOM_MOB         ; weighted mob selection -> CHAR_PTR
     JMP     PROCESS_CHAR_EVENTS
 @ %def EVENT_PICK_MOB
 @ [[EVENT_PICK_CHAR]] works the same way, but selects a random character
@@ -17975,8 +17989,13 @@ among characters.
     ORG     $6613
 EVENT_PICK_CHAR:
     SUBROUTINE EVENT_FACTION_SCENE
-    ; Random event: pick a random character, then process its char events.
-    JSR     PICK_RANDOM_CHAR
+    ; ---- EVENT_PICK_CHAR ----
+    ; Select a random character (uniform) and process its events.
+    ;
+    ; Input:  CURRENT_PLAYER = upper bound of player range
+    ; Output: CHAR_PTR -> selected char record
+    ; Clobbers: A, X, Y, CHAR_INDEX, DATA_PTR
+    JSR     PICK_RANDOM_CHAR        ; uniform char selection -> CHAR_PTR
     JMP     PROCESS_CHAR_EVENTS
 @ %def EVENT_PICK_CHAR
 @ [[EVENT_FACTION_SCENE]] picks a random mob and then searches the mob list
@@ -17998,25 +18017,35 @@ FACTION_MASK            EQU     $F7     ; faction match value for FIND_MOB_BY_FA
     ORG     $6619
 EVENT_FACTION_SCENE:
     SUBROUTINE EVENT_FACTION_SCENE_CONT
-    ; Random event: pick a random mob, check for matching faction
-    ; in the mob list; if found, run SCENE_SETUP for that mob.
+    ; ---- EVENT_FACTION_SCENE ----
+    ; Pick a random mob, find another mob with matching faction,
+    ; and trigger a scene between them.
+    ;
+    ; Input:  TOTAL_MOB_COUNT, char records at $4000+
+    ; Output: SCENE_SETUP called if faction match found,
+    ;         else falls through to EVENT_SPAWN_MOB
+    ; Clobbers: A, X, Y, CHAR_PTR, MOB_PTR, CHAR_INDEX,
+    ;           FACTION_MASK, SOURCE_CHAR, ACTIVE_CHAR
+    ;
+    ; Alternate entry EVENT_FACTION_SCENE_CONT skips mob pick,
+    ; reuses CHAR_PTR set by caller (burst path).
     JSR     PICK_RANDOM_MOB
 EVENT_FACTION_SCENE_CONT:               ; alternate entry from RANDOM_EVENTS burst
-    LDA     CHAR_PTR
-    BANE    #$09,.has_char      ; $FA still at base ($4009)?
-    RTS                         ; no character selected -> skip
+    LDA     CHAR_PTR                    ; check low byte of CHAR_PTR
+    BANE    #$09,.has_char              ; still at base ($4009)?
+    RTS                                 ; no character selected -> skip
 .has_char:
-    LDY     #$05
-    LDA     (CHAR_PTR),Y        ; char record byte 5
-    AND     #$60                ; bits 6-5 = faction mask
-    STA     FACTION_MASK        ; save for FIND_MOB_BY_FACTION
-    STOW    $4000,CHAR_PTR ;  reset $FA/$FB to $4000 (record base)
-    JSR     FIND_MOB_BY_FACTION ; search mob list for matching faction
+    LDY     #CFIELD_STYLE               ; byte 5: faction in bits 6-5
+    LDA     (CHAR_PTR),Y
+    AND     #CFIELD_FACTION_MASK        ; isolate faction bits
+    STA     FACTION_MASK                ; save for FIND_MOB_BY_FACTION
+    STOW    $4000,CHAR_PTR              ; reset CHAR_PTR to record base
+    JSR     FIND_MOB_BY_FACTION         ; search for matching faction
     BANE    #$00,.found
-    JMP     EVENT_SPAWN_MOB     ; not found -> try spawning instead
+    JMP     EVENT_SPAWN_MOB             ; no match -> try spawning
 .found:
-    STOB    #$00,SOURCE_CHAR ; clear source char
-    MOVB    CHAR_INDEX,ACTIVE_CHAR ; set active char to found index
+    STOB    #$00,SOURCE_CHAR            ; clear source char
+    MOVB    CHAR_INDEX,ACTIVE_CHAR      ; set active char = found index
     JSR     SCENE_SETUP
     JSR     CHECK_LOCATION_MATCH
     RTS
@@ -18034,30 +18063,37 @@ world during play.
     ORG     $664E
 EVENT_SPAWN_MOB:
     SUBROUTINE EVENT_SPAWN_MOB
-    ; Random event: pick a random character; if its byte 8 is nonzero
-    ; (active), try again once.  If inactive, use its faction to find
-    ; a matching mob and reorder it into the group.
+    ; ---- EVENT_SPAWN_MOB ----
+    ; Activate a dormant character by placing it into a matching
+    ; mob's group.  Picks a random char; if already active (XP
+    ; field nonzero), retries once.  On success, reorders the
+    ; char into the mob group and clamps its stats.
+    ;
+    ; Input:  CURRENT_PLAYER, char records at $4000+
+    ; Output: REORDER_CHAR + CLAMP_CHAR_FIELD called if spawned
+    ; Clobbers: A, X, Y, CHAR_PTR, MOB_PTR, CHAR_INDEX,
+    ;           FACTION_MASK, SOURCE_CHAR, ACTIVE_CHAR, TARGET_REC
     JSR     PICK_RANDOM_CHAR
-    LDY     #$08
-    LDA     (CHAR_PTR),Y     ; char record byte 8
-    BEQ     .inactive        ; zero = slot available
-    JSR     PICK_RANDOM_CHAR ; try once more
-    LDY     #$08
+    LDY     #CFIELD_XP                  ; byte 8: status/group count
+    LDA     (CHAR_PTR),Y
+    BEQ     .inactive                   ; zero = dormant slot
+    JSR     PICK_RANDOM_CHAR            ; retry once
+    LDY     #CFIELD_XP
     LDA     (CHAR_PTR),Y
     BEQ     .inactive
-    RTS                      ; both active -> give up
+    RTS                                 ; both active -> give up
 .inactive:
-    LDY     #$05
-    LDA     (CHAR_PTR),Y     ; char record byte 5
-    AND     #$60             ; faction mask
+    LDY     #CFIELD_STYLE               ; byte 5: faction in bits 6-5
+    LDA     (CHAR_PTR),Y
+    AND     #CFIELD_FACTION_MASK        ; isolate faction bits
     STA     FACTION_MASK
     JSR     FIND_MOB_BY_FACTION
     BANE    #$00,.found
-    RTS                      ; no matching mob -> skip
+    RTS                                 ; no matching mob -> skip
 .found:
     MOVB    CHAR_INDEX,SOURCE_CHAR
     STOB    #$00,ACTIVE_CHAR
-    MOVW    MOB_PTR,TARGET_REC ;  TARGET_REC/TARGET_REC+1 = mob data pointer
+    MOVW    MOB_PTR,TARGET_REC          ; pass mob ptr to REORDER_CHAR
     JSR     REORDER_CHAR
     JMP     CLAMP_CHAR_FIELD
 @ %def EVENT_SPAWN_MOB
@@ -18076,31 +18112,39 @@ through directly to [[PICK_RANDOM_CHAR]].  The shared tail
     ORG     $6689
 PICK_RANDOM_MOB:
     SUBROUTINE PICK_RANDOM_MOB
-    ; Pick a random mob group by weighted selection.
-    ; Uses TOTAL_MOB_COUNT as the range, then iterates char records
-    ; subtracting group counts (byte 8) until the target is reached.
-    ; Result: $FA/$FB points to the selected char record.
+    ; ---- PICK_RANDOM_MOB ----
+    ; Weighted random mob selection.  Generates a random number in
+    ; [1..TOTAL_MOB_COUNT], then walks char records subtracting
+    ; each group count (CFIELD_XP byte) until the accumulator
+    ; hits zero or goes negative.
+    ;
+    ; Input:  TOTAL_MOB_COUNT = total mob population
+    ; Output: CHAR_PTR -> selected char record
+    ;         CHAR_INDEX = selected player index
+    ; Clobbers: A, X, Y, MOB_PTR, DATA_PTR
+    ;
+    ; Falls through to PICK_RANDOM_CHAR if no mobs exist.
     LDA     TOTAL_MOB_COUNT
-    BEQ     PICK_RANDOM_CHAR     ; no mobs -> fall through to pick char
-    JSR     RANDOM_IN_RANGE      ; random 0..TOTAL_MOB_COUNT-1
-    BAEQ    #$00,PICK_RANDOM_MOB ; zero = retry
-    STA     MOB_PTR              ; remaining count
-    STOB    #$01,CHAR_INDEX ; player index counter
+    BEQ     PICK_RANDOM_CHAR            ; no mobs -> pick char instead
+    JSR     RANDOM_IN_RANGE             ; A = random 0..count-1
+    BAEQ    #$00,PICK_RANDOM_MOB        ; zero = retry (need 1+)
+    STA     MOB_PTR                     ; remaining count
+    STOB    #$01,CHAR_INDEX             ; start at player 1
 .next_char:
     LDA     CHAR_INDEX
-    JSR     GET_CHAR_RECORD
-    LDY     #$08
-    LDA     MOB_PTR              ; remaining
+    JSR     GET_CHAR_RECORD             ; DATA_PTR -> char record
+    LDY     #CFIELD_XP                  ; byte 8: group count in bits 3-0
+    LDA     MOB_PTR                     ; remaining
     SEC
-    SBC     (DATA_PTR),Y         ; subtract group count (byte 8)
+    SBC     (DATA_PTR),Y                ; subtract this char's group count
     STA     MOB_PTR
-    BEQ     .found               ; exact match
-    BMI     .found               ; overshot -> this is the one
+    BEQ     .found                      ; exact match
+    BMI     .found                      ; overshot -> select this one
     INC     CHAR_INDEX
-    BNE     .next_char           ; always branches
+    BNE     .next_char                  ; always branches (index < 256)
 .found:
 COPY_BE_TO_FA:
-    MOVW    DATA_PTR,CHAR_PTR ;  $FA/$FB = DATA_PTR/DATA_PTR+1 (selected record)
+    MOVW    DATA_PTR,CHAR_PTR           ; copy result to CHAR_PTR
     RTS
 @ %def PICK_RANDOM_MOB COPY_BE_TO_FA
 @ [[PICK_RANDOM_CHAR]] selects uniformly from the active player range:
@@ -18112,17 +18156,24 @@ character's record via [[GET_CHAR_RECORD]].
     ORG     $66BA
 PICK_RANDOM_CHAR:
     SUBROUTINE PICK_RANDOM_CHAR
-    ; Pick a random character from players 2..CURRENT_PLAYER-1.
-    ; Result: $FA/$FB points to the selected char record, CHAR_INDEX = index.
+    ; ---- PICK_RANDOM_CHAR ----
+    ; Uniform random character selection from players 2..CURRENT_PLAYER-1.
+    ; Computes range = CURRENT_PLAYER - 3, picks random offset,
+    ; adds base index 2.
+    ;
+    ; Input:  CURRENT_PLAYER = upper bound + 1 of player range
+    ; Output: CHAR_PTR -> selected char record
+    ;         CHAR_INDEX = selected player index
+    ; Clobbers: A, X, Y, DATA_PTR
     LDA     CURRENT_PLAYER
     SEC
-    SBC     #$03            ; range = CURRENT_PLAYER - 3
-    JSR     RANDOM_IN_RANGE ; random 0..range-1
+    SBC     #$03                        ; range = CURRENT_PLAYER - 3
+    JSR     RANDOM_IN_RANGE             ; A = random 0..range-1
     CLC
-    ADC     #$02            ; offset to player 2
-    STA     CHAR_INDEX      ; save selected index
-    JSR     GET_CHAR_RECORD ; load record for player A
-    JMP     COPY_BE_TO_FA   ; copy DATA_PTR/DATA_PTR+1 -> $FA/$FB
+    ADC     #$02                        ; offset to player 2
+    STA     CHAR_INDEX                  ; save selected index
+    JSR     GET_CHAR_RECORD             ; DATA_PTR -> char record
+    JMP     COPY_BE_TO_FA               ; copy DATA_PTR -> CHAR_PTR
 @ %def PICK_RANDOM_CHAR
 
 \section{Character event processing}
@@ -18695,12 +18746,25 @@ scene transition.
     ORG     $1D04
 TRIGGER_SCENE_EVENT:
     SUBROUTINE TRIGGER_SCENE_EVENT
+    ; Trigger a scripted scene from event data.
+    ;
+    ; Input:  EVENT_PTR  -- 3-byte event entry
+    ;         ENTITY_PTR -- current character
+    ; Output: none (side-effects only)
+    ; Behavior:
+    ;   - Clears char turn state, commits move
+    ;   - Event byte 2 = scene index
+    ;   - Event byte 1 = type:
+    ;     $D2: trigger scene only
+    ;     $D3: trigger scene, mark empty
+    ;     $D4: scene + bonus $0F + 1-3 dmg
+    ; Clobbers: A, X, Y
 
     LDA     #$00
-    JSR     SET_CHAR_STATE          ; set char field 15 state to 0
-    MOVW    EVENT_PTR,$5A5B ; save event pointer low
+    JSR     SET_CHAR_STATE          ; clear char turn state
+    MOVW    EVENT_PTR,$5A5B         ; save EVENT_PTR across call
     JSR     COMMIT_MOVE             ; commit move
-    MOVW    $5A5B,EVENT_PTR ; restore event pointer
+    MOVW    $5A5B,EVENT_PTR         ; restore EVENT_PTR
     LDY     #$02
     LDA     (EVENT_PTR),Y           ; event byte 2 = scene index
     JSR     SCENE_LOOP              ; trigger scene
@@ -18710,12 +18774,12 @@ TRIGGER_SCENE_EVENT:
     RTS                             ; $D2: trigger scene only
 .d3_or_above:
     BNE     .d4
-    LDA     #$FE                    ; $D3: mark event as empty
+    LDA     #$FE                    ; $D3: mark event empty
     DEY
     STA     (EVENT_PTR),Y
     RTS
 .d4:
-    LDA     #$FE                    ; $D4: mark event as empty
+    LDA     #$FE                    ; $D4: mark event empty
     DEY
     STA     (EVENT_PTR),Y
     LDA     #$0F
@@ -18724,7 +18788,7 @@ TRIGGER_SCENE_EVENT:
     JSR     RANDOM_IN_RANGE         ; random(3)
     CLC
     ADC     #$01                    ; 1-3
-    JMP     APPLY_DAMAGE_TO_CURRENT ; apply effect to char
+    JMP     APPLY_DAMAGE_TO_CURRENT ; apply damage to char
 @ %def TRIGGER_SCENE_EVENT
 @ When a character steps onto a treasure event, [[PICKUP_TREASURE]] handles the
 interaction.  The routine first clears the character's state, copies the event
