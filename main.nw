@@ -7176,6 +7176,34 @@ DISPLAY_FRAME_DATA:
     HEX     08 00 41 44 C3 00
 @ %def DISPLAY_FRAME_DATA
 
+@ \subsection{Runtime data area (\$A8F2--\$B2FF)}
+
+The region \$A8F2--\$B2FF is a 2,574-byte runtime data area,
+initialized to mostly zeros in the disk image.  The first 14~bytes
+(\$A8F2--\$A8FF) contain non-zero initialization data; the remaining
+2,560~bytes (\$A900--\$B2FF) are zeroed.  During gameplay, this area
+is used extensively as working storage with 77~absolute-addressed
+references from across the program, including:
+\begin{itemize}
+\item Entity/mob runtime state (\$A919, \$A960, \$A964, \$A96C, \$A974)
+\item Subroutine at \$AB45 (called from game data at \$4A64)
+\item Display buffer at \$B120 (indexed load from \$1980)
+\item Comparison data at \$ABD0 (tested from \$59FE, \$5A65, \$5AE3)
+\item Disk I/O state (\$ADBB, \$AFBA)
+\item Jump vector at \$AD06 (from \$0601)
+\end{itemize}
+Full decomposition of individual fields is deferred.
+
+<<runtime data area>>=
+    ORG     $A8F2
+RUNTIME_DATA_INIT:
+    ; Non-zero initialization data ($A8F2-$A8FF)
+    HEX     AA 00 40 55 A4 55 01 00 CA 02 01 00 80 80
+
+RUNTIME_DATA_AREA:
+    DS      2560,$00           ; zeroed runtime working storage ($A900-$B2FF)
+@ %def RUNTIME_DATA_INIT RUNTIME_DATA_AREA
+
 @ Entity and item definition tables (\$A6B9--\$A723): packed records
 defining entity types, item properties, and associated string pointers.
 Each record appears to be 6--8 bytes with a 3-character name abbreviation
@@ -20855,6 +20883,7 @@ The following root chunks produce the assembly files when tangled.
 <<display and dos data>>
 <<entity item tables>>
 <<extended entity data>>
+<<runtime data area>>
 <<disk read field>>
 <<verify data field>>
 <<disk vm loop>>
