@@ -7493,15 +7493,20 @@ analysis.
 This region contains interleaved lookup tables and string data used
 by the shop, combat, and entity display systems.
 
-\paragraph{Shop item table (\$7EDD--\$7F2E).}
-Ten records for purchasable items.  Each has a 2-byte buy-effect
-handler address ([[SHOP_BUY_EFFECT_0]]--[[SHOP_BUY_EFFECT_4]] for
-weapons, [[XP_AWARD_0]]--[[XP_AWARD_4]] for armor), a 2-byte pointer
-to the item's name string, and a 1-byte price value.  Between some
-records are embedded display format strings (high-ASCII digits and
-separators used by the shop price renderer).  The tail at
-\$7F1F--\$7F2E contains additional price format data indexed
-from~\$7951.
+\paragraph{Shop table (\$7EDD--\$7F2E).}
+Two [[SHOP_RECORD_SIZE]]-byte (\$29 = 41 bytes) shop records,
+selected by [[DISPLAY_SHOP]] based on the entity's type byte
+(byte~1 of [[ENTITY_REC]], minus~\$D5).  Record~0 is the weapon
+shop; record~1 is the armor shop.
+
+Each record contains five 5-byte item slots at offsets \$00, \$05,
+\$0A, \$0F, and~\$14.  Each slot holds a 2-byte buy-effect handler
+address, a 2-byte item name string pointer, and a 1-byte
+price-per-unit value.  The entity's bitmask (byte~2, stored in
+[[$5A83]]) determines which slots are displayed; unused slots contain
+display format data.  Bytes \$19--\$27 hold additional items or
+display format strings.  Byte~\$28 is the shop scene number (passed
+to [[SCENE_LOOP]] when entering the shop).
 
 \paragraph{Item name strings (\$7F2F--\$7FBD).}
 Ten length-prefixed high-ASCII item name strings (5~weapons,
@@ -7524,60 +7529,65 @@ SMITES, WHOPS, WHACKS, BASHES, WHOMPS, WALLOPS, SMASHES,
 CLOBBERS, LAMBASTES.  The table base at \$807D is referenced from
 the attack display routine at \$7E2E.
 
-<<shop item table>>=
+<<shop table>>=
     ORG     $7EDD
-SHOP_ITEM_TABLE:
-    ; --- Weapon records ---
-    ; rec0: AN IRON SWORD (price $0A)
+SHOP_TABLE:
+    ; === Weapon shop record (41 bytes) ===
+    ; slot 0 [+$00]: AN IRON SWORD (price $0A)
     DC.W    SHOP_BUY_EFFECT_0
     DC.W    S_IRON_SWORD
     DC.B    $0A
-    ; rec1: A STEEL SWORD (price $32)
+    ; slot 1 [+$05]: A STEEL SWORD (price $32)
     DC.W    SHOP_BUY_EFFECT_1
     DC.W    S_STEEL_SWORD
     DC.B    $32
-    ; display format: "7E . "
+    ; slot 2 [+$0A]: display format (masked out)
     HEX     B7 C5 A0 AE A0
-    ; rec2: AN OAK CLUB (price $03)
+    ; slot 3 [+$0F]: AN OAK CLUB (price $03)
     DC.W    SHOP_BUY_EFFECT_2
     DC.W    S_OAK_CLUB
     DC.B    $03
-    ; display format: "2.  ."
+    ; slot 4 [+$14]: display format (masked out)
     HEX     B2 AE A0 A0 AE
-    ; rec3: A STEEL DAGGER (price $0F)
+    ; [+$19]: A STEEL DAGGER (price $0F)
     DC.W    SHOP_BUY_EFFECT_3
     DC.W    S_STEEL_DAGGER
     DC.B    $0F
-    ; rec4: A SHIV (price $0A)
+    ; [+$1E]: A SHIV (price $0A)
     DC.W    SHOP_BUY_EFFECT_4
     DC.W    S_SHIV
     DC.B    $0A
-    ; display format: "6 4 F2"
-    HEX     B6 A0 B4 A0 C6 32
-    ; --- Armor records ---
-    ; rec5: PLATE ARMOR (price $50)
+    ; [+$23]: display format
+    HEX     B6 A0 B4 A0 C6
+    ; [+$28]: scene number
+    DC.B    $32                ; scene $32 (weapon shop)
+
+    ; === Armor shop record (41 bytes) ===
+    ; slot 0 [+$00]: PLATE ARMOR (price $50)
     DC.W    XP_AWARD_0
     DC.W    S_PLATE_ARMOR
     DC.B    $50
-    ; rec6: RITHMIL PLATE ARMOR (price $C8)
+    ; slot 1 [+$05]: RITHMIL PLATE ARMOR (price $C8)
     DC.W    XP_AWARD_1
     DC.W    S_RITHMIL_PLATE
     DC.B    $C8
-    ; rec7: CHAIN MAIL (price $28)
+    ; slot 2 [+$0A]: CHAIN MAIL (price $28)
     DC.W    XP_AWARD_2
     DC.W    S_CHAIN_MAIL
     DC.B    $28
-    ; rec8: RITHMIL CHAIN MAIL (price $64)
+    ; slot 3 [+$0F]: RITHMIL CHAIN MAIL (price $64)
     DC.W    XP_AWARD_3
     DC.W    S_RITHMIL_CHAIN
     DC.B    $64
-    ; rec9: LEATHER ARMOR (price $08)
+    ; slot 4 [+$14]: LEATHER ARMOR (price $08)
     DC.W    XP_AWARD_4
     DC.W    S_LEATHER_ARMOR
     DC.B    $08
-    ; display format: " 5O.5 KL1MP/1A93"
-    HEX     A0 B5 CF AE B5 A0 CB CC B1 CD D0 AF B1 C1 B9 33
-@ %def SHOP_ITEM_TABLE
+    ; [+$19]: display format
+    HEX     A0 B5 CF AE B5 A0 CB CC B1 CD D0 AF B1 C1 B9
+    ; [+$28]: scene number
+    DC.B    $33                ; scene $33 (armor shop)
+@ %def SHOP_TABLE
 
 <<item name strings>>=
     ORG     $7F2F
@@ -16903,7 +16913,7 @@ when all bits have been checked.
 SHOP_PRICE          EQU     $5A81   ; shop: accumulated price low byte
 SHOP_PRICE_HI       EQU     $5A82   ; shop: accumulated price high byte
 SHOP_ITEM_MASK      EQU     $5A80   ; shop: bitmask for current item ($80 rotating right)
-SHOP_ITEM_OFFSET EQU    $5A85   ; offset into shop item table (5 per item)
+SHOP_ITEM_OFFSET EQU    $5A85   ; offset into shop record (5 per item slot)
 @ %def SHOP_PRICE SHOP_PRICE_HI SHOP_ITEM_MASK SHOP_ITEM_OFFSET
 
 <<zero page defines>>=
@@ -16920,7 +16930,7 @@ DISPLAY_SHOP:
     BEQ     .do_shop
     RTS
 .do_shop:
-    STOW    SHOP_ITEM_TABLE,SHOP_DATA_PTR
+    STOW    SHOP_TABLE,SHOP_DATA_PTR
     LDY     #$01
     LDA     (ENTITY_REC),Y
     SEC
@@ -21273,7 +21283,7 @@ The following root chunks produce the assembly files when tangled.
 <<status border data>>
 <<press space string>>
 <<press button string>>
-<<shop item table>>
+<<shop table>>
 <<item name strings>>
 <<map object names>>
 <<attack verb strings>>
