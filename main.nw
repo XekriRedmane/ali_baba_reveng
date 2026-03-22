@@ -16946,7 +16946,7 @@ DISPLAY_SHOP:
     LDA     (ENTITY_REC),Y
     STA     $5A83
     JSR     SET_CURSOR_ROW21
-    LDY     #$28
+    LDY     #SHOP_SCENE_OFFSET
     LDA     (SHOP_DATA_PTR),Y
     JSR     SCENE_LOOP
     JSR     LOAD_CHAR_NAME_PTR
@@ -17030,8 +17030,9 @@ DISPLAY_SHOP:
 table.
 
 <<defines>>=
-SHOP_RECORD_SIZE        EQU     $29     ; size of one shop item record (41 bytes)
-@ %def SHOP_RECORD_SIZE
+SHOP_RECORD_SIZE        EQU     $29     ; size of one shop record (41 bytes)
+SHOP_SCENE_OFFSET       EQU     $28     ; offset of scene number within shop record
+@ %def SHOP_RECORD_SIZE SHOP_SCENE_OFFSET
 
 <<advance shop ptr>>=
     ORG     $71F0
