@@ -16808,7 +16808,7 @@ FIND_NEAREST_EVENT:
     ; Find the nearest non-activated event to the current entity.
     ;
     ; Input:  ENTITY_PTR  — entity whose position to measure from
-    ;         CHAR_PTR+6  — pointer to event list
+    ;         CHAR_PTR    — bytes 6-7 of record hold event list pointer
     ;
     ; Output: A = packed position of nearest event
     ;
