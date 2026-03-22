@@ -17015,9 +17015,13 @@ DISPLAY_SHOP:
     STA     SHOP_ITEM_OFFSET
     JMP     .item_loop
 @ %def DISPLAY_SHOP
-@ [[ADVANCE_SHOP_PTR]] adds~\$29 (41 bytes---the size of one shop data
-record) to [[SHOP_DATA_PTR]], advancing it to the next shop entry in
-the data table.
+@ [[ADVANCE_SHOP_PTR]] adds [[SHOP_RECORD_SIZE]] (41 bytes) to
+[[SHOP_DATA_PTR]], advancing it to the next shop entry in the data
+table.
+
+<<defines>>=
+SHOP_RECORD_SIZE        EQU     $29     ; size of one shop item record (41 bytes)
+@ %def SHOP_RECORD_SIZE
 
 <<advance shop ptr>>=
     ORG     $71F0
@@ -17025,7 +17029,7 @@ ADVANCE_SHOP_PTR:
     SUBROUTINE ADVANCE_SHOP_PTR
     CLC
     LDA     SHOP_DATA_PTR
-    ADC     #$29
+    ADC     #SHOP_RECORD_SIZE
     STA     SHOP_DATA_PTR
     BCC     .done
     INC     SHOP_DATA_PTR+1
