@@ -3901,6 +3901,7 @@ MFIELD_ATTACK       EQU     $07     ; byte 7: attack stat
 MFIELD_XP           EQU     $08     ; byte 8: status (7) | pending XP (6-4) | group count (3-0)
 MFIELD_DEFENSE      EQU     $09     ; byte 9: defense stat
 MFIELD_LEVEL        EQU     $0B     ; byte 11: class/faction (7-5) | level (4-0)
+MFIELD_FLAGS        EQU     $0F     ; byte 15: status flags (bit 2 = combat engaged)
 @ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_MOB_TYPE MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL
 
 <<game init>>=
@@ -16436,10 +16437,38 @@ AI_BEST_POS             EQU     $BE     ; best hostile position in ai_choose_tar
 AI_BEST_STR             EQU     $BF     ; best hostile strength in ai_choose_target
 @ %def AI_BEST_STR
 
+<<defines>>=
+AI_TARGET_ROW       EQU     $5A73   ; AI target row (from POS_TO_COLROW)
+@ %def AI_TARGET_ROW
+
 <<ai choose target>>=
     ORG     $68AB
 AI_CHOOSE_TARGET:
     SUBROUTINE AI_CHOOSE_TARGET
+    ; Select a movement target for an NPC based on its AI mode.
+    ;
+    ; Input:  ENTITY_PTR    — NPC entity record
+    ;         CHAR_PTR      — character index record
+    ;         MOB_PTR       — mob data pointer (set by group iteration)
+    ;         CHAR_AI_MODE  — AI behavior mode (0-5+)
+    ;
+    ; Output: AI_TARGET_POS — packed position of chosen target
+    ;         AI_TARGET_COL — target column
+    ;         AI_TARGET_ROW — target row
+    ;         AI_PREV_DIR   — cleared to 0
+    ;
+    ; Behavior:
+    ;   Mode 0/1: attempt to join player's party; if no match,
+    ;     fall through to mode 2.
+    ;   Mode 2: if strength > mob type, target nearest event;
+    ;     otherwise no target.
+    ;   Mode 3: scan group for nearest hostile mob.
+    ;   Mode 4: no target (forced movement by NPC_MOVE_AI).
+    ;   Mode 5+: scan group for strongest hostile mob.
+    ;
+    ; Modifies: AI_TARGET_POS, AI_TARGET_COL, AI_TARGET_ROW,
+    ;           AI_PREV_DIR, AI_BEST_POS, AI_BEST_STR, TARGET_REC
+    ; Clobbers: A, X, Y
 
     ; --- dispatch by AI mode ---
     STOB    #$00,AI_PREV_DIR
@@ -16449,53 +16478,53 @@ AI_CHOOSE_TARGET:
     ; --- mode 0/1: check if NPC should join party ---
     JSR     PICK_RANDOM_MEMBER
     LDA     MOB_PTR+1
-    BAEQ    #$00,.simple_target ; no match -> simple target
+    BAEQ    #$00,.simple_target    ; no match -> simple target
     JSR     SET_CURSOR_ROW21
-    LDA     #$24
-    JSR     DISPLAY_MESSAGE     ; "joins party" message
+    LDA     #$24                   ; "joins party" message
+    JSR     DISPLAY_MESSAGE
     JSR     PRINT_MEMBER_NAME
     JSR     SCROLL_STATUS_LINE
     JSR     DELAY_WITH_ANIMATION
-    LDA     #$25
+    LDA     #$25                   ; confirmation message
     JSR     DISPLAY_MESSAGE
-    STOB    #$00,CHAR_AI_MODE ; switch to player control
-    LDY     #$04
-    LDA     (ENTITY_PTR),Y
-    SEC
-    SBC     #$15                ; adjust char field 4
-    STA     (ENTITY_PTR),Y
-    LDY     #$0F
-    LDA     (MOB_PTR),Y         ; source field 15 high bits
-    AND     #$C0
-    STA     $BA
-    LDA     (ENTITY_PTR),Y      ; target field 15 low bits
-    AND     #$3F
-    ORA     $BA                 ; merge high bits from source
-    STA     (ENTITY_PTR),Y
-    LDY     #$08
-    LDA     (CHAR_PTR),Y        ; group field 8
-    CLC
-    ADC     #$01                ; increment party size
-    STA     (CHAR_PTR),Y
-    INC     $5A01               ; increment global party count
+    STOB    #$00,CHAR_AI_MODE      ; switch to player control
+    LDY     #MFIELD_APPEARANCE     ; \ adjust appearance (remove NPC flag)
+    LDA     (ENTITY_PTR),Y         ;  |
+    SEC                            ;  |
+    SBC     #$15                   ;  |
+    STA     (ENTITY_PTR),Y         ; /
+    LDY     #MFIELD_FLAGS          ; \ copy high 2 bits of source flags
+    LDA     (MOB_PTR),Y            ;  | to entity's flags field
+    AND     #$C0                   ;  |
+    STA     $BA                    ;  |
+    LDA     (ENTITY_PTR),Y         ;  |
+    AND     #$3F                   ;  |
+    ORA     $BA                    ;  |
+    STA     (ENTITY_PTR),Y         ; /
+    LDY     #CFIELD_XP             ; \ increment party size in group record
+    LDA     (CHAR_PTR),Y           ;  |
+    CLC                            ;  |
+    ADC     #$01                   ;  |
+    STA     (CHAR_PTR),Y           ; /
+    INC     TOTAL_MOB_COUNT        ; increment global count
     RTS
 
-    ; --- mode 2: compare stats for target ---
+    ; --- mode 2: compare strength vs mob type for target ---
 .mode_ge2:
     BNE     .mode_ge3
 .simple_target:
-    LDY     #$05
-    LDA     (ENTITY_PTR),Y      ; char field 5
+    LDY     #MFIELD_STRENGTH       ; strength (bits 4-0)
+    LDA     (ENTITY_PTR),Y
     AND     #$1F
     STA     $BA
-    INY
-    LDA     (ENTITY_PTR),Y      ; char field 6
+    INY                            ; Y = MFIELD_MOB_TYPE
+    LDA     (ENTITY_PTR),Y        ; mob type (bits 5-0)
     AND     #$3F
-    BAPL    $BA,.use_encounter
-    STOB    #$00,AI_TARGET_POS ; no target
+    BAPL    $BA,.use_encounter     ; mob type >= strength -> seek encounter
+    STOB    #$00,AI_TARGET_POS     ; no target
     JMP     .done
 .use_encounter:
-    JSR     FIND_NEAREST_EVENT  ; find encounter position
+    JSR     FIND_NEAREST_EVENT
     STA     AI_TARGET_POS
     JMP     .done
 
@@ -16503,30 +16532,30 @@ AI_CHOOSE_TARGET:
 .mode_ge3:
     BAPL    #$04,.mode_ge4
     MOVW    ENTITY_PTR,TARGET_REC
-    STOB    #$3C,AI_TARGET_COL ; initial min distance
+    STOB    #$3C,AI_TARGET_COL     ; initial min distance = 60
     JSR     FIRST_GROUP_MEMBER
 .loop3:
     JSR     CHECK_HOSTILE
-    BAEQ    #$00,.skip3
-    LDY     #$03
-    LDA     (MOB_PTR),Y         ; mob packed position
-    JSR     MANHATTAN_DISTANCE  ; compute distance
-    BAGE    AI_TARGET_COL,.skip3 ; not closer
-    STA     AI_TARGET_COL       ; new minimum
-    LDY     #$03
+    BAEQ    #$00,.skip3            ; not hostile -> skip
+    LDY     #MFIELD_POSITION
     LDA     (MOB_PTR),Y
-    STA     AI_TARGET_POS       ; target = this mob's position
+    JSR     MANHATTAN_DISTANCE
+    BAGE    AI_TARGET_COL,.skip3   ; not closer -> skip
+    STA     AI_TARGET_COL          ; new minimum distance
+    LDY     #MFIELD_POSITION
+    LDA     (MOB_PTR),Y
+    STA     AI_TARGET_POS          ; target = this mob's position
 .skip3:
-    JSR     NEXT_GROUP_MEMBER   ; next group member
+    JSR     NEXT_GROUP_MEMBER
     LDA     MOB_PTR+1
     BNE     .loop3
     LDA     AI_TARGET_COL
-    BANE    #$3C,.found3
-    MOVB    EVENT_POS,AI_TARGET_POS ; no hostile found -> use default
+    BANE    #$3C,.found3           ; found one (distance changed from $3C)
+    MOVB    EVENT_POS,AI_TARGET_POS ; no hostile -> fallback to event
 .found3:
     JMP     .done
 
-    ; --- mode 4: no target ---
+    ; --- mode 4: no target (forced movement) ---
 .mode_ge4:
     BNE     .mode_gt4
     STOB    #$00,AI_TARGET_POS
@@ -16534,38 +16563,38 @@ AI_CHOOSE_TARGET:
 
     ; --- mode 5+: find strongest hostile ---
 .mode_gt4:
-    STOB    #$00,AI_BEST_STR ; max strength seen
+    STOB    #$00,AI_BEST_STR       ; max strength seen = 0
     MOVW    ENTITY_PTR,TARGET_REC
     JSR     FIRST_GROUP_MEMBER
 .loop5:
     JSR     CHECK_HOSTILE
-    BAEQ    #$00,.skip5
-    LDY     #$05
-    LDA     (MOB_PTR),Y         ; mob field 5
-    AND     #$1F                ; strength stat
-    BAMI    AI_BEST_STR,.skip5 ; not stronger
-    STA     AI_BEST_STR         ; new max
-    LDY     #$03
+    BAEQ    #$00,.skip5            ; not hostile -> skip
+    LDY     #MFIELD_STRENGTH
     LDA     (MOB_PTR),Y
-    STA     AI_BEST_POS         ; target position
+    AND     #$1F                   ; strength (bits 4-0)
+    BAMI    AI_BEST_STR,.skip5     ; not stronger -> skip
+    STA     AI_BEST_STR            ; new max strength
+    LDY     #MFIELD_POSITION
+    LDA     (MOB_PTR),Y
+    STA     AI_BEST_POS            ; record position
 .skip5:
-    JSR     NEXT_GROUP_MEMBER   ; next group member
+    JSR     NEXT_GROUP_MEMBER
     LDA     MOB_PTR+1
     BNE     .loop5
     LDA     AI_BEST_STR
-    BEQ     .no_target5
-    MOVB    AI_BEST_POS,AI_TARGET_POS ; strongest mob's position
+    BEQ     .no_target5            ; none found
+    MOVB    AI_BEST_POS,AI_TARGET_POS
     JMP     .done
 .no_target5:
-    MOVB    EVENT_POS,AI_TARGET_POS ; no hostile -> use default
+    MOVB    EVENT_POS,AI_TARGET_POS ; fallback to event
     JMP     .done
 
-    ; --- convert target position to col/row ---
+    ; --- convert target to col/row ---
 .done:
     LDA     AI_TARGET_POS
     JSR     POS_TO_COLROW
-    STA     AI_TARGET_COL       ; target column
-    STY     $5A73               ; target row
+    STA     AI_TARGET_COL
+    STY     AI_TARGET_ROW
     RTS
 @ %def AI_CHOOSE_TARGET
 @ [[NPC_MOVE_AI]] implements the movement decision for AI-controlled
