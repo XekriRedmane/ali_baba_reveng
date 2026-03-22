@@ -7849,23 +7849,23 @@ PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random 
 STEP_PRNG:
     SUBROUTINE STEP_PRNG
 
-    LDA     PRNG_STATE              ; val
-    ASL                             ; val*2
-    ASL                             ; val*4
-    STA     PRNG_TEMP               ; temp = val*4
-    ASL                             ; val*8
-    ASL                             ; val*16
-    ASL                             ; val*32
-    ASL                             ; val*64
+    LDA     PRNG_STATE                 ; val
+    ASL                                ; val*2
+    ASL                                ; val*4
+    STA     PRNG_TEMP                  ; temp = val*4
+    ASL                                ; val*8
+    ASL                                ; val*16
+    ASL                                ; val*32
+    ASL                                ; val*64
     CLC
-    ADC     PRNG_TEMP               ; val*64 + val*4 = val*68
+    ADC     PRNG_TEMP                  ; val*64 + val*4 = val*68
     CLC
-    ADC     PRNG_STATE              ; val*68 + val = val*69
+    ADC     PRNG_STATE                 ; val*68 + val = val*69
     CLC
-    ADC     #$53                    ; + $53
-    STA     PRNG_STATE              ; store full result
-    LSR                             ; val >> 1
-    STA     PRNG_OUTPUT             ; shifted copy for random tests
+    ADC     #$53                       ; + $53
+    STA     PRNG_STATE                 ; store full result
+    LSR                                ; val >> 1
+    STA     PRNG_OUTPUT                ; shifted copy for random tests
     RTS
 @ %def STEP_PRNG
 Two shifts produce [[val*4]], saved to [[PRNG_TEMP]].  Four more shifts give
@@ -7910,73 +7910,73 @@ bracket to minimize the number of PRNG calls.
 RANDOM_IN_RANGE:
     SUBROUTINE RANDOM_IN_RANGE
 
-    STA     RNG_LIMIT               ; save range limit
+    STA     RNG_LIMIT                  ; save range limit
     BANE    #$00,.nonzero
-    RTS                             ; range=0 -> return 0
+    RTS                                ; range=0 -> return 0
 
 .nonzero:
     BAPL    #$02,.ge2
-    LDY     #$06                    ;  | range 1: mask=$40, shift=6
-    LDA     #$40                    ;  |
-    BNE     .have_mask              ; /
+    LDY     #$06                       ;  | range 1: mask=$40, shift=6
+    LDA     #$40                       ;  |
+    BNE     .have_mask                 ; /
 .ge2:
     BAPL    #$04,.ge4
-    LDY     #$05                    ;  | range 2-3: mask=$60, shift=5
-    LDA     #$60                    ;  |
-    BNE     .have_mask              ; /
+    LDY     #$05                       ;  | range 2-3: mask=$60, shift=5
+    LDA     #$60                       ;  |
+    BNE     .have_mask                 ; /
 .ge4:
     BAPL    #$08,.ge8
-    LDY     #$04                    ;  | range 4-7: mask=$70, shift=4
-    LDA     #$70                    ;  |
-    BNE     .have_mask              ; /
+    LDY     #$04                       ;  | range 4-7: mask=$70, shift=4
+    LDA     #$70                       ;  |
+    BNE     .have_mask                 ; /
 .ge8:
     BAPL    #$10,.ge16
-    LDY     #$03                    ;  | range 8-15: mask=$78, shift=3
-    LDA     #$78                    ;  |
-    BNE     .have_mask              ; /
+    LDY     #$03                       ;  | range 8-15: mask=$78, shift=3
+    LDA     #$78                       ;  |
+    BNE     .have_mask                 ; /
 .ge16:
     BAPL    #$20,.ge32
-    LDY     #$02                    ;  | range 16-31: mask=$7C, shift=2
-    LDA     #$7C                    ;  |
-    BNE     .have_mask              ; /
+    LDY     #$02                       ;  | range 16-31: mask=$7C, shift=2
+    LDA     #$7C                       ;  |
+    BNE     .have_mask                 ; /
 .ge32:
     BAPL    #$40,.ge64
-    LDY     #$01                    ;  | range 32-63: mask=$7E, shift=1
-    LDA     #$7E                    ;  |
-    BNE     .have_mask              ; /
+    LDY     #$01                       ;  | range 32-63: mask=$7E, shift=1
+    LDA     #$7E                       ;  |
+    BNE     .have_mask                 ; /
 .ge64:
-    LDY     #$00                    ; range 64-127: mask=$7F, shift=0
+    LDY     #$00                       ; range 64-127: mask=$7F, shift=0
     LDA     #$7F
 
 .have_mask:
-    STA     RNG_MASK                ; save bit mask
-    LDA     RNG_LIMIT               ; reload range limit
-    STY     RNG_LIMIT               ; save shift count in RNG_LIMIT
+    STA     RNG_MASK                   ; save bit mask
+    LDA     RNG_LIMIT                  ; reload range limit
+    STY     RNG_LIMIT                  ; save shift count in RNG_LIMIT
 .shift_loop:
-    DEY                             ; \
-    BMI     .shifted                ;  | shift limit left by (shift count)
-    CLC                             ;  | positions so it aligns with the
-    ROL                             ;  | mask bits
-    BNE     .shift_loop             ; /
+    DEY                                ; \
+    BMI     .shifted                   ;  | shift limit left by (shift count)
+    CLC                                ;  | positions so it aligns with the
+    ROL                                ;  | mask bits
+    BNE     .shift_loop                ; /
 .shifted:
-    LDY     RNG_LIMIT               ; Y = shift count
-    STA     RNG_LIMIT               ; save shifted limit
+    LDY     RNG_LIMIT                  ; Y = shift count
+    STA     RNG_LIMIT                  ; save shifted limit
 
 .sample:
-    JSR     STEP_PRNG               ; get next random byte
-    LDA     PRNG_OUTPUT             ; load masked PRNG output
-    AND     RNG_MASK                ; mask to relevant bits
-    BAEQ    RNG_LIMIT,.accept       ; equal -> accept
-    BPL     .sample                 ; greater -> reject, retry
+    JSR     STEP_PRNG                  ; get next random byte
+    LDA     PRNG_OUTPUT                ; load masked PRNG output
+    AND     RNG_MASK                   ; mask to relevant bits
+    BAEQ    RNG_LIMIT,.accept          ; equal -> accept
+    BPL     .sample                    ; greater -> reject, retry
 
 .accept:
-    DEY                             ; \
-    BPL     .shift_right            ;  | shift result right by (shift count)
-    RTS                             ;  | to recover the final value
+    DEY                                ; \
+    BPL     .shift_right               ;  | shift result right by (shift count)
+    RTS                                ;  | to recover the final value
 .shift_right:
-    CLC                             ;  |
-    ROR                             ;  |
-    BCC     .accept                 ; / (always taken: masked bit is 0)
+    CLC                                ;  |
+    ROR                                ;  |
+    BCC     .accept                    ; / (always taken: masked bit is 0)
 @ %def RANDOM_IN_RANGE
 
 \section{Coordinate conversion}
@@ -8005,15 +8005,15 @@ the remainder.
 POS_TO_COLROW:
     SUBROUTINE POS_TO_COLROW
 
-    LDY     #$00            ; row counter = 0
+    LDY     #$00                       ; row counter = 0
 .loop:
     CLC
-    ADC     #$EC            ; A -= MAP_WIDTH ($EC = -20)
-    BCC     .done           ; underflow → went past 0
-    INY                     ; row++
-    BCS     .loop           ; always taken (C=1)
+    ADC     #$EC                       ; A -= MAP_WIDTH ($EC = -20)
+    BCC     .done                      ; underflow -> went past 0
+    INY                                ; row++
+    BCS     .loop                      ; always taken (C=1)
 .done:
-    ADC     #MAP_WIDTH      ; add 20 back → remainder
+    ADC     #MAP_WIDTH                 ; add 20 back -> remainder
     RTS
 @ %def POS_TO_COLROW
 The inverse of [[POS_TO_COLROW]]: converts a column in~A and row in~Y
@@ -8039,22 +8039,34 @@ COLROW_TO_POS:
 
     CLC
 .loop:
-    DEY                     ; row--
-    BPL     .add            ; row >= 0 → add another 20
-    RTS                     ; Y exhausted, A = result
+    DEY                                ; row--
+    BPL     .add                       ; row >= 0 -> add another 20
+    RTS                                ; Y exhausted, A = result
 .add:
-    ADC     #MAP_WIDTH      ; A += 20
-    BCC     .loop           ; no overflow → continue
-                            ; C=1 → overflow, fall through
+    ADC     #MAP_WIDTH                 ; A += 20
+    BCC     .loop                      ; no overflow -> continue
+                                       ; C=1 -> overflow, fall through
 @ %def COLROW_TO_POS
 
 @ [[GET_MOB_DATA]] computes a pointer into the game data from a 1-based
 index in~A.  Each record is 16~bytes.  The result [[MOB_DATA_PTR]]
-([[$BA/$BB]]) = [[$4000/$4001]] base + (index$-$1)$\times$16.
+([[$BA/$BB]]) = [[MOB_BASE_LO]]/[[MOB_BASE_HI]] base + (index$-$1)$\times$16.
 
 <<zero page defines>>=
 MOB_DATA_PTR            EQU     $BA     ; mob data record pointer (2 bytes, $BA/$BB)
 @ %def MOB_DATA_PTR
+
+@ The mob data base address is stored in the first two bytes of the
+character table header record at [[$4000]].  [[CHAR_LIST_HEAD]] at
+[[$4002]] is the head of the character linked list.
+
+<<defines>>=
+MOB_BASE_LO         EQU     $4000   ; mob data base address low byte
+MOB_BASE_HI         EQU     $4001   ; mob data base address high byte
+CHAR_LIST_HEAD      EQU     $4002   ; head of character linked list (mob index, 0=none)
+HIGH_NIBBLE_MASK    EQU     $F0     ; bits 7-4: generic high nibble extraction
+NAME_BUF_LEN        EQU     $14     ; character name display buffer length (20 bytes)
+@ %def MOB_BASE_LO MOB_BASE_HI CHAR_LIST_HEAD HIGH_NIBBLE_MASK NAME_BUF_LEN
 
 <<get mob data>>=
     ORG     $0C32
@@ -8063,7 +8075,7 @@ MOB_DATA_PTR            EQU     $BA     ; mob data record pointer (2 bytes, $BA/
 ;
 ; Each mob record is 16 bytes.  Given a 1-based
 ; index, computes MOB_DATA_PTR = base + (index-1)*16
-; where base = $4000/$4001.
+; where base = MOB_BASE_LO/MOB_BASE_HI.
 ;
 ; Input:   A = mob index (1-based)
 ; Output:  MOB_DATA_PTR ($BA/$BB) = record address
@@ -8073,22 +8085,22 @@ GET_MOB_DATA:
     SUBROUTINE GET_MOB_DATA
 
     CLC
-    ADC     #$FF            ; A = index - 1
-    ROL2                    ; rotate left 4 times
-    ROL2                    ;   = multiply by 16 (with carry)
-    TAY                     ; save intermediate
-    ROL                     ; one more rotate
-    AND     #$0F            ; high nybble → page offset
+    ADC     #$FF                       ; A = index - 1
+    ROL2                               ; rotate left 4 times
+    ROL2                               ;   = multiply by 16 (with carry)
+    TAY                                ; save intermediate
+    ROL                                ; one more rotate
+    AND     #LOW_NIBBLE_MASK           ; high nybble -> page offset
     CLC
-    ADC     $4001           ; add base page
-    STA     MOB_DATA_PTR+1  ; store high byte
+    ADC     MOB_BASE_HI                ; add base page
+    STA     MOB_DATA_PTR+1             ; store high byte
     TYA
-    AND     #$F0            ; low nybble → byte offset
+    AND     #HIGH_NIBBLE_MASK          ; low nybble -> byte offset
     CLC
-    ADC     $4000           ; add base offset
-    STA     MOB_DATA_PTR    ; store low byte
+    ADC     MOB_BASE_LO                ; add base offset
+    STA     MOB_DATA_PTR               ; store low byte
     BCC     .done
-    INC     MOB_DATA_PTR+1  ; propagate carry
+    INC     MOB_DATA_PTR+1             ; propagate carry
 .done:
     RTS
 @ %def GET_MOB_DATA
@@ -8267,20 +8279,20 @@ MOB_PTR                 EQU     $F4     ; mob data pointer (2 bytes, $F4/$F5)
 CLAMP_CHAR_FIELD:
     SUBROUTINE CLAMP_CHAR_FIELD
 
-    LDY     #MFIELD_STRENGTH        ; byte 5: strength
-    LDA     (MOB_PTR),Y             ; load strength byte
-    AND     #STRENGTH_MASK          ; bits 4-0 = minimum HP
-    STA     MOB_DATA_PTR            ; save as floor value
-    INY                             ; Y = MFIELD_HP (byte 6)
-    LDA     (MOB_PTR),Y             ; load HP byte
-    AND     #HP_MASK                ; bits 5-0 = current HP
-    BALT    MOB_DATA_PTR,.clamp     ; HP < floor -> clamp
-    RTS                             ; HP >= floor -> done
+    LDY     #MFIELD_STRENGTH           ; byte 5: strength
+    LDA     (MOB_PTR),Y                ; load strength byte
+    AND     #STRENGTH_MASK             ; bits 4-0 = minimum HP
+    STA     MOB_DATA_PTR               ; save as floor value
+    INY                                ; Y = MFIELD_HP (byte 6)
+    LDA     (MOB_PTR),Y                ; load HP byte
+    AND     #HP_MASK                   ; bits 5-0 = current HP
+    BALT    MOB_DATA_PTR,.clamp        ; HP < floor -> clamp
+    RTS                                ; HP >= floor -> done
 .clamp:
-    LDA     (MOB_PTR),Y             ; reload HP byte
-    AND     #HP_FLAGS_MASK          ; preserve flag bits 7-6
-    ORA     MOB_DATA_PTR            ; set HP to floor value
-    STA     (MOB_PTR),Y             ; store clamped HP
+    LDA     (MOB_PTR),Y                ; reload HP byte
+    AND     #HP_FLAGS_MASK             ; preserve flag bits 7-6
+    ORA     MOB_DATA_PTR               ; set HP to floor value
+    STA     (MOB_PTR),Y                ; store clamped HP
     RTS
 @ %def CLAMP_CHAR_FIELD
 
@@ -8288,7 +8300,7 @@ CLAMP_CHAR_FIELD:
 
 These routines implement character selection browsing for the scene event
 menu.  They walk the mob linked list (starting from the head pointer at
-[[$4002]]) looking for player characters (byte~4 of the mob data record
+[[CHAR_LIST_HEAD]]) looking for player characters (byte~4 of the mob data record
 $<$~\$15).
 
 \begin{itemize}
@@ -8316,7 +8328,7 @@ CHAR_SELECT_NAME    EQU     $7B4B   ; 20-byte name display buffer in menu
 @ %def BROWSE_CHAR_INDEX CHAR_SELECT_NAME
 
 @ [[FIND_FIRST_PC]] scans the mob linked list from the head pointer at
-[[$4002]], following byte-2 links.  For each mob whose byte~4 (appearance)
+[[CHAR_LIST_HEAD]], following byte-2 links.  For each mob whose byte~4 (appearance)
 is $<$~\$15 and bit~7 clear, it is a player character.  On success, copies
 the name into [[CHAR_SELECT_NAME]] and returns with carry clear.  If the
 list is exhausted (byte-2 link = 0), returns with carry set.
@@ -8326,7 +8338,7 @@ list is exhausted (byte-2 link = 0), returns with carry set.
 ; -----------------------------------------------
 ; FIND_FIRST_PC -- Find first player character
 ;
-; Scans mob linked list from $4002 head pointer.
+; Scans mob linked list from CHAR_LIST_HEAD.
 ; A PC has appearance < NPC_APPEARANCE_MIN and
 ; bit 7 clear.
 ;
@@ -8340,24 +8352,24 @@ list is exhausted (byte-2 link = 0), returns with carry set.
 FIND_FIRST_PC:
     SUBROUTINE FIND_FIRST_PC
 
-    LDA     $4002                   ; head of character linked list
+    LDA     CHAR_LIST_HEAD             ; head of character linked list
 .check:
-    CMP     #$00                    ; end of list?
-    BNE     .have_entry             ; no -> examine this entry
-    SEC                             ; yes -> not found
+    CMP     #$00                       ; end of list?
+    BNE     .have_entry                ; no -> examine this entry
+    SEC                                ; yes -> not found
     RTS
 .have_entry:
-    STA     BROWSE_CHAR_INDEX       ; save current mob index
-    JSR     GET_MOB_DATA            ; -> MOB_DATA_PTR = mob record
-    LDY     #MFIELD_APPEARANCE      ; byte 4: appearance
-    LDA     (MOB_DATA_PTR),Y        ; load appearance
-    BMI     .skip                   ; bit 7 set -> not a PC
-    CMP     #NPC_APPEARANCE_MIN     ; < $15?
-    BMI     COPY_PC_NAME_TO_BUF     ; yes -> player character
+    STA     BROWSE_CHAR_INDEX          ; save current mob index
+    JSR     GET_MOB_DATA               ; -> MOB_DATA_PTR = mob record
+    LDY     #MFIELD_APPEARANCE         ; byte 4: appearance
+    LDA     (MOB_DATA_PTR),Y           ; load appearance
+    BMI     .skip                      ; bit 7 set -> not a PC
+    CMP     #NPC_APPEARANCE_MIN        ; < $15?
+    BMI     COPY_PC_NAME_TO_BUF        ; yes -> player character
 .skip:
-    LDY     #MFIELD_NEXT            ; byte 2: next link
-    LDA     (MOB_DATA_PTR),Y        ; follow chain
-    JMP     .check                  ; check next entry
+    LDY     #MFIELD_NEXT               ; byte 2: next link
+    LDA     (MOB_DATA_PTR),Y           ; follow chain
+    JMP     .check                     ; check next entry
 @ %def FIND_FIRST_PC
 
 @ [[COPY_PC_NAME_TO_BUF]] copies the name of the mob pointed to by
@@ -8384,34 +8396,34 @@ COPY_PC_NAME_TO_BUF:
 ; Clobbers: A, X, Y, MOB_PTR, TARGET_REC,
 ;           MOB_DATA_PTR
 ; -----------------------------------------------
-    LDA     MOB_DATA_PTR            ; \
-    STA     MOB_PTR                 ;  | MOB_PTR = MOB_DATA_PTR
-    LDA     MOB_DATA_PTR+1          ;  |
-    STA     MOB_PTR+1               ; /
-    LDY     #MFIELD_NAME_LO         ; byte 0: name ptr low
-    LDA     (MOB_PTR),Y             ; load name ptr low
-    STA     TARGET_REC              ; \
-    INY                             ;  | TARGET_REC = name string
-    LDA     (MOB_PTR),Y             ;  | (Y = MFIELD_NAME_HI)
-    STA     TARGET_REC+1            ; /
-    LDA     #<CHAR_SELECT_NAME      ; \
-    STA     MOB_DATA_PTR            ;  | MOB_DATA_PTR = display buf
-    LDA     #>CHAR_SELECT_NAME      ;  |
-    STA     MOB_DATA_PTR+1          ; /
-    LDY     #$00                    ; string offset 0
-    LDA     (TARGET_REC),Y          ; byte 0 = name length
-    TAX                             ; X = chars remaining
+    LDA     MOB_DATA_PTR               ; \
+    STA     MOB_PTR                    ;  | MOB_PTR = MOB_DATA_PTR
+    LDA     MOB_DATA_PTR+1             ;  |
+    STA     MOB_PTR+1                  ; /
+    LDY     #MFIELD_NAME_LO            ; byte 0: name ptr low
+    LDA     (MOB_PTR),Y                ; load name ptr low
+    STA     TARGET_REC                 ; \
+    INY                                ;  | TARGET_REC = name string
+    LDA     (MOB_PTR),Y                ;  | (Y = MFIELD_NAME_HI)
+    STA     TARGET_REC+1               ; /
+    LDA     #<CHAR_SELECT_NAME         ; \
+    STA     MOB_DATA_PTR               ;  | MOB_DATA_PTR = display buf
+    LDA     #>CHAR_SELECT_NAME         ;  |
+    STA     MOB_DATA_PTR+1             ; /
+    LDY     #$00                       ; string offset 0
+    LDA     (TARGET_REC),Y             ; byte 0 = name length
+    TAX                                ; X = chars remaining
 .copy_loop:
-    INY                             ; advance to next char
-    LDA     (TARGET_REC),Y          ; load name character
-    DEX                             ; decrement remaining count
-    BPL     .store                  ; count >= 0 -> keep char
-    LDA     #$20                    ; else pad with space
+    INY                                ; advance to next char
+    LDA     (TARGET_REC),Y             ; load name character
+    DEX                                ; decrement remaining count
+    BPL     .store                     ; count >= 0 -> keep char
+    LDA     #$20                       ; else pad with space
 .store:
-    STA     (MOB_DATA_PTR),Y        ; store into display buffer
-    CPY     #$14                    ; copied 20 chars?
-    BNE     .copy_loop              ; no -> continue
-    CLC                             ; success
+    STA     (MOB_DATA_PTR),Y           ; store into display buffer
+    CPY     #NAME_BUF_LEN              ; copied 20 chars?
+    BNE     .copy_loop                 ; no -> continue
+    CLC                                ; success
     RTS
 @ %def COPY_PC_NAME_TO_BUF
 
@@ -8429,7 +8441,7 @@ can [[JSR]] to it.
 ; Clobbers: (see FIND_NEXT_PC)
 ; -----------------------------------------------
 FIND_NEXT_PC_WRAP:
-    JSR     FIND_NEXT_PC            ; find next PC in list
+    JSR     FIND_NEXT_PC               ; find next PC in list
     RTS
 @ %def FIND_NEXT_PC_WRAP
 
@@ -8455,24 +8467,24 @@ bit~7 clear), and either copies the name or recurses.
 ;           TARGET_REC
 ; -----------------------------------------------
 FIND_NEXT_PC:
-    LDY     #MFIELD_NEXT            ; byte 2: next link
-    LDA     (MOB_PTR),Y             ; load next mob index
-    BNE     .have_link              ; nonzero -> follow it
-    JSR     FIND_FIRST_PC           ; zero -> wrap to first PC
+    LDY     #MFIELD_NEXT               ; byte 2: next link
+    LDA     (MOB_PTR),Y                ; load next mob index
+    BNE     .have_link                 ; nonzero -> follow it
+    JSR     FIND_FIRST_PC              ; zero -> wrap to first PC
     RTS
 .have_link:
-    STA     BROWSE_CHAR_INDEX       ; save mob index
-    JSR     GET_MOB_DATA            ; -> MOB_DATA_PTR = mob record
-    LDA     MOB_DATA_PTR            ; \
-    STA     MOB_PTR                 ;  | MOB_PTR = MOB_DATA_PTR
-    LDA     MOB_DATA_PTR+1          ;  |
-    STA     MOB_PTR+1               ; /
-    LDY     #MFIELD_APPEARANCE      ; byte 4: appearance
-    LDA     (MOB_PTR),Y             ; load appearance
-    BMI     FIND_NEXT_PC            ; bit 7 set -> skip
-    CMP     #NPC_APPEARANCE_MIN     ; < $15?
-    BPL     FIND_NEXT_PC            ; no -> skip, try next
-    JSR     COPY_PC_NAME_TO_BUF     ; yes -> copy name
+    STA     BROWSE_CHAR_INDEX          ; save mob index
+    JSR     GET_MOB_DATA               ; -> MOB_DATA_PTR = mob record
+    LDA     MOB_DATA_PTR               ; \
+    STA     MOB_PTR                    ;  | MOB_PTR = MOB_DATA_PTR
+    LDA     MOB_DATA_PTR+1             ;  |
+    STA     MOB_PTR+1                  ; /
+    LDY     #MFIELD_APPEARANCE         ; byte 4: appearance
+    LDA     (MOB_PTR),Y                ; load appearance
+    BMI     FIND_NEXT_PC               ; bit 7 set -> skip
+    CMP     #NPC_APPEARANCE_MIN        ; < $15?
+    BPL     FIND_NEXT_PC               ; no -> skip, try next
+    JSR     COPY_PC_NAME_TO_BUF        ; yes -> copy name
     RTS
 @ %def FIND_NEXT_PC
 
@@ -8499,20 +8511,20 @@ predecessor.  It then resolves that index and copies the name.
 ;           TARGET_REC, INPUT_BUFFER (2 bytes)
 ; -----------------------------------------------
 FIND_PREV_PC:
-    LDA     BROWSE_CHAR_INDEX       ; \
-    STA     INPUT_BUFFER            ; / save current index
-    JSR     FIND_FIRST_PC           ; start from first PC
+    LDA     BROWSE_CHAR_INDEX          ; \
+    STA     INPUT_BUFFER               ; / save current index
+    JSR     FIND_FIRST_PC              ; start from first PC
 .scan:
-    LDA     BROWSE_CHAR_INDEX       ; \
-    STA     INPUT_BUFFER+1          ; / save as candidate predecessor
-    JSR     FIND_NEXT_PC            ; advance to next PC
-    LDA     BROWSE_CHAR_INDEX       ; wrapped back to original?
-    CMP     INPUT_BUFFER            ; compare with saved index
-    BNE     .scan                   ; no -> keep scanning
-    LDA     INPUT_BUFFER+1          ; yes -> predecessor index
-    STA     BROWSE_CHAR_INDEX       ; set as current
-    JSR     GET_MOB_DATA            ; resolve to record pointer
-    JSR     COPY_PC_NAME_TO_BUF     ; copy name to buffer
+    LDA     BROWSE_CHAR_INDEX          ; \
+    STA     INPUT_BUFFER+1             ; / save as candidate predecessor
+    JSR     FIND_NEXT_PC               ; advance to next PC
+    LDA     BROWSE_CHAR_INDEX          ; wrapped back to original?
+    CMP     INPUT_BUFFER               ; compare with saved index
+    BNE     .scan                      ; no -> keep scanning
+    LDA     INPUT_BUFFER+1             ; yes -> predecessor index
+    STA     BROWSE_CHAR_INDEX          ; set as current
+    JSR     GET_MOB_DATA               ; resolve to record pointer
+    JSR     COPY_PC_NAME_TO_BUF        ; copy name to buffer
     RTS
 @ %def FIND_PREV_PC
 
@@ -8538,13 +8550,13 @@ If no player characters exist (carry set), it falls back to
 ;           TARGET_REC
 ; -----------------------------------------------
 INIT_CHAR_SELECT:
-    STOB    #$01,SCENE_EVENT_RESULT  ; mark event handled
-    JSR     SCENE_SETUP             ; set up scene boundaries
-    JSR     FIND_FIRST_PC           ; find first player character
-    BCC     .found                  ; carry clear -> found
-    JMP     MOVE_LOOP               ; carry set -> no PCs
+    STOB    #$01,SCENE_EVENT_RESULT    ; mark event handled
+    JSR     SCENE_SETUP                ; set up scene boundaries
+    JSR     FIND_FIRST_PC              ; find first player character
+    BCC     .found                     ; carry clear -> found
+    JMP     MOVE_LOOP                  ; carry set -> no PCs
 .found:
-    JMP     ENTER_CHAR_SELECT       ; -> character selection menu
+    JMP     ENTER_CHAR_SELECT          ; -> character selection menu
 @ %def INIT_CHAR_SELECT
 The scene loop calls [[$A478]] (a game support routine in the relocated
 block at [[$9600]]--[[$A8FF]]) each iteration to check for user input.
@@ -8596,10 +8608,10 @@ TARGET_REC              EQU     $BC     ; secondary entity record pointer in com
 SAVE_ZP_POINTERS:
     SUBROUTINE SAVE_ZP_POINTERS
 
-    MOVW    TARGET_REC,SAVED_BC     ; $BC/$BD -> $5A9A
-    MOVW    ENTITY_PTR,SAVED_F8     ; $F8/$F9 -> $5A9C
-    MOVW    DATA_PTR,SAVED_BE       ; $BE/$BF -> $5A9E
-    MOVW    MOB_PTR,SAVED_F4        ; $F4/$F5 -> $5AA0
+    MOVW    TARGET_REC,SAVED_BC        ; $BC/$BD -> $5A9A
+    MOVW    ENTITY_PTR,SAVED_F8        ; $F8/$F9 -> $5A9C
+    MOVW    DATA_PTR,SAVED_BE          ; $BE/$BF -> $5A9E
+    MOVW    MOB_PTR,SAVED_F4           ; $F4/$F5 -> $5AA0
     RTS
 @ %def SAVE_ZP_POINTERS
 @ [[RESTORE_ZP_POINTERS]] is the inverse: it copies the saved values back
@@ -8622,10 +8634,10 @@ or other operation that may have clobbered them.
 RESTORE_ZP_POINTERS:
     SUBROUTINE RESTORE_ZP_POINTERS
 
-    MOVW    SAVED_BC,TARGET_REC     ; $5A9A -> $BC/$BD
-    MOVW    SAVED_F8,ENTITY_PTR     ; $5A9C -> $F8/$F9
-    MOVW    SAVED_BE,DATA_PTR       ; $5A9E -> $BE/$BF
-    MOVW    SAVED_F4,MOB_PTR        ; $5AA0 -> $F4/$F5
+    MOVW    SAVED_BC,TARGET_REC        ; $5A9A -> $BC/$BD
+    MOVW    SAVED_F8,ENTITY_PTR        ; $5A9C -> $F8/$F9
+    MOVW    SAVED_BE,DATA_PTR          ; $5A9E -> $BE/$BF
+    MOVW    SAVED_F4,MOB_PTR           ; $5AA0 -> $F4/$F5
     RTS
 @ %def RESTORE_ZP_POINTERS
 
