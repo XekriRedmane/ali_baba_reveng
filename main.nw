@@ -6835,7 +6835,8 @@ MENU_OPTION_STRINGS:
     ; $7CF1: "KEEP ALL GOLD"
     HEX     0D CB C5 C5 D0 A0 C1 CC CC A0 C7 CF CC C4
 S_PAY_FOR:
-    ; "PAY 000000 FOR " + 20-byte item name area (template, modified at runtime)
+    ; Price digits and item name are overwritten at runtime by DISPLAY_SHOP.
+    ; The 20 bytes after "FOR " are development leftovers.
     APSTR   "PAY 000000 FOR  _    Y `   B7 1E Au"
     ; $7D23: "BUY SOMETHING ELSE"
     HEX     12 C2 D5 D9 A0 D3 CF CD C5 D4 C8 C9 CE C7 A0 C5 CC D3 C5
