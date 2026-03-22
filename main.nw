@@ -7447,11 +7447,7 @@ analysis.
     HEX     AD 8C 5A F0 0C AD 00 5A D0 10 20 58 0D CE 8C 5A
     HEX     60 20 36 0D 20 1E 0D 4C 5E 0D A2 0C 20 81 0D CA
     HEX     D0 FA 60 AD 8C 5A F0 03 CE 8C 5A 60
-<<fill 1979>>=
-    ORG     $1979
-    HEX     A5 F8 85 BC A5 F9 85 BD 20 B1 0E C9 00 D0 01 60
-    HEX     A0 03 B1 F4 20 DB 13 C9 01 D0 01 60 10 03 A9 02
-    HEX     60 A9 00 60
+
 <<fill 4000>>=
     ORG     $4000
     HEX     80 4C 05 9F A0 A6 9A C9 B0
@@ -16446,13 +16442,59 @@ returns 1 (attack ready), the caller uses these to load the target.
 TARGET_PTR_LO   EQU     $5A86   ; selected combat target pointer (low byte)
 TARGET_PTR_HI   EQU     $5A87   ; selected combat target pointer (high byte)
 @ %def TARGET_PTR_LO TARGET_PTR_HI
-@ [[GET_ENTITY_THREAT]] evaluates the threat level of the mob at [[MOB_PTR]]
-relative to the current entity.  This is a stub---the full implementation has
-not yet been disassembled.
+@ \subsection{Entity threat evaluation (\$1979)}
+
+[[GET_ENTITY_THREAT]] evaluates the threat level of the mob at
+[[MOB_PTR]] relative to the current entity at [[ENTITY_PTR]].
+
+\paragraph{Threat levels.}
+\begin{itemize}
+\item 0 --- not hostile, or hostile but distant (distance $>$ 1)
+\item 1 --- hostile and adjacent (distance $=$ 1)
+\item 2 --- hostile and co-located (distance $=$ 0)
+\end{itemize}
+
+The routine copies [[ENTITY_PTR]] to [[TARGET_REC]] for
+[[CHECK_HOSTILE]], then measures [[MANHATTAN_DISTANCE]] from the
+mob's position to the entity.
 
 <<get entity threat>>=
     ORG     $1979
 GET_ENTITY_THREAT:
+    SUBROUTINE GET_ENTITY_THREAT
+    ; Evaluate threat level of mob at MOB_PTR vs entity at ENTITY_PTR.
+    ;
+    ; Input:  ENTITY_PTR — reference entity
+    ;         MOB_PTR    — mob to evaluate
+    ; Output: A = 0 (no threat), 1 (adjacent), 2 (co-located)
+    ; Modifies: TARGET_REC
+    ; Clobbers: A, Y
+
+    ; --- check hostility ---
+    LDA     ENTITY_PTR             ; \ copy ENTITY_PTR to TARGET_REC
+    STA     TARGET_REC             ;  |
+    LDA     ENTITY_PTR+1           ;  |
+    STA     TARGET_REC+1           ; /
+    JSR     CHECK_HOSTILE
+    CMP     #$00
+    BNE     .hostile               ; hostile -> measure distance
+    RTS                            ; not hostile -> return 0
+
+    ; --- measure distance ---
+.hostile:
+    LDY     #MFIELD_POSITION       ; mob's map position
+    LDA     (MOB_PTR),Y
+    JSR     MANHATTAN_DISTANCE     ; A = distance to entity
+    CMP     #$01
+    BNE     .not_adjacent
+    RTS                            ; distance = 1 -> return 1 (adjacent)
+.not_adjacent:
+    BPL     .far                   ; distance > 1 -> too far
+    LDA     #$02                   ; distance = 0 -> return 2 (co-located)
+    RTS
+.far:
+    LDA     #$00                   ; return 0 (too far)
+    RTS
 @ %def GET_ENTITY_THREAT
 
 <<select combat target>>=
@@ -22091,7 +22133,6 @@ The following root chunks produce the assembly files when tangled.
 <<mob attack>>
 <<select combat target>>
 <<get entity threat>>
-<<fill 1979>>
 <<load target ptr>>
 <<game turn loop>>
 <<commit move>>
