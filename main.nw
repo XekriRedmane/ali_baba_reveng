@@ -16203,7 +16203,7 @@ AUTO_HEAL:
 
     LDY     #MFIELD_MOB_TYPE       ; byte 6: HP in bits 5-0
     LDA     (ENTITY_PTR),Y
-    AND     #$3F                   ; isolate HP
+    AND     #HP_MASK               ; isolate HP (bits 5-0)
     BAMI    #$28,.do_heal          ; HP < 40 -> try healing
     RTS
 .do_heal:
@@ -16261,7 +16261,7 @@ INCREMENT_HP:
     CLC
     ADC     #$01                   ; HP += 1
     STA     (ENTITY_PTR),Y
-    AND     #$3F                   ; isolate HP
+    AND     #HP_MASK               ; isolate HP (bits 5-0)
     BAEQ    #$03,.notify           ; HP == 3 -> threshold crossed
     RTS
 .notify:
@@ -17349,6 +17349,7 @@ XP_AWARD_TABLE      EQU     $7FBE   ; 5-byte XP award values by action type
 <<defines>>=
     ; (ENTITY_LEVEL_FIELD and ENTITY_XP_FIELD removed; use MFIELD_LEVEL and MFIELD_XP)
 STRENGTH_MASK           EQU     $1F     ; byte 5: mask for strength bits 4-0
+HP_MASK                 EQU     $3F     ; byte 6: mask for HP bits 5-0
 LEVEL_MASK              EQU     $1F     ; byte 11: mask for level bits 4-0
 LEVEL_FLAG_MASK         EQU     $E0     ; byte 11: mask for flag bits 7-5
 PENDING_XP_UNIT         EQU     $10     ; byte 8: one pending XP unit (bit 4)
