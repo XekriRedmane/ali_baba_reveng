@@ -6865,6 +6865,7 @@ MENU_OPTION_STRINGS:
     APSTR   "ATTACK 5i<% SIBCM  T1     I"
     APSTR   "ATTACK SOMEONE ELSE"
     APSTR   "CANCEL ATTACK"
+S_MISSES:
     APSTR   "MISSES"
     ; "DUCATS TO DROP" + display buffer (overwritten at runtime)
     APSTR   "DUCATS TO DROP :  4L :0"
@@ -14826,111 +14827,159 @@ willingness score, the attack proceeds; otherwise the attacker hesitates and a
 
 <<defines>>=
 COMBAT_WILLINGNESS EQU  $5A76   ; accumulated willingness-to-fight score
-@ %def COMBAT_WILLINGNESS
+    ; --- Byte 11 (MFIELD_LEVEL) flag bit masks ---
+LEVEL_BIT5_MASK     EQU     $20     ; byte 11 bit 5: rage/berserk flag
+LEVEL_CLEAR_BIT4    EQU     $EF     ; byte 11: clear bit 4 (consume rage)
+TARGET_BIT6_MASK    EQU     $40     ; byte 11 bit 6: cautious flag
+TARGET_BIT7_MASK    EQU     $80     ; byte 11 bit 7: aggressive flag
+    ; --- Byte 15 (MFIELD_FLAGS) bit masks ---
+FLAGS_ENGAGED_BIT   EQU     $04     ; byte 15 bit 2: combat engaged
+FLAGS_STATE_MASK    EQU     $03     ; byte 15 bits 1-0: combat state (0-3)
+    ; --- Byte 5 defense mask ---
+DEFENSE_HALF_MASK   EQU     $0F     ; byte 5: defense (bits 4-1 shifted down via ROR)
+    ; --- Scratch ---
+TARGET_DEFENSE      EQU     $5A77   ; scratch: target's defense value
+@ %def COMBAT_WILLINGNESS LEVEL_BIT5_MASK LEVEL_CLEAR_BIT4 TARGET_BIT6_MASK TARGET_BIT7_MASK FLAGS_ENGAGED_BIT FLAGS_STATE_MASK DEFENSE_HALF_MASK TARGET_DEFENSE
 
 <<resolve attack>>=
     ORG     $15AB
 RESOLVE_ATTACK:
     SUBROUTINE RESOLVE_ATTACK
-    ; Combat willingness calculation and attack resolution.
-    ; Computes willingness score in COMBAT_WILLINGNESS based on char/target stats,
-    ; then rolls random to determine if attack occurs.
+    ; Compute combat willingness and resolve attack or hesitation.
+    ;
+    ; Input:  ENTITY_PTR    — attacker record
+    ;         MOB_PTR       — target record
+    ;         IS_PLAYER_TURN — 1 = player, 0 = AI
+    ;
+    ; Output: branches to PLAYER_ATTACK or MOB_ATTACK on hit;
+    ;         prints "MISSES" and returns on hesitation.
+    ;
+    ; Behavior:
+    ;   Player willingness is fixed at 28.  AI willingness starts
+    ;   at the entity's level (byte 11 bits 4-0) and accumulates
+    ;   modifiers from flag bits, combat state, HP, and defense.
+    ;   Clamped to 0-30, then random roll 0-30 determines hit.
+    ;
+    ; Modifies: COMBAT_WILLINGNESS, TARGET_DEFENSE, entity byte 11
+    ; Clobbers: A, X, Y
+
+    ; --- set blink cursor to target ---
     JSR     SET_BLINK_TARGET
+
+    ; --- player: fixed willingness ---
     LDA     IS_PLAYER_TURN
     BANE    #$01,.not_player
-    STOB    #$1C,COMBAT_WILLINGNESS
+    STOB    #$1C,COMBAT_WILLINGNESS ; player = 28 (always willing)
     JMP     .clamp_done
+
+    ; --- AI: base level ---
 .not_player:
-    LDY     #$0B
+    LDY     #MFIELD_LEVEL          ; byte 11: flags | level
     LDA     (ENTITY_PTR),Y
     TAX
-    AND     #$1F
+    AND     #LEVEL_MASK            ; level (bits 4-0) = base willingness
     STA     COMBAT_WILLINGNESS
+
+    ; --- AI: attacker flag bits (byte 11) ---
     TXA
-    AND     #$20
+    AND     #LEVEL_BIT5_MASK       ; bit 5: rage flag
     BEQ     .no_bit5
     TXA
-    AND     #$EF
+    AND     #LEVEL_CLEAR_BIT4      ; consume rage: clear bit 4
     STA     (ENTITY_PTR),Y
-    LDA     #$18
+    LDA     #$18                   ; +24 (rage bonus)
     JSR     ADD_WILLINGNESS
 .no_bit5:
-    LDA     (MOB_PTR),Y
+
+    ; --- AI: target flag bits (byte 11) ---
+    LDA     (MOB_PTR),Y           ; target byte 11
     TAY
-    AND     #$40
+    AND     #TARGET_BIT6_MASK      ; bit 6: cautious
     BEQ     .no_bit6
-    LDA     #$FC
+    LDA     #$FC                   ; -4 (target cautious)
     JSR     ADD_WILLINGNESS
 .no_bit6:
     TYA
-    AND     #$80
+    AND     #TARGET_BIT7_MASK      ; bit 7: aggressive
     BEQ     .no_bit7
-    LDA     #$08
+    LDA     #$08                   ; +8 (target aggressive)
     JSR     ADD_WILLINGNESS
+
+    ; --- AI: target combat state (byte 15) ---
 .no_bit7:
-    LDY     #$0F
+    LDY     #MFIELD_FLAGS          ; byte 15: status flags
     LDA     (MOB_PTR),Y
     TAX
-    AND     #$04
+    AND     #FLAGS_ENGAGED_BIT     ; bit 2: combat engaged
     BEQ     .no_restrict
-    LDA     #$06
+    LDA     #$06                   ; +6 (already fighting)
     JSR     ADD_WILLINGNESS
 .no_restrict:
     TXA
-    AND     #$03
+    AND     #FLAGS_STATE_MASK      ; bits 1-0: combat state
     BAPL    #$01,.ge1
-    LDA     #$03
+    LDA     #$03                   ; +3 (state 0: idle)
     JSR     ADD_WILLINGNESS
     JMP     .state_done
 .ge1:
     BNE     .ne1
-    LDA     #$FF
+    LDA     #$FF                   ; -1 (state 1: guarding)
     JSR     ADD_WILLINGNESS
     JMP     .state_done
 .ne1:
     BANE    #$03,.state_done
-    LDA     #$FD
+    LDA     #$FD                   ; -3 (state 3: retreating)
     JSR     ADD_WILLINGNESS
+
+    ; --- AI: target HP check ---
 .state_done:
-    LDY     #$06
+    LDY     #MFIELD_MOB_TYPE       ; byte 6: HP in bits 5-0
     LDA     (MOB_PTR),Y
-    AND     #$3F
-    BAGE    #$03,.hp_ok
-    LDA     #$18
+    AND     #HP_MASK
+    BAGE    #$03,.hp_ok            ; HP >= 3 -> not critical
+    LDA     #$18                   ; +24 (target critically wounded)
     JSR     ADD_WILLINGNESS
+
+    ; --- AI: defense differential (same position only) ---
 .hp_ok:
-    LDY     #$03
+    LDY     #MFIELD_POSITION       ; byte 3: map position
     LDA     (ENTITY_PTR),Y
     CMP     (MOB_PTR),Y
-    BNE     .diff_pos
-    LDY     #$05
-    LDA     (MOB_PTR),Y
-    ROR
-    AND     #$0F
-    STA     $5A77
-    LDA     (ENTITY_PTR),Y
-    ROR
-    AND     #$0F
+    BNE     .diff_pos              ; not co-located -> skip
+    LDY     #MFIELD_STRENGTH       ; byte 5: defense in bits 4-1
+    LDA     (MOB_PTR),Y           ; \ target defense
+    ROR                            ;  | shift bits 4-1 to 3-0
+    AND     #DEFENSE_HALF_MASK     ;  |
+    STA     TARGET_DEFENSE         ; /
+    LDA     (ENTITY_PTR),Y        ; \ attacker defense
+    ROR                            ;  | shift bits 4-1 to 3-0
+    AND     #DEFENSE_HALF_MASK     ; /
     SEC
-    SBC     $5A77
+    SBC     TARGET_DEFENSE         ; delta = attacker - target
     JSR     ADD_WILLINGNESS
+
+    ; --- clamp willingness to 0-30 ---
 .diff_pos:
     LDA     COMBAT_WILLINGNESS
     BPL     .not_neg
-    STOB    #$00,COMBAT_WILLINGNESS
+    STOB    #$00,COMBAT_WILLINGNESS ; floor at 0
     JMP     .clamp_done
 .not_neg:
     BAMI    #$1F,.clamp_done
-    STOB    #$1E,COMBAT_WILLINGNESS
+    STOB    #$1E,COMBAT_WILLINGNESS ; ceiling at 30
+
+    ; --- random roll: attack or hesitate ---
 .clamp_done:
-    LDA     #$1F
+    LDA     #$1F                   ; range 0-30
     JSR     RANDOM_IN_RANGE
-    BAMI    COMBAT_WILLINGNESS,.attack
-    BEQ     .attack
+    BAMI    COMBAT_WILLINGNESS,.attack ; roll < willingness -> hit
+    BEQ     .attack                ; roll == willingness -> hit
+
+    ; --- hesitate: print "[name] MISSES" ---
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    STOW    $7CD2,TARGET_REC
+    STOW    S_MISSES,TARGET_REC
     JSR     PRINT_BOTTOM_CENTERED
     JSR     SCROLL_STATUS_LINE
     LDA     #$01
@@ -14939,6 +14988,8 @@ RESOLVE_ATTACK:
 .is_player:
     JSR     DELAY_WITH_ANIMATION
     RTS
+
+    ; --- dispatch attack ---
 .attack:
     LDA     IS_PLAYER_TURN
     BEQ     .mob_attack
