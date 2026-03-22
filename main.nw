@@ -15762,21 +15762,37 @@ HANDLE_ENCOUNTER:
     LDA     #$01
     JMP     APPLY_DAMAGE_TO_CURRENT
 @ %def HANDLE_ENCOUNTER
-@ [[HANDLE_MOB_ENCOUNTER]] is called when a character's movement brings it
-into contact with another entity.  It first evaluates the threat level at the
-destination by calling [[SUM_HOSTILE_AT_POS]]: if any hostiles are present,
-the routine computes a flee probability based on the character's strength
-(field~5, low 5~bits) plus a base of~\$10, minus the total adjacent threat,
-clamped to 4--\$1C.  This value is doubled twice (ASL, ASL) and OR'd with~3 to
-produce a threshold; the PRNG is compared against it, and if the random value
-exceeds the threshold, the character flees---the position is reset to the
-turn's starting location and [[END_TURN]] is called.  If the character does
-not flee (or there was no threat), [[COMMIT_MOVE]] updates the position.
-The routine then calls [[CHECK_ENCOUNTER]]: if the result is below~2 (no
-hostile), it checks [[CHECK_THREATS_HERE]] and either continues the movement
-loop or ends the turn.  If hostiles are present (result $\geq$ 2), it walks
-the target group's linked list and sets the restricted flag on every member
-at the same position, displays an encounter message (\$1F), and ends the turn.
+@ \subsection{Mob movement encounter (\$1E5A)}
+
+[[HANDLE_MOB_ENCOUNTER]] resolves what happens when a character's
+movement brings it into contact with another entity.
+
+\paragraph{Flee check.}
+The routine first sums the hostile strength at the destination via
+[[SUM_HOSTILE_AT_POS]].  If hostiles are present, a flee threshold
+is computed:
+\begin{itemize}
+\item Base courage = strength (byte~5 bits~4--0) + \$10.
+\item Subtract total adjacent threat; clamp result to 4--\$1C.
+\item Threshold = (clamped value $\times$ 4) OR \$03.
+\end{itemize}
+If the PRNG output exceeds this threshold, the character flees:
+its position resets to the turn's starting location and
+[[END_TURN]] is called.
+
+\paragraph{Move commit.}
+If the character holds ground (or no threat was present),
+[[COMMIT_MOVE]] updates the position.
+
+\paragraph{Encounter resolution.}
+[[CHECK_ENCOUNTER]] classifies the destination:
+\begin{itemize}
+\item Result $<$ 2 (no hostile): [[CHECK_THREATS_HERE]] decides
+      whether to continue moving ([[MOVE_LOOP]]) or end the turn.
+\item Result $\ge$ 2 (hostile present): the routine walks the
+      target group's linked list, sets the restricted flag on every
+      co-located member, displays a combat message, and ends the turn.
+\end{itemize}
 
 <<handle mob encounter>>=
     ORG     $1E5A
