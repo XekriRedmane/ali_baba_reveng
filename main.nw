@@ -16963,17 +16963,17 @@ DISPLAY_SHOP:
     INY                        ;  |
     LDA     (SHOP_DATA_PTR),Y ;  |
     STA     PRINT_STRING_ADDR+1; /
-    LDY     #$00
-    LDA     (PRINT_STRING_ADDR),Y
-    TAY
-    TAX
-    DEX
-.copy_name:
-    LDA     (PRINT_STRING_ADDR),Y
-    STA     $7D0F,X
-    DEY
-    DEX
-    BPL     .copy_name
+    LDY     #$00               ; \ copy item name into "PAY ... FOR" string
+    LDA     (PRINT_STRING_ADDR),Y ;  | Y = string length
+    TAY                        ;  |
+    TAX                        ;  |
+    DEX                        ;  | X = length - 1 (dest index)
+.copy_name:                    ;  |
+    LDA     (PRINT_STRING_ADDR),Y ;  |
+    STA     SHOP_ITEM_NAME,X   ;  |
+    DEY                        ;  |
+    DEX                        ;  |
+    BPL     .copy_name         ; /
     JMP     START_GAME_INPUT
 .next_item:
     CLC
