@@ -70,6 +70,20 @@ Add a comment block immediately after the `SUBROUTINE` directive with:
 
 Omit the Outputs section if the routine doesn't return meaningful values (e.g., it ends with `JMP` to another routine).
 
+### Pass 4: Rewrite prose documentation
+
+The noweb `@` prose that precedes each chunk should be a clear, structured summary — not a dense wall of text. Rewrite it using LaTeX formatting:
+
+1. **Subsection header**: `\subsection{Routine name ($XXXX)}` with the routine's address.
+2. **Opening paragraph**: 1-2 sentences stating what the routine does and when it is called.
+3. **`\paragraph{}` sections** for each distinct game mechanic or algorithm phase. Use descriptive names like "Willingness score.", "Hit roll.", "Flee probability.", "Defense calculation."
+4. **Itemized lists** (`\begin{itemize}`) for branching conditions, HP thresholds, outcome tables, or multi-step processes.
+5. **Tables** (`\begin{tabular}`) for data-driven mechanics with multiple modifiers or lookup values (e.g., willingness deltas, damage tiers).
+6. **Cross-references**: use `[[LABEL]]` for routine and variable names in prose.
+7. Keep prose concise — the code comments have the instruction-level detail; the prose explains the *game design* and *algorithm structure*.
+
+Reference examples: RESOLVE_ATTACK (willingness table), PLAYER_ATTACK (target classification list), APPLY_DAMAGE (HP threshold list with death handler steps), DISPLAY_SHOP (shop record structure).
+
 ### Reference: DISPLAY_SHOP
 
 The routine DISPLAY_SHOP ($70DF) in main.nw is the reference example of a fully annotated routine. Study its style for comment alignment, bracket grouping, section headers, and header plate format.
