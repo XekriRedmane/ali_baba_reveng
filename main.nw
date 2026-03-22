@@ -7848,6 +7848,10 @@ PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random 
 ; ---------------------------------------------------------------
 STEP_PRNG:
     SUBROUTINE STEP_PRNG
+    ; Advance the PRNG: state = 69*state + $53, output = state >> 1.
+    ;
+    ; Output: PRNG_STATE updated, PRNG_OUTPUT = state >> 1, A = PRNG_OUTPUT
+    ; Clobbers: A
 
     LDA     PRNG_STATE                 ; val
     ASL                                ; val*2
@@ -7909,6 +7913,11 @@ bracket to minimize the number of PRNG calls.
 ; ---------------------------------------------------------------
 RANDOM_IN_RANGE:
     SUBROUTINE RANDOM_IN_RANGE
+    ; Return a random number in 0..A-1 via rejection sampling.
+    ;
+    ; Input:  A = range limit (1-127; 0 returns 0)
+    ; Output: A = random value in 0..limit-1
+    ; Clobbers: A, Y
 
     STA     RNG_LIMIT                  ; save range limit
     BANE    #$00,.nonzero
@@ -8004,6 +8013,11 @@ the remainder.
 ; -----------------------------------------------
 POS_TO_COLROW:
     SUBROUTINE POS_TO_COLROW
+    ; Unpack a map position (0-199) into column and row.
+    ;
+    ; Input:  A = packed position
+    ; Output: A = column (0-19), Y = row (0-9)
+    ; Clobbers: flags
 
     LDY     #$00                       ; row counter = 0
 .loop:
@@ -8036,6 +8050,11 @@ carry occurs (overflow past 255).
 ; -----------------------------------------------
 COLROW_TO_POS:
     SUBROUTINE COLROW_TO_POS
+    ; Pack column and row into a map position.
+    ;
+    ; Input:  A = column (0-19), Y = row (0-9)
+    ; Output: A = packed position (0-199)
+    ; Clobbers: Y, flags
 
     CLC
 .loop:
@@ -8083,6 +8102,11 @@ NAME_BUF_LEN        EQU     $14     ; character name display buffer length (20 b
 ; -----------------------------------------------
 GET_MOB_DATA:
     SUBROUTINE GET_MOB_DATA
+    ; Look up mob data record by 1-based index.
+    ;
+    ; Input:  A = mob index (1-based)
+    ; Output: MOB_DATA_PTR ($BA/$BB) = pointer to mob record
+    ; Clobbers: A, Y
 
     CLC
     ADC     #$FF                       ; A = index - 1
@@ -8278,6 +8302,11 @@ MOB_PTR                 EQU     $F4     ; mob data pointer (2 bytes, $F4/$F5)
 ; -----------------------------------------------
 CLAMP_CHAR_FIELD:
     SUBROUTINE CLAMP_CHAR_FIELD
+    ; Clamp entity strength and HP fields to valid ranges.
+    ;
+    ; Input:  ENTITY_PTR = entity record
+    ; Behavior: caps strength (byte 5) at 31, HP (byte 6) at 63
+    ; Clobbers: A, Y
 
     LDY     #MFIELD_STRENGTH           ; byte 5: strength
     LDA     (MOB_PTR),Y                ; load strength byte
@@ -8351,6 +8380,12 @@ list is exhausted (byte-2 link = 0), returns with carry set.
 ; -----------------------------------------------
 FIND_FIRST_PC:
     SUBROUTINE FIND_FIRST_PC
+    ; Find the first player character in the group list.
+    ;
+    ; Input:  CHAR_PTR = group head
+    ; Output: MOB_PTR = first PC (appearance < NPC_APPEARANCE_MIN), carry clear
+    ;         carry set if none found
+    ; Clobbers: A, Y
 
     LDA     CHAR_LIST_HEAD             ; head of character linked list
 .check:
@@ -8607,6 +8642,9 @@ TARGET_REC              EQU     $BC     ; secondary entity record pointer in com
 ; -----------------------------------------------
 SAVE_ZP_POINTERS:
     SUBROUTINE SAVE_ZP_POINTERS
+    ; Save ZP pointers $F4-$FB to SAVED_* variables.
+    ;
+    ; Clobbers: A
 
     MOVW    TARGET_REC,SAVED_BC        ; $BC/$BD -> $5A9A
     MOVW    ENTITY_PTR,SAVED_F8        ; $F8/$F9 -> $5A9C
@@ -8633,6 +8671,9 @@ or other operation that may have clobbered them.
 ; -----------------------------------------------
 RESTORE_ZP_POINTERS:
     SUBROUTINE RESTORE_ZP_POINTERS
+    ; Restore ZP pointers $F4-$FB from SAVED_* variables.
+    ;
+    ; Clobbers: A
 
     MOVW    SAVED_BC,TARGET_REC        ; $5A9A -> $BC/$BD
     MOVW    SAVED_F8,ENTITY_PTR        ; $5A9C -> $F8/$F9
