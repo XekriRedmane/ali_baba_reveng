@@ -14539,17 +14539,26 @@ called with~2 to record the new state.
 
 <<enter combat state>>=
     ORG     $14B7
+; ---------------------------------------------------------------
+; ENTER_COMBAT_STATE — transition character to combat-ready
+;
+; Evaluates the encounter at the character's position.  If no
+; hostile is co-located (result != 2), the restricted flag is
+; set to limit the character's options.  State is set to 2
+; (combat ready).
+;
+; In:  ENTITY_PTR = current character record
+; Out: char state = 2; restricted flag set if no hostile present
+; ---------------------------------------------------------------
 ENTER_COMBAT_STATE:
     SUBROUTINE ENTER_COMBAT_STATE
-    ; Check encounter, clear restricted flag, conditionally set it,
-    ; then set char state to 2.
-    JSR     CHECK_ENCOUNTER
-    JSR     CLEAR_RESTRICTED
+    JSR     CHECK_ENCOUNTER         ; evaluate encounter at position
+    JSR     CLEAR_RESTRICTED        ; start with restriction cleared
     LDA     #$02
-    BANE    ENCOUNTER_RESULT,.skip
-    JSR     SET_RESTRICTED
+    BANE    ENCOUNTER_RESULT,.skip  ; hostile co-located? skip
+    JSR     SET_RESTRICTED          ; no hostile -> restrict options
 .skip:
-    LDA     #$02
+    LDA     #$02                    ; state 2 = combat ready
     JSR     SET_CHAR_STATE
     RTS
 @ %def ENTER_COMBAT_STATE
@@ -14561,13 +14570,23 @@ willingness check and damage calculation take place.
 
 <<start combat>>=
     ORG     $14CD
+; ---------------------------------------------------------------
+; START_COMBAT — begin active attack
+;
+; Sets char state to 3 (attacking), loads the pre-selected
+; combat target into TARGET_REC, and jumps to RESOLVE_ATTACK
+; for the willingness check and damage calculation.
+;
+; In:  ENTITY_PTR = current character record
+;      TARGET_PTR_LO/HI = pre-selected target address
+; Out: char state = 3; control transfers to RESOLVE_ATTACK
+; ---------------------------------------------------------------
 START_COMBAT:
     SUBROUTINE START_COMBAT
-    ; Set char state to 3, call $199D, jump to combat logic at $15AB.
-    LDA     #$03
+    LDA     #$03                    ; state 3 = attacking
     JSR     SET_CHAR_STATE
-    JSR     LOAD_TARGET_PTR
-    JMP     RESOLVE_ATTACK
+    JSR     LOAD_TARGET_PTR         ; TARGET_REC <- target address
+    JMP     RESOLVE_ATTACK          ; perform attack resolution
 @ %def START_COMBAT
 
 @ \subsection{Attack direction handlers (\$14D8--\$14E9)}
@@ -15411,13 +15430,23 @@ the X~register as a temporary.
 
 <<apply damage to current>>=
     ORG     $1425
+; ---------------------------------------------------------------
+; APPLY_DAMAGE_TO_CURRENT — apply damage to current entity
+;
+; Convenience wrapper: copies ENTITY_PTR into EFFECT_REC and
+; tail-calls APPLY_DAMAGE.  A is preserved across the pointer
+; copy via X as a temporary.
+;
+; In:  A = damage amount
+;      ENTITY_PTR = target entity record
+; Out: EFFECT_REC = ENTITY_PTR; falls through to APPLY_DAMAGE
+; ---------------------------------------------------------------
 APPLY_DAMAGE_TO_CURRENT:
     SUBROUTINE APPLY_DAMAGE_TO_CURRENT
-    ; Apply effect: copy ENTITY_PTR/ENTITY_PTR+1 -> EFFECT_REC/EFFECT_REC+1, JMP $106F with A
-    TAX
-    MOVW    ENTITY_PTR,EFFECT_REC
-    TXA
-    JMP     APPLY_DAMAGE
+    TAX                             ; save damage amount in X
+    MOVW    ENTITY_PTR,EFFECT_REC   ; target <- current entity
+    TXA                             ; restore damage amount
+    JMP     APPLY_DAMAGE            ; apply damage to EFFECT_REC
 @ %def APPLY_DAMAGE_TO_CURRENT
 When the player steps onto an occupied cell, [[HANDLE_ENCOUNTER]] determines
 what happens.  The event type (byte~1 of the event entry) splits the logic
@@ -15798,15 +15827,15 @@ with an event slot that requires a higher strength or special item.
 
 <<show locked msg>>=
     ORG     $1CF1
+; SHOW_LOCKED_MSG — display locked/blocked message, reset to idle
 SHOW_LOCKED_MSG:
     SUBROUTINE SHOW_LOCKED_MSG
-    ; Display message $0C and set char state to 0.
-    JSR     SET_CURSOR_ROW21
-    JSR     PRINT_MOB_NAME
+    JSR     SET_CURSOR_ROW21        ; position cursor
+    JSR     PRINT_MOB_NAME          ; print blocking entity name
     JSR     SCROLL_STATUS_LINE
-    LDA     #MSG_HIT_STATUE
+    LDA     #MSG_HIT_STATUE         ; "CHARGES INTO A STONE STATUE."
     JSR     DISPLAY_MESSAGE
-    LDA     #$00
+    LDA     #$00                    ; state 0 = idle
     JMP     SET_CHAR_STATE
 @ %def SHOW_LOCKED_MSG
 @ [[SET_TARGET_RESTRICTED]] sets bit~2 of field~15 on the mob record at
@@ -15816,11 +15845,12 @@ so they cannot simply walk away.
 
 <<set target restricted>>=
     ORG     $1F03
+; SET_TARGET_RESTRICTED — pin mob at current position
 SET_TARGET_RESTRICTED:
     SUBROUTINE SET_TARGET_RESTRICTED
-    LDY     #$0F
+    LDY     #MFIELD_FLAGS           ; byte 15: status flags
     LDA     (MOB_PTR),Y
-    ORA     #$04
+    ORA     #$04                    ; set bit 2 = combat engaged
     STA     (MOB_PTR),Y
     RTS
 @ %def SET_TARGET_RESTRICTED
@@ -15845,6 +15875,7 @@ no-op stub for external callers at [[$4A1F]] and [[$4BE4]].
 
 <<orphaned encounter handler>>=
     ORG     $1F19
+; ORPHANED_ENCOUNTER_HANDLER — dead code from earlier build
 ORPHANED_ENCOUNTER_HANDLER:
     SUBROUTINE ORPHANED_ENCOUNTER_HANDLER
 ; ---------------------------------------------------------------
@@ -15905,9 +15936,9 @@ ORPHANED_ENCOUNTER_HANDLER:
     BEQ     .no_flee
 
     ; Compute flee probability from strength vs threats
-    LDY     #$05
+    LDY     #MFIELD_STRENGTH
     LDA     (ENTITY_PTR),Y  ; strength field
-    AND     #$1F
+    AND     #STRENGTH_MASK
     CLC
     ADC     #$10            ; base 16
     SEC
@@ -15939,7 +15970,7 @@ ORPHANED_ENCOUNTER_HANDLER:
 
 .no_flee:                               ; $1FAF
     JSR     $1C3C           ; -> COMMIT_MOVE
-    LDY     #$03
+    LDY     #MFIELD_POSITION
     LDA     (ENTITY_PTR),Y  ; entity position
     JSR     $0E6C           ; -> CHECK_ENCOUNTER
     LDA     ENCOUNTER_RESULT
@@ -15955,7 +15986,7 @@ ORPHANED_ENCOUNTER_HANDLER:
 .walk_group:
     LDA     MOB_PTR+1
     BEQ     .group_done
-    LDY     #$03
+    LDY     #MFIELD_POSITION
     LDA     (ENTITY_PTR),Y  ; entity position
     CMP     (MOB_PTR),Y     ; mob position
     BNE     .next_member
@@ -15973,8 +16004,8 @@ ORPHANED_ENCOUNTER_HANDLER:
     JMP     $1C91           ; -> END_TURN
 
 .set_combat_flag:                       ; $1FF6
-    LDY     #$0F
-    LDA     (MOB_PTR),Y     ; mob byte $0F
+    LDY     #MFIELD_FLAGS
+    LDA     (MOB_PTR),Y     ; mob flags byte
     ORA     #$04            ; set bit 2 = combat engaged
     STA     (MOB_PTR),Y
 ; $1FFE: RTS -- also serves as no-op stub for callers at $4A1F/$4BE4
