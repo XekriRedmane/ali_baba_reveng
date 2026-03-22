@@ -16836,6 +16836,10 @@ results.  The function temporarily borrows [[FONT_COL]] and [[FONT_ROW]] as
 scratch storage---these are safe to clobber here since no rendering is in
 progress.
 
+<<zero page defines>>=
+DIST_COL                EQU     $BA     ; |col difference| scratch in MANHATTAN_DISTANCE
+@ %def DIST_COL
+
 <<manhattan distance>>=
     ORG     $13DB
 MANHATTAN_DISTANCE:
@@ -16846,7 +16850,7 @@ MANHATTAN_DISTANCE:
     ; Output: A = |col_diff| + |row_diff|
     ;
     ; Uses ENTITY_PTR byte EFIELD_POSITION as the entity's position.
-    ; FONT_COL/FONT_ROW and $BA used as scratch.
+    ; FONT_COL/FONT_ROW and DIST_COL used as scratch.
     ; Clobbers: A, X, Y
 
     ; --- unpack target position ---
@@ -16866,7 +16870,7 @@ MANHATTAN_DISTANCE:
     EOR     #$FF                   ; \ negate if negative
     ADC     #$01                   ; / (two's complement abs)
 .pos1:
-    STA     $BA                    ; save |delta col|
+    STA     DIST_COL               ; save |delta col|
 
     ; --- |row difference| ---
     TYA
@@ -16877,7 +16881,7 @@ MANHATTAN_DISTANCE:
     ADC     #$01                   ; /
 .pos2:
     CLC
-    ADC     $BA                    ; A = |delta col| + |delta row|
+    ADC     DIST_COL               ; A = |delta col| + |delta row|
     RTS
 @ %def MANHATTAN_DISTANCE
 
