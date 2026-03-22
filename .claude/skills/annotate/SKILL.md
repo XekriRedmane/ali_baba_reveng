@@ -6,9 +6,18 @@ Annotate an existing documented routine: replace raw addresses and constants wit
 
 ```
 /annotate ROUTINE_NAME
+/annotate all routines in SECTION_NAME
 ```
 
-Where ROUTINE_NAME is the label of a routine already in main.nw (e.g., `DISPLAY_SHOP`).
+ROUTINE_NAME is the label of a routine already in main.nw (e.g., `DISPLAY_SHOP`).
+
+When annotating all routines in a section or subsection:
+1. Find the section boundaries (`\section{...}` or `\subsection{...}` to the next section/subsection).
+2. Identify all routines (ORG + `@ %def` pairs) within the range.
+3. Skip routines that already have plate comments.
+4. Launch **parallel agents** (one per routine, or group small related routines into one agent). Each agent receives the routine source and the annotation rules, and returns proposed replacement text.
+5. Review all agent results, normalize comment style, and merge into main.nw.
+6. Assemble and verify after all changes.
 
 ## Instructions
 
