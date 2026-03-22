@@ -16286,6 +16286,10 @@ STAT_SCALE          EQU     $5A7E   ; strength-derived level threshold step
 STAT_LEVEL_BITS     EQU     $5A7F   ; level bits during stat modification
 @ %def STAT_SCALE STAT_LEVEL_BITS
 
+<<zero page defines>>=
+LEVEL_THRESHOLD     EQU     $BA     ; 16-bit level threshold accumulator (2 bytes)
+@ %def LEVEL_THRESHOLD
+
 <<modify char stats>>=
     ORG     $704D
 MODIFY_CHAR_STATS:
@@ -16299,7 +16303,7 @@ MODIFY_CHAR_STATS:
     ; Output: bytes $0D/$0E (gold) updated,
     ;         byte $0C (level encoding) recomputed
     ;
-    ; Modifies: STAT_SCALE, STAT_LEVEL_BITS, $BA, $BB
+    ; Modifies: STAT_SCALE, STAT_LEVEL_BITS, LEVEL_THRESHOLD/HI
     ; Clobbers: A, X, Y
 
     ; --- add or subtract gold ---
@@ -16353,24 +16357,24 @@ MODIFY_CHAR_STATS:
 .done_cnt:
     INY                            ; Y = 0
     STY     STAT_LEVEL_BITS        ; init level bits accumulator
-    STY     $BA                    ; \ init 16-bit threshold
-    STY     $BB                    ; / accumulator to 0
+    STY     LEVEL_THRESHOLD        ; \ init 16-bit threshold
+    STY     LEVEL_THRESHOLD+1     ; / accumulator to 0
 .outer_loop:
     LDY     #MFIELD_GOLD_HI
     BXEQ    #$00,.store_final      ; no levels remain -> store
     CLC                            ; \ add STAT_SCALE to threshold
-    LDA     $BA                    ;  |
+    LDA     LEVEL_THRESHOLD        ;  |
     ADC     STAT_SCALE             ;  |
-    STA     $BA                    ;  |
+    STA     LEVEL_THRESHOLD        ;  |
     BCC     .no_carry              ;  |
-    INC     $BB                    ; /
+    INC     LEVEL_THRESHOLD+1     ; /
 .no_carry:
     LDA     (EFFECT_REC),Y         ; gold high byte
-    BALT    $BB,.store_final       ; gold_hi < threshold_hi -> done
-    BNE     .next_iter             ; gold_hi > threshold_hi -> next
+    BALT    LEVEL_THRESHOLD+1,.store_final ; gold_hi < thresh_hi -> done
+    BNE     .next_iter             ; gold_hi > thresh_hi -> next
     DEY                            ; Y = MFIELD_GOLD_LO
     LDA     (EFFECT_REC),Y         ; gold low byte
-    BALT    $BA,.store_final       ; gold_lo < threshold_lo -> done
+    BALT    LEVEL_THRESHOLD,.store_final ; gold_lo < thresh_lo -> done
 .next_iter:
     DEX                            ; one fewer level
     CLC                            ; \ advance level bits by $10
