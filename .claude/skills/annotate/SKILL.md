@@ -20,9 +20,10 @@ For every raw hex address or constant in the routine:
 
 1. **Subroutine calls** (`JSR $XXXX`, `JMP $XXXX`): look up the label in main.sym or main.nw and replace.
 2. **Data addresses** (`LDA $XXXX`, `STA $XXXX`, etc.): check if an EQU exists. If not and the address appears meaningful (game state, display buffer, etc.), create one with a descriptive name.
-3. **Immediate constants** (`LDA #$XX`, `LDY #$XX`, `CMP #$XX`): if the value has a known meaning (field offset, bitmask, record size, character code), create an EQU with `#$XX` syntax for non-address constants.
-4. **Indirect addressing** (`LDA ($XX),Y`): check if the ZP pointer has an EQU name.
-5. **Indexed addressing** (`STA $XXXX,X`): check if the base address has an EQU name.
+3. **Immediate constants** (`LDA #$XX`, `LDY #$XX`, `CMP #$XX`): if the value has a known meaning (field offset, bitmask, record size, character code), create an EQU. Define the EQU WITHOUT `#` (e.g., `LEVEL_MASK EQU $1F`) and use `#` on the instruction (e.g., `AND #LEVEL_MASK`).
+4. **Record field offsets**: if a constant is used as an offset into a record (e.g., `LDY #$03 / LDA (ptr),Y`), create a named EQU for that offset. Group all field offset EQUs for the same record type together in a central `<<defines>>=` chunk (e.g., `EFIELD_*` for entity records, `EVENT_*` for event records). Check if an offset EQU already exists before creating a new one.
+5. **Indirect addressing** (`LDA ($XX),Y`): check if the ZP pointer has an EQU name.
+6. **Indexed addressing** (`STA $XXXX,X`): check if the base address has an EQU name.
 
 For new EQUs, follow the zero-page aliasing convention: when a ZP address is used for different purposes in different subsystems, define a context-specific EQU name and only use it in the relevant code.
 
