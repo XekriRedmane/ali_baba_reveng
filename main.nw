@@ -4783,7 +4783,7 @@ repositioned, and message~\$2F (joystick confirmation) is displayed.
 SELECT_INPUT_MODE:
     SUBROUTINE SELECT_INPUT_MODE
 
-    LDA     #$38           ; message $38: input mode prompt
+    LDA     #MSG_INPUT_PROMPT           ; message $38: input mode prompt
     JSR     DISPLAY_MESSAGE
     LDA     $C061          ; read paddle button 1
     AND     #$80           ; isolate bit 7 (pressed state)
@@ -4806,7 +4806,7 @@ SELECT_INPUT_MODE:
 .joystick:
     STOB    #$01,INPUT_MODE ; 1 = joystick
     JSR     SET_CURSOR_ROW21
-    LDA     #$2F           ; message $2F: joystick confirmation
+    LDA     #MSG_JOYSTICK_MODE           ; message $2F: joystick confirmation
     JMP     DISPLAY_MESSAGE
 @ %def SELECT_INPUT_MODE
 
@@ -6423,6 +6423,48 @@ NUM_TO_DECIMAL_CONT:
     INY                         ; advance output index
     RTS
 @ %def NUM_TO_DECIMAL NUM_TO_DECIMAL_CONT
+<<defines>>=
+    ; --- Message number constants (index into game message table) ---
+MSG_DOOR_OPENS      EQU     $01     ; "THE DOOR SWINGS OPEN!"
+MSG_INSERT_DISK     EQU     $02     ; "INSERT ALI BABA DISK"
+MSG_INSERT_GAME     EQU     $03     ; "HAH! JUST A SCRATCH!" (also insert game disk prompt)
+MSG_FEELING_WEAK    EQU     $09     ; "IS FEELING RATHER WEAK."
+MSG_LOTS_OF_FIGHT   EQU     $0A     ; "STILL HAS LOTS OF FIGHT LEFT."
+MSG_HIT_WALL        EQU     $0B     ; "SMASHES INTO A SOLID WALL."
+MSG_HIT_STATUE      EQU     $0C     ; "CHARGES INTO A STONE STATUE."
+MSG_DEATH           EQU     $0D     ; "DEPARTS THE LAND OF THE LIVING."
+MSG_ROCK_FALLS      EQU     $0F     ; "A LITTLE ROCK CRACKS AND FALLS."
+MSG_HEAVY_ROCK      EQU     $10     ; "A HEAVY PIECE OF ROCK FALLS,"
+MSG_DUST_CLOUD      EQU     $11     ; "A BILLOWING CLOUD OF DUST"
+MSG_TOPPLES         EQU     $12     ; "THE SCULPTURE TOPPLES OVER"
+MSG_TOUCHED         EQU     $14     ; "AS SOON AS IT IS TOUCHED,"
+MSG_TOUGH_HIDE      EQU     $16     ; "WHOSE TOUGH HIDE SOFTENS THE BLOW."
+MSG_BREAKS_FREE     EQU     $1B     ; "BREAKS FREE OF THE FRACAS."
+MSG_ESCAPE_FAIL     EQU     $1C     ; "FAILS TO ESCAPE FROM THE ENEMY."
+MSG_TACKLE_FAIL     EQU     $1D     ; "FAILS TO TACKLE THE ENEMY."
+MSG_FLYING_TACKLE   EQU     $1E     ; "LEAPS INTO A FLYING TACKLE"
+MSG_UNCONSCIOUS     EQU     $1F     ; "IS UNCONSCIOUS."
+MSG_REST_STRONGER   EQU     $20     ; "FEELS STRONGER AFTER RESTING."
+MSG_REGAIN_CONSC    EQU     $21     ; "STRUGGLES BACK TO CONSCIOUSNESS."
+MSG_JOINS_PARTY     EQU     $24     ; "IN GRATITUDE I AM YOURS TO COMMAND."
+MSG_THANK_YOU       EQU     $25     ; "THANK YOU."
+MSG_SHUFFLES_OFF    EQU     $26     ; "SHUFFLES OFF THIS MORTAL COIL."
+MSG_ARMOR_WORTHLESS EQU     $2A     ; "YOUR USED ARMOR IS WORTHLESS."
+MSG_XP_GAINED       EQU     $2B     ; "ALL THE GOLD SINKS INTO SOME QUICKS"
+MSG_GOLD_LOST       EQU     $2C     ; "SOME GOLD FALLS THRU HOLES..."
+MSG_GOLD_DROPPED    EQU     $2D     ; gold dropped on map
+MSG_NO_GOLD         EQU     $2E     ; "YOU HAVE NO GOLD!"
+MSG_JOYSTICK_MODE   EQU     $2F     ; joystick confirmation
+MSG_PRESS_KEY       EQU     $30     ; "PRESS ANY KEY TO CONTINUE."
+MSG_TOO_POOR        EQU     $31     ; "SORRY, BUT YOU ARE TOO POOR."
+MSG_INSERT_SCENARIO EQU     $33     ; "WHO, UNAWARE OF DANGER," (scenario disk prompt)
+MSG_ENOUGH          EQU     $34     ; "ENOUGH IS ENOUGH!"
+MSG_SAVED_ME        EQU     $35     ; "YOU SAVED ME FROM MY IMPRISONMENT,"
+MSG_NO_XP           EQU     $37     ; no XP to flush
+MSG_INPUT_PROMPT    EQU     $38     ; input mode prompt (keyboard/joystick)
+MSG_READ_ERROR      EQU     $3B     ; disk read error
+@ %def MSG_DOOR_OPENS MSG_INSERT_DISK MSG_INSERT_GAME MSG_FEELING_WEAK MSG_LOTS_OF_FIGHT MSG_HIT_WALL MSG_HIT_STATUE MSG_DEATH MSG_ROCK_FALLS MSG_HEAVY_ROCK MSG_DUST_CLOUD MSG_TOPPLES MSG_TOUCHED MSG_TOUGH_HIDE MSG_BREAKS_FREE MSG_ESCAPE_FAIL MSG_TACKLE_FAIL MSG_FLYING_TACKLE MSG_UNCONSCIOUS MSG_REST_STRONGER MSG_REGAIN_CONSC MSG_JOINS_PARTY MSG_THANK_YOU MSG_SHUFFLES_OFF MSG_ARMOR_WORTHLESS MSG_XP_GAINED MSG_GOLD_LOST MSG_GOLD_DROPPED MSG_NO_GOLD MSG_JOYSTICK_MODE MSG_PRESS_KEY MSG_TOO_POOR MSG_INSERT_SCENARIO MSG_ENOUGH MSG_SAVED_ME MSG_NO_XP MSG_INPUT_PROMPT MSG_READ_ERROR
+
 Displays a message from the game's message table.  Takes the message
 index in~A.  The message table base address is stored at
 [[$4005/$4006]]; each entry is a length-prefixed string.  The routine
@@ -9889,7 +9931,7 @@ SCENE_LOOP:
 
 .exit:
     JSR     SET_TEXT_WINDOW_BOTTOM
-    LDA     #$1B
+    LDA     #MSG_BREAKS_FREE
     JSR     DISPLAY_MESSAGE                 ; display message (mode off)
     JMP     .done
 @ %def SCENE_LOOP
@@ -10305,7 +10347,7 @@ DRAW_MAP_ENTITIES:
     AND     #$60           ; check style bits 5-6
     BEQ     .scan_grid
     JSR     SET_CURSOR_ROW21
-    LDA     #$0F
+    LDA     #MSG_ROCK_FALLS
     JSR     DISPLAY_MESSAGE
     STOB    #$FF,MAP_REDRAW_FLAG
     BNE     .draw_mobs     ; always taken
@@ -11676,7 +11718,7 @@ SHOW_IDLE_STATUS:
     JSR     SCROLL_STATUS_LINE
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #$20                    ; message $20: idle status text
+    LDA     #MSG_REST_STRONGER                    ; message $20: idle status text
     JMP     DISPLAY_MESSAGE
 @ %def SHOW_IDLE_STATUS
 @ For active mob groups (type $\geq$~3), [[START_MOB_TURN]] prepares the
@@ -13384,7 +13426,7 @@ CHAR_SELECT_INIT:
     JSR     FIND_FIRST_PC      ; find first player character
     BCC     CHAR_SELECT_HOME   ; carry clear -> found, enter init path
     JSR     SET_CURSOR_ROW21   ; no PCs: position cursor
-    LDA     #$35               ; message $35: "YOU SAVED ME..."
+    LDA     #MSG_SAVED_ME               ; message $35: "YOU SAVED ME..."
     JSR     DISPLAY_MESSAGE
     JMP     MOVE_LOOP          ; back to main loop
 
@@ -13522,7 +13564,7 @@ CONTINUE_GAME:
 
 .scenario:
     JSR     SET_CURSOR_ROW21
-    LDA     #$33               ; "INSERT SCENARIO DISK"
+    LDA     #MSG_INSERT_SCENARIO               ; "INSERT SCENARIO DISK"
     JSR     DISPLAY_MESSAGE
     JSR     WAIT_KEYPRESS      ; wait for user
     JSR     VERIFY_DISK_SIGNATURE ; check "ALI" signature
@@ -13533,7 +13575,7 @@ CONTINUE_GAME:
 
 .bad_disk:
     JSR     SET_CURSOR_ROW21
-    LDA     #$16               ; error message
+    LDA     #MSG_TOUGH_HIDE               ; error message
     JSR     DISPLAY_MESSAGE
     JSR     ENSURE_GAME_DISK
     JMP     INIT_WORLD         ; back to save/load menu
@@ -13678,7 +13720,7 @@ CANCEL_SCENARIO:
 
 SCENARIO_INSERT_PROMPT:
     JSR     SET_CURSOR_ROW21
-    LDA     #$33               ; "INSERT SCENARIO DISK"
+    LDA     #MSG_INSERT_SCENARIO               ; "INSERT SCENARIO DISK"
     JSR     DISPLAY_MESSAGE
     JMP     ENTER_SCENARIO_DISK
 
@@ -13711,13 +13753,13 @@ USE_SCENARIO_DISK:
 
 .sig_error:
     JSR     SET_CURSOR_ROW21
-    LDA     #$16               ; error message
+    LDA     #MSG_TOUGH_HIDE               ; error message
     JSR     DISPLAY_MESSAGE
     JMP     .cleanup
 
 DISPLAY_INSERT_MSG:
     JSR     SET_CURSOR_ROW21
-    LDA     #$1B               ; "INSERT" confirmation message
+    LDA     #MSG_BREAKS_FREE               ; "INSERT" confirmation message
     JMP     DISPLAY_MESSAGE
 @ %def CANCEL_SCENARIO SCENARIO_INSERT_PROMPT FORMAT_SCENARIO_DISK USE_SCENARIO_DISK DISPLAY_INSERT_MSG
 
@@ -13745,11 +13787,11 @@ ENSURE_GAME_DISK:
 
 PROMPT_INSERT_DISK:
     JSR     SET_CURSOR_ROW21
-    LDA     #$03               ; "INSERT GAME DISK"
+    LDA     #MSG_INSERT_GAME               ; "INSERT GAME DISK"
     JSR     DISPLAY_MESSAGE
 
 WAIT_KEYPRESS:
-    LDA     #$30               ; "PRESS ANY KEY"
+    LDA     #MSG_PRESS_KEY               ; "PRESS ANY KEY"
     JSR     DISPLAY_MESSAGE
     STA     $C010              ; clear keyboard strobe
 .wait:
@@ -13957,7 +13999,7 @@ READ_GAME_DATA:
     DEC     $BF
     BNE     .sector
     JSR     SET_CURSOR_ROW21
-    LDA     #$3B               ; read error message
+    LDA     #MSG_READ_ERROR               ; read error message
     JSR     DISPLAY_MESSAGE
     JMP     COLD_RESTART       ; fatal: reboot from disk
 
@@ -14924,7 +14966,7 @@ PLAYER_ATTACK:
 .immune:
     JSR     DISPATCH_ON_MODE
     JSR     SCROLL_STATUS_LINE
-    LDA     #$14
+    LDA     #MSG_TOUCHED
     JMP     DISPLAY_MESSAGE
 .roll_hit:
     LDA     #$0D
@@ -14945,7 +14987,7 @@ PLAYER_ATTACK:
     LDX     #$0C              ; tune 6: combat avoided effect
     JSR     TUNE_PLAYER
     JSR     SET_CURSOR_ROW21
-    LDA     #$02
+    LDA     #MSG_INSERT_DISK
     JMP     DISPLAY_MESSAGE
 .check_event:
     LDY     #$02
@@ -14985,7 +15027,7 @@ PLAYER_ATTACK:
     JSR     DRAW_CHAR_AT_POS
     JSR     SET_CURSOR_ROW21
 .show_found:
-    LDA     #$12
+    LDA     #MSG_TOPPLES
     JSR     DISPLAY_MESSAGE
     JMP     EVENT_PRNG_CHECK
 .take_item:
@@ -15001,7 +15043,7 @@ PLAYER_ATTACK:
 .blocked:
     JSR     DISPATCH_ON_MODE
     JSR     SET_CURSOR_ROW21
-    LDA     #$10
+    LDA     #MSG_HEAVY_ROCK
     JMP     DISPLAY_MESSAGE
 @ %def PLAYER_ATTACK
 @ [[MOB_ATTACK]] resolves an attack from a mob against the current character.
@@ -15077,7 +15119,7 @@ MOB_ATTACK:
     TXA
     JMP     DISPLAY_MESSAGE
 .critical:
-    LDA     #$34
+    LDA     #MSG_ENOUGH
     JMP     DISPLAY_MESSAGE
 .partial:
     STA     COMBAT_STRENGTH
@@ -15153,17 +15195,17 @@ APPLY_DAMAGE:
     ORA     #$04              ; set restricted flag
     STA     (EFFECT_REC),Y
     JSR     PRINT_ENTITY_NAME
-    LDA     #$09
+    LDA     #MSG_FEELING_WEAK
     JSR     DISPLAY_MESSAGE   ; "badly hurt" message
     RTS
 .check8:
     BAPL    #$08,.ge8
     JSR     PRINT_ENTITY_NAME
-    LDA     #$0A
+    LDA     #MSG_LOTS_OF_FIGHT
     JMP     DISPLAY_MESSAGE   ; "wounded" message
 .ge8:
     JSR     PRINT_ENTITY_NAME
-    LDA     #$0B
+    LDA     #MSG_HIT_WALL
     JMP     DISPLAY_MESSAGE   ; "scratched" message
 
     ; --- character dies ---
@@ -15285,7 +15327,7 @@ HANDLE_ENCOUNTER:
     JMP     .special                   ; rare: special encounter
 .normal:
     JSR     SET_CURSOR_ROW21
-    LDA     #$01
+    LDA     #MSG_DOOR_OPENS
     JSR     DISPLAY_MESSAGE            ; "encounter" message
     LDX     #$14              ; tune 10: encounter effect
     JMP     TUNE_PLAYER
@@ -15353,7 +15395,7 @@ HANDLE_ENCOUNTER:
     LDX     #$0C              ; tune 6: combat avoided effect
     JSR     TUNE_PLAYER
     JSR     SET_CURSOR_ROW21
-    LDA     #$02
+    LDA     #MSG_INSERT_DISK
     JMP     DISPLAY_MESSAGE            ; "avoided encounter" message
 
     ; --- special encounter (rare) ---
@@ -15418,7 +15460,7 @@ HANDLE_MOB_ENCOUNTER:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #$1E
+    LDA     #MSG_FLYING_TACKLE
     JSR     DISPLAY_MESSAGE
     MOVB    TURN_START_COL,CURRENT_COL
     MOVB    TURN_START_ROW,CURRENT_ROW
@@ -15452,7 +15494,7 @@ HANDLE_MOB_ENCOUNTER:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #$1F
+    LDA     #MSG_UNCONSCIOUS
     JSR     DISPLAY_MESSAGE
     JMP     END_TURN
 @ %def HANDLE_MOB_ENCOUNTER
@@ -15525,7 +15567,7 @@ HANDLE_EVENT_SLOT:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #$0D
+    LDA     #MSG_DEATH
     JSR     DISPLAY_MESSAGE
     LDA     #$01
     JMP     APPLY_DAMAGE_TO_CURRENT
@@ -15539,7 +15581,7 @@ HANDLE_EVENT_SLOT:
     AND     #$1F
     BAPL    PRNG_OUTPUT,.type40
     JSR     SET_CURSOR_ROW21
-    LDA     #$10
+    LDA     #MSG_HEAVY_ROCK
     JSR     DISPLAY_MESSAGE
     LDY     #$02
     LDA     EVENT_SLOT_BYTE
@@ -15553,7 +15595,7 @@ EVENT_PRNG_CHECK:              ; $1DDC - external entry point
     RTS
 .trap_damage:
     JSR     SET_CURSOR_ROW21
-    LDA     #$11
+    LDA     #MSG_DUST_CLOUD
     JSR     DISPLAY_MESSAGE
     JSR     SET_RESTRICTED
     JSR     PRINT_MOB_NAME
@@ -15575,7 +15617,7 @@ EVENT_PRNG_CHECK:              ; $1DDC - external entry point
     JMP     .clear_slot
 .big_treasure:
     JSR     SET_CURSOR_ROW21
-    LDA     #$12
+    LDA     #MSG_TOPPLES
     JSR     DISPLAY_MESSAGE
     LDA     EVENT_SUB_VALUE
     BAMI    #$1F,.clear_slot
@@ -15610,7 +15652,7 @@ SHOW_LOCKED_MSG:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #$0C
+    LDA     #MSG_HIT_STATUE
     JSR     DISPLAY_MESSAGE
     LDA     #$00
     JMP     SET_CHAR_STATE
@@ -15737,7 +15779,7 @@ ORPHANED_ENCOUNTER_HANDLER:
     JSR     $7444           ; -> SET_CURSOR_ROW21
     JSR     $0DD1           ; -> PRINT_MOB_NAME
     JSR     $7421           ; -> SCROLL_STATUS_LINE
-    LDA     #$1E            ; message: flee
+    LDA     #MSG_FLYING_TACKLE            ; message: flee
     JSR     $739F           ; -> DISPLAY_MESSAGE
     MOVB    TURN_START_COL,CURRENT_COL
     MOVB    TURN_START_ROW,CURRENT_ROW
@@ -15774,7 +15816,7 @@ ORPHANED_ENCOUNTER_HANDLER:
     JSR     $7444           ; -> SET_CURSOR_ROW21
     JSR     $0DD1           ; -> PRINT_MOB_NAME
     JSR     $7421           ; -> SCROLL_STATUS_LINE
-    LDA     #$1F            ; message: engage combat
+    LDA     #MSG_UNCONSCIOUS            ; message: engage combat
     JSR     $739F           ; -> DISPLAY_MESSAGE
     JMP     $1C91           ; -> END_TURN
 
@@ -16097,7 +16139,7 @@ AUTO_HEAL:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #$21
+    LDA     #MSG_REGAIN_CONSC
     JMP     DISPLAY_MESSAGE
 @ %def AUTO_HEAL
 @ [[INCREMENT_HP]] adds~1 to the entity's field~6 (which holds HP in its low
@@ -16480,12 +16522,12 @@ AI_CHOOSE_TARGET:
     LDA     MOB_PTR+1
     BAEQ    #$00,.simple_target    ; no match -> simple target
     JSR     SET_CURSOR_ROW21
-    LDA     #$24                   ; "joins party" message
+    LDA     #MSG_JOINS_PARTY                   ; "joins party" message
     JSR     DISPLAY_MESSAGE
     JSR     PRINT_MEMBER_NAME
     JSR     SCROLL_STATUS_LINE
     JSR     DELAY_WITH_ANIMATION
-    LDA     #$25                   ; confirmation message
+    LDA     #MSG_THANK_YOU                   ; confirmation message
     JSR     DISPLAY_MESSAGE
     STOB    #$00,CHAR_AI_MODE      ; switch to player control
     LDY     #MFIELD_APPEARANCE     ; \ adjust appearance (remove NPC flag)
@@ -17989,12 +18031,12 @@ FLUSH_PENDING_XP:
     ADC     (ENTITY_PTR),Y     ; add pending XP to level
     STA     (ENTITY_PTR),Y     ; store updated level
     JSR     SET_CURSOR_ROW21
-    LDA     #$2B               ; XP gained message
+    LDA     #MSG_XP_GAINED               ; XP gained message
     JMP     DISPLAY_MESSAGE
 
 .no_xp:
     JSR     SET_CURSOR_ROW21
-    LDA     #$37               ; no XP message
+    LDA     #MSG_NO_XP               ; no XP message
     JSR     DISPLAY_MESSAGE
     JMP     MOVE_LOOP
 @ %def FLUSH_PENDING_XP
@@ -18041,7 +18083,7 @@ INIT_DROP_GOLD:
     STX     DROP_AMOUNT_LO
     BNE     .has_gold
     JSR     SET_CURSOR_ROW21
-    LDA     #$2E               ; "no gold" message
+    LDA     #MSG_NO_GOLD               ; "no gold" message
     JSR     DISPLAY_MESSAGE
     JMP     MENU_OTHER_OPTIONS
 
@@ -18173,7 +18215,7 @@ DROP_GOLD_EXEC:
     BEQ     .lost              ; zero -> all lost
 
 .has_gold:
-    LDA     #$2D               ; gold dropped message
+    LDA     #MSG_GOLD_DROPPED               ; gold dropped message
     JSR     DISPLAY_MESSAGE
     LDA     DROP_AMOUNT_LO
     STA     $BC
@@ -18185,7 +18227,7 @@ DROP_GOLD_EXEC:
     JMP     MOVE_LOOP
 
 .lost:
-    LDA     #$2C               ; gold lost message
+    LDA     #MSG_GOLD_LOST               ; gold lost message
     JSR     DISPLAY_MESSAGE
     JMP     MOVE_LOOP
 @ %def DROP_GOLD_EXEC
@@ -18541,7 +18583,7 @@ UPDATE_EVENT_LIST:
     LDA     (EVENT_PTR),Y   ; entry byte 0 = position
     BANE    #$FF,.not_end
     JSR     SET_CURSOR_ROW21
-    LDA     #$2A
+    LDA     #MSG_ARMOR_WORTHLESS
     JMP     DISPLAY_MESSAGE ; "event list full" message
 .not_end:
     BANE    #$FE,.check_match
@@ -18607,7 +18649,7 @@ CHECK_CAN_LEAVE:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #$1C
+    LDA     #MSG_ESCAPE_FAIL
     JSR     DISPLAY_MESSAGE
     LDA     #$01
     RTS
@@ -18615,7 +18657,7 @@ CHECK_CAN_LEAVE:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
-    LDA     #$1D
+    LDA     #MSG_TACKLE_FAIL
     JSR     DISPLAY_MESSAGE
     LDA     #$00
     RTS
