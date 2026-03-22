@@ -19726,9 +19726,8 @@ RESIDENT_DISPATCH_FETCH:
 .no_carry:
     TAX                              ; opcode -> X (also saves position)
     LDA     RESIDENT_DISPATCH_TABLE,X
-    STA     resident_jmp+1           ; self-modify: JMP low byte
-resident_jmp:
-    JMP     $07E0              ; self-modified: low byte patched from dispatch table
+    STA     $07E0              ; patch JMP low byte at $07DF in handler page
+    JMP     $07DF              ; jump to handler page dispatch
 @ %def RESIDENT_DISPATCH
 Opcode \$00 handler---the resident interpreter's GOTO instruction.
 Decodes an address and redirects execution there.
