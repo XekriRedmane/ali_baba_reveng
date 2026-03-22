@@ -16698,73 +16698,108 @@ mobs of various strength ranges, and locked/safe events each contribute
 different penalty amounts via [[INC_MOB_COUNTERS]].  The entity's position
 is restored before returning.
 
+<<defines>>=
+AI_BEST_DIST        EQU     $5A68   ; current best distance to AI target
+AI_SAVED_POS        EQU     $5A69   ; saved entity position during direction eval
+@ %def AI_BEST_DIST AI_SAVED_POS
+
 <<evaluate direction>>=
     ORG     $6815
 EVALUATE_DIRECTION:
     SUBROUTINE EVALUATE_DIRECTION
+    ; Score a candidate direction for NPC movement AI.
+    ;
+    ; Input:  AI_TEST_POS    — candidate position to evaluate
+    ;         AI_TARGET_POS  — AI's desired target position
+    ;         AI_DIRECTION   — index into DIR_SCORES for this direction
+    ;         AI_BEST_DIST   — current best distance to target
+    ;         ENTITY_PTR     — entity being moved
+    ;
+    ; Output: DIR_SCORES[AI_DIRECTION] updated with penalty points
+    ;
+    ; Behavior:
+    ;   Penalizes the direction based on: already at target (+9),
+    ;   not closer than current best (+2), wall (+7), and entity
+    ;   type at the candidate square (friendly +3, hostile +1..+6,
+    ;   locked event +7, safe event +1).
+    ;
+    ; Modifies: DIR_SCORES, AI_SAVED_POS
+    ; Clobbers: A, X, Y
+
+    ; --- check if already at target ---
     LDA     AI_TARGET_POS
     BAEQ    AI_TEST_POS,.skip_target
-    LDY     #$09
+    LDY     #$09                   ; heavy penalty: already there
     JSR     INC_MOB_COUNTERS
+
+    ; --- check distance improvement ---
 .skip_target:
-    LDY     #$03
-    LDA     (ENTITY_PTR),Y
-    STA     $5A69
-    LDA     AI_TEST_POS
-    STA     (ENTITY_PTR),Y
+    LDY     #MFIELD_POSITION       ; \ save entity's current position
+    LDA     (ENTITY_PTR),Y         ;  |
+    STA     AI_SAVED_POS           ; /
+    LDA     AI_TEST_POS            ; \ temporarily set entity to test pos
+    STA     (ENTITY_PTR),Y         ; / (for MANHATTAN_DISTANCE)
     LDA     AI_TARGET_POS
-    BEQ     .no_distance
+    BEQ     .no_distance           ; no target -> skip distance check
     JSR     MANHATTAN_DISTANCE
-    BALT    $5A68,.no_distance
-    LDY     #$02
+    BALT    AI_BEST_DIST,.no_distance ; closer -> no penalty
+    LDY     #$02                   ; penalty: not closer
     JSR     INC_MOB_COUNTERS
+
+    ; --- restore position and check occupant ---
 .no_distance:
-    LDY     #$03
-    LDA     $5A69
-    STA     (ENTITY_PTR),Y
+    LDY     #MFIELD_POSITION       ; \ restore original position
+    LDA     AI_SAVED_POS           ;  |
+    STA     (ENTITY_PTR),Y         ; /
     LDA     AI_TEST_POS
-    JSR     FIND_ENTITY_AT_POS
+    JSR     FIND_ENTITY_AT_POS     ; what's at the candidate square?
     LDA     ENTITY_REC+1
-    BNE     .has_entity
+    BNE     .has_entity            ; nonzero hi byte -> entity found
     LDA     ENTITY_REC
-    BNE     .wall
-    RTS
+    BNE     .wall                  ; nonzero lo byte -> wall/obstacle
+    RTS                            ; empty square -> no penalty
+
 .wall:
-    LDY     #$07
+    LDY     #$07                   ; heavy penalty: wall
     JMP     INC_MOB_COUNTERS
+
+    ; --- classify entity by type byte ---
 .has_entity:
-    BALT    #$80,.mob
-    RTS
+    BALT    #$80,.mob              ; bit 7 clear -> mob
+    RTS                            ; bit 7 set -> player char, no penalty
+
 .mob:
     LDY     #$01
-    LDA     (ENTITY_REC),Y
+    LDA     (ENTITY_REC),Y        ; entity byte 1 (type)
     BAGE    #$80,.ge80
-    LDY     #$03
+    LDY     #$03                   ; type < $80: friendly mob
     JMP     INC_MOB_COUNTERS
 .ge80:
     BAGE    #$C0,.geC0
-    LDY     #$06
+    LDY     #$06                   ; type $80-$BF: hostile (strong)
     JMP     INC_MOB_COUNTERS
 .geC0:
     BAGE    #$D2,.geD2
-    LDY     #$01
+    LDY     #$01                   ; type $C0-$D1: hostile (weak)
     JMP     INC_MOB_COUNTERS
 .geD2:
     BAGE    #$D5,.geD5
-    LDY     #$02
+    LDY     #$02                   ; type $D2-$D4: hostile (medium)
     JMP     INC_MOB_COUNTERS
 .geD5:
     BAGE    #$D8,.geD8
-    LDY     #$03
+    LDY     #$03                   ; type $D5-$D7: shop/special
     JMP     INC_MOB_COUNTERS
+
+    ; --- event entity: check lock status ---
 .geD8:
-    INY
-    LDA     (ENTITY_REC),Y
+    INY                            ; Y = 2
+    LDA     (ENTITY_REC),Y        ; entity byte 2
     BAGE    #$40,.safe
-    LDY     #$07
+    LDY     #$07                   ; locked event: heavy penalty
     JMP     INC_MOB_COUNTERS
 .safe:
-    LDY     #$01
+    LDY     #$01                   ; safe event: light penalty
 ; falls through to INC_MOB_COUNTERS
 @ %def EVALUATE_DIRECTION
 @ [[INC_MOB_COUNTERS]] adds~Y to the direction score for the current AI
@@ -16776,16 +16811,23 @@ penalize directions based on what occupies the candidate square.
 
 <<inc mob counters>>=
     ORG     $689F
-    SUBROUTINE INC_MOB_COUNTERS
-; Increments mob counters; Y = count-1 on entry
 INC_MOB_COUNTERS:
-    LDX     AI_DIRECTION
-    DEY
+    SUBROUTINE INC_MOB_COUNTERS
+    ; Add Y to the direction penalty score for the current AI direction.
+    ;
+    ; Input:  Y             — penalty count (decremented to zero)
+    ;         AI_DIRECTION  — index into DIR_SCORES array
+    ;
+    ; Output: DIR_SCORES[AI_DIRECTION] incremented by Y
+    ; Clobbers: X, Y, flags
+
+    LDX     AI_DIRECTION           ; current direction index
+    DEY                            ; pre-decrement (Y=0 -> done)
     BPL     .do_inc
     RTS
 .do_inc:
-    INC     DIR_SCORES,X
-    BPL     INC_MOB_COUNTERS
+    INC     DIR_SCORES,X           ; add one penalty point
+    BPL     INC_MOB_COUNTERS       ; loop until Y < 0
 @ %def INC_MOB_COUNTERS
 @ [[FIND_NEAREST_EVENT]] scans the character's event list for the closest
 non-activated event, measured by Manhattan distance from the entity's current
