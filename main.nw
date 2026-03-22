@@ -14810,20 +14810,46 @@ NEXT_COLOCATED_MOB:
     RTS
 @ %def SELECT_SOMEONE_ELSE CHECK_ATTACK_ELIGIBLE NEXT_COLOCATED_MOB
 
-@ [[RESOLVE_ATTACK]] is the core combat resolution routine.  It first sets the
-blink cursor to the target's position, then computes a ``willingness to fight''
-score in [[COMBAT_WILLINGNESS]].  For player characters the score is fixed
-at~\$1C (28), but for AI-controlled entities it accumulates modifiers from
-several sources: the entity's base level (field~11 low 5~bits), flag bits in
-fields~11 and~15 of both attacker and target (bit~5 adds +24, bit~6 subtracts
-4, bit~7 adds +8), the target's combat state (idle +3, state~1 $-$1, state~3
-$-$3), critically low HP on the target (+24), and a same-position defense
-differential from field~5.  These modifiers are accumulated through
-[[ADD_WILLINGNESS]] and clamped to 0--30.  The game then rolls
-[[RANDOM_IN_RANGE]] with limit~\$1F (31): if the roll is at or below the
-willingness score, the attack proceeds; otherwise the attacker hesitates and a
-``holds back'' message is printed.  Successful attacks branch to
-[[PLAYER_ATTACK]] or [[MOB_ATTACK]] depending on [[IS_PLAYER_TURN]].
+@ \subsection{Combat willingness and attack resolution (\$15AB)}
+
+[[RESOLVE_ATTACK]] determines whether an entity commits to an attack
+or hesitates.  Player characters always attack; AI entities compute a
+\emph{willingness score} that is tested against a random roll.
+
+\paragraph{Willingness score.}
+For players, willingness is fixed at~28.  For AI, it starts at the
+entity's level (byte~11, bits~4--0) and accumulates modifiers:
+
+\begin{center}
+\begin{tabular}{llr}
+\toprule
+\textbf{Condition} & \textbf{Source} & \textbf{Delta} \\
+\midrule
+Attacker rage flag (bit~5 of byte~11) & attacker & $+24$ \\
+Target cautious flag (bit~6 of byte~11) & target & $-4$ \\
+Target aggressive flag (bit~7 of byte~11) & target & $+8$ \\
+Target combat-engaged (bit~2 of byte~15) & target & $+6$ \\
+Target idle (state~0, bits~1--0 of byte~15) & target & $+3$ \\
+Target guarding (state~1) & target & $-1$ \\
+Target retreating (state~3) & target & $-3$ \\
+Target critically wounded (HP $<$ 3) & target & $+24$ \\
+Defense differential (same position only) & both & attacker $-$ target \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The final score is clamped to 0--30.
+
+\paragraph{Attack roll.}
+A random number 0--30 is generated.  If the roll is at or below the
+willingness score, the attack proceeds to [[PLAYER_ATTACK]] or
+[[MOB_ATTACK]] depending on [[IS_PLAYER_TURN]].  Otherwise the
+attacker hesitates and ``MISSES'' is displayed.
+
+\paragraph{Rage consumption.}
+When the rage flag (bit~5) is set, the routine grants the $+24$
+bonus and then clears bit~4 of byte~11, consuming the rage for
+future turns.
 
 <<defines>>=
 COMBAT_WILLINGNESS EQU  $5A76   ; accumulated willingness-to-fight score
