@@ -17259,6 +17259,11 @@ AWARD_XP:
     JMP     BROWSE_HANDLER
 
 EXTRACT_PENDING_XP:
+    ; Extract the pending XP field from a packed entity byte.
+    ;
+    ; Input:  A = entity byte 8 (status|pending_xp|count)
+    ; Output: A = pending XP value (0-7), from bits 6-4
+    ; Clobbers: flags
     ROR                            ; \ extract bits 6-4 of A
     ROR                            ;  | shift right 4 positions
     ROR                            ;  |
