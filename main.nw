@@ -11840,10 +11840,6 @@ relocated block (\$9600--\$A8FF).  [[INPUT_LOOP]] calls it to wait for
 a keypress; a zero return indicates the player pressed return (select),
 while any other value is passed to [[VALIDATE_INPUT]].
 
-<<defines>>=
-READ_KEYBOARD                EQU     $A44C   ; read keyboard input (relocated block)
-@ %def READ_KEYBOARD
-
 <<input loop>>=
     ORG     $5F19
 INPUT_LOOP:
@@ -13374,7 +13370,7 @@ WRITE_GAME_DATA:
 
 [[READ_GAME_DATA]] reads [[SAVE_SECTOR_COUNT]] (26) sectors of save
 data from disk into the \$4000 buffer.  On persistent failure, it
-displays message~\$3B and jumps to the EALDR error handler at [[$A56F]].
+displays message~\$3B and jumps to [[COLD_RESTART]] at [[$A56F]].
 
 [[SETUP_SLOT_IOB]] calculates the disk track for a given slot:
 \begin{itemize}
@@ -13413,7 +13409,7 @@ READ_GAME_DATA:
     JSR     SET_CURSOR_ROW21
     LDA     #$3B               ; read error message
     JSR     DISPLAY_MESSAGE
-    JMP     $A56F              ; EALDR error handler
+    JMP     COLD_RESTART       ; fatal: reboot from disk
 
 SETUP_SLOT_IOB:
     SUBROUTINE SETUP_SLOT_IOB
@@ -18239,8 +18235,345 @@ TUNE_11_MOVEMENT:
     DC.B    $26               ; NORAND
     DC.B    $23               ; HIGH
     DC.B    $3F,$1E            ; G6 (96ms)
-    DC.B    $24               ; END
+    ; END byte ($24) is provided by TUNE_STUB_BIT's BIT opcode at $A440
 @ %def TUNE_11_MOVEMENT
+
+@ \section{Relocated block: game support routines}
+
+The following routines reside in the relocated block (\$9600--\$A8FF,
+originally staged at \$2000--\$32FF).  They provide keyboard input,
+scene data loading, disk checkpointing, and integrity checking.
+
+\subsection{Tune stubs and keyboard dispatch (\$A440--\$A44B)}
+
+[[TUNE_STUB_BIT]] is a short entry point that tests bit~\$A2 (a ZP
+flag), loads A=\$0A, and jumps to the tune player at [[$A4BE]].
+[[DISK_READ_JUMP]] jumps to [[DISK_READ]] (\$6C12).
+[[DISK_RTS]] is a single RTS used as a no-op call target.
+
+<<tune stubs>>=
+    ORG     $A440
+TUNE_END_MARKER:
+    DC.B    $24               ; tune END byte (shared with TUNE_11)
+
+LOAD_SCENE_DISK_ENTRY:
+    LDX     #$0D               ; track $0D
+    LDA     #$0A               ; sector $0A
+    JMP     SETUP_AND_READ_DISK
+
+DISK_READ_JUMP:
+    JMP     DISK_READ
+
+DISK_RTS:
+    RTS
+@ %def TUNE_END_MARKER LOAD_SCENE_DISK_ENTRY DISK_READ_JUMP DISK_RTS
+
+@ \subsection{Read keyboard (\$A44C--\$A477)}
+
+[[READ_KEYBOARD]] clears the keyboard strobe, calls [[COLROW_TO_POS]]
+(\$0D30) to update the map position, then enters a polling loop.
+It checks [[PRNG_OUTPUT]] (\$5A18) masked with \$7E; if zero, it
+calls the integrity check routine at [[$A4E6]].  Then it steps the
+PRNG, calls an animation delay at [[$755E]], and loops until a
+keypress is detected (BPL on \$C000).  On keypress it clears the
+strobe and returns the key in~A.
+
+<<read keyboard routine>>=
+    ORG     $A44C
+READ_KEYBOARD:
+    SUBROUTINE READ_KEYBOARD
+    LDA     #$FF
+    STA     $C010              ; clear keyboard strobe
+    JSR     $0D30              ; update map position
+    LDA     PRNG_OUTPUT
+    AND     #$7E
+    BNE     .display
+    JSR     VERIFY_INTEGRITY
+
+.display:
+    JSR     $0D1E              ; display update
+.poll:
+    JSR     STEP_PRNG
+    JSR     $755E              ; animation delay
+    BPL     .got_key           ; key available
+    JSR     $0D5E              ; idle processing
+    JMP     .poll
+
+.got_key:
+    STA     $C010              ; clear keyboard strobe
+    PHA
+    JSR     $0D36              ; post-input processing
+    PLA
+    RTS
+@ %def READ_KEYBOARD
+
+@ \subsection{Load scene data from disk (\$A478--\$A4BD)}
+
+[[$A478]] loads scene data from the game disk.  It sets up the RWTS
+IOB for a buffer at [[SCENE_TEXT_DATA]] (\$5C00), calculates the
+track and sector from [[GAME_SIG_TRACK]] and [[SCENE_NUMBER]]
+(sector = (sig\_sector + scene) mod~13, incrementing track on
+overflow), then reads the sector via [[DISK_READ]].  On failure
+after 2~retries it returns carry set; on success carry clear.
+
+<<load scene from disk>>=
+    ORG     $A478
+LOAD_SCENE_FROM_DISK:
+    SUBROUTINE LOAD_SCENE_FROM_DISK
+    JSR     DISK_RTS           ; no-op (placeholder)
+    LDA     #$00
+    LDY     #$08
+    STA     (RWTS_IOB_PTR),Y   ; IOB+8 = buffer lo ($00)
+    INY
+    LDA     #$5C
+    STA     (RWTS_IOB_PTR),Y   ; IOB+9 = buffer hi ($5C -> $5C00)
+    LDA     GAME_SIG_TRACK     ; base track
+    STA     $BE
+    LDA     GAME_SIG_SECTOR    ; base sector
+    CLC
+    ADC     SCENE_NUMBER       ; + current scene
+.mod13:
+    CMP     #$0D               ; >= 13 sectors per track?
+    BCC     .set_iob           ; no -> done
+    INC     $BE                ; next track
+    SEC
+    SBC     #$0D               ; subtract 13
+    JMP     .mod13
+
+.set_iob:
+    LDY     #$05
+    STA     (RWTS_IOB_PTR),Y   ; IOB+5 = sector
+    DEY
+    LDA     $BE
+    STA     (RWTS_IOB_PTR),Y   ; IOB+4 = track
+    LDA     #$02               ; retry counter
+    STA     $BE
+.retry:
+    JSR     DISK_READ_JUMP     ; read from disk
+    BCS     .error
+    JSR     DISK_RTS           ; no-op
+    CLC                        ; success
+    RTS
+.error:
+    DEC     $BE
+    BNE     .retry
+    JSR     DISK_RTS           ; no-op
+    SEC                        ; all retries failed
+    RTS
+@ %def LOAD_SCENE_FROM_DISK
+
+@ \subsection{Tune player dispatch (\$A4BE--\$A4E1)}
+
+[[$A4BE]] sets up the RWTS IOB with the given track (X) and sector (A),
+buffer at \$A400, then reads from disk with retries.  On persistent
+failure it jumps to the [[COLD_RESTART]] error handler.
+
+<<tune player dispatch>>=
+    ORG     $A4BE
+SETUP_AND_READ_DISK:
+    SUBROUTINE SETUP_AND_READ_DISK
+    LDY     #$05
+    STA     (RWTS_IOB_PTR),Y   ; IOB+5 = sector (A)
+    DEY
+    TXA
+    STA     (RWTS_IOB_PTR),Y   ; IOB+4 = track (X)
+    LDA     #$00
+    LDY     #$08
+    STA     (RWTS_IOB_PTR),Y   ; IOB+8 = buffer lo ($00)
+    INY
+    LDA     #$A4
+    STA     (RWTS_IOB_PTR),Y   ; IOB+9 = buffer hi ($A4 -> $A400)
+    LDA     #$02               ; retry counter
+    STA     $BE
+.retry:
+    JSR     DISK_READ_JUMP
+    BCS     .error
+    RTS                        ; success
+.error:
+    DEC     $BE
+    BNE     .retry
+    JMP     COLD_RESTART       ; fatal: disk read failure
+@ %def SETUP_AND_READ_DISK
+
+@ \subsection{Integrity verification (\$A4E2--\$A56E)}
+
+[[INTEGRITY_DATA]] holds two pairs of expected checksum values
+(4~bytes total) at \$A4E2--\$A4E5, stored as self-modifying
+operands.
+
+[[VERIFY_INTEGRITY]] computes a checksum over \$B300--\$B443 (the
+disk I/O routines) using [[COMPUTE_CHECKSUM]], and compares the
+result with the first expected pair at [[INTEGRITY_DATA]].  If they
+mismatch, it jumps to [[GAME_INIT]] (\$6DED) to reinitialize.
+
+[[VERIFY_DISK_IO]] computes a checksum over \$6DD8--\$6DFA (the
+scene loader) and compares with the second expected pair.
+
+[[COMPUTE_CHECKSUM]] accumulates a running XOR/ADD checksum over the
+byte range \$BA/\$BB through \$BE/\$BF.  It returns the 16-bit
+result in A (low) and Y (high).
+
+<<integrity verification>>=
+    ORG     $A4E2
+INTEGRITY_DATA:
+    HEX     AE 7A 4F 87        ; expected checksums (2 pairs)
+
+VERIFY_INTEGRITY:
+    SUBROUTINE VERIFY_INTEGRITY
+    LDA     #$00               ; \ range: $B300-$B443
+    STA     $BA                ;  |
+    LDA     #$B3               ;  |
+    STA     $BB                ;  |
+    LDA     #$43               ;  |
+    STA     $BE                ;  |
+    LDA     #$B4               ;  |
+    STA     $BF                ; /
+    JSR     COMPUTE_CHECKSUM
+    CMP     INTEGRITY_DATA     ; compare low byte
+    BNE     .fail
+    TYA
+    CMP     INTEGRITY_DATA+1   ; compare high byte
+    BNE     .fail
+    RTS                        ; checksums match
+.fail:
+    JMP     $6DED              ; GAME_INIT: reinitialize
+
+VERIFY_DISK_IO:
+    LDA     #$D8               ; \ range: $6DD8-$6DFA
+    STA     $BA                ;  |
+    LDA     #$6D               ;  |
+    STA     $BB                ;  |
+    LDA     #$FA               ;  |
+    STA     $BE                ;  |
+    LDA     #$6D               ;  |
+    STA     $BF                ; /
+    JSR     COMPUTE_CHECKSUM
+    CMP     INTEGRITY_DATA+2   ; compare low byte
+    BNE     .fail
+    TYA
+    CMP     INTEGRITY_DATA+3   ; compare high byte
+    BNE     .fail
+    RTS
+    ; unreachable padding (overwritten at runtime as checksum accumulators)
+    HEX     B1 A0
+
+COMPUTE_CHECKSUM:
+    SUBROUTINE COMPUTE_CHECKSUM
+    CLC
+    LDY     #$00
+    STY     $A527              ; checksum low = 0 (self-modifying)
+    STY     $A528              ; checksum high = 0
+.loop:
+    LDA     ($BA),Y
+    ADC     $A527
+    STA     $A527
+    JSR     .advance           ; advance pointer
+    BCS     .done              ; reached end -> return
+    LDA     ($BA),Y
+    ADC     $A528
+    STA     $A528
+    EOR     $A527
+    STA     $A527
+    JSR     .advance
+    BCC     .loop              ; not done -> continue
+
+.done:
+    LDA     $A527              ; return checksum low in A
+    LDY     $A528              ; return checksum high in Y
+    RTS
+
+.advance:
+    INC     $BA
+    BNE     .no_carry
+    INC     $BB
+.no_carry:
+    LDA     $BA
+    CMP     $BE
+    BNE     .not_end
+    LDA     $BB
+    CMP     $BF
+    BNE     .not_end
+    SEC                        ; reached end of range
+    RTS
+.not_end:
+    CLC
+    RTS
+@ %def INTEGRITY_DATA VERIFY_INTEGRITY VERIFY_DISK_IO COMPUTE_CHECKSUM
+
+@ \subsection{Cold restart error handler (\$A56F--\$A58F)}
+
+[[COLD_RESTART]] is the fatal error handler.  It clears memory from
+\$0800 to \$A46F (the entire program area), then jumps to \$C600
+(the Disk~II boot ROM) to restart the system from disk.
+
+<<cold restart>>=
+    ORG     $A56F
+COLD_RESTART:
+    SUBROUTINE COLD_RESTART
+    LDA     #$00
+    STA     $BE
+    LDA     #$08
+    STA     $BF
+    LDY     #$00
+.clear:
+    STA     ($BE),Y
+    DEY
+    BNE     .clear
+    INC     $BF
+    LDA     $BF
+    CMP     #$A5               ; stop at page $A5
+    BNE     .clear
+    LDY     #$6F
+.clear_tail:
+    STA     ($BE),Y            ; clear $A500-$A56F
+    DEY
+    BNE     .clear_tail
+    JMP     $C600              ; reboot from Disk II
+@ %def COLD_RESTART
+
+@ \subsection{Pointer advance helpers (\$A590--\$A5BB)}
+
+These are small utility routines for advancing pointers and comparing
+against end-of-range boundaries.  They duplicate logic from
+[[COMPUTE_CHECKSUM]] but use different ZP addresses.
+
+<<pointer helpers>>=
+    ORG     $A590
+LOAD_END_OFFSET:
+    LDY     $A563              ; load end boundary (self-modifying operand)
+    RTS
+
+ADVANCE_BA:
+    INC     $BA
+    BNE     .no_carry
+    INC     $BB
+.no_carry:
+    LDA     $BA
+    CMP     $BE
+    BNE     .not_end
+    LDA     $BB
+    CMP     $BF
+    BNE     .not_end
+    SEC
+    RTS
+.not_end:
+    CLC
+    RTS
+
+ADVANCE_1A:
+    INC     $1B
+    LDA     $1A
+    CMP     $1E
+    BNE     .not_end2
+    LDA     $1B
+    CMP     $1F
+    BNE     .not_end2
+    SEC
+    RTS
+.not_end2:
+    CLC
+    RTS
+@ %def ADVANCE_BA ADVANCE_1A
 
 @ [[TUNE_LOOP_CTR]] counts iterations of the script's built-in loop
 construct.  [[TUNE_PRNG_MASK]] controls action randomization: the
@@ -20403,6 +20736,13 @@ The following root chunks produce the assembly files when tangled.
 <<std font data>>
 <<game message strings>>
 <<resident tune bytecode>>
+<<tune stubs>>
+<<read keyboard routine>>
+<<load scene from disk>>
+<<tune player dispatch>>
+<<integrity verification>>
+<<cold restart>>
+<<pointer helpers>>
 <<disk read field>>
 <<verify data field>>
 <<disk vm loop>>
