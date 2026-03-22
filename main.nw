@@ -3906,8 +3906,12 @@ MFIELD_LEVEL_ENC    EQU     $0C     ; byte 12: level encoding (hi nib = XP mult,
 MFIELD_GOLD_LO      EQU     $0D     ; byte 13: gold counter low byte
 MFIELD_GOLD_HI      EQU     $0E     ; byte 14: gold counter high byte
 MFIELD_CHAR         EQU     $00     ; byte 0: display character
+MFIELD_NAME_LO      EQU     $00     ; byte 0: name pointer low (alias for PCs)
+MFIELD_NAME_HI      EQU     $01     ; byte 1: name pointer high (alias for PCs)
+MFIELD_HP           EQU     $06     ; byte 6: bits 5-0 = HP (alias of MFIELD_MOB_TYPE)
 MFIELD_FLAGS        EQU     $0F     ; byte 15: status flags (bit 2 = combat engaged)
-@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP CFIELD_FACTION_MASK MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_MOB_TYPE MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL
+HP_FLAGS_MASK       EQU     $C0     ; byte 6: mask for flags bits 7-6 (above HP)
+@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP CFIELD_FACTION_MASK MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_MOB_TYPE MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL MFIELD_NAME_LO MFIELD_NAME_HI MFIELD_HP HP_FLAGS_MASK
 
 <<game init>>=
     ORG     $78C7
@@ -6972,10 +6976,26 @@ a cosmetic fix (suppressing a leading ``0'' in the experience field), it
 scrolls the status line, prints the formatted stats, and enters an
 input wait loop.
 
+<<defines>>=
+LOW_NIBBLE_MASK     EQU     $0F     ; bits 3-0: generic low nibble extraction
+@ %def LOW_NIBBLE_MASK
+
 <<display char stats>>=
     ORG     $7780
 DISPLAY_CHAR_STATS:
     SUBROUTINE DISPLAY_CHAR_STATS
+    ; Format and display entity stats.
+    ;
+    ; Input:  ENTITY_PTR     -- mob/entity record
+    ;         INPUT_MODE     -- 0 = keyboard, nonzero = joystick
+    ; Output: screen updated with stats; waits for keypress
+    ; Behavior:
+    ;   - Reads 8 fields from entity record, converts to decimal
+    ;   - Writes digits into STATS_TEMPLATE, displays it
+    ;   - Shows mode-appropriate input prompt
+    ;   - Polls keyboard/joystick until input received
+    ;   - Exits via CLEAR_MAP
+    ; Clobbers: A, X, Y
 
     ; --- Clear digit positions in the stats template ---
     LDA     #$A0              ; space (high-bit ASCII)
@@ -6992,25 +7012,25 @@ DISPLAY_CHAR_STATS:
     ; --- Format life force: field 6, bits 5-0 ---
     LDA     #$00
     STA     NUM_VALUE+1                ; high byte = 0
-    LDY     #$06
+    LDY     #MFIELD_MOB_TYPE
     LDA     (ENTITY_PTR),Y            ; field 6
-    AND     #$3F                       ; bits 5-0 = life force
+    AND     #HP_MASK                   ; bits 5-0 = life force
     STA     NUM_VALUE
     STOW    STATS_LIFE_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format group count: field 8, bits 3-0 ---
-    LDY     #$08
+    LDY     #MFIELD_XP
     LDA     (ENTITY_PTR),Y            ; field 8
-    AND     #$0F                       ; bits 3-0 = group count
+    AND     #LOW_NIBBLE_MASK           ; bits 3-0 = group count
     STA     NUM_VALUE
     STOW    STATS_WEAP_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format weapons: field 7, bits 3-0, plus 1 ---
-    LDY     #$07
+    LDY     #MFIELD_ATTACK
     LDA     (ENTITY_PTR),Y            ; field 7
-    AND     #$0F                       ; bits 3-0
+    AND     #LOW_NIBBLE_MASK           ; bits 3-0
     CLC
     ADC     #$01                       ; +1
     STA     NUM_VALUE
@@ -7018,9 +7038,9 @@ DISPLAY_CHAR_STATS:
     JSR     NUM_TO_DECIMAL
 
     ; --- Format ducats: field 9, bits 3-0, plus 1 ---
-    LDY     #$09
+    LDY     #MFIELD_DEFENSE
     LDA     (ENTITY_PTR),Y            ; field 9
-    AND     #$0F                       ; bits 3-0
+    AND     #LOW_NIBBLE_MASK           ; bits 3-0
     CLC
     ADC     #$01                       ; +1
     STA     NUM_VALUE
@@ -7028,31 +7048,31 @@ DISPLAY_CHAR_STATS:
     JSR     NUM_TO_DECIMAL
 
     ; --- Format strength: field 5, bits 4-0 ---
-    LDY     #$05
+    LDY     #MFIELD_STRENGTH
     LDA     (ENTITY_PTR),Y            ; field 5
-    AND     #$1F                       ; bits 4-0 = strength
+    AND     #STRENGTH_MASK             ; bits 4-0 = strength
     STA     NUM_VALUE
     STOW    STATS_STR_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format armor: field 12, bits 3-0 ---
-    LDY     #$0C
+    LDY     #MFIELD_LEVEL_ENC
     LDA     (ENTITY_PTR),Y            ; field 12
-    AND     #$0F                       ; bits 3-0
+    AND     #LOW_NIBBLE_MASK           ; bits 3-0
     STA     NUM_VALUE
     STOW    STATS_SPEED_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format dexterity: field 11, bits 4-0 ---
-    LDY     #$0B
+    LDY     #MFIELD_LEVEL
     LDA     (ENTITY_PTR),Y            ; field 11
-    AND     #$1F                       ; bits 4-0 = dexterity
+    AND     #LEVEL_MASK                ; bits 4-0 = dexterity
     STA     NUM_VALUE
     STOW    STATS_DEXT_OUT,DECIMAL_OUT_PTR
     JSR     NUM_TO_DECIMAL
 
     ; --- Format experience: fields 13-14 (16-bit) ---
-    LDY     #$0D
+    LDY     #MFIELD_GOLD_LO
     LDA     (ENTITY_PTR),Y            ; field 13 (low byte)
     STA     NUM_VALUE
     INY
@@ -7846,26 +7866,38 @@ PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random 
 
 <<step prng>>=
     ORG     $78A8
+; ---------------------------------------------------------------
+; STEP_PRNG -- advance the linear congruential PRNG
+;
+; Computes val = 69 * val + $53 (mod 256) and stores
+; both the full result and a shifted copy.
+;
+; In:  PRNG_STATE = current LCG state
+; Out: PRNG_STATE = updated state
+;      PRNG_OUTPUT = state >> 1 (0..127)
+;      A = PRNG_OUTPUT
+; Clobbers: A
+; ---------------------------------------------------------------
 STEP_PRNG:
     SUBROUTINE STEP_PRNG
 
-    LDA     PRNG_STATE  ; val
-    ASL                 ; val*2
-    ASL                 ; val*4
-    STA     PRNG_TEMP   ; temp = val*4
-    ASL                 ; val*8
-    ASL                 ; val*16
-    ASL                 ; val*32
-    ASL                 ; val*64
+    LDA     PRNG_STATE              ; val
+    ASL                             ; val*2
+    ASL                             ; val*4
+    STA     PRNG_TEMP               ; temp = val*4
+    ASL                             ; val*8
+    ASL                             ; val*16
+    ASL                             ; val*32
+    ASL                             ; val*64
     CLC
-    ADC     PRNG_TEMP   ; val*64 + val*4 = val*68
+    ADC     PRNG_TEMP               ; val*64 + val*4 = val*68
     CLC
-    ADC     PRNG_STATE  ; val*68 + val = val*69
+    ADC     PRNG_STATE              ; val*68 + val = val*69
     CLC
-    ADC     #$53        ; + $53
-    STA     PRNG_STATE  ; store full result
-    LSR                 ; val >> 1
-    STA     PRNG_OUTPUT ; shifted copy (used for random tests)
+    ADC     #$53                    ; + $53
+    STA     PRNG_STATE              ; store full result
+    LSR                             ; val >> 1
+    STA     PRNG_OUTPUT             ; shifted copy for random tests
     RTS
 @ %def STEP_PRNG
 Two shifts produce [[val*4]], saved to [[PRNG_TEMP]].  Four more shifts give
@@ -7896,76 +7928,87 @@ bracket to minimize the number of PRNG calls.
 
 <<random in range>>=
     ORG     $1317
+; ---------------------------------------------------------------
+; RANDOM_IN_RANGE -- uniform random integer via rejection sampling
+;
+; Finds the smallest power-of-two bitmask covering the range,
+; then loops calling STEP_PRNG until the masked output falls
+; within the limit.  Avoids modulo bias.
+;
+; In:  A = range limit (1..127); if A=0, returns 0
+; Out: A = random value in 0..limit-1
+; Clobbers: A, Y
+; ---------------------------------------------------------------
 RANDOM_IN_RANGE:
     SUBROUTINE RANDOM_IN_RANGE
 
-    STA     RNG_LIMIT         ; save range limit
+    STA     RNG_LIMIT               ; save range limit
     BANE    #$00,.nonzero
-    RTS                       ; range=0 -> return 0
+    RTS                             ; range=0 -> return 0
 
 .nonzero:
     BAPL    #$02,.ge2
-    LDY     #$06              ;  | range 1: mask=$40, shift=6
-    LDA     #$40              ;  |
-    BNE     .have_mask        ; /
+    LDY     #$06                    ;  | range 1: mask=$40, shift=6
+    LDA     #$40                    ;  |
+    BNE     .have_mask              ; /
 .ge2:
     BAPL    #$04,.ge4
-    LDY     #$05              ;  | range 2-3: mask=$60, shift=5
-    LDA     #$60              ;  |
-    BNE     .have_mask        ; /
+    LDY     #$05                    ;  | range 2-3: mask=$60, shift=5
+    LDA     #$60                    ;  |
+    BNE     .have_mask              ; /
 .ge4:
     BAPL    #$08,.ge8
-    LDY     #$04              ;  | range 4-7: mask=$70, shift=4
-    LDA     #$70              ;  |
-    BNE     .have_mask        ; /
+    LDY     #$04                    ;  | range 4-7: mask=$70, shift=4
+    LDA     #$70                    ;  |
+    BNE     .have_mask              ; /
 .ge8:
     BAPL    #$10,.ge16
-    LDY     #$03              ;  | range 8-15: mask=$78, shift=3
-    LDA     #$78              ;  |
-    BNE     .have_mask        ; /
+    LDY     #$03                    ;  | range 8-15: mask=$78, shift=3
+    LDA     #$78                    ;  |
+    BNE     .have_mask              ; /
 .ge16:
     BAPL    #$20,.ge32
-    LDY     #$02              ;  | range 16-31: mask=$7C, shift=2
-    LDA     #$7C              ;  |
-    BNE     .have_mask        ; /
+    LDY     #$02                    ;  | range 16-31: mask=$7C, shift=2
+    LDA     #$7C                    ;  |
+    BNE     .have_mask              ; /
 .ge32:
     BAPL    #$40,.ge64
-    LDY     #$01              ;  | range 32-63: mask=$7E, shift=1
-    LDA     #$7E              ;  |
-    BNE     .have_mask        ; /
+    LDY     #$01                    ;  | range 32-63: mask=$7E, shift=1
+    LDA     #$7E                    ;  |
+    BNE     .have_mask              ; /
 .ge64:
-    LDY     #$00              ; range 64-127: mask=$7F, shift=0
+    LDY     #$00                    ; range 64-127: mask=$7F, shift=0
     LDA     #$7F
 
 .have_mask:
-    STA     RNG_MASK          ; save bit mask
-    LDA     RNG_LIMIT         ; reload range limit
-    STY     RNG_LIMIT         ; save shift count in RNG_LIMIT
+    STA     RNG_MASK                ; save bit mask
+    LDA     RNG_LIMIT               ; reload range limit
+    STY     RNG_LIMIT               ; save shift count in RNG_LIMIT
 .shift_loop:
-    DEY                       ; \
-    BMI     .shifted          ;  | shift limit left by (shift count)
-    CLC                       ;  | positions so it aligns with the
-    ROL                       ;  | mask bits
-    BNE     .shift_loop       ; /
+    DEY                             ; \
+    BMI     .shifted                ;  | shift limit left by (shift count)
+    CLC                             ;  | positions so it aligns with the
+    ROL                             ;  | mask bits
+    BNE     .shift_loop             ; /
 .shifted:
-    LDY     RNG_LIMIT         ; Y = shift count
-    STA     RNG_LIMIT         ; save shifted limit
+    LDY     RNG_LIMIT               ; Y = shift count
+    STA     RNG_LIMIT               ; save shifted limit
 
 .sample:
-    JSR     STEP_PRNG         ; get next random byte
-    LDA     PRNG_OUTPUT
-    AND     RNG_MASK          ; mask to relevant bits
-    BAEQ    RNG_LIMIT,.accept ; equal -> accept
-    BPL     .sample           ; greater -> reject, retry
+    JSR     STEP_PRNG               ; get next random byte
+    LDA     PRNG_OUTPUT             ; load masked PRNG output
+    AND     RNG_MASK                ; mask to relevant bits
+    BAEQ    RNG_LIMIT,.accept       ; equal -> accept
+    BPL     .sample                 ; greater -> reject, retry
 
 .accept:
-    DEY                       ; \
-    BPL     .shift_right      ;  | shift result right by (shift count)
-    RTS                       ;  | to recover the final value
+    DEY                             ; \
+    BPL     .shift_right            ;  | shift result right by (shift count)
+    RTS                             ;  | to recover the final value
 .shift_right:
-    CLC                       ;  |
-    ROR                       ;  |
-    BCC     .accept           ; / (always taken: masked bit is 0)
+    CLC                             ;  |
+    ROR                             ;  |
+    BCC     .accept                 ; / (always taken: masked bit is 0)
 @ %def RANDOM_IN_RANGE
 
 \section{Coordinate conversion}
@@ -7981,19 +8024,29 @@ the remainder.
 
 <<pos to colrow>>=
     ORG     $0C25
+; -----------------------------------------------
+; POS_TO_COLROW — convert linear position to (col, row)
+;
+; Divides a packed map position by MAP_WIDTH (20)
+; using repeated subtraction.
+;
+; Input:   A = map position (0-199)
+; Output:  A = column (0-19), Y = row (0-9)
+; Clobbers: flags
+; -----------------------------------------------
 POS_TO_COLROW:
     SUBROUTINE POS_TO_COLROW
 
-    LDY      #$00  ; row = 0
+    LDY     #$00            ; row counter = 0
 .loop:
     CLC
-    ADC      #$EC  ; A -= 20 (unsigned)
-    BCC      .done ; underflow -> remainder is negative
-    INY            ; row++
-    BCS      .loop ; always taken (carry set)
+    ADC     #$EC            ; A -= MAP_WIDTH ($EC = -20)
+    BCC     .done           ; underflow → went past 0
+    INY                     ; row++
+    BCS     .loop           ; always taken (C=1)
 .done:
-    ADC      #$14  ; add 20 back -> A = column (remainder)
-    RTS            ; A = column (0-19), Y = row (0-9)
+    ADC     #MAP_WIDTH      ; add 20 back → remainder
+    RTS
 @ %def POS_TO_COLROW
 The inverse of [[POS_TO_COLROW]]: converts a column in~A and row in~Y
 to a linear map position [[A = col + row * 20]].  The carry is cleared
@@ -8003,18 +8056,28 @@ carry occurs (overflow past 255).
 
 <<colrow to pos>>=
     ORG     $0D98
+; -----------------------------------------------
+; COLROW_TO_POS — convert (col, row) to linear position
+;
+; Computes pos = col + row * MAP_WIDTH by adding
+; MAP_WIDTH (20) once per row.
+;
+; Input:   A = column (0-19), Y = row (0-9)
+; Output:  A = map position (0-199)
+; Clobbers: Y, flags
+; -----------------------------------------------
 COLROW_TO_POS:
     SUBROUTINE COLROW_TO_POS
 
     CLC
 .loop:
-    DEY           ; row--
-    BPL     .add  ; still >= 0 -> add another 20
-    RTS           ; Y exhausted, A = result
+    DEY                     ; row--
+    BPL     .add            ; row >= 0 → add another 20
+    RTS                     ; Y exhausted, A = result
 .add:
-    ADC     #$14  ; A += 20
-    BCC     .loop ; no overflow -> continue
-                                ; carry set -> return (overflow)
+    ADC     #MAP_WIDTH      ; A += 20
+    BCC     .loop           ; no overflow → continue
+                            ; C=1 → overflow, fall through
 @ %def COLROW_TO_POS
 
 @ [[GET_MOB_DATA]] computes a pointer into the game data from a 1-based
@@ -8027,26 +8090,37 @@ MOB_DATA_PTR            EQU     $BA     ; mob data record pointer (2 bytes, $BA/
 
 <<get mob data>>=
     ORG     $0C32
+; -----------------------------------------------
+; GET_MOB_DATA — compute pointer to mob data record
+;
+; Each mob record is 16 bytes.  Given a 1-based
+; index, computes MOB_DATA_PTR = base + (index-1)*16
+; where base = $4000/$4001.
+;
+; Input:   A = mob index (1-based)
+; Output:  MOB_DATA_PTR ($BA/$BB) = record address
+; Clobbers: A, Y, flags
+; -----------------------------------------------
 GET_MOB_DATA:
     SUBROUTINE GET_MOB_DATA
 
     CLC
-    ADC     #$FF           ; A = index - 1
-    ROL2 ;  rotate left 4 times
-    ROL2 ;  = multiply by 16 (with carry)
-    TAY                    ; save intermediate
-    ROL                    ; one more rotate
-    AND     #$0F           ; high nybble -> page offset
+    ADC     #$FF            ; A = index - 1
+    ROL2                    ; rotate left 4 times
+    ROL2                    ;   = multiply by 16 (with carry)
+    TAY                     ; save intermediate
+    ROL                     ; one more rotate
+    AND     #$0F            ; high nybble → page offset
     CLC
-    ADC     $4001          ; add base page
-    STA     MOB_DATA_PTR+1 ; high byte
+    ADC     $4001           ; add base page
+    STA     MOB_DATA_PTR+1  ; store high byte
     TYA
-    AND     #$F0           ; low nybble -> byte offset
+    AND     #$F0            ; low nybble → byte offset
     CLC
-    ADC     $4000          ; add base offset
-    STA     MOB_DATA_PTR   ; low byte
+    ADC     $4000           ; add base offset
+    STA     MOB_DATA_PTR    ; store low byte
     BCC     .done
-    INC     MOB_DATA_PTR+1 ; carry
+    INC     MOB_DATA_PTR+1  ; propagate carry
 .done:
     RTS
 @ %def GET_MOB_DATA
@@ -8210,23 +8284,35 @@ MOB_PTR                 EQU     $F4     ; mob data pointer (2 bytes, $F4/$F5)
 
 <<clamp char field>>=
     ORG     $0A93
+; -----------------------------------------------
+; CLAMP_CHAR_FIELD -- Clamp HP floor to strength
+;
+; Ensures byte 6 (HP) low 6 bits >= byte 5
+; (strength) low 5 bits.  If HP is below the
+; strength floor, replaces HP bits with the
+; strength value while preserving byte 6 flags.
+;
+; Input:   MOB_PTR -> 16-byte mob data record
+; Output:  byte 6 HP clamped if needed
+; Clobbers: A, Y, MOB_DATA_PTR (scratch)
+; -----------------------------------------------
 CLAMP_CHAR_FIELD:
     SUBROUTINE CLAMP_CHAR_FIELD
 
-    LDY     #$05
-    LDA     (MOB_PTR),Y ; byte 5 of record
-    AND     #$1F        ; low 5 bits = minimum
-    STA     $BA
-    INY
-    LDA     (MOB_PTR),Y ; byte 6 of record
-    AND     #$3F        ; low 6 bits = current value
-    BALT    $BA,.clamp ; current < minimum -> clamp
-    RTS                 ; current >= minimum -> done
+    LDY     #MFIELD_STRENGTH        ; byte 5: strength
+    LDA     (MOB_PTR),Y             ; load strength byte
+    AND     #STRENGTH_MASK          ; bits 4-0 = minimum HP
+    STA     MOB_DATA_PTR            ; save as floor value
+    INY                             ; Y = MFIELD_HP (byte 6)
+    LDA     (MOB_PTR),Y             ; load HP byte
+    AND     #HP_MASK                ; bits 5-0 = current HP
+    BALT    MOB_DATA_PTR,.clamp     ; HP < floor -> clamp
+    RTS                             ; HP >= floor -> done
 .clamp:
-    LDA     (MOB_PTR),Y ; reload byte 6
-    AND     #$C0        ; preserve top 2 bits
-    ORA     $BA         ; set low bits to minimum
-    STA     (MOB_PTR),Y
+    LDA     (MOB_PTR),Y             ; reload HP byte
+    AND     #HP_FLAGS_MASK          ; preserve flag bits 7-6
+    ORA     MOB_DATA_PTR            ; set HP to floor value
+    STA     (MOB_PTR),Y             ; store clamped HP
     RTS
 @ %def CLAMP_CHAR_FIELD
 
@@ -8269,27 +8355,41 @@ list is exhausted (byte-2 link = 0), returns with carry set.
 
 <<find first pc>>=
     ORG     $0AAE
+; -----------------------------------------------
+; FIND_FIRST_PC -- Find first player character
+;
+; Scans mob linked list from $4002 head pointer.
+; A PC has appearance < NPC_APPEARANCE_MIN and
+; bit 7 clear.
+;
+; Input:   none
+; Output:  C=0: found, BROWSE_CHAR_INDEX set,
+;               name copied to CHAR_SELECT_NAME
+;          C=1: no PCs in list
+; Clobbers: A, X, Y, MOB_DATA_PTR, MOB_PTR,
+;           TARGET_REC
+; -----------------------------------------------
 FIND_FIRST_PC:
     SUBROUTINE FIND_FIRST_PC
 
-    LDA     $4002              ; head of character linked list
+    LDA     $4002                   ; head of character linked list
 .check:
-    CMP     #$00               ; end of list?
-    BNE     .have_entry        ; no -> examine this entry
-    SEC                        ; yes -> not found
+    CMP     #$00                    ; end of list?
+    BNE     .have_entry             ; no -> examine this entry
+    SEC                             ; yes -> not found
     RTS
 .have_entry:
-    STA     BROWSE_CHAR_INDEX  ; save current mob index
-    JSR     GET_MOB_DATA       ; -> MOB_DATA_PTR = mob record
-    LDY     #$04
-    LDA     (MOB_DATA_PTR),Y   ; byte 4 = appearance
-    BMI     .skip              ; bit 7 set -> not a PC
-    CMP     #$15               ; < 21?
-    BMI     COPY_PC_NAME_TO_BUF ; yes -> player character, go copy name
+    STA     BROWSE_CHAR_INDEX       ; save current mob index
+    JSR     GET_MOB_DATA            ; -> MOB_DATA_PTR = mob record
+    LDY     #MFIELD_APPEARANCE      ; byte 4: appearance
+    LDA     (MOB_DATA_PTR),Y        ; load appearance
+    BMI     .skip                   ; bit 7 set -> not a PC
+    CMP     #NPC_APPEARANCE_MIN     ; < $15?
+    BMI     COPY_PC_NAME_TO_BUF     ; yes -> player character
 .skip:
-    LDY     #$02
-    LDA     (MOB_DATA_PTR),Y   ; byte 2 = next link
-    JMP     .check             ; follow chain
+    LDY     #MFIELD_NEXT            ; byte 2: next link
+    LDA     (MOB_DATA_PTR),Y        ; follow chain
+    JMP     .check                  ; check next entry
 @ %def FIND_FIRST_PC
 
 @ [[COPY_PC_NAME_TO_BUF]] copies the name of the mob pointed to by
@@ -8303,34 +8403,47 @@ clear (success).
 <<find first pc>>=
     ORG     $0ACE
 COPY_PC_NAME_TO_BUF:
-    LDA     MOB_DATA_PTR       ; \
-    STA     MOB_PTR            ;  | MOB_PTR = MOB_DATA_PTR
-    LDA     MOB_DATA_PTR+1     ;  |
-    STA     MOB_PTR+1          ; /
-    LDY     #$00
-    LDA     (MOB_PTR),Y        ; byte 0 = name ptr low
-    STA     TARGET_REC         ; \
-    INY                        ;  | TARGET_REC = name string pointer
-    LDA     (MOB_PTR),Y        ;  |
-    STA     TARGET_REC+1       ; /
-    LDA     #<CHAR_SELECT_NAME ; \
-    STA     MOB_DATA_PTR       ;  | MOB_DATA_PTR = display buffer
-    LDA     #>CHAR_SELECT_NAME ;  |
-    STA     MOB_DATA_PTR+1     ; /
-    LDY     #$00
-    LDA     (TARGET_REC),Y     ; byte 0 = name length
-    TAX                        ; X = chars remaining
+; -----------------------------------------------
+; COPY_PC_NAME_TO_BUF -- Copy PC name to buffer
+;
+; Copies the length-prefixed name string from the
+; mob record at MOB_DATA_PTR into the 20-byte
+; CHAR_SELECT_NAME display buffer, padding with
+; spaces.
+;
+; Input:   MOB_DATA_PTR -> mob data record
+; Output:  C=0 (success), name in CHAR_SELECT_NAME
+; Clobbers: A, X, Y, MOB_PTR, TARGET_REC,
+;           MOB_DATA_PTR
+; -----------------------------------------------
+    LDA     MOB_DATA_PTR            ; \
+    STA     MOB_PTR                 ;  | MOB_PTR = MOB_DATA_PTR
+    LDA     MOB_DATA_PTR+1          ;  |
+    STA     MOB_PTR+1               ; /
+    LDY     #MFIELD_NAME_LO         ; byte 0: name ptr low
+    LDA     (MOB_PTR),Y             ; load name ptr low
+    STA     TARGET_REC              ; \
+    INY                             ;  | TARGET_REC = name string
+    LDA     (MOB_PTR),Y             ;  | (Y = MFIELD_NAME_HI)
+    STA     TARGET_REC+1            ; /
+    LDA     #<CHAR_SELECT_NAME      ; \
+    STA     MOB_DATA_PTR            ;  | MOB_DATA_PTR = display buf
+    LDA     #>CHAR_SELECT_NAME      ;  |
+    STA     MOB_DATA_PTR+1          ; /
+    LDY     #$00                    ; string offset 0
+    LDA     (TARGET_REC),Y          ; byte 0 = name length
+    TAX                             ; X = chars remaining
 .copy_loop:
-    INY
-    LDA     (TARGET_REC),Y     ; load name character
-    DEX                        ; decrement remaining count
-    BPL     .store             ; if count >= 0, keep character
-    LDA     #$20               ; else pad with space
+    INY                             ; advance to next char
+    LDA     (TARGET_REC),Y          ; load name character
+    DEX                             ; decrement remaining count
+    BPL     .store                  ; count >= 0 -> keep char
+    LDA     #$20                    ; else pad with space
 .store:
-    STA     (MOB_DATA_PTR),Y   ; store into display buffer
-    CPY     #$14               ; copied 20 chars?
-    BNE     .copy_loop         ; no -> continue
-    CLC                        ; success
+    STA     (MOB_DATA_PTR),Y        ; store into display buffer
+    CPY     #$14                    ; copied 20 chars?
+    BNE     .copy_loop              ; no -> continue
+    CLC                             ; success
     RTS
 @ %def COPY_PC_NAME_TO_BUF
 
@@ -8340,8 +8453,15 @@ can [[JSR]] to it.
 
 <<find first pc>>=
     ORG     $0AFE
+; -----------------------------------------------
+; FIND_NEXT_PC_WRAP -- JSR wrapper for FIND_NEXT_PC
+;
+; Input:   MOB_PTR -> current mob data record
+; Output:  (see FIND_NEXT_PC)
+; Clobbers: (see FIND_NEXT_PC)
+; -----------------------------------------------
 FIND_NEXT_PC_WRAP:
-    JSR     FIND_NEXT_PC
+    JSR     FIND_NEXT_PC            ; find next PC in list
     RTS
 @ %def FIND_NEXT_PC_WRAP
 
@@ -8353,25 +8473,38 @@ bit~7 clear), and either copies the name or recurses.
 
 <<find first pc>>=
     ORG     $0B02
+; -----------------------------------------------
+; FIND_NEXT_PC -- Find next PC in linked list
+;
+; Follows MFIELD_NEXT link from MOB_PTR.  Wraps
+; to list head if chain ends.  Recurses through
+; non-PC entries.
+;
+; Input:   MOB_PTR -> current mob data record
+; Output:  BROWSE_CHAR_INDEX set to next PC,
+;          name copied to CHAR_SELECT_NAME
+; Clobbers: A, X, Y, MOB_DATA_PTR, MOB_PTR,
+;           TARGET_REC
+; -----------------------------------------------
 FIND_NEXT_PC:
-    LDY     #$02
-    LDA     (MOB_PTR),Y       ; byte 2 = next link
-    BNE     .have_link         ; nonzero -> follow it
-    JSR     FIND_FIRST_PC      ; zero -> wrap to first PC
+    LDY     #MFIELD_NEXT            ; byte 2: next link
+    LDA     (MOB_PTR),Y             ; load next mob index
+    BNE     .have_link              ; nonzero -> follow it
+    JSR     FIND_FIRST_PC           ; zero -> wrap to first PC
     RTS
 .have_link:
-    STA     BROWSE_CHAR_INDEX  ; save mob index
-    JSR     GET_MOB_DATA       ; -> MOB_DATA_PTR = mob record
-    LDA     MOB_DATA_PTR       ; \
-    STA     MOB_PTR            ;  | MOB_PTR = MOB_DATA_PTR
-    LDA     MOB_DATA_PTR+1     ;  |
-    STA     MOB_PTR+1          ; /
-    LDY     #$04
-    LDA     (MOB_PTR),Y        ; byte 4 = appearance
-    BMI     FIND_NEXT_PC       ; bit 7 set -> skip, try next
-    CMP     #$15               ; < 21?
-    BPL     FIND_NEXT_PC       ; no -> skip, try next
-    JSR     COPY_PC_NAME_TO_BUF ; yes -> copy name
+    STA     BROWSE_CHAR_INDEX       ; save mob index
+    JSR     GET_MOB_DATA            ; -> MOB_DATA_PTR = mob record
+    LDA     MOB_DATA_PTR            ; \
+    STA     MOB_PTR                 ;  | MOB_PTR = MOB_DATA_PTR
+    LDA     MOB_DATA_PTR+1          ;  |
+    STA     MOB_PTR+1               ; /
+    LDY     #MFIELD_APPEARANCE      ; byte 4: appearance
+    LDA     (MOB_PTR),Y             ; load appearance
+    BMI     FIND_NEXT_PC            ; bit 7 set -> skip
+    CMP     #NPC_APPEARANCE_MIN     ; < $15?
+    BPL     FIND_NEXT_PC            ; no -> skip, try next
+    JSR     COPY_PC_NAME_TO_BUF     ; yes -> copy name
     RTS
 @ %def FIND_NEXT_PC
 
@@ -8384,21 +8517,34 @@ predecessor.  It then resolves that index and copies the name.
 
 <<find first pc>>=
     ORG     $0B28
+; -----------------------------------------------
+; FIND_PREV_PC -- Find previous PC in linked list
+;
+; Walks forward from list head, recording each PC
+; index, until wrapping back to the current one.
+; The last recorded index is the predecessor.
+;
+; Input:   BROWSE_CHAR_INDEX = current PC index
+; Output:  BROWSE_CHAR_INDEX = predecessor PC,
+;          name copied to CHAR_SELECT_NAME
+; Clobbers: A, X, Y, MOB_DATA_PTR, MOB_PTR,
+;           TARGET_REC, INPUT_BUFFER (2 bytes)
+; -----------------------------------------------
 FIND_PREV_PC:
-    LDA     BROWSE_CHAR_INDEX  ; \
-    STA     INPUT_BUFFER       ; / save current index
-    JSR     FIND_FIRST_PC      ; start from first PC
+    LDA     BROWSE_CHAR_INDEX       ; \
+    STA     INPUT_BUFFER            ; / save current index
+    JSR     FIND_FIRST_PC           ; start from first PC
 .scan:
-    LDA     BROWSE_CHAR_INDEX  ; \
-    STA     INPUT_BUFFER+1     ; / save as candidate predecessor
-    JSR     FIND_NEXT_PC       ; advance to next PC
-    LDA     BROWSE_CHAR_INDEX  ; did we wrap back to original?
-    CMP     INPUT_BUFFER       ;
-    BNE     .scan              ; no -> keep scanning
-    LDA     INPUT_BUFFER+1     ; yes -> predecessor index
-    STA     BROWSE_CHAR_INDEX  ; set as current
-    JSR     GET_MOB_DATA       ; resolve to record pointer
-    JSR     COPY_PC_NAME_TO_BUF ; copy name to buffer
+    LDA     BROWSE_CHAR_INDEX       ; \
+    STA     INPUT_BUFFER+1          ; / save as candidate predecessor
+    JSR     FIND_NEXT_PC            ; advance to next PC
+    LDA     BROWSE_CHAR_INDEX       ; wrapped back to original?
+    CMP     INPUT_BUFFER            ; compare with saved index
+    BNE     .scan                   ; no -> keep scanning
+    LDA     INPUT_BUFFER+1          ; yes -> predecessor index
+    STA     BROWSE_CHAR_INDEX       ; set as current
+    JSR     GET_MOB_DATA            ; resolve to record pointer
+    JSR     COPY_PC_NAME_TO_BUF     ; copy name to buffer
     RTS
 @ %def FIND_PREV_PC
 
@@ -8411,14 +8557,26 @@ If no player characters exist (carry set), it falls back to
 
 <<find first pc>>=
     ORG     $0B4F
+; -----------------------------------------------
+; INIT_CHAR_SELECT -- Scene event: character select
+;
+; Marks event handled, sets up scene, then finds
+; first PC.  Jumps to ENTER_CHAR_SELECT on success
+; or MOVE_LOOP if no PCs exist.
+;
+; Input:   none (scene event entry point)
+; Output:  jumps to ENTER_CHAR_SELECT or MOVE_LOOP
+; Clobbers: A, X, Y, MOB_DATA_PTR, MOB_PTR,
+;           TARGET_REC
+; -----------------------------------------------
 INIT_CHAR_SELECT:
-    STOB    #$01,SCENE_EVENT_RESULT ; mark event handled
-    JSR     SCENE_SETUP        ; set up scene boundaries
-    JSR     FIND_FIRST_PC      ; find first player character
-    BCC     .found             ; carry clear -> found
-    JMP     MOVE_LOOP          ; carry set -> no PCs, back to main loop
+    STOB    #$01,SCENE_EVENT_RESULT  ; mark event handled
+    JSR     SCENE_SETUP             ; set up scene boundaries
+    JSR     FIND_FIRST_PC           ; find first player character
+    BCC     .found                  ; carry clear -> found
+    JMP     MOVE_LOOP               ; carry set -> no PCs
 .found:
-    JMP     ENTER_CHAR_SELECT  ; -> character selection menu
+    JMP     ENTER_CHAR_SELECT       ; -> character selection menu
 @ %def INIT_CHAR_SELECT
 The scene loop calls [[$A478]] (a game support routine in the relocated
 block at [[$9600]]--[[$A8FF]]) each iteration to check for user input.
@@ -8456,13 +8614,24 @@ TARGET_REC              EQU     $BC     ; secondary entity record pointer in com
 
 <<save zp pointers>>=
     ORG     $6D53
+; -----------------------------------------------
+; SAVE_ZP_POINTERS -- Save ZP pointer pairs
+;
+; Copies four 2-byte ZP pointer pairs into the
+; $5A page for later restoration.
+;
+; Input:   TARGET_REC, ENTITY_PTR, DATA_PTR,
+;          MOB_PTR (ZP pointers)
+; Output:  SAVED_BC/F8/BE/F4 updated
+; Clobbers: A
+; -----------------------------------------------
 SAVE_ZP_POINTERS:
     SUBROUTINE SAVE_ZP_POINTERS
 
-    MOVW    TARGET_REC,SAVED_BC
-    MOVW    ENTITY_PTR,SAVED_F8
-    MOVW    DATA_PTR,SAVED_BE
-    MOVW    MOB_PTR,SAVED_F4
+    MOVW    TARGET_REC,SAVED_BC     ; $BC/$BD -> $5A9A
+    MOVW    ENTITY_PTR,SAVED_F8     ; $F8/$F9 -> $5A9C
+    MOVW    DATA_PTR,SAVED_BE       ; $BE/$BF -> $5A9E
+    MOVW    MOB_PTR,SAVED_F4        ; $F4/$F5 -> $5AA0
     RTS
 @ %def SAVE_ZP_POINTERS
 @ [[RESTORE_ZP_POINTERS]] is the inverse: it copies the saved values back
@@ -8471,13 +8640,24 @@ or other operation that may have clobbered them.
 
 <<restore zp pointers>>=
     ORG     $6D7C
+; -----------------------------------------------
+; RESTORE_ZP_POINTERS -- Restore ZP pointer pairs
+;
+; Copies four saved 2-byte pointer pairs from the
+; $5A page back into zero page.
+;
+; Input:   SAVED_BC/F8/BE/F4 (saved values)
+; Output:  TARGET_REC, ENTITY_PTR, DATA_PTR,
+;          MOB_PTR restored
+; Clobbers: A
+; -----------------------------------------------
 RESTORE_ZP_POINTERS:
     SUBROUTINE RESTORE_ZP_POINTERS
 
-    MOVW    SAVED_BC,TARGET_REC
-    MOVW    SAVED_F8,ENTITY_PTR
-    MOVW    SAVED_BE,DATA_PTR
-    MOVW    SAVED_F4,MOB_PTR
+    MOVW    SAVED_BC,TARGET_REC     ; $5A9A -> $BC/$BD
+    MOVW    SAVED_F8,ENTITY_PTR     ; $5A9C -> $F8/$F9
+    MOVW    SAVED_BE,DATA_PTR       ; $5A9E -> $BE/$BF
+    MOVW    SAVED_F4,MOB_PTR        ; $5AA0 -> $F4/$F5
     RTS
 @ %def RESTORE_ZP_POINTERS
 
@@ -18189,10 +18369,22 @@ range are skipped, and [[$FF]] in byte~0 marks the end of the list.
     ORG     $66CE
 PROCESS_CHAR_EVENTS:
     SUBROUTINE PROCESS_CHAR_EVENTS
-    ; Walk the 3-byte event list pointed to by char record bytes 6-7.
-    ; For entries with byte 1 in range $40-$7F, subtract $40 from the
-    ; value and trigger the event via CHECK_LOCATION_MATCH.
-    LDWIY    CHAR_PTR,#$06,EVENT_PTR ; char record byte 6 = event list low
+    ; Walk the character's 3-byte event list and trigger pending events.
+    ;
+    ; Input:  CHAR_PTR       -- character record (bytes 6-7 = event list ptr)
+    ;         CHAR_INDEX     -- current player index
+    ; Output: triggers CHECK_LOCATION_MATCH for each pending event
+    ; Behavior:
+    ;   - Loads event list pointer from CFIELD_EVENTS
+    ;   - For each 3-byte entry:
+    ;     $FF in byte 0 = end of list -> RTS
+    ;     byte 1 bit 7 set -> skip (already activated)
+    ;     byte 1 < $40 -> skip (not pending)
+    ;     byte 1 in $40-$7F -> subtract $40, write back,
+    ;       copy CHAR_INDEX to ACTIVE_CHAR, JMP CHECK_LOCATION_MATCH
+    ;   - Advances EVENT_PTR by 3 for each skipped entry
+    ; Clobbers: A, Y
+    LDWIY    CHAR_PTR,#CFIELD_EVENTS,EVENT_PTR ; char record bytes 6-7 = event list ptr
 .scan:
     LDY     #$00
     LDA     (EVENT_PTR),Y ; event byte 0
@@ -18224,30 +18416,43 @@ bit~7 set and whose bits~6--4 match [[FACTION_MASK]].  It returns [[A]]=1 if
 a match is found (with [[MOB_PTR]] pointing to it), or [[A]]=0 if the end of
 the list is reached without a match.
 
+<<defines>>=
+FLAGS_FACTION_MASK  EQU     $70     ; byte 15 bits 6-4: faction identifier
+@ %def FLAGS_FACTION_MASK
+
 <<find mob by faction>>=
     ORG     $6706
 FIND_MOB_BY_FACTION:
     SUBROUTINE FIND_MOB_BY_FACTION
-    ; Walk the mob linked list from ($FA) byte 2, looking for a mob
-    ; whose byte $0F has bit 7 set and bits 6-4 match FACTION_MASK (faction).
-    ; Returns A=1 if found (with MOB_PTR/MOB_PTR+1 pointing to it), A=0 if not.
-    LDY     #$02
+    ; Search the mob linked list for a faction match.
+    ;
+    ; Input:  CHAR_PTR       -- character record (byte 2 = first mob link)
+    ;         FACTION_MASK   -- expected faction value (bits 6-4 of MFIELD_FLAGS)
+    ; Output: A = 1 if found (MOB_PTR -> matching mob record)
+    ;         A = 0 if end of list reached (no match)
+    ; Behavior:
+    ;   - Follows linked list via CFIELD_NEXT / MFIELD_NEXT
+    ;   - For each mob, checks MFIELD_FLAGS bit 7 (active)
+    ;     and bits 6-4 (faction) against FACTION_MASK
+    ;   - Stops at first match or zero link
+    ; Clobbers: A, Y, MOB_DATA_PTR
+    LDY     #CFIELD_NEXT
     LDA     (CHAR_PTR),Y       ; char record byte 2 = first link
 .check_link:
     BNE     .resolve
     RTS                        ; zero link -> return A=0
 .resolve:
-    JSR     GET_MOB_DATA       ; resolve link -> MOB_DATA_PTR/MOB_DATA_PTR+1
-    MOVW    MOB_DATA_PTR,MOB_PTR ;  MOB_PTR/MOB_PTR+1 = mob data pointer
-    LDY     #$0F
+    JSR     GET_MOB_DATA       ; resolve link -> MOB_DATA_PTR
+    MOVW    MOB_DATA_PTR,MOB_PTR ; MOB_PTR = mob data pointer
+    LDY     #MFIELD_FLAGS
     LDA     (MOB_PTR),Y        ; mob data byte $0F
     BPL     .next              ; bit 7 clear -> skip
-    AND     #$70               ; bits 6-4
+    AND     #FLAGS_FACTION_MASK ; bits 6-4
     BANE    FACTION_MASK,.next ; match faction?
     LDA     #$01               ; found -> return 1
     RTS
 .next:
-    LDY     #$02
+    LDY     #MFIELD_NEXT
     LDA     (MOB_PTR),Y        ; next link
     JMP     .check_link
 @ %def FIND_MOB_BY_FACTION
@@ -19235,6 +19440,25 @@ TUNE_TABLE:
     ORG     $795B
 TUNE_PLAYER:
     SUBROUTINE TUNE_PLAYER
+    ; Bytecode interpreter for sound effects and music.
+    ;
+    ; Input:  X = tune index (byte offset into TUNE_TABLE:
+    ;             $00=empty, $02=hit, $04=damage, $06=attract,
+    ;             $08=mob death, $0A=NPC death, $0C=avoided,
+    ;             $0E=interact, $10=AI turn, $12=menu, $14=encounter,
+    ;             $16=movement)
+    ;         Y = combat strength (used only for X=$02 or X=$04,
+    ;             patched into script loop count)
+    ; Output: sound played; ATTRACT_FLAG set for index $06
+    ; Behavior:
+    ;   - Clears keyboard strobe
+    ;   - Sets ATTRACT_FLAG = 1 for tune index $06, else 0
+    ;   - For indices $02/$04, patches loop count from Y-1
+    ;   - Loads script address from TUNE_TABLE into TUNE_PC
+    ;   - Runs bytecode interpreter (opcodes $00-$26 = control,
+    ;     $27+ = note with PRNG-randomized frequency)
+    ;   - In attract mode, polls keyboard/joystick each step
+    ; Clobbers: A, X, Y
 
     STA     $C010             ; clear keyboard strobe
     STOB    #$00,ATTRACT_FLAG ; attract_flag = 0
