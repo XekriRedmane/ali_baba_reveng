@@ -3883,6 +3883,9 @@ CURRENT_PLAYER      EQU     $5A02   ; current player index (1-based)
 ENTITY_PTR          EQU     $F8     ; entity record pointer (2 bytes, $F8/$F9)
 
     ; --- Entity record field offsets ---
+EFIELD_NEXT         EQU     $02     ; byte 2: next link pointer (linked list)
+EFIELD_POSITION     EQU     $03     ; byte 3: map position (packed col/row)
+EFIELD_APPEARANCE   EQU     $04     ; byte 4: appearance index (font char lookup)
 EFIELD_STRENGTH     EQU     $05     ; byte 5: bits 4-0 = strength (mob) / bits 4-1 = defense (char)
 EFIELD_ATTACK       EQU     $07     ; byte 7: attack stat (swords, clubs set this)
 EFIELD_XP           EQU     $08     ; byte 8: status (7) | pending XP (6-4) | group count (3-0)
@@ -16837,31 +16840,44 @@ progress.
     ORG     $13DB
 MANHATTAN_DISTANCE:
     SUBROUTINE MANHATTAN_DISTANCE
-    ; Manhattan distance: |col(A) - col(char)| + |row(A) - row(char)|
-    ; Input: A = packed position to measure from
-    ; Uses char's position from (ENTITY_PTR)[3]
-    JSR     POS_TO_COLROW  ; A -> col in A, row in Y
-    STA     FONT_COL       ; save target col
-    STY     FONT_ROW       ; save target row
-    LDY     #$03
-    LDA     (ENTITY_PTR),Y ; char packed position
+    ; Compute Manhattan distance between a position and the current entity.
+    ;
+    ; Input:  A = packed map position to measure from
+    ; Output: A = |col_diff| + |row_diff|
+    ;
+    ; Uses ENTITY_PTR byte EFIELD_POSITION as the entity's position.
+    ; FONT_COL/FONT_ROW and $BA used as scratch.
+    ; Clobbers: A, X, Y
+
+    ; --- unpack target position ---
+    JSR     POS_TO_COLROW          ; A -> col in A, row in Y
+    STA     FONT_COL               ; save target col
+    STY     FONT_ROW               ; save target row
+
+    ; --- unpack entity position ---
+    LDY     #EFIELD_POSITION
+    LDA     (ENTITY_PTR),Y         ; entity's packed position
     JSR     POS_TO_COLROW
+
+    ; --- |col difference| ---
     SEC
-    SBC     FONT_COL       ; char col - target col
+    SBC     FONT_COL               ; entity col - target col
     BCS     .pos1
-    EOR     #$FF           ; negate (absolute value)
-    ADC     #$01
+    EOR     #$FF                   ; \ negate if negative
+    ADC     #$01                   ; / (two's complement abs)
 .pos1:
-    STA     $BA            ; |delta col|
+    STA     $BA                    ; save |delta col|
+
+    ; --- |row difference| ---
     TYA
     SEC
-    SBC     FONT_ROW       ; char row - target row
+    SBC     FONT_ROW               ; entity row - target row
     BCS     .pos2
-    EOR     #$FF
-    ADC     #$01
+    EOR     #$FF                   ; \ negate if negative
+    ADC     #$01                   ; /
 .pos2:
     CLC
-    ADC     $BA            ; |delta col| + |delta row|
+    ADC     $BA                    ; A = |delta col| + |delta row|
     RTS
 @ %def MANHATTAN_DISTANCE
 
