@@ -8145,6 +8145,10 @@ DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
     ORG     $0D10
 DELAY_WITH_ANIMATION:
     SUBROUTINE DELAY_WITH_ANIMATION
+    ; Delay for DELAY_COUNT iterations with animation.
+    ;
+    ; Behavior: calls ANIM_TICK_AND_WAIT in a loop
+    ; Clobbers: A, X, Y
 
     LDA     DELAY_COUNT        ; load iteration count
 .loop:
@@ -8176,6 +8180,11 @@ WAIT_LOOP_COUNT         EQU     $5A8C   ; inner wait loop counter
     ORG     $0D1E
 TICK_ANIM_COUNTER:
     SUBROUTINE TICK_ANIM_COUNTER
+    ; Decrement animation frame counter; advance frame at zero.
+    ;
+    ; Behavior: decrements ANIM_FRAME_CTR, calls DRAW_BLINK_ALT
+    ;   on expiry, reloads WAIT_LOOP_COUNT from ANIM_WAIT_TABLE
+    ; Clobbers: A, X
 
     DEC     ANIM_FRAME_CTR    ; tick frame counter
     BNE     .reload           ; not zero -> just reload wait count
@@ -8201,6 +8210,11 @@ ANIM_FRAME_TABLE        EQU     $7AB6   ; per-frame frame counts (indexed)
     ORG     $0D30
 ANIM_TICK_AND_WAIT:
     SUBROUTINE ANIM_TICK_AND_WAIT
+    ; Tick animation and burn time.
+    ;
+    ; Behavior: calls TICK_ANIM_COUNTER + TIMED_WAIT, then
+    ;   advances frame (DRAW_BLINK_NORMAL + reload) on expiry
+    ; Clobbers: A, X, Y
 
     JSR     TICK_ANIM_COUNTER  ; tick counter, reload wait count
     JSR     TIMED_WAIT         ; burn time
@@ -8224,6 +8238,10 @@ If the count is already zero on entry, it returns immediately.
     ORG     $0D49
 TIMED_WAIT:
     SUBROUTINE TIMED_WAIT
+    ; Wait for WAIT_LOOP_COUNT iterations via ROM WAIT.
+    ;
+    ; Input:  WAIT_LOOP_COUNT = iteration count (0 = immediate return)
+    ; Clobbers: A
 
     LDA     WAIT_LOOP_COUNT ; anything to wait for?
     BNE     .wait           ; yes -> enter wait loop
@@ -8249,6 +8267,9 @@ WAIT_DURATION           EQU     $7AAD   ; ROM WAIT duration parameter
     ORG     $0D58
 CALL_ROM_WAIT:
     SUBROUTINE CALL_ROM_WAIT
+    ; Load WAIT_DURATION and tail-call ROM WAIT ($FCA8).
+    ;
+    ; Clobbers: A
 
     LDA     WAIT_DURATION ; load duration parameter
     JMP     ROM_WAIT      ; tail-call ROM WAIT
@@ -8264,6 +8285,11 @@ is enabled or not.
 <<dispatch on mode>>=
     ORG     $1F0C
     SUBROUTINE DISPATCH_ON_MODE
+    ; Dispatch timing delay based on sound mode.
+    ;
+    ; Behavior: if sound disabled ($60 = RTS sentinel),
+    ;   DELAY_WITH_ANIMATION; else ANIM_TICK_AND_WAIT
+    ; Clobbers: A, X, Y
 ; Dispatches on PLAY_HIGH_TONE: if $60 (RTS) then DELAY_WITH_ANIMATION else ANIM_TICK_AND_WAIT
 DISPATCH_ON_MODE:
     LDA     PLAY_HIGH_TONE
