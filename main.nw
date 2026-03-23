@@ -18873,10 +18873,23 @@ HALVE_STEP:
 
 \section{Turn events}
 
-@ [[TRIGGER_SCENE_EVENT]] handles events in the [[$D2--$D4]] range of the
-encounter dispatch table.  It clears the character state, then enters the
-scene loop with a mode derived from the event type, triggering a scripted
-scene transition.
+@ \subsection{Scene event trigger (\$1D04)}
+
+[[TRIGGER_SCENE_EVENT]] handles events in the \$D2--\$D4 range of the
+encounter dispatch table.  It clears the character's turn state, commits
+the pending move, then triggers a scripted scene transition based on the
+event type byte.
+
+\paragraph{Event types.}
+\begin{itemize}
+\item \textbf{\$D2} --- Trigger the scene specified by event byte~2.  The
+  event entry is left intact for future encounters.
+\item \textbf{\$D3} --- Trigger the scene, then mark the event slot as
+  empty (\$FE) so it cannot fire again.
+\item \textbf{\$D4} --- Trigger the scene, mark the slot empty, then
+  trigger a bonus scene~\$0F and apply 1--3~HP of damage to the current
+  character.
+\end{itemize}
 
 <<trigger scene event>>=
     ORG     $1D04
@@ -18926,22 +18939,50 @@ TRIGGER_SCENE_EVENT:
     ADC     #$01                    ; 1-3
     JMP     APPLY_DAMAGE_TO_CURRENT ; apply damage to char
 @ %def TRIGGER_SCENE_EVENT
-@ When a character steps onto a treasure event, [[PICKUP_TREASURE]] handles the
-interaction.  The routine first clears the character's state, copies the event
-pointer to [[MOB_PTR]], and commits the movement.  It then reads byte~1 of the
-event entry to determine the treasure type.  Values below~\$C9 are normal
-treasure: the routine subtracts~\$C0 to get a treasure table index, reads the
-quantity from byte~2, calls [[MODIFY_CURRENT_STATS]] to look up the item data,
-and---if the character's inventory is not full---adds the item and formats a
-pickup message with [[NUM_TO_DECIMAL]] and [[CLEAR_AND_DISPLAY]].  Values at
-\$C9 or above indicate trapped chests.  A random roll selects one of four trap
-types: lose 1--5~HP, lose 2--9~HP, decrement a counter in field~11, or zero
-out all gold.  Each trap triggers a distinct scene (scenes~\$36--\$39).  If the
-character is in a different room from the current room, the event entry's type
-byte is stepped back by~9, turning the chest into a different kind of treasure
-for re-encounter.  The special type~\$D1 triggers scene~\$0B, increments two
-stat counters, and has a 1-in-3 chance of producing a bonus scene~\$0C---a
-lucky find.
+@ \subsection{Treasure pickup (\$646B)}
+
+[[PICKUP_TREASURE]] handles the interaction when a character steps onto a
+treasure event.  It clears the character's turn state, copies the event
+pointer to [[MOB_PTR]], commits the pending move, and then dispatches on
+byte~1 of the event entry.
+
+\paragraph{Normal treasure (byte~1 $<$ \$C9).}
+The routine subtracts \$C0 from the type byte to obtain a treasure table
+index (0--8), reads the quantity from byte~2, and calls
+[[MODIFY_CURRENT_STATS]] to apply the item.  If the character's inventory
+is not full (appearance $<$ \$15), it formats a pickup message using
+[[NUM_TO_DECIMAL]] and [[CLEAR_AND_DISPLAY]], then marks the event slot
+as empty (\$FE).
+
+\paragraph{Trapped chest (byte~1 $\geq$ \$C9, $\neq$ \$D1).}
+A random roll (mod~4) selects one of four trap types:
+
+\begin{center}
+\begin{tabular}{clll}
+\toprule
+\textbf{Trap} & \textbf{Effect} & \textbf{Scene} & \textbf{Detail} \\
+\midrule
+0 & HP loss   & \$36 & Lose 1--5~HP \\
+1 & HP loss   & \$37 & Lose 2--9~HP \\
+2 & Counter decrement & \$38 & Decrement field~11 low 5~bits \\
+3 & Gold zeroed & \$39 & Set gold low and high to 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+After applying the trap, the routine checks whether the character is in
+the current room.  If not, it subtracts~9 from the type byte, converting
+the chest into a different treasure type for re-encounter.  If the
+character is in the current room, the type is converted to a normal
+treasure index (type $-$ \$C9) and processing continues at the normal
+treasure path.
+
+\paragraph{Special chest (byte~1 = \$D1).}
+This type triggers scene~\$0B, increments the 5-bit counters in both
+field~5 and field~11 (via [[INC_FIELD5_COUNTER]] and
+[[INC_FIELD_COUNTER]]), and then rolls a 1-in-3 chance for a bonus
+scene~\$0C (a lucky find).  On the bonus path, the event slot is marked
+empty.
 
 <<defines>>=
 TRAP_TYPE           EQU     $5A58   ; treasure trap: random trap type (0-3)
@@ -19089,14 +19130,23 @@ PICKUP_TREASURE:
     JSR     SCENE_LOOP             ; show bonus scene $0C
     JMP     .mark_used             ; mark event used
 @ %def PICKUP_TREASURE
-@ [[INC_FIELD5_COUNTER]] and [[INC_FIELD_COUNTER]] increment a 5-bit counter
-packed into the low bits of a character record field.  The first entry point
-targets field~5 (the defense/experience counter); the second targets field~11
-(the level counter).  Both share a common body that masks out the low five
-bits, checks whether the value has already reached the maximum of~31, and if
-not, adds~1 to the full byte---which works correctly because the upper bits
-are preserved by the addition as long as the low field does not overflow past
-31.
+@ \subsection{5-bit field counter increment (\$657B)}
+
+[[INC_FIELD5_COUNTER]] and [[INC_FIELD_COUNTER]] increment a 5-bit counter
+packed into the low bits of a character record field.
+
+\begin{itemize}
+\item [[INC_FIELD5_COUNTER]] targets field~5 ([[MFIELD_STRENGTH]], the
+  defense/experience counter).
+\item [[INC_FIELD_COUNTER]] targets field~11 ([[MFIELD_LEVEL]], the
+  level counter).
+\end{itemize}
+
+Both entry points share a common body that isolates the low 5~bits,
+checks whether the value has already reached the maximum of~31, and if
+not, adds~1 to the full byte.  This works correctly because the upper
+bits are preserved by the addition as long as the low field does not
+overflow past~31.
 
 <<inc field5 counter>>=
     ORG     $657B
@@ -19127,7 +19177,9 @@ INC_FIELD_COUNTER:
     STA     (ENTITY_PTR),Y
     RTS
 @ %def INC_FIELD5_COUNTER INC_FIELD_COUNTER
-@ [[CLEAR_STATUS_SLOTS]] fills two 5-byte regions of the display buffer
+@ \subsection{Clear status display slots (\$6593)}
+
+[[CLEAR_STATUS_SLOTS]] fills two 5-byte regions of the display buffer
 (\$7BAB--\$7BAF and \$7BCC--\$7BD0) with spaces.  These regions hold the
 formatted quantity and gold amount strings used by [[PICKUP_TREASURE]]'s
 display message, and clearing them ensures no stale digits remain from a
@@ -19153,9 +19205,12 @@ CLEAR_STATUS_SLOTS:
     BPL     .loop
     RTS
 @ %def CLEAR_STATUS_SLOTS
-@ [[CLEAR_AND_DISPLAY]] zeroes the flag at~\$5A57 and tail-calls
-[[DISPLAY_MESSAGE_LOOP]].  Clearing the flag ensures the message loop starts
-from scratch rather than continuing a previous multi-part display sequence.
+@ \subsection{Clear and display message (\$65A1)}
+
+[[CLEAR_AND_DISPLAY]] zeroes the message line counter at~\$5A57 and
+tail-calls [[DISPLAY_MESSAGE_LOOP]].  Clearing the counter ensures the
+message loop starts from scratch rather than continuing a previous
+multi-part display sequence.
 
 <<clear and display>>=
     ORG     $65A1
@@ -19173,17 +19228,32 @@ CLEAR_AND_DISPLAY:
     STOB    #$00,MSG_LINE_COUNT    ; reset line counter
     JMP     DISPLAY_MESSAGE_LOOP   ; display message
 @ %def CLEAR_AND_DISPLAY
-@ [[UPDATE_EVENT_LIST]] maintains the character's event list when treasure is
-dropped or an event is spawned at a map position.  It takes a position in~A
-and a value in [[NUM_VALUE]]/[[NUM_VALUE+1]]; if the value is zero, it returns
-immediately.  The routine walks the 3-byte event entries starting from the
-pointer at bytes~6--7 of the character record.  When it finds an empty slot
-(\$FE), it inserts a new entry: byte~0 gets the position, byte~1 gets the
-value high bits (masked to 3~bits) OR'd with~\$C0 to mark it as activated, and
-byte~2 gets the value low byte.  If the routine finds an existing entry at the
-same position with a type in the \$C0--\$D0 range, it adds the new value to
-that entry instead of creating a duplicate.  If the list terminator~(\$FF) is
-reached with no room, it displays message~\$2A (``event list full'').
+@ \subsection{Event list update (\$1260)}
+
+[[UPDATE_EVENT_LIST]] inserts or updates a 3-byte event entry in the
+character's event list.  It takes a map position in~A and a value in
+[[NUM_VALUE]]/[[NUM_VALUE+1]].  If the value is zero, it returns
+immediately.
+
+\paragraph{Scan behavior.}
+The routine walks the 3-byte event entries starting from the pointer at
+bytes~6--7 of the character record ([[CFIELD_EVENTS]]).  Each entry
+consists of a position byte, a type byte, and a value byte.
+
+\paragraph{Slot handling.}
+The scan processes each slot as follows:
+\begin{itemize}
+\item \textbf{\$FF} (end-of-list) --- No empty slot was found.  Displays
+  message~\$2A (``event list full'').
+\item \textbf{\$FE} (empty slot) --- Inserts a new entry: byte~0 gets
+  the position, byte~1 gets the value high bits (masked to 3~bits) OR'd
+  with~\$C0 to mark it as activated, and byte~2 gets the value low byte.
+\item \textbf{Matching position with type \$C0--\$D0} --- Adds the new
+  value to the existing entry's value bytes rather than creating a
+  duplicate.
+\item \textbf{Other} --- Advances to the next 3-byte entry and
+  continues scanning.
+\end{itemize}
 
 <<update event list>>=
     ORG     $1260
@@ -19263,12 +19333,20 @@ UPDATE_EVENT_LIST:
 .no_carry:
     JMP     .scan
 @ %def UPDATE_EVENT_LIST
-@ [[CHECK_CAN_LEAVE]] uses the PRNG to determine whether a character can
-leave an area.  It steps the PRNG and compares the output against a threshold
-of~\$40: if the random value is at or above the threshold (roughly 75\%
-chance), the check passes and message~\$1C is displayed; otherwise it fails
-with message~\$1D.  The result is returned in~A (1~for success, 0~for
-failure).  Both paths print the mob's name before the message for context.
+@ \subsection{Leave-area check (\$1231)}
+
+[[CHECK_CAN_LEAVE]] uses the PRNG to determine whether a character can
+leave an area.
+
+\paragraph{Mechanic.}
+The routine steps the PRNG and compares the output against a threshold
+of~\$40:
+\begin{itemize}
+\item \textbf{Pass} (output $\geq$ \$40, roughly 75\% chance) --- Prints
+  the mob's name followed by message~\$1C, returns A~=~1.
+\item \textbf{Fail} (output $<$ \$40, roughly 25\% chance) --- Prints
+  the mob's name followed by message~\$1D, returns A~=~0.
+\end{itemize}
 
 <<check can leave>>=
     ORG     $1231
