@@ -8713,40 +8713,49 @@ RESTORE_ZP_POINTERS:
 
 \section{Character and location records}
 
-Computes a pointer to a character record from a 1-based index in~A.
-Each character record is 9~bytes, stored sequentially starting at [[$4000]].
-Returns [[\CHAR_REC/\CHAR_REC+1 = $4000 + A $\times$ 9]].  If A~=~0, returns
-[[\CHAR_REC/\CHAR_REC+1 = $4000]] immediately (index 0 is the base/header record).
+\subsection{Character record pointer (\$1053)}
 
-@ [[CHAR_REC]] is a 2-byte zero-page pointer at [[$BE/$BF]] that holds the
-result of [[GET_CHAR_RECORD]].  The routine below computes
-$4000 + \text{index} \times 9$ and stores the address in [[CHAR_REC]],
-giving the caller a pointer to the selected character's 9-byte record.
+[[GET_CHAR_RECORD]] computes a zero-page pointer to a character's 9-byte
+record in the character table, given a 0-based index in~A.
+The character table begins at [[CHAR_TABLE_BASE]] (\$4000), with records
+laid out sequentially at stride [[CHAR_RECORD_SIZE]] (9~bytes).
+Index~0 returns a pointer to the base/header record.  The result is
+stored in [[CHAR_REC]] (\$BE/\$BF).
 
 <<zero page defines>>=
 CHAR_REC                EQU     $BE     ; character record pointer from GET_CHAR_RECORD (2 bytes)
 @ %def CHAR_REC
 
+<<defines>>=
+CHAR_TABLE_BASE         EQU     $4000   ; base address of character record array
+CHAR_RECORD_SIZE        EQU     $09     ; bytes per character record
+@ %def CHAR_TABLE_BASE CHAR_RECORD_SIZE
+
 <<get char record>>=
     ORG     $1053
 GET_CHAR_RECORD:
     SUBROUTINE GET_CHAR_RECORD
+    ; Compute pointer to character record from index.
+    ;
+    ; Inputs:  A = 0-based character index
+    ; Outputs: CHAR_REC/+1 = CHAR_TABLE_BASE + A * CHAR_RECORD_SIZE
+    ; Clobbers: A, X
 
-    TAX                ; X = index (loop counter)
-    STOW    $4000,CHAR_REC ;  CHAR_REC/CHAR_REC+1 = $4000 (base)
+    TAX                                 ; X = index (loop counter)
+    STOW    CHAR_TABLE_BASE,CHAR_REC    ; CHAR_REC = $4000 (base)
 .loop:
     DEX
-    BPL     .advance   ; more records to skip
-    RTS                ; done: CHAR_REC/CHAR_REC+1 points to record
+    BPL     .advance                    ; records to skip -> advance
+    RTS                                 ; index exhausted: CHAR_REC ready
 .advance:
-    CLC                ; \
-    LDA     CHAR_REC   ;  | CHAR_REC/CHAR_REC+1 += 9
-    ADC     #$09       ;  | (9 bytes per record)
-    STA     CHAR_REC   ;  |
-    LDA     CHAR_REC+1 ;  |
-    ADC     #$00       ;  |
-    STA     CHAR_REC+1 ; /
-    BNE     .loop      ; always taken ($BF >= $40)
+    CLC                                 ; \
+    LDA     CHAR_REC                    ;  | CHAR_REC += CHAR_RECORD_SIZE
+    ADC     #CHAR_RECORD_SIZE           ;  | (9 bytes per record)
+    STA     CHAR_REC                    ;  |
+    LDA     CHAR_REC+1                  ;  |
+    ADC     #$00                        ;  | propagate carry
+    STA     CHAR_REC+1                  ; /
+    BNE     .loop                       ; always taken: high byte >= $40
 @ %def GET_CHAR_RECORD
 Location data and character data share the same 9-byte record table at
 [[$4000]].  [[GET_CHAR_RECORD]] indexes into this table (index~$\times$~9
@@ -10000,44 +10009,50 @@ CHAR_CHARSET        EQU     $80A6
 CHAR_UPPER_LEFT     EQU     $80A8
 @ %def CHAR_LOWER_LEFT CHAR_LOWER_RIGHT CHAR_UPPER_RIGHT CHAR_CHARSET CHAR_UPPER_LEFT
 
-The [[PLOT_CHAR]] routine prints the character number in [[A]], at the text
-coordinate in [[X]] and [[Y]].
+@ \subsection{Plot character (\$5DB0)}
+
+[[PLOT_CHAR]] renders a single custom font glyph at a given text
+coordinate.  It stores the character number, column, and row, forces
+the custom font charset, and delegates to [[PRINT_FONTCHAR_AT_TEXT_POS]].
 
 <<plot char>>=
     ORG     $5DB0
 PLOT_CHAR:
     SUBROUTINE PLOT_CHAR
+    ; Inputs:  A = character number, X = text column, Y = text row
+    ; Outputs: glyph rendered to hi-res page
+    ; Clobbers: A, X, Y
 
-    STA     FONT_CHARNUM
-    STX     TEXT_COL
-    STY     TEXT_ROW
-    STOB    #$01,FONT_CHARSET
-    JMP     PRINT_FONTCHAR_AT_TEXT_POS
+    STA     FONT_CHARNUM            ; save glyph index
+    STX     TEXT_COL                ; save target column
+    STY     TEXT_ROW                ; save target row
+    STOB    #$01,FONT_CHARSET       ; force custom font charset
+    JMP     PRINT_FONTCHAR_AT_TEXT_POS ; render and return
 @ %def PLOT_CHAR
 
 \chapter{Map and Scene}
 
-Initializes a scene for display:
+@ \subsection{Scene setup (\$0A17)}
+
+[[SCENE_SETUP]] places a mob at a random position within the location's
+bounding box, updates the linked list, and draws the character if it is
+the current player.
+
 \begin{enumerate}
-  \item Loads the character record for index [[ACTIVE_CHAR]].
-  \item Reads the character's bounding box from bytes~3--4 of the record at [[\CHAR_REC]].
-  \item Converts to column/row ranges.
-  \item Picks a random position within those bounds.
-  \item Sets the font cursor there.
-  \item Performs additional character-record bookkeeping.
+  \item Loads the record for [[ACTIVE_CHAR]] via [[GET_CHAR_RECORD]].
+  \item Reads bytes~3--4 ([[LFIELD_MIN_POS]], [[LFIELD_MAX_POS]]) and
+        decodes each to column/row via [[POS_TO_COLROW]].
+  \item Increments minimums by one (exclusive border).
+  \item Calls [[RANDOM_IN_RANGE]] twice to choose random column and row.
+  \item Stores the position in [[MFIELD_POSITION]] of the mob record via
+        [[MOB_PTR]], clears gold ([[MFIELD_GOLD_LO]]/[[MFIELD_GOLD_HI]]),
+        and reorders the mob in the linked list.
+  \item If [[ACTIVE_CHAR]] equals [[CURRENT_PLAYER]], draws the character.
 \end{enumerate}
 
-The bounding box bytes are packed map positions decoded by
-[[POS_TO_COLROW]].  The routine increments the minimums (so the range
-is exclusive of the border), then calls [[RANDOM_IN_RANGE]] twice to
-pick a random column and row within the bounds.
-
-@ [[SOURCE_CHAR]] records which character is being reordered.
-[[BOUNDS_MIN_COL]], [[BOUNDS_MIN_ROW]], [[BOUNDS_MAX_COL]], and
-[[BOUNDS_MAX_ROW]] hold the scene's bounding box after unpacking.
-[[FONT_COL]] is the font column coordinate, used here to store the
-randomly chosen column.  [[SCENE_SETUP]] initializes all of these from
-the character record and calls [[RANDOM_IN_RANGE]] for placement.
+@ [[LFIELD_MIN_POS]] and [[LFIELD_MAX_POS]] are location-record aliases
+for bytes~3 and~4.  For character records these same offsets hold position
+and appearance; for location records they hold the bounding box corners.
 
 <<defines>>=
 SOURCE_CHAR         EQU     $5A28   ; source character for reorder
@@ -10045,8 +10060,10 @@ BOUNDS_MAX_COL      EQU     $5A52   ; scene setup: right column boundary
 BOUNDS_MAX_ROW      EQU     $5A54   ; scene setup: bottom row boundary
 BOUNDS_MIN_COL      EQU     $5A51   ; scene setup: left column boundary
 BOUNDS_MIN_ROW      EQU     $5A53   ; scene setup: top row boundary
-FONT_COL        EQU     $5A0C
-@ %def SOURCE_CHAR BOUNDS_MAX_COL BOUNDS_MAX_ROW BOUNDS_MIN_COL BOUNDS_MIN_ROW FONT_COL
+FONT_COL            EQU     $5A0C   ; font cursor column coordinate
+LFIELD_MIN_POS      EQU     $03     ; location record byte 3: top-left bounding position
+LFIELD_MAX_POS      EQU     $04     ; location record byte 4: bottom-right bounding position
+@ %def SOURCE_CHAR BOUNDS_MAX_COL BOUNDS_MAX_ROW BOUNDS_MIN_COL BOUNDS_MIN_ROW FONT_COL LFIELD_MIN_POS LFIELD_MAX_POS
 
 <<defines>>=
 ACTIVE_CHAR         EQU     $5A29   ; character index being processed
@@ -10056,162 +10073,196 @@ ACTIVE_CHAR         EQU     $5A29   ; character index being processed
     ORG     $0A17
 SCENE_SETUP:
     SUBROUTINE SCENE_SETUP
+    ; Place a mob at a random position within the location's bounding box.
+    ;
+    ; Inputs:  ACTIVE_CHAR — character/scene index, MOB_PTR — mob record
+    ; Behavior:
+    ;   Reads bounding box from location record, picks random position,
+    ;   stores into mob record, reorders linked list, clears gold.
+    ;   If active char is current player, draws the character.
+    ; Clobbers: A, X, Y
 
-    LDA     ACTIVE_CHAR       ; character/scene index
-    JSR     GET_CHAR_RECORD   ; index -> CHAR_REC = char record
-    LDY     #$03
-    LDA     (CHAR_REC),Y      ; byte 3: min position (packed)
-    JSR     POS_TO_COLROW     ; -> A=min_col, Y=min_row
-    STA     BOUNDS_MIN_COL    ; min_col
-    STY     BOUNDS_MIN_ROW    ; min_row
-    LDY     #$04
-    LDA     (CHAR_REC),Y      ; byte 4: max position (packed)
-    JSR     POS_TO_COLROW     ; -> A=max_col, Y=max_row
-    STA     BOUNDS_MAX_COL    ; max_col
-    STY     BOUNDS_MAX_ROW    ; max_row
-    INC     BOUNDS_MIN_COL    ; min_col++ (exclusive border)
-    INC     BOUNDS_MIN_ROW    ; min_row++
+    LDA     ACTIVE_CHAR                ; scene/character index
+    JSR     GET_CHAR_RECORD            ; -> CHAR_REC = 9-byte record
+    LDY     #LFIELD_MIN_POS            ; byte 3: top-left bounding position
+    LDA     (CHAR_REC),Y
+    JSR     POS_TO_COLROW              ; -> A = min_col, Y = min_row
+    STA     BOUNDS_MIN_COL
+    STY     BOUNDS_MIN_ROW
+    LDY     #LFIELD_MAX_POS            ; byte 4: bottom-right bounding position
+    LDA     (CHAR_REC),Y
+    JSR     POS_TO_COLROW              ; -> A = max_col, Y = max_row
+    STA     BOUNDS_MAX_COL
+    STY     BOUNDS_MAX_ROW
+    INC     BOUNDS_MIN_COL             ; exclusive border: min_col++
+    INC     BOUNDS_MIN_ROW             ; exclusive border: min_row++
     CLC
-    LDA     BOUNDS_MAX_COL    ; \
-    SBC     BOUNDS_MIN_COL    ;  | col_range = max_col - min_col
-    JSR     RANDOM_IN_RANGE   ;  | random column offset
-    CLC                       ;  |
-    ADC     BOUNDS_MIN_COL    ;  | col = min_col + offset
-    STA     FONT_COL          ; / set font column
+    LDA     BOUNDS_MAX_COL             ; \
+    SBC     BOUNDS_MIN_COL             ;  | col_range = max - min
+    JSR     RANDOM_IN_RANGE            ;  | random offset in [0, range)
+    CLC                                ;  |
+    ADC     BOUNDS_MIN_COL             ;  | col = min + offset
+    STA     FONT_COL                   ; / save for COLROW_TO_POS
     CLC
-    LDA     BOUNDS_MAX_ROW    ; \
-    SBC     BOUNDS_MIN_ROW    ;  | row_range = max_row - min_row
-    JSR     RANDOM_IN_RANGE   ;  | random row offset
-    CLC                       ;  |
-    ADC     BOUNDS_MIN_ROW    ; / row = min_row + offset
-    TAY                       ; Y = row
-    LDA     FONT_COL          ; A = col
-    JSR     COLROW_TO_POS     ; -> A = linear position
-    LDY     #$03
-    STA     (MOB_PTR),Y       ; store position in record byte 3
-    MOVW    MOB_PTR,TARGET_REC ;  TARGET_REC/TARGET_REC+1 = MOB_PTR/MOB_PTR+1
-    STOB    #$00,SOURCE_CHAR ; clear source char index
-    JSR     REORDER_CHAR      ; reorder character in linked list
-    LDY     #$0D
-    LDA     #$00              ; \
-    STA     (MOB_PTR),Y       ;  | clear bytes 13-14 of record
-    INY                       ;  |
-    STA     (MOB_PTR),Y       ; /
-    JSR     CLAMP_CHAR_FIELD  ; ensure byte 6 >= byte 5 minimum
-    LDA     CURRENT_PLAYER    ; current player index
-    BANE    ACTIVE_CHAR,.done ; not current player -> skip
-    LDY     #$03
-    LDA     (MOB_PTR),Y       ; load position from record
-    JSR     DRAW_CHAR_AT_POS  ; draw character at position
+    LDA     BOUNDS_MAX_ROW             ; \
+    SBC     BOUNDS_MIN_ROW             ;  | row_range = max - min
+    JSR     RANDOM_IN_RANGE            ;  | random offset
+    CLC                                ;  |
+    ADC     BOUNDS_MIN_ROW             ; / row = min + offset
+    TAY                                ; Y = row
+    LDA     FONT_COL                   ; A = col
+    JSR     COLROW_TO_POS              ; -> A = linear map position
+    LDY     #MFIELD_POSITION           ; byte 3: mob map position
+    STA     (MOB_PTR),Y                ; store new position
+    MOVW    MOB_PTR,TARGET_REC         ; TARGET_REC = MOB_PTR
+    STOB    #$00,SOURCE_CHAR           ; no source character
+    JSR     REORDER_CHAR               ; splice into linked list
+    LDY     #MFIELD_GOLD_LO            ; byte 13: gold low byte
+    LDA     #$00                       ; \
+    STA     (MOB_PTR),Y                ;  | clear gold counter
+    INY                                ;  | Y = MFIELD_GOLD_HI
+    STA     (MOB_PTR),Y                ; /
+    JSR     CLAMP_CHAR_FIELD           ; enforce byte 6 >= byte 5
+    LDA     CURRENT_PLAYER             ; current player index
+    BANE    ACTIVE_CHAR,.done          ; not current player -> skip draw
+    LDY     #MFIELD_POSITION           ; byte 3: mob map position
+    LDA     (MOB_PTR),Y                ; reload position
+    JSR     DRAW_CHAR_AT_POS           ; render character at position
 .done:
     RTS
 @ %def SCENE_SETUP
 \label{sec:scene_loop}
+@ \subsection{Scene loop (\$6C37)}
 
-This is the main scene display loop.  It is called with the scene number
-in~A.
+[[SCENE_LOOP]] is the main scene display loop, called with the scene
+number in~A.  It loops until the user presses a key or all scene
+transitions complete.
 
-@ [[SCENE_NUMBER]] holds the current scene index.  [[SCENE_TEXT_DATA]] is
-the base address of the scene's text byte stream, loaded from disk by
-[[LOAD_SCENE_DATA]].  [[SCENE_TRANSITION]] is a flag byte: when nonzero,
-[[SCENE_LOOP]] treats its value as a new scene number and restarts the
-display cycle.
+\begin{enumerate}
+  \item Disables the blink cursor and saves zero-page pointers.
+  \item Tests [[PRNG_OUTPUT]] bits~1 and~3; if any set ($\sim$75\%),
+        skips [[LOAD_SCENE_DATA]].
+  \item Calls the relocated keyboard/timing check at \$A478; carry set
+        means the user pressed a key.
+  \item Renders the status bar and scene text via [[TEXT_RENDERER]].
+  \item Plays the attract tune ([[TUNE_ATTRACT]], index~6).
+  \item If [[SCENE_TRANSITION]] is nonzero, uses it as a new scene number
+        and loops back.
+  \item On exit, clears [[LOCATION_POS]]/[[LOCATION_STYLE]], calls
+        [[ENTER_LOCATION]], and restores zero-page pointers.
+\end{enumerate}
 
 <<defines>>=
 SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene number)
-SCENE_TEXT_DATA     EQU     $5C00   ; base address of scene text data (loaded by LOAD_SCENE_DATA)
+SCENE_TEXT_DATA     EQU     $5C00   ; base address of scene text data
 SCENE_NUMBER        EQU     $5A99   ; current scene number
-@ %def SCENE_TRANSITION SCENE_TEXT_DATA SCENE_NUMBER
+PRNG_SCENE_SKIP_MASK EQU    $0A     ; bits 1+3: skip disk load ~75% of iterations
+TUNE_ATTRACT        EQU     $06     ; tune player index for attract/opening music
+@ %def SCENE_TRANSITION SCENE_TEXT_DATA SCENE_NUMBER PRNG_SCENE_SKIP_MASK TUNE_ATTRACT
 
 <<scene loop>>=
     ORG     $6C37
 SCENE_LOOP:
     SUBROUTINE SCENE_LOOP
+    ; Main scene display loop.
+    ;
+    ; Inputs:  A = scene number
+    ; Behavior:
+    ;   Displays scene text, plays attract tune, loops until keypress
+    ;   or all transitions complete.  Redraws map on exit.
+    ; Clobbers: A, X, Y
 
-    STA     SCENE_NUMBER                    ; store scene number
-    STOB    #$14,BLINK_COL ; disable blink cursor
+    STA     SCENE_NUMBER               ; store incoming scene number
+    STOB    #MAP_WIDTH,BLINK_COL       ; disable blink cursor (sentinel = 20)
 
-    JSR     SAVE_ZP_POINTERS
+    JSR     SAVE_ZP_POINTERS           ; save caller's ZP context
 
-    JSR     STEP_PRNG
-    LDA     PRNG_OUTPUT                     ; PRNG output
-    AND     #$0A                            ; test bits 1 and 3
-    BNE     .display                        ; if any set, skip disk load
-    JSR     LOAD_SCENE_DATA
+    JSR     STEP_PRNG                  ; advance PRNG
+    LDA     PRNG_OUTPUT                ; fresh random byte
+    AND     #PRNG_SCENE_SKIP_MASK      ; test bits 1 and 3
+    BNE     .display                   ; ~75%: skip disk reload
+    JSR     LOAD_SCENE_DATA            ; reload scene text from disk
 
 .display:
-    JSR     $A478                           ; keyboard/timing check (relocated block)
-    BCS     .exit                           ; carry set = user pressed key
+    JSR     $A478                      ; keyboard/timing check (relocated block)
+    BCS     .exit                      ; carry set = key pressed
 
-    JSR     DISPLAY_STATUS_BAR
-    STOW    SCENE_TEXT_DATA,TEXT_STREAM_PTR ; scene text data -> $06/$07
-    JSR     TEXT_RENDERER
+    JSR     DISPLAY_STATUS_BAR         ; refresh status bar
+    STOW    SCENE_TEXT_DATA,TEXT_STREAM_PTR ; point at scene data
+    JSR     TEXT_RENDERER              ; render scene text
 
-    LDX     #$06                            ; tune 3: attract/opening
-    JSR     TUNE_PLAYER
-    LDA     SCENE_TRANSITION                ; scene transition flag
-    BEQ     .done                           ; zero = no transition
-    STA     SCENE_NUMBER                    ; set new scene number
-    JMP     .display                        ; continue
+    LDX     #TUNE_ATTRACT              ; tune 6: attract/opening music
+    JSR     TUNE_PLAYER                ; advance tune playback
+    LDA     SCENE_TRANSITION           ; scene transition flag
+    BEQ     .done                      ; zero = no transition
+    STA     SCENE_NUMBER               ; nonzero = new scene number
+    JMP     .display                   ; restart with new scene
 
 .done:
-    JSR     SET_TEXT_WINDOW_BOTTOM
+    JSR     SET_TEXT_WINDOW_BOTTOM     ; restore text window
     LDA     #$00
-    STA     LOCATION_POS                    ; clear location flags
+    STA     LOCATION_POS               ; clear location flags
     STA     LOCATION_STYLE
-    JSR     ENTER_LOCATION                  ; redraw map if location changed
-    JMP     RESTORE_ZP_POINTERS             ; restore and return
+    JSR     ENTER_LOCATION             ; redraw map if location changed
+    JMP     RESTORE_ZP_POINTERS        ; restore ZP and return
 
 .exit:
     JSR     SET_TEXT_WINDOW_BOTTOM
     LDA     #MSG_BREAKS_FREE
-    JSR     DISPLAY_MESSAGE                 ; display message (mode off)
+    JSR     DISPLAY_MESSAGE            ; "breaks free" message
     JMP     .done
 @ %def SCENE_LOOP
-Loads scene-specific data from disk into the [[$5C00]] region.  The disk
-read calls [[DISK_READ_FIELD]] at [[$B300]], which enters the disk~VM
-interpreter to perform the multi-sector read.  If the read fails, the
-routine fills a byte with PRNG output (a graceful degradation rather than
-crashing).
+@ \subsection{Load scene data (\$6DD8)}
 
+[[LOAD_SCENE_DATA]] reads scene data from disk into the \$5C00 region.
+It asserts the disk motor on, sets the IOB track field, dispatches RWTS,
+then calls [[DISK_READ_FIELD]].  On failure, it writes a PRNG byte into
+the message string area as a graceful degradation.
 
 <<load scene data>>=
     ORG     $6DD8
 LOAD_SCENE_DATA:
     SUBROUTINE LOAD_SCENE_DATA
+    ; Load scene text data from disk.
+    ;
+    ; Inputs:  $08/$09 = IOB pointer
+    ; Behavior:
+    ;   Sets IOB track to 5, runs RWTS + DISK_READ_FIELD.
+    ;   On error, writes PRNG byte into message area.
+    ; Clobbers: A, Y
 
-    BIT     $C0E9           ; check disk controller
-    LDA     #$05            ; \
-    LDY     #$04            ;  | ($08)+4 = 5 (track configuration)
-    STA     ($08),Y         ; /
+    BIT     $C0E9                   ; assert disk motor on
+    LDA     #$05                    ; \
+    LDY     #$04                    ;  | IOB byte 4 = track 5
+    STA     ($08),Y                 ; /
     LDA     #$00
-    JSR     RWTS_DISPATCH   ; execute RWTS command
+    JSR     RWTS_DISPATCH           ; execute RWTS command
     CLC
-    JSR     DISK_READ_FIELD ; read sector data from disk
+    JSR     DISK_READ_FIELD         ; read sector data
     BCS     .error
-    RTS
+    RTS                             ; success
 
 .error:
-    LDY     PRNG_OUTPUT     ; on error: fill with PRNG data
-    JSR     STEP_PRNG
-    LDA     PRNG_OUTPUT
-    STA     $9AA6,Y
+    LDY     PRNG_OUTPUT             ; use PRNG as index
+    JSR     STEP_PRNG               ; advance PRNG
+    LDA     PRNG_OUTPUT             ; load new PRNG byte
+    STA     $9AA6,Y                 ; fill into message area
     RTS
 @ %def LOAD_SCENE_DATA
-@ [[TILE_DEFAULT_TAB]], [[TILE_FILL_TAB]], and [[TILE_BLINK_TAB]] are
-three 4-entry lookup tables indexed by the 2-bit style code from
-[[LOCATION_STYLE]] bits 6--5.  [[LOAD_MAP_TILES]] reads all three tables
-to set [[DEFAULT_CHAR]], [[MAP_FILL_CHAR]], and [[BLINK_ALT_CHAR]] for
-the current location.
+@ \subsection{Load map tiles (\$746C)}
+
+[[LOAD_MAP_TILES]] extracts the 2-bit style index from bits~7--6 of
+[[LOCATION_STYLE]] and uses it to look up three tile characters from
+parallel tables: [[TILE_BLINK_TAB]], [[TILE_FILL_TAB]], and
+[[TILE_DEFAULT_TAB]].  The results are stored in [[BLINK_ALT_CHAR]],
+[[MAP_FILL_CHAR]], and [[DEFAULT_CHAR]].
 
 <<defines>>=
 TILE_DEFAULT_TAB        EQU     $7AD0   ; 4-byte table: default char per style
 TILE_FILL_TAB           EQU     $7AD4   ; 4-byte table: fill char per style
 TILE_BLINK_TAB          EQU     $7AD8   ; 4-byte table: blink alt char per style
-@ %def TILE_DEFAULT_TAB TILE_FILL_TAB TILE_BLINK_TAB
-
-@ The routine below implements this tile-set selection.
-
+STYLE_INDEX_MASK        EQU     $03     ; mask for 2-bit style index
+@ %def TILE_DEFAULT_TAB TILE_FILL_TAB TILE_BLINK_TAB STYLE_INDEX_MASK
 
 <<defines>>=
 BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
@@ -10223,84 +10274,34 @@ MAP_FILL_CHAR           EQU     $7AC1   ; character used to fill the map grid
     ORG     $746C
 LOAD_MAP_TILES:
     SUBROUTINE LOAD_MAP_TILES
+    ; Select tile characters for the current location style.
+    ;
+    ; Inputs:  LOCATION_STYLE (bits 7-6 = style index)
+    ; Outputs: BLINK_ALT_CHAR, MAP_FILL_CHAR, DEFAULT_CHAR
+    ; Clobbers: A, X
 
-    LDA     LOCATION_STYLE ; location style byte
-    ROL2 ; rotate bits 7-6 down to bits 1-0
+    LDA     LOCATION_STYLE          ; location style byte
+    ROL2                            ; rotate bits 7-6 down to 1-0
     ROL2
-    AND     #$03           ; mask to 2-bit style index
+    AND     #STYLE_INDEX_MASK       ; mask to 2-bit style index
     TAX
-    LDA     TILE_BLINK_TAB,X
+    LDA     TILE_BLINK_TAB,X        ; blink alternate char for this style
     STA     BLINK_ALT_CHAR
-    LDA     TILE_FILL_TAB,X
+    LDA     TILE_FILL_TAB,X         ; map fill char for this style
     STA     MAP_FILL_CHAR
-    LDA     TILE_DEFAULT_TAB,X
+    LDA     TILE_DEFAULT_TAB,X      ; default char for this style
     STA     DEFAULT_CHAR
     RTS
 @ %def LOAD_MAP_TILES
-Two basic routines print the font character stored in [[FONT_CHARNUM]].
-[[PRINT_FONTCHAR_AT_TEXT_POS]] converts the font position to a text position
-before calling [[RENDER_FONT_CHAR]]. A stored control string at [[s_PRINT_FONT_CHAR]]
-has slots for the character set and the four character blocks that
-[[RENDER_FONT_CHAR]] fills in before printing.
 
-When printing using the 2x2 font characters, we can set up the HRCG's
-"block display mode". This takes four characters and plots them in a 2x2
-array with the upper left at the text cursor position.
+@ \subsection{Setup scene display (\$0901)}
 
-Because our font table consists of 4 "normal" characters, we need to be able
-to map a font character onto its character set and character. The font table
-contains 120 font characters, or 480 "normal" characters. Since each
-character set is 96 characters, the entire font table spans five character
-sets, with character set 1 starting off the table.
-
-Not only that, but the first character in the character set is ASCII 32
-(space), so we have to take that into account also.
-
-This is what the [[RENDER_FONT_CHAR]], [[PRINT_FONTCHAR_AT_TEXT_POS]], and
-[[PLOT_FONTCHAR]] routines do.
-
-
-@ The blink cursor is a saved font position used to flash a character on the
-hi-res screen.  Three bytes at [[$5AA2]]--[[$5AA4]] mirror [[FONT_COL]],
-[[FONT_ROW]], and [[FONT_CHARNUM]]: they record which character to blink and
-where.  The rendering path (\$74E0) copies them into the [[FONT_]] variables
-before calling [[RENDER_FONT_CHAR]].
-
-A [[BLINK_COL]] value of [[$14]] (20) acts as a sentinel meaning ``no active
-blink position,'' since valid font--column values are 0--19.  Both
-[[GAME_INIT]] and [[SCENE_LOOP]] store [[$14]] here to disable the blink
-cursor at startup and at each new scene.
-
-
-@ Draws the ``alternate'' blink character (the blink-off frame).
-Temporarily replaces [[BLINK_CHAR]] with the alternate character from
-[[$7AC3]], calls [[DRAW_BLINK_CHAR]] to render it, then restores
-the original [[BLINK_CHAR]].  Called by [[TICK_ANIM_COUNTER]] when
-the animation frame counter reaches zero.
-
-Renders a custom font character at the current font position:
-\begin{enumerate}
-  \item Converts [[FONT_CHARNUM]] and [[FONT_CHARSET]] into four block-character indices (upper-left, upper-right, lower-left, lower-right) for a $2\times2$ character cell.
-  \item Patches the [[s_PRINT_FONT_CHAR]] control string with the glyph indices.
-  \item Calls [[PRINT_STRING]] to output the character.
-\end{enumerate}
-
-Each charset holds 24~characters (\$18).  Characters beyond~\$18 bump the
-charset index.  The four glyph indices are consecutive starting at
-[[charnum * 4 + $20]].
-
-Called when entering a new scene.  Initialises the AI wait delay:
-if [[CHAR_AI_MODE]] is non-zero (AI-controlled character), sets
-[[AI_WAIT_FLAG]] to~\$0A and calls [[TUNE_PLAYER]] with index~\$10;
-otherwise clears the flag.  Then draws the character, sets
-[[WAIT_LOOP_COUNT]] to twice the wait flag (via ROL), and jumps to
-[[DRAW_SPRITE]].
-
-@ [[CHAR_AI_MODE]] distinguishes player-controlled characters (0) from
-AI-controlled mobs (modes 2--5).  [[AI_WAIT_FLAG]] is set to [[$0A]] when
-entering a scene with an AI character and cleared otherwise.
-[[SETUP_SCENE_DISPLAY]] tests both values to decide whether to invoke the
-[[TUNE_PLAYER]] and how long to delay before drawing the sprite.
+[[SETUP_SCENE_DISPLAY]] prepares the display for a character's scene turn.
+If [[CHAR_AI_MODE]] is nonzero (AI-controlled), sets [[AI_WAIT_FLAG]] to
+\$0A (10~ticks) and plays the AI turn tune; otherwise clears the flag.
+After drawing the character sprite and loading its name pointer, shifts
+[[AI_WAIT_FLAG]] left by one (ROL) into [[WAIT_LOOP_COUNT]] and
+tail-calls [[TIMED_WAIT]].
 
 <<defines>>=
 CHAR_AI_MODE    EQU     $5A05   ; 0 = player, 2-5 = AI behavior modes
@@ -10311,51 +10312,56 @@ AI_WAIT_FLAG    EQU     $5A06   ; wait delay for AI moves (0 or $0A)
     ORG     $0901
 SETUP_SCENE_DISPLAY:
     SUBROUTINE SETUP_SCENE_DISPLAY
+    ; Initialize display for a character's scene turn.
+    ;
+    ; Inputs:  CHAR_AI_MODE — 0 = player, nonzero = AI
+    ; Behavior:
+    ;   AI turns get a 10-tick wait and the AI tune.
+    ;   Sets up sprite and name, then waits proportionally.
+    ; Clobbers: A, X
 
-    STOB    #$00,AI_WAIT_FLAG
-    BANE    CHAR_AI_MODE,.not_ai
-    STOB    #$0A,AI_WAIT_FLAG
-    LDX     #$10                ; tune 8: AI turn effect
+    STOB    #$00,AI_WAIT_FLAG       ; assume player: no wait
+    BANE    CHAR_AI_MODE,.not_ai    ; branch if not AI
+    STOB    #$0A,AI_WAIT_FLAG       ; AI: set 10-tick delay
+    LDX     #$10                    ; tune 8: AI turn effect
     JSR     TUNE_PLAYER
 .not_ai:
-    JSR     SETUP_CHAR_SPRITE
-    JSR     LOAD_CHAR_NAME_PTR
-    LDA     AI_WAIT_FLAG
-    ROL
-    STA     WAIT_LOOP_COUNT
-    JMP     TIMED_WAIT
+    JSR     SETUP_CHAR_SPRITE       ; draw character sprite
+    JSR     LOAD_CHAR_NAME_PTR      ; load character name pointer
+    LDA     AI_WAIT_FLAG            ; 0 or 10
+    ROL                             ; shift left: 0->0, 10->20
+    STA     WAIT_LOOP_COUNT         ; store final wait count
+    JMP     TIMED_WAIT              ; wait and return
 @ %def SETUP_SCENE_DISPLAY
-Called from [[SCENE_LOOP]] to set up the viewport when the player
-enters a new location.  Compares [[$FA]] with [[LOCATION_POS]]; if
-unchanged, returns immediately.  Otherwise:
+@ \subsection{Enter location (\$72A7)}
+
+[[ENTER_LOCATION]] sets up the viewport when the player enters a new
+location.  If [[CHAR_PTR]] low byte matches [[LOCATION_POS]], the
+location is unchanged and the routine returns immediately.  Otherwise:
+
 \begin{enumerate}
-  \item Stores the new position.
-  \item Calls [[GET_MOB_DATA]] and [[SET_TEXT_WINDOW]] / [[CLEAR_MAP]].
-  \item Computes the event position via [[MANHATTAN_DISTANCE]].
-  \item Extracts the location style from record field~5; if changed, reloads the map tile set.
-  \item Reads fields~3 and~4 of the location record (via [[$FA]] indirect) to obtain the viewport bounds (min/max column and row).
-  \item Iterates a nested loop: for each row, for each column, calls [[DRAW_MAP_COL]] to render that cell.
-  \item If bit~7 of field~5 is clear, calls [[DRAW_MAP_ENTITIES]] to overlay entity icons on the map.
+  \item Stores the new position and calls [[ANIM_TICK_AND_WAIT]],
+        [[SET_TEXT_WINDOW_BOTTOM]], and [[CLEAR_MAP]].
+  \item Points [[ENTITY_PTR]] at [[CANDIDATE_POS]] (\$5A15) and calls
+        [[FIND_NEAREST_EVENT]] to compute [[EVENT_POS]].
+  \item Reads [[CFIELD_STYLE]] (byte~5); strips the visited flag with
+        [[STYLE_ID_MASK]].  If the style changed, updates
+        [[LOCATION_STYLE]], reloads tiles, and fills the map.
+  \item Reads [[LFIELD_MIN_POS]] (byte~3) and [[LFIELD_MAX_POS]] (byte~4)
+        to set the viewport bounds.
+  \item Draws all cells in a nested row/column loop via [[DRAW_MAP_COL]].
+  \item If the visited flag (bit~7 of [[CFIELD_STYLE]]) is clear, calls
+        [[DRAW_MAP_ENTITIES]] to overlay entity icons.
 \end{enumerate}
 
-@ [[EVENT_POS]] stores the event position computed by [[MANHATTAN_DISTANCE]].
-[[VIEW_MIN_COL]], [[VIEW_MIN_ROW]], [[VIEW_MAX_COL]], and [[VIEW_MAX_ROW]]
-define the visible map rectangle, extracted from fields 3 and 4 of the
-location record.  [[ENTER_LOCATION]] uses these bounds to drive a nested
-column/row loop that redraws the entire viewport.
-
 <<defines>>=
-EVENT_POS           EQU     $5A5E   ; event position (from MANHATTAN_DISTANCE)
-VIEW_MIN_ROW    EQU     $5A0B   ; viewport min row
-VIEW_MIN_COL    EQU     $5A0A   ; viewport min column (from location field 3)
-VIEW_MAX_ROW    EQU     $5A09   ; viewport max row
-VIEW_MAX_COL    EQU     $5A08   ; viewport max column (from location field 4)
-@ %def EVENT_POS VIEW_MIN_ROW VIEW_MIN_COL VIEW_MAX_ROW VIEW_MAX_COL
-
-@ [[FONT_ROW]] is the current font row coordinate, and [[SET_TEXT_WINDOW]]
-is the routine at [[$76C2]] that configures the HRCG text window parameters.
-[[ENTER_LOCATION]] uses [[FONT_ROW]] as the row iterator in the map redraw
-loop and calls [[SET_TEXT_WINDOW]] during viewport setup.
+EVENT_POS           EQU     $5A5E   ; event position (from FIND_NEAREST_EVENT)
+VIEW_MIN_ROW        EQU     $5A0B   ; viewport min row
+VIEW_MIN_COL        EQU     $5A0A   ; viewport min column
+VIEW_MAX_ROW        EQU     $5A09   ; viewport max row
+VIEW_MAX_COL        EQU     $5A08   ; viewport max column
+STYLE_ID_MASK       EQU     $7F     ; strip visited flag (bit 7) from CFIELD_STYLE
+@ %def EVENT_POS VIEW_MIN_ROW VIEW_MIN_COL VIEW_MAX_ROW VIEW_MAX_COL STYLE_ID_MASK
 
 <<defines>>=
 FONT_ROW        EQU     $5A0D
@@ -10366,68 +10372,67 @@ SET_TEXT_WINDOW EQU     $76C2   ; set text window parameters
     ORG     $72A7
 ENTER_LOCATION:
     SUBROUTINE ENTER_LOCATION
+    ; Set up viewport when entering a new location.
+    ;
+    ; Inputs:  CHAR_PTR — current character record pointer
+    ; Behavior:
+    ;   If location unchanged, returns immediately.  Otherwise clears
+    ;   map, finds nearest event, updates style/tiles if needed, and
+    ;   redraws all cells in a nested row/column loop.
+    ; Clobbers: A, X, Y
 
-    LDA     CHAR_PTR
-    BANE    LOCATION_POS,.changed
+    LDA     CHAR_PTR               ; current location (low byte)
+    BANE    LOCATION_POS,.changed  ; changed since last render?
     RTS
 .changed:
-    STA     LOCATION_POS
-    JSR     ANIM_TICK_AND_WAIT
-    JSR     SET_TEXT_WINDOW_BOTTOM
-    JSR     CLEAR_MAP
-    LDA     #$15
-    STA     ENTITY_PTR
-    LDA     #$5A
-    STA     ENTITY_PTR+1
-    JSR     FIND_NEAREST_EVENT
-    STA     EVENT_POS
-    LDY     #$05
+    STA     LOCATION_POS           ; record new position
+    JSR     ANIM_TICK_AND_WAIT     ; advance animation frame
+    JSR     SET_TEXT_WINDOW_BOTTOM ; configure text window
+    JSR     CLEAR_MAP              ; clear map display
+    STOW    CANDIDATE_POS,ENTITY_PTR ; ENTITY_PTR -> $5A15
+    JSR     FIND_NEAREST_EVENT     ; find closest event
+    STA     EVENT_POS              ; save event position
+    LDY     #CFIELD_STYLE          ; byte 5: style | visited flag
     LDA     (CHAR_PTR),Y
-    AND     #$7F
-    BAEQ    LOCATION_STYLE,.same_style
-    STA     LOCATION_STYLE
-    JSR     LOAD_MAP_TILES
-    JSR     FILL_MAP
+    AND     #STYLE_ID_MASK         ; strip visited flag (bit 7)
+    BAEQ    LOCATION_STYLE,.same_style ; style unchanged?
+    STA     LOCATION_STYLE         ; update current style
+    JSR     LOAD_MAP_TILES         ; reload tile set
+    JSR     FILL_MAP               ; fill map with new tiles
 .same_style:
-    LDY     #$03
+    LDY     #LFIELD_MIN_POS        ; byte 3: min viewport position
     LDA     (CHAR_PTR),Y
-    JSR     POS_TO_COLROW
-    STY     VIEW_MIN_ROW
-    STY     FONT_ROW
-    STA     VIEW_MIN_COL
-    LDY     #$04
+    JSR     POS_TO_COLROW          ; A = col, Y = row
+    STY     VIEW_MIN_ROW           ; set top edge
+    STY     FONT_ROW               ; row iterator starts at top
+    STA     VIEW_MIN_COL           ; set left edge
+    LDY     #LFIELD_MAX_POS        ; byte 4: max viewport position
     LDA     (CHAR_PTR),Y
-    JSR     POS_TO_COLROW
-    STY     VIEW_MAX_ROW
-    STA     VIEW_MAX_COL
+    JSR     POS_TO_COLROW          ; A = col, Y = row
+    STY     VIEW_MAX_ROW           ; set bottom edge
+    STA     VIEW_MAX_COL           ; set right edge
 .row_loop:
-    MOVB    VIEW_MIN_COL,FONT_COL
+    MOVB    VIEW_MIN_COL,FONT_COL  ; reset column to left edge
 .col_loop:
-    JSR     DRAW_MAP_COL
+    JSR     DRAW_MAP_COL           ; draw tile at (FONT_COL, FONT_ROW)
     INC     FONT_COL
     LDA     VIEW_MAX_COL
-    BAPL    FONT_COL,.col_loop
+    BAPL    FONT_COL,.col_loop     ; next column
     INC     FONT_ROW
     LDA     VIEW_MAX_ROW
-    BAPL    FONT_ROW,.row_loop
-    LDY     #$05
+    BAPL    FONT_ROW,.row_loop     ; next row
+    LDY     #CFIELD_STYLE          ; byte 5: check visited flag
     LDA     (CHAR_PTR),Y
-    BMI     .skip_entities
-    JSR     DRAW_MAP_ENTITIES
+    BMI     .skip_entities         ; bit 7 set = visited, skip
+    JSR     DRAW_MAP_ENTITIES      ; overlay entity icons
 .skip_entities:
     RTS
 @ %def ENTER_LOCATION
-Checks whether the current location position lies on the viewport
-boundary.  Converts [[LOCATION_ID]] to column/row via
-[[POS_TO_COLROW]], then compares against all four viewport edges
-([[VIEW_MIN_COL]], [[VIEW_MAX_COL]], [[VIEW_MIN_ROW]],
-[[VIEW_MAX_ROW]]).  If any match, sets [[\DATA_PTR]]=1 and [[\DATA_PTR+1]]=0
-(``at edge''); otherwise sets both to~0 (``interior'').
+@ \subsection{Check at boundary (\$0BFA)}
 
-@ [[LOCATION_ID]] stores the current map position index.
-[[CHECK_AT_BOUNDARY]] converts it to column/row coordinates and compares
-against each viewport edge to determine whether the character is standing
-on the map boundary.
+[[CHECK_AT_BOUNDARY]] tests whether [[LOCATION_ID]] lies on any viewport
+edge.  Converts the position to column/row, compares against all four
+edges, and stores \$0001 in [[DATA_PTR]] if at edge, \$0000 if interior.
 
 <<defines>>=
 LOCATION_ID     EQU     $5A17   ; current location/position index
@@ -10437,127 +10442,135 @@ LOCATION_ID     EQU     $5A17   ; current location/position index
     ORG     $0BFA
 CHECK_AT_BOUNDARY:
     SUBROUTINE CHECK_AT_BOUNDARY
+    ; Test if LOCATION_ID is on any viewport edge.
+    ;
+    ; Inputs:  LOCATION_ID, VIEW_MIN/MAX_COL/ROW
+    ; Outputs: DATA_PTR = 1 (at edge) or 0 (interior)
+    ; Clobbers: A, Y
 
-    LDA     LOCATION_ID
-    JSR     POS_TO_COLROW
-    BAEQ    VIEW_MIN_COL,.at_edge
-    BAEQ    VIEW_MAX_COL,.at_edge
-    TYA
-    BAEQ    VIEW_MIN_ROW,.at_edge
-    BAEQ    VIEW_MAX_ROW,.at_edge
-    STOB    #$00,DATA_PTR
+    LDA     LOCATION_ID            ; current map position
+    JSR     POS_TO_COLROW          ; A = col, Y = row
+    BAEQ    VIEW_MIN_COL,.at_edge  ; on left edge?
+    BAEQ    VIEW_MAX_COL,.at_edge  ; on right edge?
+    TYA                            ; row -> A
+    BAEQ    VIEW_MIN_ROW,.at_edge  ; on top edge?
+    BAEQ    VIEW_MAX_ROW,.at_edge  ; on bottom edge?
+    STOB    #$00,DATA_PTR          ; interior: result = 0
     STA     DATA_PTR+1
     RTS
 .at_edge:
-    STOW2    $0001,DATA_PTR
+    STOW2    $0001,DATA_PTR        ; boundary: result = 1
     RTS
 @ %def CHECK_AT_BOUNDARY
-Fills the entire 20$\times$10 map grid with a single character.  The fill
-character is read from [[MAP_FILL_CHAR]] ([[$7AC1]], default [[$25]]).
-The routine renders the glyph once via [[RENDER_FONT_CHAR]] to build the
-HRCG control string, then loops over all 200 grid positions (from
-bottom-right to top-left), re-printing the same string at each position
-via [[PRINT_STRING]].
+@ \subsection{Fill map (\$743B)}
 
-@ [[FILL_MAP]] fills the entire 20$\times$10 map grid with a single tile
-character:
-\begin{enumerate}
-  \item Starts at column~19, row~9 (bottom-right corner).
-  \item Renders the fill character once via [[RENDER_FONT_CHAR]] to build the HRCG control string.
-  \item Loops through all 200 positions by decrementing the column and wrapping to the next row up when it goes negative.
-  \item For each position after the first, calls [[FONT_POS_TO_TEXT_POS]] and [[PRINT_STRING]] to repeat the same pre-built glyph.
-\end{enumerate}
-This avoids recalculating the font data 199 additional times.
+[[FILL_MAP]] fills the entire $20\times10$ map grid with [[MAP_FILL_CHAR]].
+It renders the glyph once via [[RENDER_FONT_CHAR]] to build the HRCG
+control string, then loops over all 200 positions from bottom-right to
+top-left, re-printing the same pre-built string at each position.
 
 <<fill map>>=
     ORG     $743B
 FILL_MAP:
     SUBROUTINE FILL_MAP
+    ; Fill entire 20x10 map grid with MAP_FILL_CHAR.
+    ;
+    ; Inputs:  MAP_FILL_CHAR — tile character to fill with
+    ; Behavior:
+    ;   Renders glyph once, then stamps it at all 200 positions
+    ;   by decrementing col (wrapping at 0) and row.
+    ; Clobbers: A, X, Y
 
-    STOB    #$13,FONT_COL ; start at column 19, row 9
-    STOB    #$09,FONT_ROW
-    MOVB    MAP_FILL_CHAR,FONT_CHARNUM ; fill character (default $25)
-    STOB    #$01,FONT_CHARSET ; charset 1 (custom font)
-    JSR     RENDER_FONT_CHAR     ; render glyph once (builds control string)
+    STOB    #$13,FONT_COL           ; start at column 19 (rightmost)
+    STOB    #$09,FONT_ROW           ; start at row 9 (bottom)
+    MOVB    MAP_FILL_CHAR,FONT_CHARNUM ; fill character
+    STOB    #$01,FONT_CHARSET       ; charset 1 = custom font
+    JSR     RENDER_FONT_CHAR        ; build HRCG control string once
 .loop:
-    DEC     FONT_COL             ; next column left
-    BPL     .draw                ; still >= 0 -> draw
-    STOB    #$13,FONT_COL ; wrap to column 19
-    DEC     FONT_ROW             ; next row up
-    BPL     .draw                ; still >= 0 -> draw
-    RTS                          ; all 200 positions filled
+    DEC     FONT_COL                ; move one column left
+    BPL     .draw                   ; col >= 0 -> draw
+    STOB    #$13,FONT_COL           ; wrap to column 19
+    DEC     FONT_ROW                ; move one row up
+    BPL     .draw                   ; row >= 0 -> draw
+    RTS                             ; all 200 positions filled
 .draw:
-    JSR     FONT_POS_TO_TEXT_POS ; set text cursor to font position
-    JSR     PRINT_STRING         ; re-print the same glyph string
+    JSR     FONT_POS_TO_TEXT_POS    ; set HRCG cursor
+    JSR     PRINT_STRING            ; stamp pre-built glyph
     JMP     .loop
 @ %def FILL_MAP
-Loads the first two bytes of the record at [[$FA/$FB]] (CHAR\_PTR)
-into [[PRINT_STRING_ADDR]] and tail-calls [[SETUP_TEXT_POS]].
-Used before map redraw to set the text window from the current
-character's record.
+@ \subsection{Clear map (\$76B0)}
+
+[[CLEAR_MAP]] loads bytes~0--1 of the record at [[CHAR_PTR]] (the name
+string pointer) into [[PRINT_STRING_ADDR]] and tail-calls
+[[SETUP_TEXT_POS]] to configure the text window.
 
 <<clear map>>=
     ORG     $76B0
 CLEAR_MAP:
 
-    LDWIY    CHAR_PTR,#$00,PRINT_STRING_ADDR ; record byte 0 -> PRINT_STRING_ADDR low
+    LDWIY    CHAR_PTR,#$00,PRINT_STRING_ADDR ; bytes 0-1: name ptr -> PRINT_STRING_ADDR
     JMP     SETUP_TEXT_POS
 @ %def CLEAR_MAP
-Draws a single map cell at the current [[FONT_COL]]/[[FONT_ROW]].
-Computes the linear position inline (col + row$\times$20) rather than
-calling [[COLROW_TO_POS]], then calls [[FIND_ENTITY_AT_POS]],
-[[GET_MAP_CHAR]], and [[RENDER_FONT_CHAR]] to draw the tile.
+@ \subsection{Draw map column (\$7323)}
 
+[[DRAW_MAP_COL]] draws a single map cell at [[FONT_COL]]/[[FONT_ROW]].
+Computes the linear position inline (col + row $\times$ [[MAP_WIDTH]])
+rather than calling [[COLROW_TO_POS]], then resolves the entity and
+renders its font character.
 
 <<draw map col>>=
     ORG     $7323
 DRAW_MAP_COL:
     SUBROUTINE DRAW_MAP_COL
+    ; Draw one map cell at FONT_COL/FONT_ROW.
+    ;
+    ; Inputs:  FONT_COL, FONT_ROW
+    ; Behavior:
+    ;   Computes linear position, finds entity, draws glyph.
+    ; Clobbers: A, X, Y
 
-    LDA     FONT_COL
+    LDA     FONT_COL               ; A = column
     CLC
-    LDY     FONT_ROW
+    LDY     FONT_ROW               ; Y = row counter
 .mult_loop:
-    DEY
-    BMI     .mult_done
-    ADC     #$14                    ; +20 per row
+    DEY                            ; row--
+    BMI     .mult_done             ; Y < 0 -> done
+    ADC     #MAP_WIDTH             ; A += 20 (one row)
     BCC     .mult_loop
 .mult_done:
-    JSR     FIND_ENTITY_AT_POS
-    JSR     GET_ENTITY_FONTCHAR
-    JSR     RENDER_FONT_CHAR
+    JSR     FIND_ENTITY_AT_POS     ; find entity at position
+    JSR     GET_ENTITY_FONTCHAR    ; resolve font character
+    JSR     RENDER_FONT_CHAR       ; draw it
     RTS
 @ %def DRAW_MAP_COL
-Draws entity icons on the map.  Three modes:
+@ \subsection{Draw map entities (\$733B)}
+
+[[DRAW_MAP_ENTITIES]] overlays entity icons on the map.  Three phases:
 
 \begin{enumerate}
-\item If [[MAP_REDRAW_FLAG]] is set, skip straight to drawing mobs.
-\item If [[LOCATION_STYLE]] bits 5--6 are set, scroll the map and
-      set the redraw flag.
-\item Otherwise, scan the full grid cell by cell: for each cell that
-      contains a non-\$FE entity in the drawable range, draw its icon
-      via [[DRAW_MAP_ICON_B]].
+  \item Sets [[CFIELD_DRAWN_FLAG]] (bit~7) in [[CFIELD_STYLE]] to mark
+        entities drawn.  If [[MAP_REDRAW_FLAG]] is set, jumps directly to
+        mob drawing.
+  \item Checks [[STYLE_SCROLL_MASK]] (bits~6--5) of [[LOCATION_STYLE]].
+        If set, displays [[MSG_ROCK_FALLS]], sets [[MAP_REDRAW_FLAG]], and
+        falls through to mob drawing.
+  \item Otherwise, scans the view grid cell by cell.  Byte~2
+        ([[CFIELD_NEXT]]) is saved and zeroed during the scan.  For each
+        entity whose [[EVFIELD_TYPE]] is not [[EVENT_EMPTY]] and falls in
+        the drawable range, draws its icon via [[DRAW_MAP_ICON_B]].
 \end{enumerate}
 
-After the grid scan (or redraw), iterates the mob group via
-[[FIRST_GROUP_MEMBER]]/[[NEXT_GROUP_MEMBER]], drawing each mob's
-icon using [[DRAW_BLINK_CHAR]] (or [[RENDER_FONT_CHAR]] if the
-mob has no blink animation).
-
-@ [[MAP_REDRAW_FLAG]] at [[$7AC4]] is a nonzero/zero flag.  When set,
-[[DRAW_MAP_ENTITIES]] skips the cell-by-cell grid scan and jumps directly
-to the mob-drawing phase, avoiding redundant work when the entire map has
-already been redrawn by a scroll operation.
+After the grid scan, iterates the mob group via
+[[FIRST_GROUP_MEMBER]]/[[NEXT_GROUP_MEMBER]].  Each mob's
+[[MFIELD_POSITION]] and [[MFIELD_APPEARANCE]] set up the font cursor.
+If the low nibble of [[MFIELD_LEVEL_ENC]] is zero, the mob gets only a
+static render; otherwise the full blink sequence plays.
 
 <<defines>>=
 MAP_REDRAW_FLAG         EQU     $7AC4   ; non-zero = full map redraw needed
-@ %def MAP_REDRAW_FLAG
-
-@ [[ENTITY_REC]] is a 2-byte zero-page pointer at [[$BE/$BF]] that
-receives the result of [[FIND_ENTITY_AT_POS]]: a pointer to the entity
-record occupying a given map position.  Bit 7 of the high byte
-distinguishes mobs (set) from player characters (clear).
-[[DRAW_MAP_ENTITIES]] uses it during the cell-by-cell grid scan.
+CFIELD_DRAWN_FLAG       EQU     $80     ; bit 7 of CFIELD_STYLE: entities drawn
+STYLE_SCROLL_MASK       EQU     $60     ; bits 6-5 of LOCATION_STYLE: scroll trigger
+@ %def MAP_REDRAW_FLAG CFIELD_DRAWN_FLAG STYLE_SCROLL_MASK
 
 <<zero page defines>>=
 ENTITY_REC              EQU     $BE     ; entity lookup result from FIND_ENTITY_AT_POS (2 bytes)
@@ -10567,45 +10580,52 @@ ENTITY_REC              EQU     $BE     ; entity lookup result from FIND_ENTITY_
     ORG     $733B
 DRAW_MAP_ENTITIES:
     SUBROUTINE DRAW_MAP_ENTITIES
+    ; Draw entity icons on the current map viewport.
+    ;
+    ; Inputs:  CHAR_PTR, VIEW_MIN/MAX_COL/ROW
+    ; Behavior:
+    ;   Marks entities drawn, optionally triggers rock-fall scroll,
+    ;   scans grid for drawable entities, then iterates mob group.
+    ; Clobbers: A, X, Y
 
-    LDY     #$05
+    LDY     #CFIELD_STYLE          ; byte 5: style + visited flag
     LDA     (CHAR_PTR),Y
-    ORA     #$80
-    STA     (CHAR_PTR),Y   ; mark entities drawn (set bit 7)
-    LDA     MAP_REDRAW_FLAG
+    ORA     #CFIELD_DRAWN_FLAG     ; set bit 7 = entities drawn
+    STA     (CHAR_PTR),Y
+    LDA     MAP_REDRAW_FLAG        ; full redraw pending?
     BEQ     .no_redraw
-    JMP     .draw_mobs
+    JMP     .draw_mobs             ; skip grid scan
 .no_redraw:
     LDA     LOCATION_STYLE
-    AND     #$60           ; check style bits 5-6
-    BEQ     .scan_grid
+    AND     #STYLE_SCROLL_MASK     ; bits 6-5: scroll trigger
+    BEQ     .scan_grid             ; 0 = normal scan
     JSR     SET_CURSOR_ROW21
     LDA     #MSG_ROCK_FALLS
     JSR     DISPLAY_MESSAGE
-    STOB    #$FF,MAP_REDRAW_FLAG
-    BNE     .draw_mobs     ; always taken
+    STOB    #$FF,MAP_REDRAW_FLAG   ; schedule full redraw
+    BNE     .draw_mobs             ; always taken
 .scan_grid:
-    MOVB    VIEW_MIN_COL,FONT_COL
+    MOVB    VIEW_MIN_COL,FONT_COL  ; start at top-left of view
     MOVB    VIEW_MIN_ROW,FONT_ROW
-    LDY     #$02
+    LDY     #CFIELD_NEXT           ; byte 2: mob head link
     LDA     (CHAR_PTR),Y
-    PHA                    ; save record byte 2
+    PHA                            ; save mob head
     LDA     #$00
-    STA     (CHAR_PTR),Y   ; clear it during scan
+    STA     (CHAR_PTR),Y           ; clear during scan
 .cell_check:
     LDA     FONT_COL
     LDY     FONT_ROW
-    JSR     COLROW_TO_POS
-    JSR     FIND_ENTITY_AT_POS
-    LDA     ENTITY_REC+1
-    BEQ     .next_col      ; no entity here
-    JSR     GET_ENTITY_FONTCHAR
-    LDY     #$01
+    JSR     COLROW_TO_POS          ; A = packed position
+    JSR     FIND_ENTITY_AT_POS     ; -> ENTITY_REC
+    LDA     ENTITY_REC+1           ; high byte of entity pointer
+    BEQ     .next_col              ; 0 = no entity here
+    JSR     GET_ENTITY_FONTCHAR    ; resolve font character
+    LDY     #EVFIELD_TYPE          ; byte 1: event type
     LDA     (ENTITY_REC),Y
-    BAEQ    #$FE,.next_col ; $FE = skip
-    BALT    #$80,.draw_it ; $00-$7F = draw
-    BALT    #$C0,.next_col ; $80-ENTITY_REC+1 = skip
-.draw_it:                           ; $C0-$FF = draw
+    BAEQ    #EVENT_EMPTY,.next_col ; $FE = empty slot, skip
+    BALT    #$80,.draw_it          ; $00-$7F = drawable
+    BALT    #EVENT_ACTIVATED,.next_col ; $80-$BF = not activated, skip
+.draw_it:                          ; $C0-$FF = activated, draw
     JSR     SET_CURSOR_ROW21
     JSR     CLASSIFY_ENTITY_TYPE
     JSR     PRINT_BOTTOM_CENTERED
@@ -10613,57 +10633,52 @@ DRAW_MAP_ENTITIES:
 .next_col:
     INC     FONT_COL
     LDA     VIEW_MAX_COL
-    BAPL    FONT_COL,.cell_check ; inner: next column
-    MOVB    VIEW_MIN_COL,FONT_COL
+    BAPL    FONT_COL,.cell_check   ; next column
+    MOVB    VIEW_MIN_COL,FONT_COL  ; wrap column, advance row
     INC     FONT_ROW
     LDA     VIEW_MAX_ROW
-    BAPL    FONT_ROW,.cell_check ; outer: next row
-    LDY     #$02
+    BAPL    FONT_ROW,.cell_check   ; next row
+    LDY     #CFIELD_NEXT           ; restore mob head link
     PLA
-    STA     (CHAR_PTR),Y   ; restore record byte 2
-    BNE     .draw_mobs
+    STA     (CHAR_PTR),Y
+    BNE     .draw_mobs             ; non-zero -> draw mobs too
     RTS
 .draw_mobs:
-    JSR     FIRST_GROUP_MEMBER
+    JSR     FIRST_GROUP_MEMBER     ; MOB_PTR -> first mob
 .mob_loop:
-    LDY     #$03
+    LDY     #MFIELD_POSITION       ; byte 3: packed map position
     LDA     (MOB_PTR),Y
-    JSR     POS_TO_COLROW
+    JSR     POS_TO_COLROW          ; A = col, Y = row
     STY     FONT_ROW
     STA     FONT_COL
-    STOB    #$01,FONT_CHARSET ; custom font
-    LDY     #$04
+    STOB    #$01,FONT_CHARSET      ; custom font
+    LDY     #MFIELD_APPEARANCE     ; byte 4: appearance index
     LDA     (MOB_PTR),Y
-    JSR     APPEARANCE_TO_FONTCHAR
+    JSR     APPEARANCE_TO_FONTCHAR ; -> font char number
     STA     FONT_CHARNUM
-    BYEQ    #$00,.mob_blink
-    LDY     #$0C
+    BYEQ    #$00,.mob_blink        ; char 0 -> always blink
+    LDY     #MFIELD_LEVEL_ENC      ; byte 12: level encoding
     LDA     (MOB_PTR),Y
-    AND     #$0F
-    BEQ     .mob_anim
+    AND     #LOW_NIBBLE_MASK       ; low nibble = base level
+    BEQ     .mob_anim              ; 0 -> static render only
 .mob_blink:
     JSR     SET_CURSOR_ROW21
     JSR     PRINT_MEMBER_NAME
-    JSR     DRAW_MAP_ICON_B
+    JSR     DRAW_MAP_ICON_B        ; draw with blink
     JMP     .mob_done
 .mob_anim:
-    JSR     RENDER_FONT_CHAR
+    JSR     RENDER_FONT_CHAR       ; draw without blink
 .mob_done:
-    JSR     NEXT_GROUP_MEMBER
-    LDA     MOB_PTR+1
+    JSR     NEXT_GROUP_MEMBER      ; advance to next mob
+    LDA     MOB_PTR+1              ; 0 = end of group
     BNE     .mob_loop
     RTS
 @ %def DRAW_MAP_ENTITIES
-After drawing a map entity, [[DRAW_MAP_ICON_B]] copies the current font
-position ([[FONT_COL]]/[[FONT_ROW]]/[[FONT_CHARNUM]]) into the
-blink cursor variables ([[BLINK_COL]]/[[BLINK_ROW]]/[[BLINK_CHAR]]),
-then calls [[TIMED_WAIT]] with the delay from [[BLINK_DELAY]].
-It finishes by resetting [[BLINK_COL]] to~\$14 (disabled).
+@ \subsection{Draw map icon (\$740B)}
 
-@ [[BLINK_CHAR]], [[BLINK_ROW]], and [[BLINK_DELAY]] are the blink-cursor
-state variables.  [[DRAW_MAP_ICON_B]] copies the current font position into
-[[BLINK_ROW]] and [[BLINK_CHAR]], then uses [[BLINK_DELAY]] as the
-argument to [[TIMED_WAIT]] so the icon flashes briefly on screen.
+[[DRAW_MAP_ICON_B]] renders an entity icon, flashes it briefly with the
+blink alternate frame, waits for [[BLINK_DELAY]] ticks, restores the
+normal frame, and disables the blink cursor.
 
 <<defines>>=
 BLINK_CHAR      EQU     $5AA4   ; font character number
@@ -10675,18 +10690,25 @@ BLINK_ROW       EQU     $5AA3   ; font row
     ORG     $740B
 DRAW_MAP_ICON_B:
     SUBROUTINE DRAW_MAP_ICON_B
+    ; Draw entity icon with blink flash effect.
+    ;
+    ; Inputs:  FONT_COL, FONT_ROW, FONT_CHARNUM
+    ; Behavior:
+    ;   Renders glyph, copies to blink cursor, flashes alternate
+    ;   frame, waits, restores normal, disables blink.
+    ; Clobbers: A, X, Y
 
-    JSR     SCROLL_STATUS_LINE
-    JSR     RENDER_FONT_CHAR
-    MOVB    FONT_COL,BLINK_COL
-    MOVB    FONT_ROW,BLINK_ROW
-    MOVB    FONT_CHARNUM,BLINK_CHAR
-    JSR     DRAW_BLINK_ALT
-    MOVB    BLINK_DELAY,WAIT_LOOP_COUNT
-    JSR     TIMED_WAIT
-    JSR     DRAW_BLINK_NORMAL
-    JSR     ANIM_TICK_AND_WAIT
-    STOB    #$14,BLINK_COL ; disable blink cursor
+    JSR     SCROLL_STATUS_LINE     ; update status line
+    JSR     RENDER_FONT_CHAR       ; draw glyph
+    MOVB    FONT_COL,BLINK_COL     ; arm blink cursor: column
+    MOVB    FONT_ROW,BLINK_ROW     ;                   row
+    MOVB    FONT_CHARNUM,BLINK_CHAR;                   character
+    JSR     DRAW_BLINK_ALT         ; draw alternate blink frame
+    MOVB    BLINK_DELAY,WAIT_LOOP_COUNT ; load blink duration
+    JSR     TIMED_WAIT             ; pause for blink interval
+    JSR     DRAW_BLINK_NORMAL      ; restore normal frame
+    JSR     ANIM_TICK_AND_WAIT     ; advance animation clock
+    STOB    #MAP_WIDTH,BLINK_COL   ; disable blink cursor (sentinel = 20)
     RTS
 @ %def DRAW_MAP_ICON_B
 @ \subsection{RWTS command dispatch (\$6C12--\$6C35)}
