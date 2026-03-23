@@ -11458,13 +11458,35 @@ REORDER_LINK        EQU     $5A2A   ; temp: saved next-link during reorder
     ORG     $0F84
 REORDER_CHAR:
     SUBROUTINE REORDER_CHAR
+    ; Move a character from one group's chain into another, sorted by level.
+    ;
+    ; Inputs:
+    ;   SOURCE_CHAR     — index of the character to remove from its current group
+    ;   ACTIVE_CHAR     — destination group head index (0 = random insertion)
+    ;   TARGET_REC      — record pointer for the character being moved
+    ;
+    ; Behavior:
+    ;   Phase 1 walks SOURCE_CHAR's group chain to find the predecessor node,
+    ;   patches it to skip over the removed node (unlinking it), and decrements
+    ;   the source group's member count.
+    ;   Phase 2 walks the destination group chain and inserts the removed node
+    ;   at the correct position: in ascending level order when ACTIVE_CHAR != 0,
+    ;   or at a random position when ACTIVE_CHAR = 0 (coin-flip via STEP_PRNG).
+    ;   After insertion, adjusts TOTAL_MOB_COUNT if the moved character is an
+    ;   NPC (appearance < NPC_APPEARANCE_MIN): decrements if source was group 0,
+    ;   increments if destination is group 0.
+    ;
+    ; Modifies:
+    ;   REORDER_LINK, REORDER_SORT_KEY, CURRENT_ROOM, TOTAL_MOB_COUNT,
+    ;   CHAR_REC, MOB_DATA_PTR
+    ; Clobbers: A, X, Y
 
 ; --- Phase 1: unlink character SOURCE_CHAR from its current chain ---
     LDA     SOURCE_CHAR            ; source character index
     JSR     GET_CHAR_RECORD        ; CHAR_REC = record pointer
     JSR     DECR_GROUP_COUNT       ; source group lost a member
 .walk1:
-    LDY     #$02                   ; \
+    LDY     #CFIELD_NEXT           ; \
     LDA     (CHAR_REC),Y           ;  | REORDER_LINK = byte 2 of current record
     STA     REORDER_LINK           ; /  (the "next" link we're removing)
     JSR     GET_MOB_DATA           ; MOB_DATA_PTR/MOB_DATA_PTR+1 = resolve link; TARGET_REC/TARGET_REC+1 = mob data
@@ -11473,11 +11495,11 @@ REORDER_CHAR:
     LDA     MOB_DATA_PTR+1         ;  |
     BANE    TARGET_REC+1,.advance1
     ; Found predecessor: TARGET_REC/TARGET_REC+1 points to the node being removed
-    LDY     #$02
+    LDY     #CFIELD_NEXT
     LDA     REORDER_LINK           ; \  if removed node's link == CURRENT_ROOM,
     BANE    CURRENT_ROOM,.patch1
     LDA     (TARGET_REC),Y         ; \
-    STA     CURRENT_ROOM           ; /  CURRENT_ROOM = (TARGET_REC)[2] (successor's link)
+    STA     CURRENT_ROOM           ; /  CURRENT_ROOM = (TARGET_REC)[CFIELD_NEXT] (successor's link)
 .patch1:
     LDA     (TARGET_REC),Y         ; \  predecessor.byte2 = removed.byte2
     STA     (CHAR_REC),Y           ; /  (skip over removed node)
@@ -11488,31 +11510,31 @@ REORDER_CHAR:
 
 ; --- Phase 2: re-insert at correct sorted position in ACTIVE_CHAR's chain ---
 .phase2:
-    LDY     #$0B                   ; \
+    LDY     #MFIELD_LEVEL          ; \
     LDA     (TARGET_REC),Y         ;  | REORDER_SORT_KEY = byte 11 of removed node
-    AND     #$1F                   ;  |   (level, 5-bit)
+    AND     #LEVEL_MASK            ;  |   (level, 5-bit)
     STA     REORDER_SORT_KEY       ; /
     LDA     ACTIVE_CHAR            ; destination character index
     JSR     GET_CHAR_RECORD        ; CHAR_REC = dest record pointer
     JSR     INCR_GROUP_COUNT       ; dest group gained a member
 .walk2:
-    LDY     #$02                   ; \
+    LDY     #MFIELD_NEXT           ; \
     LDA     (CHAR_REC),Y           ;  | check byte 2 of current record
     BAEQ    #$00,.insert
     JSR     GET_MOB_DATA           ; resolve link
     LDA     ACTIVE_CHAR            ; \
     BEQ     .random                ; /  if dest index = 0, use random decision
-    LDY     #$0B                   ; \
+    LDY     #MFIELD_LEVEL          ; \
     LDA     (MOB_DATA_PTR),Y       ;  | compare candidate's level
-    AND     #$1F                   ;  | with removed node's level
+    AND     #LEVEL_MASK            ;  | with removed node's level
     BAPL    REORDER_SORT_KEY,.advance2 ; if >= , keep walking (insert later)
 .insert:
-    LDY     #$02                   ; \
-    LDA     (CHAR_REC),Y           ;  | (TARGET_REC)[2] = (CHAR_REC)[2]  (link successor)
+    LDY     #MFIELD_NEXT           ; \
+    LDA     (CHAR_REC),Y           ;  | (TARGET_REC)[CFIELD_NEXT] = (CHAR_REC)[MFIELD_NEXT]
     STA     (TARGET_REC),Y         ;  |
-    LDA     REORDER_LINK           ;  | (CHAR_REC)[2] = saved link (insert node)
+    LDA     REORDER_LINK           ;  | (CHAR_REC)[MFIELD_NEXT] = saved link (insert node)
     STA     (CHAR_REC),Y           ; /
-    LDY     #$04                   ; \
+    LDY     #CFIELD_APPEARANCE     ; \
     LDA     (TARGET_REC),Y         ;  | if byte 4 of ($BC) >= $15, done
     BALT    #$15,.adjust
     RTS                            ; /
@@ -11575,6 +11597,23 @@ GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
     ORG     $102F
 DECR_GROUP_COUNT:
     SUBROUTINE DECR_GROUP_COUNT
+    ; Decrement or increment the group count byte of a mob data record.
+    ;
+    ; Inputs:
+    ;   DATA_PTR    — pointer to mob data record ($BE/$BF); null = no-op
+    ;   TARGET_REC  — pointer to character record ($BC/$BD); byte 4 (appearance)
+    ;                 must be < NPC_APPEARANCE_MIN or call is a no-op
+    ;
+    ; Behavior:
+    ;   Stores -1 or +1 in GROUP_COUNT_DELTA, then bails if DATA_PTR is null
+    ;   or if the character's appearance index indicates an inactive NPC.
+    ;   Otherwise adds the delta to byte 8 of the mob data record at DATA_PTR,
+    ;   which encodes group count (bits 3-0), pending XP (bits 6-4), and status
+    ;   (bit 7) in a packed byte.
+    ;
+    ; Modifies:
+    ;   GROUP_COUNT_DELTA, mob data byte 8 at (DATA_PTR + MFIELD_XP)
+    ; Clobbers: A, Y
 
     LDA     #$FF              ; delta = -1
     BNE     .apply            ; always taken
@@ -11586,12 +11625,12 @@ INCR_GROUP_COUNT:
     BANE    #$00,.not_null
     RTS                       ; /
 .not_null:
-    LDY     #$04              ; \
-    LDA     (TARGET_REC),Y    ;  | bail if byte 4 of (TARGET_REC) >= $15
-    BALT    #NPC_APPEARANCE_MIN,.ok ;  ($15+ = inactive/dead)
+    LDY     #CFIELD_APPEARANCE ; \
+    LDA     (TARGET_REC),Y    ;  | bail if appearance >= $15 (inactive/dead)
+    BALT    #NPC_APPEARANCE_MIN,.ok
     RTS                       ; /
 .ok:
-    LDY     #$08              ; \
+    LDY     #MFIELD_XP        ; \
     LDA     (DATA_PTR),Y      ;  | group count (low nibble) += delta
     CLC                       ;  |
     ADC     GROUP_COUNT_DELTA ;  |
@@ -11618,12 +11657,34 @@ If the link is zero (end of chain), [[MOB_PTR]] is set to null.
     ORG     $12FA
 FIRST_GROUP_MEMBER:
     SUBROUTINE FIRST_GROUP_MEMBER
+    ; Advance group-member cursor to the first or next mob in a linked chain.
+    ;
+    ; Inputs:
+    ;   CHAR_PTR  — points to the group-head character record ($FA/$FB);
+    ;               byte 2 (CFIELD_NEXT) holds the first mob link index
+    ;   MOB_PTR   — points to the current mob record ($F4/$F5);
+    ;               byte 2 (MFIELD_NEXT) holds the next mob link index
+    ;
+    ; Behavior:
+    ;   FIRST_GROUP_MEMBER reads the next-link from byte 2 of the group head
+    ;   (CHAR_PTR).  NEXT_GROUP_MEMBER reads it from byte 2 of the current
+    ;   mob cursor (MOB_PTR).  If the link index is non-zero, GET_MOB_DATA
+    ;   resolves it to a 16-byte record pointer and advances MOB_PTR.  If the
+    ;   link index is zero the chain is exhausted and MOB_PTR is set to null.
+    ;
+    ; Outputs:
+    ;   MOB_PTR  — updated to point to the next mob record, or $0000 at
+    ;              end of chain
+    ;
+    ; Modifies:
+    ;   MOB_PTR, MOB_DATA_PTR
+    ; Clobbers: A, Y
 
-    LDY     #$02           ; \
+    LDY     #CFIELD_NEXT   ; \
     LDA     (CHAR_PTR),Y   ;  | check byte 2 of group head ($FA)
     BNE     .resolve       ; /  if nonzero, follow it
 NEXT_GROUP_MEMBER:
-    LDY     #$02           ; \
+    LDY     #MFIELD_NEXT   ; \
     LDA     (MOB_PTR),Y    ;  | check byte 2 of cursor ($F4)
     BNE     .resolve       ; /  if nonzero, follow it
     STA     MOB_PTR        ; \  end of chain:
@@ -11648,8 +11709,21 @@ EFFECT_REC              EQU     $F6     ; target entity record for damage/stats 
     ORG     $1142
 PRINT_ENTITY_NAME:
     SUBROUTINE PRINT_ENTITY_NAME
-    ; Print entity name: cursor to row 21, load name ptr from (EFFECT_REC)[0..1],
-    ; print centered at bottom, then reset text window.
+    ; Print the target entity's name centered on the status line.
+    ;
+    ; Inputs:
+    ;   EFFECT_REC  — pointer to target entity record; bytes 0-1 hold name string pointer
+    ;
+    ; Behavior:
+    ;   Positions the cursor on row 21, loads the name string pointer from
+    ;   bytes 0-1 of the EFFECT_REC record into PRINT_STRING_ADDR, prints
+    ;   the name centered on the bottom status line, then resets the text
+    ;   window via SCROLL_STATUS_LINE.
+    ;
+    ; Modifies:
+    ;   PRINT_STRING_ADDR
+    ; Clobbers: A, Y
+
     JSR     SET_CURSOR_ROW21
     LDWIY    EFFECT_REC,#$00,PRINT_STRING_ADDR ; name pointer low
     JSR     PRINT_BOTTOM_CENTERED
@@ -11664,6 +11738,19 @@ Used by 13~callers throughout the combat and interaction code.
     ORG     $0D8A
 PRINT_MOB_NAME:
     SUBROUTINE PRINT_MOB_NAME
+    ; Print the current mob or character's name centered on the status line.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR  — pointer to mob/character record; bytes 0-1 hold name string pointer
+    ;
+    ; Behavior:
+    ;   Loads the name string pointer from bytes 0-1 of the ENTITY_PTR record
+    ;   into PRINT_STRING_ADDR, then jumps to PRINT_BOTTOM_CENTERED to print
+    ;   the name centered on row 23.
+    ;
+    ; Modifies:
+    ;   PRINT_STRING_ADDR
+    ; Clobbers: A, Y
 
     LDWIY    ENTITY_PTR,#$00,PRINT_STRING_ADDR ;  PRINT_STRING_ADDR/PRINT_STRING_ADDR+1 = bytes 0-1 of ($F8)
     JMP     PRINT_BOTTOM_CENTERED ; center and print on row 23
@@ -11677,7 +11764,20 @@ to display the name centered on the status line.
     ORG     $1406
 PRINT_MEMBER_NAME:
     SUBROUTINE PRINT_MEMBER_NAME
-    ; Copy (MOB_PTR)[0..1] -> PRINT_STRING_ADDR/PRINT_STRING_ADDR+1, then JMP $7705
+    ; Print the current group member's name centered on the status line.
+    ;
+    ; Inputs:
+    ;   MOB_PTR  — pointer to group member record; bytes 0-1 hold name string pointer
+    ;
+    ; Behavior:
+    ;   Loads the name string pointer from bytes 0-1 of the MOB_PTR record
+    ;   into PRINT_STRING_ADDR, then jumps to PRINT_BOTTOM_CENTERED to print
+    ;   the name centered on row 23.
+    ;
+    ; Modifies:
+    ;   PRINT_STRING_ADDR
+    ; Clobbers: A, Y
+
     LDWIY    MOB_PTR,#$00,PRINT_STRING_ADDR
     JMP     PRINT_BOTTOM_CENTERED
 @ %def PRINT_MEMBER_NAME
@@ -11692,6 +11792,18 @@ current character's name during the status display.
     ORG     $0925
 LOAD_CHAR_NAME_PTR:
     SUBROUTINE LOAD_CHAR_NAME_PTR
+    ; Load entity name pointer and position cursor at the right status panel.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR  — pointer to current entity record (bytes 0-1 = name string address)
+    ;
+    ; Behavior:
+    ;   Reads the two-byte name pointer from bytes 0-1 of the entity record
+    ;   and stores it in PRINT_STRING_ADDR.  Jumps to SETUP_TEXT_POS_COL20
+    ;   to position the text cursor at column 20 (right status panel).
+    ;
+    ; Modifies:
+    ;   PRINT_STRING_ADDR
     LDWIY    ENTITY_PTR,#$00,PRINT_STRING_ADDR
     JMP     SETUP_TEXT_POS_COL20
 @ %def LOAD_CHAR_NAME_PTR
@@ -11712,7 +11824,23 @@ CHAR_SPRITE         EQU     $5A04   ; character's font char number for display
     ORG     $0933
 SETUP_CHAR_SPRITE:
     SUBROUTINE SETUP_CHAR_SPRITE
-    LDY     #$03
+    ; Unpack entity position and render its sprite glyph with blink cursor.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR   — pointer to current entity record (byte 3 = packed position)
+    ;   CHAR_SPRITE  — glyph index to render for this entity
+    ;
+    ; Behavior:
+    ;   Reads the packed map position from entity byte MFIELD_POSITION and
+    ;   splits it into column and row via POS_TO_COLROW.  Stores in both
+    ;   font cursor and blink cursor variables.  Loads CHAR_SPRITE as the
+    ;   glyph, selects custom font charset 1, then tail-calls RENDER_FONT_CHAR.
+    ;
+    ; Modifies:
+    ;   FONT_COL, FONT_ROW, FONT_CHARNUM, FONT_CHARSET,
+    ;   BLINK_COL, BLINK_ROW, BLINK_CHAR
+    ; Clobbers: A, X, Y
+    LDY     #MFIELD_POSITION
     LDA     (ENTITY_PTR),Y
     JSR     POS_TO_COLROW
     STA     FONT_COL
@@ -11734,6 +11862,19 @@ main iteration pointer.
     ORG     $6EC9
 LOAD_CHAR_TO_FA:
     SUBROUTINE LOAD_CHAR_TO_FA
+    ; Load a character record and expose its pointer via CHAR_PTR.
+    ;
+    ; Inputs:
+    ;   A  — character index
+    ;
+    ; Behavior:
+    ;   Calls GET_CHAR_RECORD to resolve the index into a record pointer
+    ;   in DATA_PTR, then copies it to CHAR_PTR so callers can iterate
+    ;   the record via the main-loop zero-page pointer.
+    ;
+    ; Modifies:
+    ;   CHAR_PTR
+    ; Clobbers: A, X, Y
     ; Wrapper: GET_CHAR_RECORD then copy CHAR_REC -> $FA/$FB.
     JSR     GET_CHAR_RECORD
     MOVW    DATA_PTR,CHAR_PTR
@@ -11749,7 +11890,20 @@ position in the sorted order.
     ORG     $1414
 REORDER_CURRENT_CHAR:
     SUBROUTINE REORDER_CURRENT_CHAR
-    ; Copy ENTITY_PTR/ENTITY_PTR+1 -> TARGET_REC/TARGET_REC+1, store CURRENT_PLAYER -> SOURCE_CHAR, JMP $0F84
+    ; Re-sort the active character after a stat change.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR      — pointer to the current character record
+    ;   CURRENT_PLAYER  — index of the current player character
+    ;
+    ; Behavior:
+    ;   Copies ENTITY_PTR into TARGET_REC and CURRENT_PLAYER into
+    ;   SOURCE_CHAR, then tail-calls REORDER_CHAR to re-insert the
+    ;   character into sorted order.
+    ;
+    ; Modifies:
+    ;   TARGET_REC, SOURCE_CHAR
+    ; Clobbers: A
     MOVW    ENTITY_PTR,TARGET_REC
     MOVB    CURRENT_PLAYER,SOURCE_CHAR
     JMP     REORDER_CHAR
@@ -11819,15 +11973,30 @@ CONTINUE'') message in the text window at the bottom of the screen.
     ORG     $6D1F
 DISPLAY_STATUS_BAR:
     SUBROUTINE DISPLAY_STATUS_BAR
-
+    ; Draw the status bar border and input-prompt string.
+    ;
+    ; Inputs:
+    ;   INPUT_MODE          — 0 = keyboard, nonzero = joystick
+    ;   STATUS_BORDER_DATA  — address of border-box text data
+    ;
+    ; Behavior:
+    ;   Sends ctrl-P ($90) to HRCG to toggle inverse video, then draws
+    ;   the border box via TEXT_RENDERER.  Sets text row to 23, column
+    ;   to 4, and prints S_PRESS_SPACE ("PRESS SPACE BAR") when
+    ;   INPUT_MODE is 0, or S_PRESS_BUTTON ("PRESS THE BUTTON")
+    ;   otherwise.
+    ;
+    ; Modifies:
+    ;   TEXT_STREAM_PTR, PRINT_STRING_ADDR, TEXT_ROW, TEXT_COL
+    ; Clobbers: A
     LDA     #$90                               ; ctrl-P with high bit (toggle inverse)
     JSR     ROM_COUT1
     STOW    STATUS_BORDER_DATA,TEXT_STREAM_PTR ; status bar border data -> $06/$07
     JSR     TEXT_RENDERER                      ; draw border box
     JSR     PRINT_CTRL_AB                      ; Ctrl-A, '0'
-    STOB    #$17,TEXT_ROW ; WNDBTM = 23
+    STOB    #$17,TEXT_ROW                      ; WNDBTM = 23
 
-    LDA     $5A00                              ; joystick/keyboard flag
+    LDA     INPUT_MODE                         ; 0 = keyboard, nonzero = joystick
     BNE     .joystick
 
     ; Keyboard path:
@@ -11854,28 +12023,40 @@ via [[SET_TEXT_WINDOW]] and output ctrl-K (\$8B) to finalize.
 <<setup text pos>>=
     ORG     $76D2
     SUBROUTINE SETUP_TEXT_POS
-; Two entry points: $76D2 (col 0) and $76D8 (col 20)
+    ; Prepare an HRCG text window at row 20 for a status panel.
+    ;
+    ; Behavior:
+    ;   SETUP_TEXT_POS sets the starting column to 0 (left panel);
+    ;   SETUP_TEXT_POS_COL20 sets it to MAP_WIDTH (right panel).
+    ;   Both entry points set TEXT_ROW to 20, send HRCG ctrl-AB and a
+    ;   carriage return, fill 20 columns with hi-bit spaces, compute
+    ;   TEXT_COL = 10 - TEXT_COL as a centering offset, call
+    ;   PRINT_CENTERED_PLUS_COL, and finalize with ctrl-K.
+    ;
+    ; Modifies:
+    ;   TEXT_COL, TEXT_ROW
+    ; Clobbers: A, X
 SETUP_TEXT_POS:
-    STOB    #$00,$24
+    STOB    #$00,TEXT_COL
     BEQ     .set_row
 SETUP_TEXT_POS_COL20:          ; $76D8 - original SETUP_TEXT_POS_COL20 entry
-    STOB    #$14,$24
+    STOB    #MAP_WIDTH,TEXT_COL
 .set_row:
-    STOB    #$14,$25
+    STOB    #MAP_WIDTH,TEXT_ROW
     JSR     PRINT_CTRL_AB
     LDA     #$8C
     JSR     ROM_COUT1
-    LDX     #$14
+    LDX     #MAP_WIDTH
 .space_loop:
     LDA     #$A0
     JSR     ROM_COUT1
     DEX
     BNE     .space_loop
-    STOB    #$14,$25
+    STOB    #MAP_WIDTH,TEXT_ROW
     LDA     #$0A
     SEC
-    SBC     $24
-    STA     $24
+    SBC     TEXT_COL
+    STA     TEXT_COL
     JSR     PRINT_CENTERED_PLUS_COL
     LDA     #$8B
     JMP     ROM_COUT1
@@ -11905,7 +12086,24 @@ TEXT_STREAM_IDX          EQU     $5A98   ; saved Y index into byte stream
     ORG     $6C8E
 TEXT_RENDERER:
     SUBROUTINE TEXT_RENDERER
-
+    ; Render a byte-stream of text and control codes to the hi-res screen.
+    ;
+    ; Inputs:
+    ;   TEXT_STREAM_PTR  — pointer to byte stream to render
+    ;
+    ; Behavior:
+    ;   Initializes TEXT_LEFT_MARGIN=2, TEXT_RIGHT_MARGIN=18, FONT_ROW=1,
+    ;   then reads bytes in a loop.  Bytes $00-$7C are rendered as custom
+    ;   font characters (FONT_CHARSET=2), advancing the column and wrapping
+    ;   at TEXT_RIGHT_MARGIN.  $7D resets to full-screen layout.  $7E pauses:
+    ;   plays TUNE_ATTRACT, calls DISPLAY_STATUS_BAR, then reinitializes.
+    ;   $7F ends the stream and returns.  $80-$FE are position commands:
+    ;   AND #$7F gives the new row, the following byte gives the column.
+    ;
+    ; Modifies:
+    ;   FONT_COL, FONT_ROW, FONT_CHARNUM, FONT_CHARSET,
+    ;   TEXT_LEFT_MARGIN, TEXT_RIGHT_MARGIN, TEXT_STREAM_IDX
+    ; Clobbers: A, X, Y
     LDY     #$00
 .init:
     STOB    #$02,TEXT_LEFT_MARGIN ; left margin = 2
@@ -11955,7 +12153,7 @@ TEXT_RENDERER:
     TYA                         ; \
     PHA                         ;  | save stream index
     NOP
-    LDX     #$06                ; tune 3: attract/opening
+    LDX     #TUNE_ATTRACT       ; tune 6: attract/opening
     JSR     TUNE_PLAYER
     PSHW    TEXT_STREAM_PTR     ; save stream pointer
     JSR     DISPLAY_STATUS_BAR  ; (clobbers TEXT_STREAM_PTR)
@@ -11968,10 +12166,10 @@ TEXT_RENDERER:
 
     ; --- Reset ($7D): full-screen text mode ---
 .reset:
-    STOB    #$00,TEXT_LEFT_MARGIN ; left margin = 0
-    STA     FONT_COL            ; column = 0
-    STA     FONT_ROW            ; row = 0
-    STOB    #$14,TEXT_RIGHT_MARGIN ; right margin = $14 (20)
+    STOB    #$00,TEXT_LEFT_MARGIN  ; left margin = 0
+    STA     FONT_COL               ; column = 0
+    STA     FONT_ROW               ; row = 0
+    STOB    #MAP_WIDTH,TEXT_RIGHT_MARGIN ; right margin = 20 (MAP_WIDTH)
     INY                         ; advance past $7D
     JMP     .fetch
 @ %def TEXT_RENDERER
@@ -12020,17 +12218,35 @@ the between-round event system, and the loop restarts.
     ORG     $0800
 MAIN_ENTRY:
     SUBROUTINE MAIN_ENTRY
-
+    ; Main program entry point and top-level game loop.
+    ;
+    ; Inputs:
+    ;   TOTAL_MOB_COUNT  — 0 on first run, triggers attract screen
+    ;   LOCATION_DATA    — ($4009) base of character record array
+    ;
+    ; Behavior:
+    ;   Calls GAME_INIT, then sets CHAR_PTR to LOCATION_DATA.  If
+    ;   TOTAL_MOB_COUNT is zero (first run), calls ATTRACT_SCREEN.
+    ;   Main loop: sets CURRENT_PLAYER=1, iterates 9-byte character
+    ;   records.  For each active record (MFIELD_XP != 0), calls
+    ;   ENTER_LOCATION, dispatches scene events for players 1 and 3,
+    ;   and calls PROCESS_MOB_GROUPS.  Terminates the pass when byte 1
+    ;   of the next record equals $FF, then calls RANDOM_EVENTS and
+    ;   restarts unconditionally.
+    ;
+    ; Modifies:
+    ;   CHAR_PTR, CURRENT_PLAYER, and numerous others via subcalls
+    ; Clobbers: A, X, Y
     JSR     GAME_INIT
 .restart:
-    STOW    $4009,CHAR_PTR ;  $FA/$FB = $4009 (character record base)
+    STOW    LOCATION_DATA,CHAR_PTR ;  $FA/$FB = LOCATION_DATA ($4009)
     LDA     TOTAL_MOB_COUNT    ; zero on first run (no mobs yet)
     BNE     .has_mobs          ; nonzero = game in progress
     JSR     ATTRACT_SCREEN
 .has_mobs:
     STOB    #$01,CURRENT_PLAYER ; start with player 1
 .char_loop:
-    LDY     #$08
+    LDY     #MFIELD_XP
     LDA     (CHAR_PTR),Y       ; char record byte 8 (status/group)
     BEQ     .next_char         ; zero = inactive, skip
     JSR     ENTER_LOCATION     ; draw map if location changed
@@ -12044,7 +12260,7 @@ MAIN_ENTRY:
 .next_char:
     INC     CURRENT_PLAYER
     CLC
-    LDA     #$09               ; advance to next 9-byte record
+    LDA     #CHAR_RECORD_SIZE  ; advance to next 9-byte record
     ADC     CHAR_PTR
     STA     CHAR_PTR
     BCC     .no_carry
@@ -12076,10 +12292,27 @@ calling a periodic disk checkpoint at [[$A508]] in the relocated block.
     ORG     $0884
 PROCESS_MOB_GROUPS:
     SUBROUTINE PROCESS_MOB_GROUPS
+    ; Walk the mob linked list for the current character and process each mob.
+    ;
+    ; Inputs:
+    ;   CHAR_PTR  — pointer to current character record
+    ;
+    ; Behavior:
+    ;   Reads CFIELD_NEXT from (CHAR_PTR) as the initial link and saves it
+    ;   in CURRENT_ROOM.  Rolls a 1-in-24 PRNG chance to call the disk
+    ;   checkpoint at $A508.  Then iterates the linked list: for each mob,
+    ;   resolves via GET_MOB_DATA, copies to ENTITY_PTR, reads the next link.
+    ;   Type < 3 (inactive): SHOW_IDLE_STATUS + AUTO_HEAL.
+    ;   Type >= 3 (active): START_MOB_TURN, then reset BLINK_COL to MAP_WIDTH.
+    ;   Loop continues until the link value is 0.
+    ;
+    ; Modifies:
+    ;   CURRENT_ROOM, ENTITY_PTR, MOB_DATA_PTR, BLINK_COL
+    ; Clobbers: A, X, Y
     ; Walk the mob linked list for the current character.
     ; For each group: inactive (type < 3) -> display message + auto-heal;
     ; active (type >= 3) -> set up scene and enter GAME_TURN_LOOP.
-    LDY     #$02
+    LDY     #CFIELD_NEXT
     LDA     (CHAR_PTR),Y     ; char record byte 2 = first group link
     STA     CURRENT_ROOM     ; save as current link
     JSR     CLEAR_MAP
@@ -12095,12 +12328,12 @@ PROCESS_MOB_GROUPS:
 .has_mob:
     JSR     GET_MOB_DATA     ; resolve link -> MOB_DATA_PTR/MOB_DATA_PTR+1
     MOVW    MOB_DATA_PTR,ENTITY_PTR ;  ENTITY_PTR/ENTITY_PTR+1 = mob data pointer
-    LDY     #$02
+    LDY     #MFIELD_NEXT
     LDA     (ENTITY_PTR),Y   ; mob data byte 2 = next link
     STA     CURRENT_ROOM     ; save for next iteration
-    LDY     #$06
+    LDY     #MFIELD_MOB_TYPE
     LDA     (ENTITY_PTR),Y   ; mob data byte 6
-    AND     #$3F             ; bits 5-0 = mob type
+    AND     #MOB_TYPE_MASK   ; bits 5-0 = mob type
     BAPL    #$03,.active_mob ; type >= 3?
     JSR     SHOW_IDLE_STATUS ; inactive: print name + message
     JSR     AUTO_HEAL        ; heal party members
@@ -12119,7 +12352,16 @@ status text.
     ORG     $08D1
 SHOW_IDLE_STATUS:
     SUBROUTINE SHOW_IDLE_STATUS
-    ; Display a status message for an inactive mob group.
+    ; Display a brief status message for an inactive mob group.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR  — pointer to current mob record (bytes 0-1 = name)
+    ;
+    ; Behavior:
+    ;   Scrolls the status area, prints the mob's name via PRINT_MOB_NAME,
+    ;   scrolls again, then displays MSG_REST_STRONGER ("resting, growing
+    ;   stronger") via DISPLAY_MESSAGE.
+    ; Clobbers: A, X, Y
     JSR     SCROLL_STATUS_LINE
     JSR     PRINT_MOB_NAME
     JSR     SCROLL_STATUS_LINE
@@ -12143,9 +12385,23 @@ set up, and control falls through to [[GAME_TURN_LOOP]].
     ORG     $08DF
 START_MOB_TURN:
     SUBROUTINE START_MOB_TURN
-    ; Set up the character sprite and enter the game turn loop
-    ; for an active mob group (type >= 3).
-    LDY     #$04
+    ; Set up the sprite and enter the turn loop for an active mob.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR  — pointer to current mob record
+    ;
+    ; Behavior:
+    ;   Reads MFIELD_APPEARANCE (byte 4) from the mob record and converts
+    ;   it to a font character via APPEARANCE_TO_FONTCHAR.  The font group
+    ;   (in Y) doubles as the AI behavior mode, stored in CHAR_AI_MODE.
+    ;   Calls CHECK_MOB_NEEDS_TURN; if carry clear, returns immediately.
+    ;   Otherwise positions the cursor, sets up the scene display, and
+    ;   jumps to GAME_TURN_LOOP.
+    ;
+    ; Modifies:
+    ;   CHAR_SPRITE, CHAR_AI_MODE
+    ; Clobbers: A, X, Y
+    LDY     #MFIELD_APPEARANCE
     LDA     (ENTITY_PTR),Y       ; mob data byte 4 = appearance
     JSR     APPEARANCE_TO_FONTCHAR
     STA     CHAR_SPRITE          ; save font character
@@ -12181,22 +12437,34 @@ ENCOUNTER_RESULT        EQU     $5A1F   ; 0/1/2 from CHECK_ENCOUNTER
     ORG     $0958
 CHECK_MOB_NEEDS_TURN:
     SUBROUTINE CHECK_MOB_NEEDS_TURN
-    ; Check whether a mob group needs a game turn.
-    ; Returns: carry set = needs turn, carry clear = skip.
-    ; Skips if: AI mode is player (0), or record byte 12 low nibble
-    ; is nonzero, or no encounter and no adjacent threats.
+    ; Determine whether a mob group needs to take a game turn.
+    ;
+    ; Inputs:
+    ;   CHAR_AI_MODE  — 0 = player (always gets turn), nonzero = AI
+    ;   ENTITY_PTR    — pointer to current mob record
+    ;
+    ; Behavior:
+    ;   Player-controlled characters always get a turn.  For AI mobs,
+    ;   checks three conditions: (1) MFIELD_LEVEL_ENC low nibble nonzero
+    ;   (pending action), (2) encounter at current MFIELD_POSITION, or
+    ;   (3) adjacent threats.  If none apply, clears the restricted flag
+    ;   and skips the turn.
+    ;
+    ; Outputs:
+    ;   C flag  — set = needs turn, clear = skip
+    ; Clobbers: A, Y
     LDA     CHAR_AI_MODE
     BEQ     .needs_turn      ; player-controlled always gets a turn
-    LDY     #$0C
+    LDY     #MFIELD_LEVEL_ENC
     LDA     (ENTITY_PTR),Y   ; mob data byte 12
-    AND     #$0F             ; low nibble
+    AND     #LOW_NIBBLE_MASK ; low nibble = pending action
     BNE     .needs_turn      ; nonzero = pending action -> turn
-    LDY     #$03
+    LDY     #MFIELD_POSITION
     LDA     (ENTITY_PTR),Y   ; mob data byte 3 = position
     JSR     CHECK_ENCOUNTER  ; check for encounter at this position
     LDA     ENCOUNTER_RESULT
     BNE     .needs_turn      ; encounter found -> turn
-    LDY     #$03
+    LDY     #MFIELD_POSITION
     LDA     (ENTITY_PTR),Y   ; position again
     JSR     CHECK_ADJACENT_THREATS
     LDA     ADJACENT_THREAT
@@ -12410,10 +12678,31 @@ exhausted, the character enters combat, or a special event fires.
     ORG     $19AD
 GAME_TURN_LOOP:
     SUBROUTINE GAME_TURN_LOOP
-
+    ; Execute one character's complete movement turn.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR    — pointer to current entity record
+    ;   CHAR_AI_MODE  — 0 = player (keyboard input), nonzero = AI
+    ;
+    ; Behavior:
+    ;   Saves starting position, clears flags.  Checks HP (field 6 low
+    ;   6 bits < 3 = restricted) and encounter type (2 = restricted).
+    ;   For AI, calls AI_CHOOSE_TARGET.  Computes movement points from
+    ;   field 12 low nibble, optionally reduced by threat count.
+    ;   Main loop: reads direction (player keyboard via $A44C, or
+    ;   NPC_MOVE_AI), applies to col/row, checks destination cell.
+    ;   Empty = commit move + re-check threats.  Occupied = dispatch
+    ;   by entity type: mob encounter, treasure, scene event, shop,
+    ;   or empty-slot handler.  Exits when points exhausted or combat.
+    ;
+    ; Modifies:
+    ;   TURN_ACTIVE, CURRENT_COL, CURRENT_ROW, TURN_START_COL,
+    ;   TURN_START_ROW, STEPS_TAKEN, MOVE_POINTS, INPUT_DIR,
+    ;   ENCOUNTER_RESULT
+    ; Clobbers: A, X, Y
     ; --- setup: save position, clear flags ---
     STOB    #$01,TURN_ACTIVE
-    LDY     #$03
+    LDY     #MFIELD_POSITION
     LDA     (ENTITY_PTR),Y           ; char field 3 = packed position
     JSR     POS_TO_COLROW
     STA     CURRENT_COL
@@ -12424,13 +12713,13 @@ GAME_TURN_LOOP:
     JSR     CLEAR_RESTRICTED         ; clear restricted flag (bit 2 of field 15)
 
     ; --- check constitution and encounters ---
-    LDY     #$06
+    LDY     #MFIELD_HP
     LDA     (ENTITY_PTR),Y           ; char field 6 (constitution/HP)
-    AND     #$3F
+    AND     #HP_MASK
     BAPL    #$03,.con_ok
     JSR     SET_RESTRICTED           ; set restricted (too weak)
 .con_ok:
-    LDY     #$03
+    LDY     #MFIELD_POSITION
     LDA     (ENTITY_PTR),Y
     JSR     CHECK_ENCOUNTER
     LDA     ENCOUNTER_RESULT
@@ -12443,9 +12732,9 @@ GAME_TURN_LOOP:
 
     ; --- determine movement points ---
 .get_speed:
-    LDY     #$0C
+    LDY     #MFIELD_LEVEL_ENC
     LDA     (ENTITY_PTR),Y           ; char field 12
-    AND     #$0F                     ; low nibble = speed
+    AND     #LOW_NIBBLE_MASK         ; low nibble = speed
     STA     MOVE_POINTS
 
     ; --- adjust points based on threats ---
@@ -12574,15 +12863,15 @@ MOVE_LOOP:                     ; $1A31 - external entry point
     ; --- destination occupied: dispatch by type ---
 .something:
     LDA     ENTITY_REC+1
-    BAMI    #$80,.event ; ENTITY_REC+1 < $80 -> event entry
+    BAMI    #MOB_PTR_FLAG,.event     ; ENTITY_REC+1 < $80 -> event entry
     JMP     HANDLE_MOB_ENCOUNTER     ; ENTITY_REC+1 >= $80 -> mob encounter
 
 .event:
-    LDY     #$01
+    LDY     #EVFIELD_TYPE
     LDA     (ENTITY_REC),Y           ; event byte 1
     TAX
-    AND     #$C0
-    BAEQ    #$C0,.activated
+    AND     #EVENT_ACTIVATED
+    BAEQ    #EVENT_ACTIVATED,.activated
     JMP     HANDLE_ENCOUNTER         ; non-activated -> encounter
 
 .activated:
@@ -12602,11 +12891,11 @@ MOVE_LOOP:                     ; $1A31 - external entry point
     JMP     DISPLAY_SHOP
 
 .not_map_event:
-    BAEQ    #$FE,.empty_slot
+    BAEQ    #EVENT_EMPTY,.empty_slot
     JMP     TEARDOWN_INPUT           ; $DB-$FD: unknown
 
 .empty_slot:
-    JMP     HANDLE_EVENT_SLOT        ; $FE: empty slot interaction
+    JMP     HANDLE_EVENT_SLOT        ; EVENT_EMPTY ($FE): empty slot interaction
 @ %def GAME_TURN_LOOP MOVE_LOOP
 @ [[TURN_DISPATCH]] is the decision point after a character finishes moving.
 If [[CHAR_AI_MODE]] is zero, the character is under player control and
@@ -12623,6 +12912,17 @@ Any other value means the area is safe, so the character attempts
     ORG     $14A3
 TURN_DISPATCH:
     SUBROUTINE TURN_DISPATCH
+    ; Post-movement decision point.
+    ;
+    ; Inputs:
+    ;   CHAR_AI_MODE  — 0 = player, nonzero = AI
+    ;
+    ; Behavior:
+    ;   If player-controlled, jumps to TEARDOWN_INPUT to present the
+    ;   action menu.  For AI, calls SELECT_COMBAT_TARGET: result 2
+    ;   enters combat state, negative commits an attack via START_COMBAT,
+    ;   otherwise attempts AUTO_HEAL.
+    ; Clobbers: A
     LDA     CHAR_AI_MODE
     BEQ     .no_combat
     JSR     SELECT_COMBAT_TARGET
@@ -12658,15 +12958,34 @@ TURN_TUNE_GUARD   EQU     $5AA9   ; turn reset: guards one-shot script execution
     ORG     $1B52
 COMMIT_MOVE:
     SUBROUTINE COMMIT_MOVE
-    ; Commit move: store CURRENT_COL/ROW, convert to packed pos,
-    ; update char field 3, set font char, draw sprite
+    ; Finalize character movement on the map.
+    ;
+    ; Inputs:
+    ;   CURRENT_COL, CURRENT_ROW  — new position
+    ;   ENTITY_PTR                — pointer to entity record
+    ;   CHAR_SPRITE               — font glyph for this character
+    ;   TURN_START_COL/ROW        — position at start of turn
+    ;
+    ; Behavior:
+    ;   Copies CURRENT_COL/ROW into font and blink cursor vars, packs
+    ;   them via COLROW_TO_POS, stores in entity MFIELD_POSITION.
+    ;   Draws the sprite via RENDER_FONT_CHAR.  Sets TURN_TUNE_GUARD
+    ;   to $16 to arm the one-shot movement sound.  Falls through to
+    ;   RESET_TURN_POS, which redraws the old cell and optionally
+    ;   plays the movement tune.
+    ;
+    ; Modifies:
+    ;   FONT_COL, FONT_ROW, FONT_CHARNUM, FONT_CHARSET,
+    ;   BLINK_COL, BLINK_ROW, BLINK_CHAR, TURN_TUNE_GUARD,
+    ;   TURN_START_COL, TURN_START_ROW
+    ; Clobbers: A, X, Y
     MOVB    CURRENT_COL,FONT_COL
     STA     BLINK_COL
     LDY     CURRENT_ROW
     STY     FONT_ROW
     STY     BLINK_ROW
     JSR     COLROW_TO_POS
-    LDY     #$03
+    LDY     #MFIELD_POSITION
     STA     (ENTITY_PTR),Y   ; update char packed position
     MOVB    CHAR_SPRITE,FONT_CHARNUM
     STA     BLINK_CHAR
@@ -12702,6 +13021,22 @@ RESET_TURN_POS:
     ORG     $1BA7
 END_TURN:
     SUBROUTINE END_TURN
+    ; Wrap up the character's turn and check for bonus movement.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR   — pointer to current entity record
+    ;   STEPS_TAKEN  — steps consumed this turn
+    ;
+    ; Behavior:
+    ;   Clears TURN_ACTIVE, calls CHECK_AND_RESTRICT to update the
+    ;   restricted flag at the final position.  If no steps taken, loops
+    ;   back to TURN_DISPATCH.  Otherwise extracts speed tier from
+    ;   MFIELD_LEVEL_ENC bits 2-0 (after ROR) and compares against
+    ;   STEPS_TAKEN; if level exceeds steps, grants another turn.
+    ;
+    ; Modifies:
+    ;   TURN_ACTIVE
+    ; Clobbers: A, Y
     ; End turn: clear TURN_ACTIVE, check encounter, compare level vs STEPS_TAKEN
     STOB    #$00,TURN_ACTIVE
     JSR     CHECK_AND_RESTRICT
@@ -12709,7 +13044,7 @@ END_TURN:
     BNE     .check_level
     JMP     TURN_DISPATCH
 .check_level:
-    LDY     #$0C
+    LDY     #MFIELD_LEVEL_ENC
     LDA     (ENTITY_PTR),Y
     ROR
     AND     #$07
@@ -12727,12 +13062,26 @@ to advance or reset the character through the turn state machine.
     ORG     $1BE0
 SET_CHAR_STATE:
     SUBROUTINE SET_CHAR_STATE
+    ; Write a new turn-phase state into entity field 15.
+    ;
+    ; Inputs:
+    ;   A           — new state value (0-3)
+    ;   ENTITY_PTR  — pointer to current entity record
+    ;
+    ; Behavior:
+    ;   Writes A into the low 2 bits of MFIELD_FLAGS (byte 15),
+    ;   preserving the upper 6 bits.  States: 0=idle, 1=fighting,
+    ;   2=entering combat, 3=attacking.
+    ;
+    ; Modifies:
+    ;   Entity byte MFIELD_FLAGS (low 2 bits)
+    ; Clobbers: A, Y
     ; Set char field 15 low 2 bits to A
     STA     $5A60
-    LDY     #$0F
+    LDY     #MFIELD_FLAGS
     LDA     (ENTITY_PTR),Y
-    AND     #$FC  ; clear low 2 bits
-    ORA     $5A60 ; set to new value
+    AND     #$FC              ; ~FLAGS_STATE_MASK: clear low 2 bits
+    ORA     $5A60             ; set to new value
     STA     (ENTITY_PTR),Y
     RTS
 @ %def SET_CHAR_STATE
@@ -12744,7 +13093,12 @@ character is engaged in combat but has not yet committed to an attack.
     ORG     $1BC6
 SET_STATE_FIGHT:
     SUBROUTINE SET_STATE_FIGHT
-    ; Set char field 15 state to 1
+    ; Set the character's turn state to 1 (fighting).
+    ;
+    ; Behavior:
+    ;   Loads A=1 and tail-calls SET_CHAR_STATE.  State 1 means the
+    ;   character is engaged in combat but has not committed to an attack.
+    ; Clobbers: A, Y
     LDA     #$01
     JMP     SET_CHAR_STATE
 @ %def SET_STATE_FIGHT
@@ -12759,9 +13113,22 @@ freely move away without the flee mechanic.
     ORG     $1BCB
 CHECK_AND_RESTRICT:
     SUBROUTINE CHECK_AND_RESTRICT
+    ; Evaluate the encounter at the entity's position and update restriction.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR  — pointer to current entity record
+    ;
+    ; Behavior:
+    ;   Reads MFIELD_POSITION from the entity record, calls CHECK_ENCOUNTER,
+    ;   clears the restricted flag, then re-sets it only if ENCOUNTER_RESULT
+    ;   is 2 (hostile present).
+    ;
+    ; Modifies:
+    ;   Entity byte MFIELD_FLAGS (bit 2), ENCOUNTER_RESULT
+    ; Clobbers: A, Y
     ; Check encounter at char position, clear restricted flag,
     ; set it if encounter type is 2.
-    LDY     #$03
+    LDY     #MFIELD_POSITION
     LDA     (ENTITY_PTR),Y
     JSR     CHECK_ENCOUNTER
     JSR     CLEAR_RESTRICTED
@@ -12779,10 +13146,17 @@ evaluation before conditionally re-setting the flag.
     ORG     $1BEF
 CLEAR_RESTRICTED:
     SUBROUTINE CLEAR_RESTRICTED
-    ; Clear restricted flag (bit 2 of char field 15)
-    LDY     #$0F
+    ; Clear the restricted-movement flag (bit 2 of MFIELD_FLAGS).
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR  — pointer to current entity record
+    ;
+    ; Modifies:
+    ;   Entity byte MFIELD_FLAGS (clears FLAGS_ENGAGED_BIT)
+    ; Clobbers: A, Y
+    LDY     #MFIELD_FLAGS
     LDA     (ENTITY_PTR),Y
-    AND     #$FB
+    AND     #$FB              ; ~FLAGS_ENGAGED_BIT
     STA     (ENTITY_PTR),Y
     RTS
 @ %def CLEAR_RESTRICTED
@@ -12796,10 +13170,22 @@ flee check.
     ORG     $1BF8
 SET_RESTRICTED:
     SUBROUTINE SET_RESTRICTED
+    ; Set the restricted-movement flag (bit 2 of MFIELD_FLAGS).
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR  — pointer to current entity record
+    ;
+    ; Behavior:
+    ;   Sets FLAGS_ENGAGED_BIT in MFIELD_FLAGS.  Restricted characters
+    ;   cannot freely leave their cell — they must fight or flee.
+    ;
+    ; Modifies:
+    ;   Entity byte MFIELD_FLAGS (sets FLAGS_ENGAGED_BIT)
+    ; Clobbers: A, Y
     ; Set restricted flag (bit 2 of char field 15)
-    LDY     #$0F
+    LDY     #MFIELD_FLAGS
     LDA     (ENTITY_PTR),Y
-    ORA     #$04
+    ORA     #FLAGS_ENGAGED_BIT
     STA     (ENTITY_PTR),Y
     RTS
 @ %def SET_RESTRICTED
@@ -12841,6 +13227,24 @@ while any other value is passed to [[VALIDATE_INPUT]].
     ORG     $5F19
 INPUT_LOOP:
     SUBROUTINE INPUT_LOOP
+    ; Menu driver loop: highlight selection, read input, dispatch.
+    ;
+    ; Inputs:
+    ;   X  — high byte of menu descriptor pointer
+    ;   Y  — low byte of menu descriptor pointer
+    ;
+    ; Behavior:
+    ;   Calls SETUP_INPUT to initialize the menu.  Reads the default
+    ;   selection from descriptor byte 1.  Loops: calculates the record
+    ;   pointer, highlights via SETUP_CURSOR_EXT, waits for keyboard
+    ;   input.  On return key (0), loads the exit handler address from
+    ;   record bytes 8-9 into INPUT_JMP_VEC and jumps through it.
+    ;   Other keys are validated; if the selection changes, repositions
+    ;   the cursor; if unchanged, plays the in-place tune.
+    ;
+    ; Modifies:
+    ;   CURRENT_SELECTION, INPUT_JMP_VEC
+    ; Clobbers: A, X, Y
     JSR     SETUP_INPUT
     LDY     #$01
     LDA     ($C0),Y
@@ -12875,6 +13279,18 @@ options with [[DRAW_INPUT_OPTIONS]], and renders the buffer to the screen.
     ORG     $5F60
 SETUP_INPUT:
     SUBROUTINE SETUP_INPUT
+    ; Initialize a menu: store descriptor, call init, populate display.
+    ;
+    ; Inputs:
+    ;   X  — high byte of menu descriptor pointer
+    ;   Y  — low byte of menu descriptor pointer
+    ;
+    ; Behavior:
+    ;   Stores X/Y into $C1/$C0 as the menu descriptor pointer, calls
+    ;   the menu's init routine via CALL_INPUT_INIT, clears the 120-byte
+    ;   input buffer, draws all options with DRAW_INPUT_OPTIONS, and
+    ;   renders the buffer to screen.
+    ; Clobbers: A, X, Y
     ; Set up input: store X/Y in $C1/$C0, call setup routines.
     STX     $C1
     STY     $C0
@@ -12897,6 +13313,20 @@ INPUT_OPTION_COUNT EQU  $5AAA   ; number of input options to draw
     ORG     $5F70
 DRAW_INPUT_OPTIONS:
     SUBROUTINE DRAW_INPUT_OPTIONS
+    ; Populate the input display buffer with all enabled menu options.
+    ;
+    ; Inputs:
+    ;   $C0/$C1  — pointer to menu descriptor (byte 0 = option count)
+    ;
+    ; Behavior:
+    ;   Iterates options in reverse order (count down to 1).  For each
+    ;   option, calls CALC_RECORD_PTR, checks byte 0 of the record
+    ;   (enable flag); if non-zero, copies the option text into
+    ;   INPUT_BUFFER via COPY_RECORD_DATA.
+    ;
+    ; Modifies:
+    ;   INPUT_OPTION_COUNT, INPUT_BUFFER
+    ; Clobbers: A, X, Y
     LDY     #$00
     LDA     ($C0),Y
     STA     INPUT_OPTION_COUNT
@@ -12923,6 +13353,16 @@ data.
 <<calc record ptr>>=
     ORG     $5F8C
     SUBROUTINE CALC_RECORD_PTR
+    ; Compute pointer to a menu option's 10-byte record.
+    ;
+    ; Inputs:
+    ;   A       — 1-based option index
+    ;   $C0/$C1 — pointer to menu descriptor base
+    ;
+    ; Outputs:
+    ;   $C2/$C3 — pointer to the selected option's record
+    ;             ($C0/$C1 + A*10 - 6)
+    ; Clobbers: A
 ; $C2/$C3 = $C0/$C1 + A*10 - 6
 CALC_RECORD_PTR:
     ASL
@@ -12947,6 +13387,12 @@ CALC_RECORD_PTR:
 <<setup cursor ext>>=
     ORG     $5FA2
     SUBROUTINE SETUP_CURSOR_EXT
+    ; Enable inverse video, then fall through to SETUP_CURSOR.
+    ;
+    ; Behavior:
+    ;   Calls SET_INVERSE_VIDEO to highlight the current selection,
+    ;   then falls through into SETUP_CURSOR to position and print.
+    ; Clobbers: A
 ; JSR SET_INVERSE_VIDEO then falls through to SETUP_CURSOR
 SETUP_CURSOR_EXT:
     JSR     SET_INVERSE_VIDEO
@@ -12960,7 +13406,20 @@ from bytes~6--7 of the record at [[$C2]], prints it with
 <<setup cursor>>=
     ORG     $5FA5
     SUBROUTINE SETUP_CURSOR
-; Sets up cursor: calls $5FBC, positions, loads ptr from ($C2)+6/7, prints
+    ; Position cursor at option, print its string, restore normal video.
+    ;
+    ; Inputs:
+    ;   $C2/$C3 — pointer to current option record
+    ;
+    ; Behavior:
+    ;   Calls SET_CURSOR_POS to position from record byte 1, sends
+    ;   HRCG ctrl-AB, loads the display string pointer from record
+    ;   bytes 6-7, prints it, then sends ctrl-N to restore normal video.
+    ;
+    ; Modifies:
+    ;   PRINT_STRING_ADDR, TEXT_COL, TEXT_ROW
+    ; Clobbers: A, Y
+
 SETUP_CURSOR:
     JSR     SET_CURSOR_POS
     JSR     PRINT_CTRL_AB
@@ -12977,7 +13436,20 @@ the Apple~II cursor position bytes [[$24]] (HTAB) and [[$25]] (VTAB).
 <<set cursor pos>>=
     ORG     $5FBC
     SUBROUTINE SET_CURSOR_POS
-; Maps linear position at ($C2)+1 to VTAB ($25) and HTAB ($24)
+    ; Convert linear menu position to screen row and column.
+    ;
+    ; Inputs:
+    ;   $C2/$C3 — pointer to option record; byte 1 = linear position
+    ;
+    ; Behavior:
+    ;   Reads the linear position from record byte 1.  Maps 0-39 to
+    ;   row 21, 40-79 to row 22, 80+ to row 23.  The remainder within
+    ;   each row becomes the column.  Stores in TEXT_COL and TEXT_ROW.
+    ;
+    ; Modifies:
+    ;   TEXT_COL, TEXT_ROW
+    ; Clobbers: A, Y
+; Maps linear position at ($C2)+1 to TEXT_ROW ($25) and TEXT_COL ($24)
 ; Positions 0-39 -> row 21, 40-79 -> row 22, 80+ -> row 23
 SET_CURSOR_POS:
     LDY     #$01
@@ -12996,8 +13468,8 @@ SET_CURSOR_POS:
     SEC
     SBC     #$28
 .set_pos:
-    STY     $25
-    STA     $24
+    STY     TEXT_ROW
+    STA     TEXT_COL
     RTS
 @ %def SET_CURSOR_POS
 @ [[VALIDATE_INPUT]] saves the current record pointer and repeatedly calls
@@ -13008,12 +13480,37 @@ the current selection are returned directly (indicating ``no change'' or
 ``same selection'').  The saved [[$C2/$C3]] pointer is restored before
 returning so the caller's record context is preserved.
 
+@ [[INPUT_SCAN_OFFSET]] at [[$5B24]] is a scratch byte used by
+[[VALIDATE_INPUT]] and [[READ_INPUT_CHAR]] as an index into the current
+input record.  It saves the starting offset for the scan so
+[[READ_INPUT_CHAR]] can return the key code one position beyond it.
+
+<<defines>>=
+INPUT_SCAN_OFFSET   EQU     $5B24   ; scan position index for VALIDATE_INPUT/READ_INPUT_CHAR
+@ %def INPUT_SCAN_OFFSET
+
 <<validate input>>=
     ORG     $5FDD
     SUBROUTINE VALIDATE_INPUT
+    ; Scan for the next valid (enabled) menu option matching a key.
+    ;
+    ; Inputs:
+    ;   A               — initial key code to validate
+    ;   CURRENT_SELECTION — current selection index
+    ;   $C2/$C3         — pointer to current option record
+    ;
+    ; Behavior:
+    ;   Saves $C2/$C3 and the key code.  Loops calling READ_INPUT_CHAR
+    ;   and CALC_RECORD_PTR until finding a record whose byte 0 (enable
+    ;   flag) is non-zero.  Returns 0 for no match, CURRENT_SELECTION
+    ;   for same selection, or the new index.  Restores $C2/$C3.
+    ;
+    ; Outputs:
+    ;   A  — validated option index (0 = no match)
+    ; Clobbers: A, Y
 ; Validates input: saves $C2/$C3, loops reading input until valid record found
 VALIDATE_INPUT:
-    STA     $5B24
+    STA     INPUT_SCAN_OFFSET
     PSHW    $C2 ; save $C2/$C3
 .retry:
     JSR     READ_INPUT_CHAR
@@ -13042,10 +13539,19 @@ stored offset, used by [[VALIDATE_INPUT]] to scan through valid inputs.
 <<read input char>>=
     ORG     $600A
     SUBROUTINE READ_INPUT_CHAR
-; Returns character at ($C2) + $5B24 + 1
+    ; Read the next key code from the option record.
+    ;
+    ; Inputs:
+    ;   INPUT_SCAN_OFFSET — current scan position
+    ;   $C2/$C3           — pointer to option record
+    ;
+    ; Outputs:
+    ;   A  — key code at ($C2)[INPUT_SCAN_OFFSET + 1]
+    ; Clobbers: A, Y
+; Returns character at ($C2) + INPUT_SCAN_OFFSET + 1
 READ_INPUT_CHAR:
     CLC
-    LDA     $5B24
+    LDA     INPUT_SCAN_OFFSET
     ADC     #$01
     TAY
     LDA     ($C2),Y
@@ -13062,6 +13568,15 @@ the input loop begins.
     ORG     $6014
 CALL_INPUT_INIT:
     SUBROUTINE CALL_INPUT_INIT
+    ; Execute the menu's initialization routine.
+    ;
+    ; Inputs:
+    ;   $C0/$C1 — pointer to menu descriptor; bytes 2-3 = init routine address
+    ;
+    ; Behavior:
+    ;   Reads the init routine address from descriptor bytes 2-3 into
+    ;   INPUT_JMP_VEC and jumps through it.
+    ; Clobbers: A, Y
     LDWIY    $C0,#$02,INPUT_JMP_VEC
     JMP     (INPUT_JMP_VEC)
 @ %def CALL_INPUT_INIT
@@ -13077,6 +13592,14 @@ INPUT_BUFFER    EQU     $5AAC   ; 120-byte input text display buffer
     ORG     $6024
 CLEAR_INPUT_BUFFER:
     SUBROUTINE CLEAR_INPUT_BUFFER
+    ; Fill the 120-byte input display buffer with spaces.
+    ;
+    ; Behavior:
+    ;   Writes $A0 (high-bit space) to INPUT_BUFFER[0..$77].
+    ;
+    ; Modifies:
+    ;   INPUT_BUFFER (120 bytes)
+    ; Clobbers: A, Y
     LDY     #$77
     LDA     #$A0
 .loop:
@@ -13096,6 +13619,16 @@ it).
     ORG     $602F
 RENDER_INPUT_BUFFER:
     SUBROUTINE RENDER_INPUT_BUFFER
+    ; Output the 120-byte input display buffer to the screen.
+    ;
+    ; Behavior:
+    ;   Positions the cursor at row 21, column 0.  Sends HRCG ctrl-AB,
+    ;   then outputs each byte of INPUT_BUFFER through ROM_COUT1.
+    ;   Y is saved in $BA across each COUT call.
+    ;
+    ; Modifies:
+    ;   TEXT_COL, TEXT_ROW
+    ; Clobbers: A, X, Y
     STOW2    $1500,$24
     JSR     PRINT_CTRL_AB
     LDY     #$00
@@ -13118,6 +13651,21 @@ last character to first) to avoid needing a separate length counter.
 <<copy record data>>=
     ORG     $604C
     SUBROUTINE COPY_RECORD_DATA
+    ; Copy an option's display string into the input buffer.
+    ;
+    ; Inputs:
+    ;   $C2/$C3 — pointer to option record; bytes 6-7 = string pointer,
+    ;             byte 1 = column offset in INPUT_BUFFER
+    ;
+    ; Behavior:
+    ;   Loads the string pointer from record bytes 6-7, reads the
+    ;   string length from byte 0 of the string, computes the buffer
+    ;   destination from the column offset, and copies characters into
+    ;   INPUT_BUFFER backwards (last to first).
+    ;
+    ; Modifies:
+    ;   PRINT_STRING_ADDR, INPUT_BUFFER (partial)
+    ; Clobbers: A, X, Y
 ; Copies data from pointer at ($C2)+6/7 into INPUT_BUFFER
 COPY_RECORD_DATA:
     LDWIY    $C2,#$06,PRINT_STRING_ADDR
@@ -13207,6 +13755,13 @@ is under player control.
     ORG     $60C7
 TEARDOWN_INPUT:
     SUBROUTINE TEARDOWN_INPUT
+    ; Present the default game action menu to the player.
+    ;
+    ; Behavior:
+    ;   Loads the GAME_INPUT_TABLE pointer via GET_INPUT_TABLE_PTR,
+    ;   then jumps to INPUT_LOOP to run the standard action menu.
+    ;   Entry point from TURN_DISPATCH for player-controlled turns.
+    ; Clobbers: A, X, Y
     ; Teardown input and jump to $5F19.
     JSR     GET_INPUT_TABLE_PTR
     JMP     INPUT_LOOP
@@ -13219,9 +13774,14 @@ registers to [[SETUP_INPUT]] to initialize the standard action menu.
     ORG     $60CD
 GET_INPUT_TABLE_PTR:
     SUBROUTINE GET_INPUT_TABLE_PTR
-    ; Return X=$60, Y=$7D (pointer to input table).
-    LDX     #$60
-    LDY     #$7D
+    ; Return the address of GAME_INPUT_TABLE in X (hi) and Y (lo).
+    ;
+    ; Outputs:
+    ;   X  — high byte of GAME_INPUT_TABLE
+    ;   Y  — low byte of GAME_INPUT_TABLE
+    ; Return X=high byte, Y=low byte (pointer to GAME_INPUT_TABLE).
+    LDX     #>GAME_INPUT_TABLE
+    LDY     #<GAME_INPUT_TABLE
     RTS
 @ %def GET_INPUT_TABLE_PTR
 @ [[CONFIGURE_INPUT]] patches the game's main input table to enable or disable
@@ -13239,6 +13799,18 @@ movement option (record~1) is also disabled.
     ORG     $60D2
 CONFIGURE_INPUT:
     SUBROUTINE CONFIGURE_INPUT
+    ; Patch GAME_INPUT_TABLE enable flags from the current turn state.
+    ;
+    ; Behavior:
+    ;   Calls CHECK_COMBAT_ELIGIBILITY, then patches the enable bytes:
+    ;   rec6 (rest) from SAFE_TO_REST, rec4 (flee) from UNDER_LEVEL,
+    ;   rec2/3 (combat) from ~UNDER_LEVEL, rec1 (movement) from
+    ;   MOVE_POINTS (cleared to 0 if TURN_ACTIVE is 0).  Sets max
+    ;   movement range to UNDER_LEVEL + 3.
+    ;
+    ; Modifies:
+    ;   GAME_INPUT_TABLE (enable flags and max range)
+    ; Clobbers: A
     ; Configure input handler: patch game input table enable flags
     ; from UNDER_LEVEL/SAFE_TO_REST/MOVE_POINTS/TURN_ACTIVE.
     JSR     CHECK_COMBAT_ELIGIBILITY
