@@ -14889,7 +14889,7 @@ ENTER_COMBAT_STATE:
     RTS
 @ %def ENTER_COMBAT_STATE
 @ [[START_COMBAT]] advances the character to active attack state (state~3),
-loads the combat target pointer from [[TARGET_PTR_LO]]/[[TARGET_PTR_HI]] via
+loads the combat target pointer from [[TARGET_PTR]]/[[TARGET_PTR+1]] via
 [[LOAD_TARGET_PTR]], and jumps to [[RESOLVE_ATTACK]] where the actual
 willingness check and damage calculation take place.
 
@@ -14904,13 +14904,13 @@ willingness check and damage calculation take place.
 ; for the willingness check and damage calculation.
 ;
 ; In:  ENTITY_PTR = current character record
-;      TARGET_PTR_LO/HI = pre-selected target address
+;      TARGET_PTR/HI = pre-selected target address
 ; Out: char state = 3; control transfers to RESOLVE_ATTACK
 ; ---------------------------------------------------------------
 START_COMBAT:
     SUBROUTINE START_COMBAT
     ; Enter active attack (state 3) and resolve attack.
-    ; Input: TARGET_PTR_LO/HI = pre-selected target
+    ; Input: TARGET_PTR/HI = pre-selected target
     ; Clobbers: A, X, Y
     LDA     #$03                    ; state 3 = attacking
     JSR     SET_CHAR_STATE
@@ -16310,7 +16310,7 @@ the encounter result, and adjacent threats; if any of these indicate combat,
 it returns~2, otherwise it returns~4 (safe).  For modes 3--4 (``path mid''),
 the routine walks the group's linked list looking for the hostile mob with the
 highest threat score (via [[GET_ENTITY_THREAT]]), saving its pointer in
-[[TARGET_PTR_LO]]/[[TARGET_PTR_HI]]; if a target is found, it returns~1
+[[TARGET_PTR]]/[[TARGET_PTR+1]]; if a target is found, it returns~1
 (attack ready).  For mode~5 and above (``path high''), it performs the same
 walk but ranks targets by field~5 strength instead of threat score, again
 returning~1 if a valid target is found.  If no hostile is found in the mid or
@@ -16323,14 +16323,13 @@ so far while [[SELECT_COMBAT_TARGET]] iterates through group members.
 BEST_THREAT     EQU     $5A88   ; best threat level during target selection
 @ %def BEST_THREAT
 
-@ [[TARGET_PTR_LO]] and [[TARGET_PTR_HI]] record the pointer to the
+@ [[TARGET_PTR]] and [[TARGET_PTR+1]] record the pointer to the
 mob with the best score.  When [[SELECT_COMBAT_TARGET]] finishes and
 returns 1 (attack ready), the caller uses these to load the target.
 
 <<defines>>=
-TARGET_PTR_LO   EQU     $5A86   ; selected combat target pointer (low byte)
-TARGET_PTR_HI   EQU     $5A87   ; selected combat target pointer (high byte)
-@ %def TARGET_PTR_LO TARGET_PTR_HI
+TARGET_PTR      EQU     $5A86   ; selected combat target pointer (2 bytes)
+@ %def TARGET_PTR
 @ \subsection{Entity threat evaluation (\$1979)}
 
 [[GET_ENTITY_THREAT]] evaluates the threat level of the mob at
@@ -16396,11 +16395,11 @@ SELECT_COMBAT_TARGET:
     ;         ENTITY_PTR    — current entity record
     ;         STEPS_TAKEN   — steps taken this turn
     ;
-    ; Output: A = 1: target found (TARGET_PTR_LO/HI set)
+    ; Output: A = 1: target found (TARGET_PTR/HI set)
     ;         A = 2: engage combat (no specific target)
     ;         A = 4: safe (no threats)
     ;
-    ; Modifies: BEST_THREAT, TARGET_PTR_LO, TARGET_PTR_HI
+    ; Modifies: BEST_THREAT, TARGET_PTR, TARGET_PTR+1
     ; Clobbers: A, X, Y
 
     ; --- dispatch on AI mode ---
@@ -16419,8 +16418,8 @@ SELECT_COMBAT_TARGET:
     AND     #STRENGTH_MASK         ; strength (bits 4-0)
     BAMI    BEST_THREAT,.skip_high ; not stronger -> skip
     STA     BEST_THREAT            ; new best
-    MOVB    MOB_PTR,TARGET_PTR_LO
-    MOVB    MOB_PTR+1,TARGET_PTR_HI
+    MOVB    MOB_PTR,TARGET_PTR
+    MOVB    MOB_PTR+1,TARGET_PTR+1
 .skip_high:
     JSR     NEXT_GROUP_MEMBER
     LDA     #$00
@@ -16455,8 +16454,8 @@ SELECT_COMBAT_TARGET:
     BAEQ    BEST_THREAT,.skip_mid  ; threat == 0 -> skip
     BMI     .skip_mid              ; negative threat -> skip
     STA     BEST_THREAT            ; new best threat
-    MOVB    MOB_PTR,TARGET_PTR_LO
-    MOVB    MOB_PTR+1,TARGET_PTR_HI
+    MOVB    MOB_PTR,TARGET_PTR
+    MOVB    MOB_PTR+1,TARGET_PTR+1
 .skip_mid:
     JSR     NEXT_GROUP_MEMBER
     LDA     #$00
@@ -16466,7 +16465,7 @@ SELECT_COMBAT_TARGET:
     RTS
 @ %def SELECT_COMBAT_TARGET
 @ [[LOAD_TARGET_PTR]] copies the pre-selected combat target address from
-[[TARGET_PTR_LO]]/[[TARGET_PTR_HI]] into [[MOB_PTR]] and clears
+[[TARGET_PTR]]/[[TARGET_PTR+1]] into [[MOB_PTR]] and clears
 [[IS_PLAYER_TURN]] to zero, indicating that the next attack sequence is from
 the AI's perspective.  [[START_COMBAT]] calls this to set up [[MOB_PTR]]
 before entering [[RESOLVE_ATTACK]].
@@ -16477,12 +16476,12 @@ LOAD_TARGET_PTR:
     SUBROUTINE LOAD_TARGET_PTR
     ; Load the pre-selected combat target into MOB_PTR.
     ;
-    ; Input:  TARGET_PTR_LO/HI — saved target from SELECT_COMBAT_TARGET
+    ; Input:  TARGET_PTR/HI — saved target from SELECT_COMBAT_TARGET
     ; Output: MOB_PTR = target pointer, IS_PLAYER_TURN = 0
     ; Clobbers: A
 
-    MOVB    TARGET_PTR_LO,MOB_PTR
-    MOVB    TARGET_PTR_HI,MOB_PTR+1
+    MOVB    TARGET_PTR,MOB_PTR
+    MOVB    TARGET_PTR+1,MOB_PTR+1
     STOB    #$00,IS_PLAYER_TURN    ; AI's turn (not player)
     RTS
 @ %def LOAD_TARGET_PTR
@@ -17580,11 +17579,10 @@ buy.  The item mask is rotated right to advance through items, wrapping around
 when all bits have been checked.
 
 <<defines>>=
-SHOP_PRICE          EQU     $5A81   ; shop: accumulated price low byte
-SHOP_PRICE_HI       EQU     $5A82   ; shop: accumulated price high byte
+SHOP_PRICE          EQU     $5A81   ; shop: accumulated price (2 bytes)
 SHOP_ITEM_MASK      EQU     $5A80   ; shop: bitmask for current item ($80 rotating right)
 SHOP_ITEM_OFFSET EQU    $5A85   ; offset into shop record (5 per item slot)
-@ %def SHOP_PRICE SHOP_PRICE_HI SHOP_ITEM_MASK SHOP_ITEM_OFFSET
+@ %def SHOP_PRICE SHOP_ITEM_MASK SHOP_ITEM_OFFSET
 
 <<zero page defines>>=
 SHOP_DATA_PTR           EQU     $E6     ; ZP pointer to current shop item record (2 bytes)
@@ -17611,7 +17609,7 @@ DISPLAY_SHOP:
     ;
     ; Modifies:
     ;   SHOP_DATA_PTR, SHOP_VALID_MASK, SHOP_ITEM_MASK, SHOP_ITEM_OFFSET,
-    ;   SHOP_PRICE, SHOP_PRICE_HI, LOCATION_STYLE_BITS,
+    ;   SHOP_PRICE, SHOP_PRICE+1, LOCATION_STYLE_BITS,
     ;   SHOP_PRICE_DIGITS, SHOP_ITEM_NAME, PRINT_STRING_ADDR
     ; Clobbers: A, X, Y
 
@@ -17654,7 +17652,7 @@ DISPLAY_SHOP:
     ; --- display one item ---
 .show_item:
     STOB    #$00,SHOP_PRICE        ; clear price accumulator
-    STA     SHOP_PRICE_HI
+    STA     SHOP_PRICE+1
     LDY     SHOP_ITEM_OFFSET       ; Y = offset + 4 (price byte)
     INY
     INY
@@ -17682,7 +17680,7 @@ DISPLAY_SHOP:
     DEX                            ;  |
     BPL     .clear2                ; /
     MOVB    SHOP_PRICE,PRINT_STRING_ADDR
-    MOVB    SHOP_PRICE_HI,PRINT_STRING_ADDR+1
+    MOVB    SHOP_PRICE+1,PRINT_STRING_ADDR+1
     STOW    SHOP_PRICE_DIGITS,$BA
     JSR     NUM_TO_DECIMAL         ; write price digits
     LDY     SHOP_ITEM_OFFSET       ; \ copy item name string address
@@ -17755,7 +17753,7 @@ ADVANCE_SHOP_PTR:
     RTS
 @ %def ADVANCE_SHOP_PTR
 @ [[ADD_PRICE_COMPONENT]] adds one byte from the shop data (indexed by~Y) to
-the running 16-bit price total in [[SHOP_PRICE]]/[[SHOP_PRICE_HI]].  It is
+the running 16-bit price total in [[SHOP_PRICE]]/[[SHOP_PRICE+1]].  It is
 called in a loop, once for each price component determined by the location
 style.
 
@@ -17774,7 +17772,7 @@ ADD_PRICE_COMPONENT:
     ADC     SHOP_PRICE
     STA     SHOP_PRICE
     BCC     .done
-    INC     SHOP_PRICE_HI
+    INC     SHOP_PRICE+1
 .done:
     RTS
 @ %def ADD_PRICE_COMPONENT
