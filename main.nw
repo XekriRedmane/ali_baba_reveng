@@ -10957,124 +10957,204 @@ GET_ENTITY_FONTCHAR:
 
 <<print font char data>>=
     ORG     $80A4
+; Self-modifying HRCG control string for 2x2 block character rendering.
+; RENDER_FONT_CHAR patches CHAR_CHARSET and the four glyph codes before each call.
 s_PRINT_FONT_CHAR:
-    HEX     09 ; num chars in this string
-    HEX     81 ; ctrl-A (set character set)
-    HEX     B1 ; CHAR_CHARSET (self-modified)
-    HEX     82 ; ctrl-B (block display mode)
-    HEX     A0 ; CHAR_UPPER_LEFT (self-modified)
-    HEX     A0 ; CHAR_UPPER_RIGHT (self-modified)
-    HEX     83 ; ctrl-C (move to lower left of block)
-    HEX     A0 ; CHAR_LOWER_LEFT (self-modified)
-    HEX     A0 ; CHAR_LOWER_RIGHT (self-modified)
-    HEX     84 ; ctrl-D (complete block data)
+    HEX     09              ; string length: 9 bytes follow
+    HEX     81              ; ctrl-A: select charset (next byte = selector)
+    HEX     B1              ; CHAR_CHARSET (self-modified: HRCG charset selector)
+    HEX     82              ; ctrl-B: enter block-display mode
+    HEX     A0              ; CHAR_UPPER_LEFT (self-modified: upper-left glyph)
+    HEX     A0              ; CHAR_UPPER_RIGHT (self-modified: upper-right glyph)
+    HEX     83              ; ctrl-C: advance to lower-left of block
+    HEX     A0              ; CHAR_LOWER_LEFT (self-modified: lower-left glyph)
+    HEX     A0              ; CHAR_LOWER_RIGHT (self-modified: lower-right glyph)
+    HEX     84              ; ctrl-D: complete block and emit it
 @ %def s_PRINT_FONT_CHAR
-@ [[RENDER_FONT_CHAR]] is the main entry
-point for drawing a 2$\times$2 custom font character on the hi-res screen.
-It converts the font position to a text position, then computes which HRCG
-character set and base character code correspond to the font index in
-[[FONT_CHARNUM]].  The font table spans five character sets (each holding
-96~characters starting at ASCII~32), so the routine divides the four-glyph
-index ([[FONT_CHARNUM]]$\times$4 + \$20) by~96 to get the set number and
-remainder.  These values are patched into a pre-built HRCG control string
-that sets block-display mode, selects the character set, and emits the four
-character codes.  [[PRINT_STRING]] then sends this string to HRCG, which
-renders the 2$\times$2 block at the cursor position.
 
-[[PRINT_FONTCHAR_AT_TEXT_POS]] is an alternate entry point that skips the
-position conversion, useful when the caller has already set [[$24/$25]].
+@ [[HRCG_CHARSET1_SEL]] is the HRCG ctrl-A argument that selects custom-font
+group~1: ASCII `1' with the high bit set (\$B1).  [[CHARS_PER_FONT_PAGE]]
+is the number of custom-font characters per HRCG charset page
+($96 \div 4 = 24$).  [[GLYPH_BASE]] (\$20) is the glyph code for the first
+printable position in any HRCG charset (ASCII space), so the four glyph
+codes for font character~$n$ are $n \times 4 + \$20$ through
+$n \times 4 + \$23$.
+
+<<defines>>=
+HRCG_CHARSET1_SEL   EQU     $B1     ; HRCG charset-select arg for custom font group 1
+CHARS_PER_FONT_PAGE EQU     $18     ; custom font chars per HRCG charset page (96/4)
+GLYPH_BASE          EQU     $20     ; first glyph code in any HRCG charset (ASCII space)
+@ %def HRCG_CHARSET1_SEL CHARS_PER_FONT_PAGE GLYPH_BASE
+
+@ \subsection{Render font character (\$7489)}
+
+[[RENDER_FONT_CHAR]] draws one $2\times2$ custom-font character on the
+hi-res screen.
+
+\paragraph{Charset mapping.}  The custom font spans multiple HRCG charsets.
+Group~1 starts at HRCG charset~1 ([[HRCG_CHARSET1_SEL]] = \$B1); group~2
+starts at HRCG charset~3 (\$B3), skipping charset~2 which is reserved for
+border characters.  If [[FONT_CHARNUM]] exceeds [[CHARS_PER_FONT_PAGE]]
+(24), the routine advances the HRCG charset selector one step at a time
+until the remainder fits.
+
+\paragraph{Glyph computation.}  The four glyph codes are
+$\mathit{charnum} \times 4 + \mathtt{GLYPH\_BASE}$ through $+3$.  These
+are patched into [[s_PRINT_FONT_CHAR]], which is then passed to
+[[PRINT_STRING]] for HRCG to render.
+
+[[PRINT_FONTCHAR_AT_TEXT_POS]] is an alternate entry point that omits the
+position conversion, for callers that have already set [[TEXT_COL]] and
+[[TEXT_ROW]].
 
 <<render font char>>=
     ORG     $7489
 RENDER_FONT_CHAR:
     SUBROUTINE RENDER_FONT_CHAR
+    ; Draw a 2x2 custom font character at the current font position.
+    ;
+    ; Inputs:
+    ;   FONT_COL, FONT_ROW   — font grid position
+    ;   FONT_CHARNUM          — character index within font group
+    ;   FONT_CHARSET          — font group (1 = primary, 2 = border)
+    ;
+    ; Behavior:
+    ;   Converts font position to HRCG text cursor, maps charnum to
+    ;   four consecutive glyph codes across HRCG charset pages, patches
+    ;   s_PRINT_FONT_CHAR, and calls PRINT_STRING to render.
+    ;
+    ; Modifies: s_PRINT_FONT_CHAR (CHAR_CHARSET, glyph codes),
+    ;           PRINT_STRING_ADDR
+    ; Clobbers: A, X, Y
 
-    JSR     FONT_POS_TO_TEXT_POS ; set TEXT_COL/TEXT_ROW from font pos
+    JSR     FONT_POS_TO_TEXT_POS        ; convert font pos to HRCG cursor
 PRINT_FONTCHAR_AT_TEXT_POS:
-    LDX     #$B1                 ; base charset page
+    ; --- Map font group to initial HRCG charset selector ---
+    LDX     #HRCG_CHARSET1_SEL          ; default: HRCG charset 1
     LDA     FONT_CHARSET
-    BANE    #$02,.charset_ok
-    INX                          ; charset 2 -> page $B3
-    INX
+    BANE    #$02,.charset_ok            ; group 1 -> use charset 1
+    INX                                 ; group 2: skip charset 2 (border)
+    INX                                 ;          -> HRCG charset 3
 .charset_ok:
-    STX     CHAR_CHARSET         ; patch charset in control string
+    STX     CHAR_CHARSET                ; patch selector in control string
+    ; --- Walk charset pages until charnum fits ---
     LDA     FONT_CHARNUM
 .check_range:
-    BALT    #$18,.compute_glyphs ; fits in current charset page?
-    INX                          ; no -> next charset page
+    BALT    #CHARS_PER_FONT_PAGE,.compute_glyphs ; < 24? fits in current page
+    INX                                 ; advance to next HRCG charset
     STX     CHAR_CHARSET
     SEC
-    SBC     #$18                 ; charnum -= 24
+    SBC     #CHARS_PER_FONT_PAGE        ; charnum -= 24
     JMP     .check_range
+    ; --- Compute four consecutive glyph codes ---
 .compute_glyphs:
-    ASL                          ; charnum * 4
-    ASL
+    ASL                                 ; charnum * 2
+    ASL                                 ; charnum * 4
     CLC
-    ADC     #$20                 ; + $20 = base glyph code
+    ADC     #GLYPH_BASE                 ; + $20 -> upper-left glyph code
     TAY
-    STY     CHAR_UPPER_LEFT
+    STY     CHAR_UPPER_LEFT             ; glyph 0: upper-left
     INY
-    STY     CHAR_UPPER_RIGHT
+    STY     CHAR_UPPER_RIGHT            ; glyph 1: upper-right
     INY
-    STY     CHAR_LOWER_LEFT
+    STY     CHAR_LOWER_LEFT             ; glyph 2: lower-left
     INY
-    STY     CHAR_LOWER_RIGHT
-    STOW    s_PRINT_FONT_CHAR,PRINT_STRING_ADDR ;  $BC/$BD -> control string
-    JMP     PRINT_STRING         ; output the 2x2 character
+    STY     CHAR_LOWER_RIGHT            ; glyph 3: lower-right
+    ; --- Render via HRCG ---
+    STOW    s_PRINT_FONT_CHAR,PRINT_STRING_ADDR ; aim string ptr at control string
+    JMP     PRINT_STRING                ; HRCG renders the 2x2 block
 @ %def RENDER_FONT_CHAR PRINT_FONTCHAR_AT_TEXT_POS
-Since each HRCG font character is effectively two by two "normal" characters,
-there is a routine to convert from font coordinate to text cursor coordinate
-so that the HRCG can locate the font character at the text coordinate (at
-the upper left of the font character).
+@ \subsection{Font position to text position (\$7723)}
 
-@ [[FONT_POS_TO_TEXT_POS]] converts the game's logical font position
-([[FONT_COL]], [[FONT_ROW]]) to HRCG text cursor coordinates.  Since the
-custom font uses 2$\times$2 character cells, each font position occupies two
-text columns and two text rows, so both values are doubled (ASL) and stored
-into the Apple~II cursor bytes [[$24]] and [[$25]].
+[[FONT_POS_TO_TEXT_POS]] converts a logical font position ([[FONT_COL]],
+[[FONT_ROW]]) to HRCG text cursor coordinates.  Each custom font character
+occupies a $2\times2$ block of HRCG cells, so both coordinates are doubled
+and stored into the Apple~II cursor registers [[TEXT_COL]] (\$24) and
+[[TEXT_ROW]] (\$25).
 
 <<font pos>>=
     ORG     $7723
 FONT_POS_TO_TEXT_POS:
     SUBROUTINE FONT_POS_TO_TEXT_POS
+    ; Convert font grid position to HRCG text cursor.
+    ; Each font cell = 2x2 HRCG cells, so double both coordinates.
+    ;
+    ; Inputs:  FONT_COL, FONT_ROW
+    ; Outputs: TEXT_COL ($24), TEXT_ROW ($25)
+    ; Clobbers: A
 
-    LDA     FONT_COL
-    ASL
-    STA     TEXT_COL
-    LDA     FONT_ROW
-    ASL
-    STA     TEXT_ROW
+    LDA     FONT_COL            ; font column (0-based)
+    ASL                         ; x2: one font col = two text cols
+    STA     TEXT_COL             ; store HRCG cursor column
+    LDA     FONT_ROW            ; font row (0-based)
+    ASL                         ; x2: one font row = two text rows
+    STA     TEXT_ROW             ; store HRCG cursor row
     RTS
 @ %def FONT_POS_TO_TEXT_POS
-Searches for the entity (mob or player character) that occupies a given
-map position.  Input: A~=~position (0--199), [[$FA/$FB]]~=~base address
-of the character table.  Output: [[\ENTITY_REC/\ENTITY_REC+1]]~=~pointer to entity record
-(bit~7 of [[\ENTITY_REC+1]] set if mob, clear if character).
+@ \subsection{Find entity at position (\$0B62)}
 
-The routine first walks the mob linked list.  For each record, byte~2
-is the mob index; if nonzero, [[GET_MOB_DATA]] retrieves the mob's data
-and byte~3 (position) is compared.  If no mob matches, the player
-character table is searched: bytes~6--7 of the base record give the
-start of a 3-byte-entry table whose first byte is a position.
+[[FIND_ENTITY_AT_POS]] searches for the entity (mob or player character)
+occupying a given map position.
 
-Uses heavy self-modifying code to patch absolute address operands for
-the indexed loads and table walks.
+\begin{itemize}
+  \item \textbf{Input:} A = target map position (0--199);
+        [[CHAR_PTR]] (\$FA/\$FB) = base address of the character record.
+  \item \textbf{Output:} [[ENTITY_REC]]/[[ENTITY_REC]]+1 = pointer to the
+        entity record.  Bit~7 of [[ENTITY_REC]]+1 is set ([[MOB_PTR_FLAG]])
+        if the entity is a mob; clear if it is a player character.
+\end{itemize}
 
-@ [[DAT_5a17_pos]] at [[$5A17]] temporarily holds the target map position
-during [[FIND_ENTITY_AT_POS]].  The routine stores the search position
-here on entry, then compares each mob's byte-3 position and each player
-table entry against this saved value.
+\paragraph{Search algorithm.}
+The routine uses self-modifying code: absolute operands in [[.load1]]--[[.load4]]
+are patched at runtime to redirect indexed loads to the appropriate record
+addresses.  The search proceeds in two phases:
+
+\begin{enumerate}
+  \item \textbf{Mob linked-list search} (entered first).  [[CHAR_PTR]]+[[MFIELD_NEXT]]
+        (byte~2) holds the first mob index.  Zero means the list is exhausted.
+        For each nonzero index, [[GET_MOB_DATA]] resolves the mob record,
+        and [[MFIELD_POSITION]] (byte~3) is compared with the target.
+        On a match, [[ENTITY_REC]] is set with [[MOB_PTR_FLAG]] (\$80) ORed
+        into the high byte.
+  \item \textbf{Player event-table search.}  Bytes [[CFIELD_EVENTS]]--[[CFIELD_EVENTS]]+1
+        (bytes~6--7) of the base record point to a 3-byte-entry table whose
+        byte~0 is the character's map position.  [[EVENT_END]] (\$FF) signals
+        end-of-table; on a match, [[ENTITY_REC]] is set to the table entry
+        address (bit~7 clear = character).
+\end{enumerate}
+
+@ [[ENTITY_SEARCH_POS]] at \$5A17 temporarily holds the target map position
+during [[FIND_ENTITY_AT_POS]].
+
+@ [[MOB_PTR_FLAG]] (\$80) is ORed into the high byte of [[ENTITY_REC]]+1 to
+distinguish mob records (bit~7 set) from character records (bit~7 clear).
 
 <<defines>>=
-DAT_5a17_pos        EQU     $5A17   ; saved position for room search
-@ %def DAT_5a17_pos
+ENTITY_SEARCH_POS   EQU     $5A17   ; scratch: target position for FIND_ENTITY_AT_POS
+MOB_PTR_FLAG        EQU     $80     ; bit 7 flag in ENTITY_REC+1: set = mob
+@ %def ENTITY_SEARCH_POS MOB_PTR_FLAG
 
 <<find entity at pos>>=
     ORG     $0B62
 FIND_ENTITY_AT_POS:
     SUBROUTINE FIND_ENTITY_AT_POS
+    ; Find the entity (mob or character) at a given map position.
+    ;
+    ; Inputs:
+    ;   A               — target map position (0-199)
+    ;   CHAR_PTR        — base address of character record
+    ;
+    ; Behavior:
+    ;   Walks the mob linked list first; if no mob matches, searches
+    ;   the player character event table.  Uses self-modifying code
+    ;   to patch absolute operands for indexed loads.
+    ;
+    ; Outputs:
+    ;   ENTITY_REC/+1   — pointer to matching entity record
+    ;                      (bit 7 of high byte = MOB_PTR_FLAG if mob)
+    ; Clobbers: A, X, Y
 
-    STA     DAT_5a17_pos               ; save target position
+    STA     ENTITY_SEARCH_POS          ; save target position
     LDA     CHAR_PTR+1                 ; \ patch base address into
     STA     .load3+2                   ;  | player search (high byte)
     STA     .load2+2                   ;  | mob search (high byte)
@@ -11083,188 +11163,231 @@ FIND_ENTITY_AT_POS:
     STA     .load2+1                   ; / mob search (low byte)
     JMP     .mob_search
 
-    ; --- Player character search ---
+    ; --- Player character event-table search ---
 .player_search:
-    LDX     #$06                       ; copy bytes 6-7 of record
-.load3:
-    LDA     $0B7B,X                    ; (self-modified base address)
-    STA     .load4-5,X                 ; patch .load4 operand (+6->low, +7->high)
-    INX
-    BXNE    #$08,.load3
+    LDX     #CFIELD_EVENTS             ; \ copy event list pointer (bytes 6-7)
+.load3:                                ;  |
+    LDA     $0B7B,X                    ;  | (self-modified: base = CHAR_PTR)
+    STA     .load4-5,X                 ;  | patch .load4 operand
+    INX                                ;  |
+    BXNE    #CFIELD_EVENTS+2,.load3    ; / loop for both bytes
 .load4:
-    LDY     $0B86                      ; (self-modified: read position from table)
-    BYNE    #$FF,.check_player
-    JMP     CHECK_AT_BOUNDARY          ; $FF = end of table
+    LDY     $0B86                      ; (self-modified: read position from event table)
+    BYNE    #EVENT_END,.check_player   ; $FF = end of table
+    JMP     CHECK_AT_BOUNDARY
 .check_player:
-    BYEQ    DAT_5a17_pos,.found_player ; matches target?
+    BYEQ    ENTITY_SEARCH_POS,.found_player ; position matches target?
     INC     .load4+1                   ; \
     BNE     .no_carry1                 ;  |
-    INC     .load4+2                   ;  | advance address by 3
-.no_carry1:                         ;  | (3-byte table entries)
+    INC     .load4+2                   ;  | advance pointer by 3
+.no_carry1:                            ;  | (EVENT_RECORD_SIZE = 3)
     INC     .load4+1                   ;  |
     BNE     .no_carry2                 ;  |
     INC     .load4+2                   ;  |
-.no_carry2:                         ;  |
+.no_carry2:                            ;  |
     INC     .load4+1                   ;  |
     BNE     .load4                     ;  |
     INC     .load4+2                   ; /
     JMP     .load4
 .found_player:
-    LDA     .load4+1                   ; \ ENTITY_REC/ENTITY_REC+1 = table entry address
-    STA     ENTITY_REC                 ;  |
+    LDA     .load4+1                   ; \ ENTITY_REC = event table entry address
+    STA     ENTITY_REC                 ;  | (bit 7 clear = character)
     LDA     .load4+2                   ;  |
     STA     ENTITY_REC+1               ; /
     RTS
 
     ; --- Mob linked-list search ---
 .mob_search:
-    LDX     #$02                       ; byte 2 = mob index
+    LDX     #MFIELD_NEXT               ; byte 2 = mob link index
 .load2:
-    LDA     $0BBD,X                    ; (self-modified base address)
+    LDA     $0BBD,X                    ; (self-modified: base = CHAR_PTR)
     BAEQ    #$00,.player_search        ; zero -> no more mobs, try players
-    JSR     .get_mob                   ; get mob data -> patch .load1
-    LDX     #$03                       ; byte 3 = position
+    JSR     .get_mob                   ; resolve mob data -> patch .load1
+    LDX     #MFIELD_POSITION           ; byte 3 = map position
 .load1:
     LDY     $0BC9,X                    ; (self-modified: read from mob record)
-    BYEQ    DAT_5a17_pos,.found_mob    ; position matches!
-    LDA     .load1+1                   ; \ copy mob link address
-    STA     .load2+1                   ;  | back to .load2 for next iteration
+    BYEQ    ENTITY_SEARCH_POS,.found_mob ; position matches target?
+    LDA     .load1+1                   ; \ copy mob link address back
+    STA     .load2+1                   ;  | to .load2 for next iteration
     LDA     .load1+2                   ;  |
     STA     .load2+2                   ; /
     JMP     .mob_search
 .found_mob:
-    LDA     #$80                       ; \ set bit 7 = mob flag
+    LDA     #MOB_PTR_FLAG              ; \ set bit 7 = mob pointer flag
     ORA     .load1+2                   ;  |
     STA     ENTITY_REC+1               ;  |
     LDA     .load1+1                   ;  |
-    STA     ENTITY_REC                 ; / ENTITY_REC/ENTITY_REC+1 = mob pointer | $80
+    STA     ENTITY_REC                 ; / ENTITY_REC = mob ptr | MOB_PTR_FLAG
     RTS
 
-    ; --- Helper: get mob data and patch .load1 ---
+    ; --- Helper: load mob record and patch .load1 ---
 .get_mob:
-    JSR     GET_MOB_DATA               ; A = mob index -> MOB_DATA_PTR/MOB_DATA_PTR+1 = data ptr
+    JSR     GET_MOB_DATA               ; A = mob index -> MOB_DATA_PTR
     LDA     MOB_DATA_PTR               ; \
-    STA     .load1+1                   ;  | patch .load1 operand
+    STA     .load1+1                   ;  | patch .load1 with mob record base
     LDA     MOB_DATA_PTR+1             ;  |
     STA     .load1+2                   ; /
     RTS
 @ %def FIND_ENTITY_AT_POS
-Given a map position in~A, sets the font cursor to the corresponding
-column and row, looks up what character or mob occupies that position,
-determines its font character, and draws it.
+@ \subsection{Draw character at position (\$1156)}
+
+[[DRAW_CHAR_AT_POS]] converts a map position to a font cursor location,
+resolves the occupying entity, and renders its font character.
 
 <<draw char at pos>>=
     ORG     $1156
 DRAW_CHAR_AT_POS:
     SUBROUTINE DRAW_CHAR_AT_POS
+    ; Draw the entity sprite at a map position.
+    ;
+    ; Inputs:  A = map position (0-199)
+    ; Behavior:
+    ;   Converts position to font col/row, finds the entity there,
+    ;   determines its font character, and renders it.
+    ; Clobbers: A, X, Y
 
     JSR     POS_TO_COLROW       ; A=pos -> A=col, Y=row
     STA     FONT_COL            ; set font column
     STY     FONT_ROW            ; set font row
     JSR     COLROW_TO_POS       ; re-linearize (A = col + row*20)
-    JSR     FIND_ENTITY_AT_POS  ; look up entity at position -> ENTITY_REC
-    JSR     GET_ENTITY_FONTCHAR ; determine font char from entity data
-    JMP     RENDER_FONT_CHAR    ; render the font character
+    JSR     FIND_ENTITY_AT_POS  ; resolve entity at pos -> ENTITY_REC
+    JSR     GET_ENTITY_FONTCHAR ; entity data -> font char number
+    JMP     RENDER_FONT_CHAR    ; tail-call: render and return
 @ %def DRAW_CHAR_AT_POS
-@ [[DRAW_BLINK_ALT]] temporarily swaps the blink character for the alternate
-character ([[BLINK_ALT_CHAR]]), draws it at the blink position via
-[[DRAW_BLINK_CHAR]], and restores the original.  This produces the
-``blinking'' effect on the map: the animation alternates between the entity's
-sprite and the location's default tile character.
+@ \subsection{Draw blink alternate (\$74CB)}
+
+[[DRAW_BLINK_ALT]] temporarily swaps [[BLINK_CHAR]] for the alternate
+character [[BLINK_ALT_CHAR]], draws it via [[DRAW_BLINK_CHAR]], then
+restores the original.  The animation caller alternates between
+[[DRAW_BLINK_CHAR]] (entity sprite) and [[DRAW_BLINK_ALT]] (location tile)
+to produce the blinking effect.
 
 <<draw blink alt>>=
     ORG     $74CB
 DRAW_BLINK_ALT:
     SUBROUTINE DRAW_BLINK_ALT
+    ; Draw blink position with the alternate (tile) character.
+    ;
+    ; Behavior:
+    ;   Saves BLINK_CHAR, swaps in BLINK_ALT_CHAR, draws, restores.
+    ; Clobbers: A, X, Y
 
-    LDA     BLINK_CHAR      ; save current blink char
+    LDA     BLINK_CHAR              ; save current blink char (entity sprite)
     PHA
-    MOVB    BLINK_ALT_CHAR,BLINK_CHAR ; load alternate char
-    JSR     DRAW_BLINK_CHAR ; draw at blink position
-    PULB    BLINK_CHAR ; restore original char
+    MOVB    BLINK_ALT_CHAR,BLINK_CHAR ; swap in alternate (location tile)
+    JSR     DRAW_BLINK_CHAR         ; draw alternate at blink position
+    PULB    BLINK_CHAR              ; restore sprite char
     RTS
 @ %def DRAW_BLINK_ALT
-[[DRAW_BLINK_NORMAL]] sets normal video mode (via [[SET_NORMAL_VIDEO]])
-then falls through into [[DRAW_BLINK_CHAR]].  Called by
-[[ANIM_TICK_AND_WAIT]] when the animation frame expires.
+@ \subsection{Draw blink character (\$74DD)}
 
-[[DRAW_BLINK_CHAR]] copies the blink state ([[BLINK_COL]],
-[[BLINK_ROW]], [[BLINK_CHAR]]) into [[FONT_COL]], [[FONT_ROW]],
-[[FONT_CHARNUM]], sets [[FONT_CHARSET]]~=~1, and calls
-[[RENDER_FONT_CHAR]] to render the character.  If [[BLINK_COL]]~$\ge$~20
-(the disabled sentinel), it returns immediately.  Saves and restores
-[[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]] since [[RENDER_FONT_CHAR]] uses that pointer.
+[[DRAW_BLINK_NORMAL]] sets normal video mode via [[PRINT_CTRL_N]], then
+falls through into [[DRAW_BLINK_CHAR]].  Called by [[ANIM_TICK_AND_WAIT]]
+when the animation frame expires.
 
+[[DRAW_BLINK_CHAR]] copies the blink state ([[BLINK_COL]], [[BLINK_ROW]],
+[[BLINK_CHAR]]) into the font variables and calls [[RENDER_FONT_CHAR]].
+If [[BLINK_COL]] $\ge$ [[MAP_WIDTH]] (20), blinking is disabled and the
+routine returns immediately.  Saves and restores [[PRINT_STRING_ADDR]]
+across the call since [[RENDER_FONT_CHAR]] overwrites it.
 
 <<draw blink char>>=
     ORG     $74DD
 DRAW_BLINK_NORMAL:
-    JSR     PRINT_CTRL_N      ; Ctrl-N -> normal video
+    JSR     PRINT_CTRL_N                ; Ctrl-N: restore normal video
 
 DRAW_BLINK_CHAR:
     SUBROUTINE DRAW_BLINK_CHAR
+    ; Render the blink character at the stored blink position.
+    ;
+    ; Behavior:
+    ;   If BLINK_COL >= MAP_WIDTH (disabled), returns immediately.
+    ;   Otherwise copies blink state to font vars, selects charset 1,
+    ;   and calls RENDER_FONT_CHAR.
+    ;
+    ; Modifies: FONT_COL, FONT_ROW, FONT_CHARNUM, FONT_CHARSET
+    ; Clobbers: A, X, Y
 
-    LDA     BLINK_COL         ; load blink column
-    BALT    #$14,.draw ; >= 20? (disabled sentinel)
-    RTS                       ; disabled -- do nothing
+    LDA     BLINK_COL               ; load blink column
+    BALT    #MAP_WIDTH,.draw        ; < 20? -> active, draw it
+    RTS                             ; blink disabled -- do nothing
 
 .draw:
-    STA     FONT_COL          ; copy blink state to font vars
-    MOVB    BLINK_ROW,FONT_ROW
-    MOVB    BLINK_CHAR,FONT_CHARNUM
-    STOB    #$01,FONT_CHARSET ; charset 1
-    PSHW    PRINT_STRING_ADDR ; save PRINT_STRING_ADDR (used by RENDER_FONT_CHAR)
-    JSR     RENDER_FONT_CHAR  ; render the character
-    PULW    PRINT_STRING_ADDR ; restore PRINT_STRING_ADDR
+    STA     FONT_COL                ; set font column from blink state
+    MOVB    BLINK_ROW,FONT_ROW      ; set font row
+    MOVB    BLINK_CHAR,FONT_CHARNUM ; set character number
+    STOB    #$01,FONT_CHARSET       ; charset 1 (custom font)
+    PSHW    PRINT_STRING_ADDR       ; save (RENDER_FONT_CHAR overwrites)
+    JSR     RENDER_FONT_CHAR        ; render the blink character
+    PULW    PRINT_STRING_ADDR       ; restore caller's string pointer
     RTS
 @ %def DRAW_BLINK_NORMAL DRAW_BLINK_CHAR
-Sets up the blink cursor from the current combatant.  On the mob's turn,
-the mob's packed position (byte 3 of mob data) is split into column and row,
-and its appearance (byte 4) is converted to a font character number.
-On the player's turn, the player's column and row are taken directly from
-[[CURRENT_COL]]/[[CURRENT_ROW]], and the font character is looked up via [[$0C7E]].
+@ \subsection{Set blink target (\$16A3)}
 
-@ [[IS_PLAYER_TURN]] is 0 on a mob's turn and 1 on the player's turn.
-[[SET_BLINK_TARGET]] tests it to choose between unpacking the mob's
-packed position or reading [[CURRENT_COL]]/[[CURRENT_ROW]] directly.
+[[SET_BLINK_TARGET]] loads [[BLINK_COL]], [[BLINK_ROW]], and [[BLINK_CHAR]]
+from the current combatant so the blink cursor tracks the active entity.
+[[IS_PLAYER_TURN]] selects one of two paths:
+
+\begin{itemize}
+  \item \textbf{Mob's turn} ([[IS_PLAYER_TURN]] $= 0$): the mob's packed
+    position ([[MFIELD_POSITION]], byte~3 via [[MOB_PTR]]) is split into
+    column and row by [[POS_TO_COLROW]], and the appearance index
+    ([[MFIELD_APPEARANCE]], byte~4) is converted to a font character by
+    [[APPEARANCE_TO_FONTCHAR]].
+  \item \textbf{Player's turn} ([[IS_PLAYER_TURN]] $= 1$): column and row
+    come from [[CURRENT_COL]]/[[CURRENT_ROW]]; [[MOB_PTR]] is copied to
+    [[ENTITY_REC]] so [[GET_ENTITY_FONTCHAR]] can look up the player sprite.
+\end{itemize}
 
 <<defines>>=
 IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
 @ %def IS_PLAYER_TURN
-@ The routine checks [[IS_PLAYER_TURN]] to decide which source to use for the blink cursor's position and character.
 
 <<defines>>=
-CURRENT_ROW     EQU     $5A64   ; current row during turn
 CURRENT_COL     EQU     $5A63   ; current column during turn
+CURRENT_ROW     EQU     $5A64   ; current row during turn
 @ %def CURRENT_ROW CURRENT_COL
 
 <<set blink target>>=
     ORG     $16A3
 SET_BLINK_TARGET:
     SUBROUTINE SET_BLINK_TARGET
+    ; Set blink cursor position and character from current combatant.
+    ;
+    ; Inputs:
+    ;   IS_PLAYER_TURN  — 0 = mob, 1 = player
+    ;   MOB_PTR         — pointer to current entity's record
+    ;
+    ; Behavior:
+    ;   On mob's turn, unpacks position from mob record and converts
+    ;   appearance to font char.  On player's turn, reads position
+    ;   from CURRENT_COL/ROW and looks up font char via entity record.
+    ;
+    ; Outputs: BLINK_COL, BLINK_ROW, BLINK_CHAR
+    ; Clobbers: A, X, Y
 
-    LDA     IS_PLAYER_TURN
+    LDA     IS_PLAYER_TURN              ; 0 = mob, 1 = player
     BAEQ    #$01,.player
 
-    ; --- mob path: convert packed position to col/row ---
-    LDY     #$03
-    LDA     (MOB_PTR),Y            ; mob data[3] = packed position
-    JSR     POS_TO_COLROW          ; A=col, Y=row
+    ; --- mob path: unpack position and look up appearance ---
+    LDY     #MFIELD_POSITION            ; byte 3: packed map position
+    LDA     (MOB_PTR),Y
+    JSR     POS_TO_COLROW               ; -> A = col, Y = row
     STA     BLINK_COL
     STY     BLINK_ROW
-    LDY     #$04
-    LDA     (MOB_PTR),Y            ; mob data[4] = appearance
-    JSR     APPEARANCE_TO_FONTCHAR ; appearance -> font char number
+    LDY     #MFIELD_APPEARANCE          ; byte 4: appearance index
+    LDA     (MOB_PTR),Y
+    JSR     APPEARANCE_TO_FONTCHAR      ; -> A = font char number
     STA     BLINK_CHAR
     RTS
 
-    ; --- player path: col/row already separate ---
+    ; --- player path: position already split ---
 .player:
-    MOVB    CURRENT_COL,BLINK_COL ; player font column
-    MOVB    CURRENT_ROW,BLINK_ROW ; player font row
-    MOVW    MOB_PTR,ENTITY_REC ;  copy pointer MOB_PTR -> ENTITY_REC
-    JSR     GET_ENTITY_FONTCHAR    ; look up player's font char
-    MOVB    FONT_CHARNUM,BLINK_CHAR
+    MOVB    CURRENT_COL,BLINK_COL       ; copy player column
+    MOVB    CURRENT_ROW,BLINK_ROW       ; copy player row
+    MOVW    MOB_PTR,ENTITY_REC          ; point ENTITY_REC at player record
+    JSR     GET_ENTITY_FONTCHAR         ; look up player's font char
+    MOVB    FONT_CHARNUM,BLINK_CHAR     ; store result
     RTS
 @ %def SET_BLINK_TARGET
 
