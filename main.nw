@@ -18634,29 +18634,27 @@ If the entity has no gold, it displays message~\$2E and returns to
 the other options menu.
 
 <<defines>>=
-DROP_AMOUNT_LO      EQU     $5A7A   ; drop gold amount (low byte)
-DROP_AMOUNT_HI      EQU     $5A7B   ; drop gold amount (high byte)
-DROP_STEP_LO        EQU     $5A7C   ; binary search step (low byte)
-DROP_STEP_HI        EQU     $5A7D   ; binary search step (high byte)
+DROP_AMOUNT         EQU     $5A7A   ; drop gold amount (2 bytes)
+DROP_STEP           EQU     $5A7C   ; binary search step (2 bytes)
 DROP_DISPLAY_BUF    EQU     $7CEB   ; 5-byte decimal display buffer
-@ %def DROP_AMOUNT_LO DROP_AMOUNT_HI DROP_STEP_LO DROP_STEP_HI DROP_DISPLAY_BUF
+@ %def DROP_AMOUNT DROP_STEP DROP_DISPLAY_BUF
 
 <<init drop gold>>=
     ORG     $6F17
 INIT_DROP_GOLD:
     SUBROUTINE INIT_DROP_GOLD
     LDA     #$00
-    STA     DROP_AMOUNT_LO
+    STA     DROP_AMOUNT
     LDY     #$0E
     LDA     (ENTITY_PTR),Y     ; gold high byte
     JSR     FIND_MSB           ; X = highest set bit mask
-    STX     DROP_AMOUNT_HI
+    STX     DROP_AMOUNT+1
     CPX     #$00
     BNE     .has_gold
     DEY                        ; Y = $0D
     LDA     (ENTITY_PTR),Y     ; gold low byte
     JSR     FIND_MSB
-    STX     DROP_AMOUNT_LO
+    STX     DROP_AMOUNT
     BNE     .has_gold
     JSR     SET_CURSOR_ROW21
     LDA     #MSG_NO_GOLD               ; "no gold" message
@@ -18664,10 +18662,10 @@ INIT_DROP_GOLD:
     JMP     MENU_OTHER_OPTIONS
 
 .has_gold:
-    LDA     DROP_AMOUNT_LO     ; \ copy amount to step
-    STA     DROP_STEP_LO       ;  |
-    LDA     DROP_AMOUNT_HI     ;  |
-    STA     DROP_STEP_HI       ; /
+    LDA     DROP_AMOUNT     ; \ copy amount to step
+    STA     DROP_STEP       ;  |
+    LDA     DROP_AMOUNT+1     ;  |
+    STA     DROP_STEP+1       ; /
     JSR     HALVE_STEP         ; step = amount / 2
     JMP     MENU_DROP_GOLD     ; enter drop gold menu
 @ %def INIT_DROP_GOLD
@@ -18687,9 +18685,9 @@ INIT_DROP_DISPLAY:
     STA     DROP_DISPLAY_BUF,X
     DEX
     BPL     .clear
-    LDA     DROP_AMOUNT_LO
+    LDA     DROP_AMOUNT
     STA     $BC
-    LDA     DROP_AMOUNT_HI
+    LDA     DROP_AMOUNT+1
     STA     $BD
     LDA     #<DROP_DISPLAY_BUF
     STA     $BA
@@ -18722,9 +18720,9 @@ ADJ_DROP_DEC:
 
 .entry:
     LDA     #$00
-    CMP     DROP_STEP_LO
+    CMP     DROP_STEP
     BNE     .nonzero
-    CMP     DROP_STEP_HI
+    CMP     DROP_STEP+1
     BEQ     INIT_DROP_GOLD     ; step = 0 -> reinitialize
 
 .nonzero:
@@ -18737,12 +18735,12 @@ ADJ_DROP_DEC:
     JSR     HALVE_STEP
     LDY     #$0E
     LDA     (ENTITY_PTR),Y     ; actual gold hi
-    CMP     DROP_AMOUNT_HI
+    CMP     DROP_AMOUNT+1
     BCC     .over_limit        ; drop > gold -> too much
     BNE     .done              ; drop < gold -> ok
     DEY
     LDA     (ENTITY_PTR),Y     ; actual gold lo
-    CMP     DROP_AMOUNT_LO
+    CMP     DROP_AMOUNT
     BCS     .done              ; drop <= gold -> ok
 
 .over_limit:
@@ -18771,31 +18769,31 @@ it displays message~\$2C (gold lost/stolen) instead.
     ORG     $6FB5
 DROP_GOLD_EXEC:
     SUBROUTINE DROP_GOLD_EXEC
-    LDA     DROP_AMOUNT_LO
+    LDA     DROP_AMOUNT
     STA     $BC
-    LDA     DROP_AMOUNT_HI
+    LDA     DROP_AMOUNT+1
     STA     $BD
     LDY     #$00
-    STY     DROP_STEP_HI
+    STY     DROP_STEP+1
     JSR     MODIFY_CURRENT_STATS ; subtract gold from entity
     LDA     #$19
     JSR     RANDOM_IN_RANGE    ; random 0-24
-    STA     DROP_STEP_LO
-    INC     DROP_STEP_LO       ; step = 1-25
+    STA     DROP_STEP
+    INC     DROP_STEP       ; step = 1-25
     JSR     SET_CURSOR_ROW21
     JSR     SUB_DROP           ; amount -= random step (gold lost)
-    LDA     DROP_AMOUNT_HI
+    LDA     DROP_AMOUNT+1
     BMI     .lost              ; negative -> all lost
     BNE     .has_gold
-    LDA     DROP_AMOUNT_LO
+    LDA     DROP_AMOUNT
     BEQ     .lost              ; zero -> all lost
 
 .has_gold:
     LDA     #MSG_GOLD_DROPPED               ; gold dropped message
     JSR     DISPLAY_MESSAGE
-    LDA     DROP_AMOUNT_LO
+    LDA     DROP_AMOUNT
     STA     $BC
-    LDA     DROP_AMOUNT_HI
+    LDA     DROP_AMOUNT+1
     STA     $BD
     LDY     #$03
     LDA     (ENTITY_PTR),Y     ; entity position
@@ -18842,32 +18840,32 @@ FIND_MSB:
 
 ADD_DROP:
     CLC
-    LDA     DROP_AMOUNT_LO
-    ADC     DROP_STEP_LO
-    STA     DROP_AMOUNT_LO
-    LDA     DROP_AMOUNT_HI
-    ADC     DROP_STEP_HI
-    STA     DROP_AMOUNT_HI
+    LDA     DROP_AMOUNT
+    ADC     DROP_STEP
+    STA     DROP_AMOUNT
+    LDA     DROP_AMOUNT+1
+    ADC     DROP_STEP+1
+    STA     DROP_AMOUNT+1
     RTS
 
 SUB_DROP:
     SEC
-    LDA     DROP_AMOUNT_LO
-    SBC     DROP_STEP_LO
-    STA     DROP_AMOUNT_LO
-    LDA     DROP_AMOUNT_HI
-    SBC     DROP_STEP_HI
-    STA     DROP_AMOUNT_HI
+    LDA     DROP_AMOUNT
+    SBC     DROP_STEP
+    STA     DROP_AMOUNT
+    LDA     DROP_AMOUNT+1
+    SBC     DROP_STEP+1
+    STA     DROP_AMOUNT+1
     RTS
 
 HALVE_STEP:
     CLC
-    LDA     DROP_STEP_HI
+    LDA     DROP_STEP+1
     ROR
-    STA     DROP_STEP_HI
-    LDA     DROP_STEP_LO
+    STA     DROP_STEP+1
+    LDA     DROP_STEP
     ROR
-    STA     DROP_STEP_LO
+    STA     DROP_STEP
     RTS
 @ %def FIND_MSB ADD_DROP SUB_DROP HALVE_STEP
 
