@@ -14227,6 +14227,30 @@ MENU_OTHER_OPTIONS:
     JMP     INPUT_LOOP
 @ %def MENU_OTHER_OPTIONS
 
+@ [[RETIRE_CHARACTER]] is the handler for the ``RETIRE'' option in the
+Other Options menu (rec~4 of [[OTHER_OPTIONS_TABLE]]).  It clears
+[[ACTIVE_CHAR]], reorders the character list, and re-enters
+[[SCENE_LOOP]] with scene [[SCENE_RETIRE]] (\$23).
+
+<<retire character>>=
+    ORG     $09E7
+RETIRE_CHARACTER:
+    ; Retire the active character from the party.
+    ;
+    ; Behavior:
+    ;   Clears ACTIVE_CHAR, calls REORDER_CURRENT_CHAR to update
+    ;   the character list, then enters SCENE_LOOP with SCENE_RETIRE.
+    ;
+    ; Modifies: ACTIVE_CHAR
+    ; Clobbers: A, X, Y
+
+    LDA     #$00
+    STA     ACTIVE_CHAR                ; clear active character
+    JSR     REORDER_CURRENT_CHAR
+    LDA     #SCENE_RETIRE              ; retirement scene
+    JMP     SCENE_LOOP
+@ %def RETIRE_CHARACTER
+
 @ The game settings menu at [[$6193]].  This includes game speed
 adjustment (records~1--3 with arrow keys), sound toggle, danger level
 (records~5--7), and save game.  The ``game settings'' entry at [[$61F1]]
@@ -21857,50 +21881,61 @@ settings menu.
 [[DEC_EVENT_THRESHOLD]] and [[INC_EVENT_THRESHOLD]] adjust the
 random event probability (clamped to 0--99).
 
-[[RETIRE_CHARACTER]] (\$09E7) clears [[ACTIVE_CHAR]], calls
-[[REORDER_CURRENT_CHAR]], and re-enters [[SCENE_LOOP]] with scene~\$23.
-
 <<sound and settings>>=
     ORG     $0984
 TOGGLE_SOUND:
     SUBROUTINE TOGGLE_SOUND
-    ; Check current state: PLAY_HIGH_TONE byte = $60 (RTS) means off
-    LDA     #RTS_OPCODE       ; RTS opcode
-    CMP     PLAY_HIGH_TONE    ; is sound disabled?
+    ; Sound toggle, settings display, threshold adjustment, and retirement.
+    ;
+    ; Entry points:
+    ;   TOGGLE_SOUND          — toggles sound on/off by patching tone routines
+    ;   SETTINGS_DISPLAY_INIT — formats danger level display, enters settings menu
+    ;   DEC_THRESHOLD_WRAP    — decrements event threshold, returns to caller
+    ;   INC_THRESHOLD_WRAP    — increments event threshold, returns to caller
+    ;   DEC_EVENT_THRESHOLD   — decrements EVENT_THRESHOLD (clamps to 0)
+    ;   INC_EVENT_THRESHOLD   — increments EVENT_THRESHOLD (clamps to MAX_THRESHOLD)
+    ;
+    ; Modifies: PLAY_HIGH_TONE, PLAY_LOW_TONE (patched), EVENT_THRESHOLD,
+    ;           S_SOUND_CHAR1, S_SOUND_CHAR2, S_DANGER_OUT+2..+4
+    ; Clobbers: A
+
+    ; --- Toggle sound on/off ---
+    LDA     #RTS_OPCODE                ; RTS opcode
+    CMP     PLAY_HIGH_TONE             ; is sound disabled?
     BNE     .turn_off
     ; --- Enable sound ---
-    LDA     #$CE              ; 'N' (high-bit ASCII)
-    STA     S_SOUND_CHAR1     ; patch "OFF" -> "ON "
-    LDA     #LDY_OPCODE       ; ' ' (space) / LDY opcode
-    STA     S_SOUND_CHAR2             ; trailing space
-    LDA     #LDY_OPCODE       ; LDY #$xx opcode (restores original)
+    LDA     #$CE                       ; 'N' (high-bit ASCII)
+    STA     S_SOUND_CHAR1              ; patch "OFF" -> "ON "
+    LDA     #LDY_OPCODE                ; ' ' (space) / LDY opcode
+    STA     S_SOUND_CHAR2              ; trailing space
+    LDA     #LDY_OPCODE                ; restore original entry byte
 .patch_tones:
-    STA     PLAY_HIGH_TONE    ; patch PLAY_HIGH_TONE entry byte
-    STA     PLAY_LOW_TONE     ; patch PLAY_LOW_TONE entry byte
-    JMP     MENU_GAME_SETTINGS ; re-enter settings menu
+    STA     PLAY_HIGH_TONE             ; \ patch tone routine entry bytes
+    STA     PLAY_LOW_TONE              ; /
+    JMP     MENU_GAME_SETTINGS         ; re-enter settings menu
 .turn_off:
     ; --- Disable sound ---
-    LDA     #$C6              ; 'F' (high-bit ASCII)
-    STA     S_SOUND_CHAR1     ; patch "ON " -> "OFF"
-    STA     S_SOUND_CHAR2             ;
-    LDA     #RTS_OPCODE       ; RTS opcode
-    BNE     .patch_tones      ; -> STA PLAY_HIGH_TONE / PLAY_LOW_TONE
+    LDA     #$C6                       ; 'F' (high-bit ASCII)
+    STA     S_SOUND_CHAR1              ; patch "ON " -> "OFF"
+    STA     S_SOUND_CHAR2              ;
+    LDA     #RTS_OPCODE                ; RTS opcode
+    BNE     .patch_tones               ; always taken
 
     ; --- Initialize settings display ---
 SETTINGS_DISPLAY_INIT:
-    LDA     #$20              ; \ clear danger digit area
-    STA     S_DANGER_OUT+2    ;  |
-    STA     S_DANGER_OUT+3    ;  |
+    LDA     #$20                       ; \ clear danger digit area
+    STA     S_DANGER_OUT+2             ;  |
+    STA     S_DANGER_OUT+3             ;  |
     STA     S_DANGER_OUT+4             ; /
-    LDA     #$00
-    STA     NUM_VALUE+1       ; high byte = 0
-    LDA     EVENT_THRESHOLD   ; current threshold value
-    STA     NUM_VALUE         ; -> NUM_VALUE
-    LDA     #<S_DANGER_OUT    ; \ DECIMAL_OUT_PTR -> S_DANGER_OUT
-    STA     DECIMAL_OUT_PTR   ;  |
-    LDA     #>S_DANGER_OUT    ;  |
-    STA     DECIMAL_OUT_PTR+1 ; /
-    JMP     NUM_TO_DECIMAL    ; format and return
+    LDA     #$00                       ; \ NUM_VALUE = EVENT_THRESHOLD
+    STA     NUM_VALUE+1                ;  | (high byte = 0)
+    LDA     EVENT_THRESHOLD            ;  |
+    STA     NUM_VALUE                  ; /
+    LDA     #<S_DANGER_OUT             ; \ DECIMAL_OUT_PTR -> S_DANGER_OUT
+    STA     DECIMAL_OUT_PTR            ;  |
+    LDA     #>S_DANGER_OUT             ;  |
+    STA     DECIMAL_OUT_PTR+1          ; /
+    JMP     NUM_TO_DECIMAL             ; format and return
 
     ; --- Decrement event threshold (wrapper for menu) ---
 DEC_THRESHOLD_WRAP:
@@ -21915,28 +21950,21 @@ INC_THRESHOLD_WRAP:
     ; --- Decrement EVENT_THRESHOLD (clamp to 0) ---
 DEC_EVENT_THRESHOLD:
     DEC     EVENT_THRESHOLD
-    BPL     .dec_done         ; >= 0 -> ok
-    INC     EVENT_THRESHOLD   ; clamp: -1 -> 0
+    BPL     .dec_done                  ; >= 0 -> ok
+    INC     EVENT_THRESHOLD            ; clamp: -1 -> 0
 .dec_done:
     RTS
 
-    ; --- Increment EVENT_THRESHOLD (clamp to 99) ---
+    ; --- Increment EVENT_THRESHOLD (clamp to MAX_THRESHOLD) ---
 INC_EVENT_THRESHOLD:
     LDA     EVENT_THRESHOLD
-    CMP     #MAX_THRESHOLD    ; 99 decimal
-    BCS     .inc_done         ; already at max
+    CMP     #MAX_THRESHOLD             ; 99 decimal
+    BCS     .inc_done                  ; already at max
     INC     EVENT_THRESHOLD
 .inc_done:
     RTS
 
-    ; --- Retire current character ---
-RETIRE_CHARACTER:
-    LDA     #$00
-    STA     ACTIVE_CHAR       ; clear active character
-    JSR     REORDER_CURRENT_CHAR
-    LDA     #SCENE_RETIRE     ; retirement scene
-    JMP     SCENE_LOOP
-@ %def TOGGLE_SOUND SETTINGS_DISPLAY_INIT DEC_THRESHOLD_WRAP INC_THRESHOLD_WRAP DEC_EVENT_THRESHOLD INC_EVENT_THRESHOLD RETIRE_CHARACTER
+@ %def TOGGLE_SOUND SETTINGS_DISPLAY_INIT DEC_THRESHOLD_WRAP INC_THRESHOLD_WRAP DEC_EVENT_THRESHOLD INC_EVENT_THRESHOLD
 
 \label{sec:attract_screen}
 
@@ -23713,6 +23741,7 @@ The following root chunks produce the assembly files when tangled.
 <<setup char sprite>>
 <<check mob needs turn>>
 <<sound and settings>>
+<<retire character>>
 <<attract screen>>
 <<scene setup>>
 <<clamp char field>>
