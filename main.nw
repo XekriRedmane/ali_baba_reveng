@@ -4467,42 +4467,51 @@ DRAW_BORDER_LABELS:
     BPL     .loop3
     RTS
 @ %def DRAW_BORDER_LABELS
-Plots six decorative 2$\times$2 font characters at fixed positions
-around the game border using [[PLOT_CHAR]].
+[[DRAW_BORDER_ICONS]] plots six decorative 2$\times$2 font characters
+at fixed positions around the game border.  Characters~1--4 are corner
+ornaments; character~28 (\$1C) appears at two midpoints.
 
 <<draw border icons>>=
     ORG     $5D7A
 DRAW_BORDER_ICONS:
+    ; Draw six decorative 2x2 font icons at fixed border positions.
+    ;
+    ; Behavior:
+    ;   Calls PLOT_CHAR six times with hardcoded (char, col, row)
+    ;   triples: four corner ornaments (chars 1-4) and two midpoint
+    ;   icons (char $1C).
+    ;
+    ; Clobbers: A, X, Y
 
-    LDA     #$02 ; char 2 at col 4, row 11
-    LDX     #$04
-    LDY     #$0B
-    JSR     PLOT_CHAR
+    LDA     #$02               ; \ char 2: left col 4, row 11
+    LDX     #$04               ;  |
+    LDY     #$0B               ;  |
+    JSR     PLOT_CHAR          ; /
 
-    LDA     #$01 ; char 1 at col 4, row 16
-    LDX     #$04
-    LDY     #$10
-    JSR     PLOT_CHAR
+    LDA     #$01               ; \ char 1: left col 4, row 16
+    LDX     #$04               ;  |
+    LDY     #$10               ;  |
+    JSR     PLOT_CHAR          ; /
 
-    LDA     #$03 ; char 3 at col 34, row 16
-    LDX     #$22
-    LDY     #$10
-    JSR     PLOT_CHAR
+    LDA     #$03               ; \ char 3: right col 34, row 16
+    LDX     #$22               ;  |
+    LDY     #$10               ;  |
+    JSR     PLOT_CHAR          ; /
 
-    LDA     #$04 ; char 4 at col 34, row 11
-    LDX     #$22
-    LDY     #$0B
-    JSR     PLOT_CHAR
+    LDA     #$04               ; \ char 4: right col 34, row 11
+    LDX     #$22               ;  |
+    LDY     #$0B               ;  |
+    JSR     PLOT_CHAR          ; /
 
-    LDA     #$1C ; char 28 at col 16, row 16
-    LDX     #$10
-    LDY     #$10
-    JSR     PLOT_CHAR
+    LDA     #$1C               ; \ char 28: mid col 16, row 16
+    LDX     #$10               ;  |
+    LDY     #$10               ;  |
+    JSR     PLOT_CHAR          ; /
 
-    LDA     #$1C ; char 28 at col 22, row 11
-    LDX     #$16
-    LDY     #$0B
-    JMP     PLOT_CHAR
+    LDA     #$1C               ; \ char 28: mid col 22, row 11
+    LDX     #$16               ;  |
+    LDY     #$0B               ;  |
+    JMP     PLOT_CHAR          ; / (tail-call)
 @ %def DRAW_BORDER_ICONS
 
 
@@ -8833,21 +8842,20 @@ transition.
 The [[$5C00]] region is populated dynamically by [[LOAD_SCENE_DATA]]
 from disk.  Its contents change with each scene.
 
-@ [[SAVE_ZP_POINTERS]] and [[RESTORE_ZP_POINTERS]] save and restore four
-zero-page pointer pairs to/from fixed addresses in the [[$5A00]] page.
-The saved pairs are [[$BC/$BD]] ([[TARGET_REC]]/[[PRINT_STRING_ADDR]]),
-[[$F8/$F9]] ([[ENTITY_PTR]]), [[$BE/$BF]] ([[CHAR_REC]]/[[DATA_PTR]]), and
-[[$F4/$F5]] ([[MOB_PTR]]).  These pointers are heavily aliased---the same
-zero-page bytes serve different roles in different routines---so saving
-and restoring them is necessary when entering nested operations like
-scene loading or disk I/O.
+@ [[SAVE_ZP_CONTEXT]] and [[RESTORE_ZP_CONTEXT]] save and restore four
+zero-page pointer pairs to/from shadow locations in the [[$5A]] page:
+[[TARGET_REC]] ([[$BC/$BD]]), [[ENTITY_PTR]] ([[$F8/$F9]]),
+[[DATA_PTR]] ([[$BE/$BF]]), and [[MOB_PTR]] ([[$F4/$F5]]).
+These pointers are heavily aliased---the same zero-page bytes serve
+different roles in different routines---so saving and restoring them is
+necessary when entering nested operations like scene loading or disk~I/O.
 
 <<defines>>=
-SAVED_BC            EQU     $5A9A   ; saved TARGET_REC/PRINT_STRING_ADDR (2 bytes)
-SAVED_F8            EQU     $5A9C   ; saved ENTITY_PTR pointer (2 bytes)
-SAVED_BE            EQU     $5A9E   ; saved CHAR_REC/ENTITY_REC (2 bytes)
-SAVED_F4            EQU     $5AA0   ; saved MOB_PTR pointer (2 bytes)
-@ %def SAVED_BC SAVED_F8 SAVED_BE SAVED_F4
+SAVED_TARGET_REC    EQU     $5A9A   ; saved TARGET_REC ($BC/$BD, 2 bytes)
+SAVED_ENTITY_PTR    EQU     $5A9C   ; saved ENTITY_PTR ($F8/$F9, 2 bytes)
+SAVED_DATA_PTR      EQU     $5A9E   ; saved DATA_PTR ($BE/$BF, 2 bytes)
+SAVED_MOB_PTR       EQU     $5AA0   ; saved MOB_PTR ($F4/$F5, 2 bytes)
+@ %def SAVED_TARGET_REC SAVED_ENTITY_PTR SAVED_DATA_PTR SAVED_MOB_PTR
 
 <<zero page defines>>=
 DATA_PTR                EQU     $BE     ; general data pointer / return value (2 bytes)
@@ -8857,79 +8865,49 @@ DATA_PTR                EQU     $BE     ; general data pointer / return value (2
 TARGET_REC              EQU     $BC     ; secondary entity record pointer in combat/reorder (2 bytes)
 @ %def TARGET_REC
 
-<<save zp pointers>>=
+<<save zp context>>=
     ORG     $6D53
-; -----------------------------------------------
-; SAVE_ZP_POINTERS -- Save ZP pointer pairs
-;
-; Copies four 2-byte ZP pointer pairs into the
-; $5A page for later restoration.
-;
-; Input:   TARGET_REC, ENTITY_PTR, DATA_PTR,
-;          MOB_PTR (ZP pointers)
-; Output:  SAVED_BC/F8/BE/F4 updated
-; Clobbers: A
-; -----------------------------------------------
-SAVE_ZP_POINTERS:
-    SUBROUTINE SAVE_ZP_POINTERS
-    ; Save key zero-page pointers to shadow locations.
+SAVE_ZP_CONTEXT:
+    SUBROUTINE SAVE_ZP_CONTEXT
+    ; Save four ZP pointer pairs to shadow locations in the $5A page.
     ;
     ; Behavior:
-    ;   Copies PRINT_STRING_ADDR ($BC), ENTITY_PTR ($F8),
-    ;   CHAR_REC ($BE), and MOB_PTR ($F4) to their respective
-    ;   SAVED_* shadow locations in the $5A page.
+    ;   Copies TARGET_REC, ENTITY_PTR, DATA_PTR, and MOB_PTR
+    ;   to SAVED_TARGET_REC, SAVED_ENTITY_PTR, SAVED_DATA_PTR,
+    ;   and SAVED_MOB_PTR respectively.
     ;
-    ; Modifies: SAVED_BC, SAVED_F8, SAVED_BE, SAVED_F4
+    ; Modifies: SAVED_TARGET_REC, SAVED_ENTITY_PTR, SAVED_DATA_PTR, SAVED_MOB_PTR
     ; Clobbers: A
 
-    ; Save ZP pointers $F4-$FB to SAVED_* variables.
-    ;
-    ; Clobbers: A
-
-    MOVW    TARGET_REC,SAVED_BC        ; $BC/$BD -> $5A9A
-    MOVW    ENTITY_PTR,SAVED_F8        ; $F8/$F9 -> $5A9C
-    MOVW    DATA_PTR,SAVED_BE          ; $BE/$BF -> $5A9E
-    MOVW    MOB_PTR,SAVED_F4           ; $F4/$F5 -> $5AA0
+    MOVW    TARGET_REC,SAVED_TARGET_REC
+    MOVW    ENTITY_PTR,SAVED_ENTITY_PTR
+    MOVW    DATA_PTR,SAVED_DATA_PTR
+    MOVW    MOB_PTR,SAVED_MOB_PTR
     RTS
-@ %def SAVE_ZP_POINTERS
-@ [[RESTORE_ZP_POINTERS]] is the inverse: it copies the saved values back
+@ %def SAVE_ZP_CONTEXT
+@ [[RESTORE_ZP_CONTEXT]] is the inverse: it copies the saved values back
 into zero page, restoring the caller's pointer context after a scene loop
 or other operation that may have clobbered them.
 
-<<restore zp pointers>>=
+<<restore zp context>>=
     ORG     $6D7C
-; -----------------------------------------------
-; RESTORE_ZP_POINTERS -- Restore ZP pointer pairs
-;
-; Copies four saved 2-byte pointer pairs from the
-; $5A page back into zero page.
-;
-; Input:   SAVED_BC/F8/BE/F4 (saved values)
-; Output:  TARGET_REC, ENTITY_PTR, DATA_PTR,
-;          MOB_PTR restored
-; Clobbers: A
-; -----------------------------------------------
-RESTORE_ZP_POINTERS:
-    SUBROUTINE RESTORE_ZP_POINTERS
-    ; Restore key zero-page pointers from shadow locations.
+RESTORE_ZP_CONTEXT:
+    SUBROUTINE RESTORE_ZP_CONTEXT
+    ; Restore four ZP pointer pairs from shadow locations.
     ;
     ; Behavior:
-    ;   Copies SAVED_BC, SAVED_F8, SAVED_BE, and SAVED_F4 back
-    ;   to their respective zero-page pointer locations.
+    ;   Copies SAVED_TARGET_REC, SAVED_ENTITY_PTR, SAVED_DATA_PTR,
+    ;   and SAVED_MOB_PTR back to their ZP locations.
     ;
-    ; Modifies: PRINT_STRING_ADDR, ENTITY_PTR, CHAR_REC, MOB_PTR (2 bytes each)
+    ; Modifies: TARGET_REC, ENTITY_PTR, DATA_PTR, MOB_PTR (2 bytes each)
     ; Clobbers: A
 
-    ; Restore ZP pointers $F4-$FB from SAVED_* variables.
-    ;
-    ; Clobbers: A
-
-    MOVW    SAVED_BC,TARGET_REC        ; $5A9A -> $BC/$BD
-    MOVW    SAVED_F8,ENTITY_PTR        ; $5A9C -> $F8/$F9
-    MOVW    SAVED_BE,DATA_PTR          ; $5A9E -> $BE/$BF
-    MOVW    SAVED_F4,MOB_PTR           ; $5AA0 -> $F4/$F5
+    MOVW    SAVED_TARGET_REC,TARGET_REC
+    MOVW    SAVED_ENTITY_PTR,ENTITY_PTR
+    MOVW    SAVED_DATA_PTR,DATA_PTR
+    MOVW    SAVED_MOB_PTR,MOB_PTR
     RTS
-@ %def RESTORE_ZP_POINTERS
+@ %def RESTORE_ZP_CONTEXT
 
 \chapter{Game Data}
 
@@ -9822,7 +9800,7 @@ SCENE_LOOP:
     STA     SCENE_NUMBER               ; store incoming scene number
     STOB    #MAP_WIDTH,BLINK_COL       ; disable blink cursor (sentinel = 20)
 
-    JSR     SAVE_ZP_POINTERS           ; save caller's ZP context
+    JSR     SAVE_ZP_CONTEXT           ; save caller's ZP context
 
     JSR     STEP_PRNG                  ; advance PRNG
     LDA     PRNG_OUTPUT                ; fresh random byte
@@ -9851,7 +9829,7 @@ SCENE_LOOP:
     STA     LOCATION_POS               ; clear location flags
     STA     LOCATION_STYLE
     JSR     ENTER_LOCATION             ; redraw map if location changed
-    JMP     RESTORE_ZP_POINTERS        ; restore ZP and return
+    JMP     RESTORE_ZP_CONTEXT        ; restore ZP and return
 
 .exit:
     JSR     SET_TEXT_WINDOW_BOTTOM
@@ -23943,8 +23921,8 @@ The following root chunks produce the assembly files when tangled.
 <<scene loop>>
 <<text renderer>>
 <<display status bar>>
-<<save zp pointers>>
-<<restore zp pointers>>
+<<save zp context>>
+<<restore zp context>>
 <<relocate hires staging>>
 <<load scene data>>
 <<check scene events>>
