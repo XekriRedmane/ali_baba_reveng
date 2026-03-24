@@ -12175,44 +12175,26 @@ TEXT_RENDERER:
 @ %def TEXT_RENDERER
 
 \chapter{The Main Loop}
-
-The [[start_sound]] routine goes through a sound table, executing each
-instruction until it encounters a [[TONE]] instruction. It then
-plays that tone, and then jumps to a routine given by [[indirect_routine]]. This
-routine should do something, and then return to the song-playing loop by
-jumping to [[next_table_entry]]. This allows the game to play a sound while doing
-something else, for example, animating the splash screen at the beginning of the
-game, and also interrupts the sound on keypress or joystick button press.
-
-If [[start_sound]] encounters an [[END]] instruction, it returns, and that ends
-the song.
-
-[[start_sound]] also checks for a keypress or a joystick button press, and this
-is the same as an [[END]] instruction.
-
 \label{ch:attract}
 
-When the main program starts at [[$0800]], it calls [[GAME_INIT]] to set up
-hardware and graphics, then checks [[TOTAL_MOB_COUNT]]. If zero (first run), it enters
-the \emph{attract screen}---the title sequence that cycles through story scenes
-until the player presses a key.
+[[MAIN_ENTRY]] (\$0800) is where the EALDR transfers control after loading
+and decrypting the game data.  It initializes hardware via [[GAME_INIT]],
+then runs the top-level game loop indefinitely.
 
-The entry point at [[$0800]] is where the EALDR transfers control after loading
-and decrypting the game data.  On entry:
-\begin{enumerate}
-  \item Calls [[GAME_INIT]], which initializes the Apple~II hardware, sets up hi-res graphics mode, and relocates the HRCG library and disk I/O routines to their runtime addresses.
-  \item Sets [[CHAR_PTR]] ([[$FA/$FB]]) to [[$4009]], the base of the character record array.
-  \item Inspects [[TOTAL_MOB_COUNT]]---a count of all active mob groups in the game world.  On the very first run this count is zero, so the code branches into [[ATTRACT_SCREEN]], the title sequence that plays until the player presses a key.
-\end{enumerate}
+\paragraph{Startup.}  On first run ([[TOTAL_MOB_COUNT]] = 0), the attract
+screen plays until the player presses a key.  [[CHAR_PTR]] is set to
+[[LOCATION_DATA]] (\$4009), the base of the 9-byte character record array.
 
-Once the attract screen exits (or is skipped on subsequent rounds), the main
-loop begins.  It iterates through each character record in sequence, nine
-bytes at a time.  For each active character (record byte~8 nonzero), it calls
-[[ENTER_LOCATION]] to redraw the map if the player has moved to a new
-location, dispatches scene events for players~1 and~3, and then hands off to
-[[PROCESS_MOB_GROUPS]] to run AI turns for all mob groups attached to this
-character.  After all characters have been processed, [[RANDOM_EVENTS]] runs
-the between-round event system, and the loop restarts.
+\paragraph{Main loop.}  Each pass iterates the character records, advancing
+[[CHAR_PTR]] by [[CHAR_RECORD_SIZE]] (9) per step:
+\begin{itemize}
+  \item Skip inactive characters ([[MFIELD_XP]] byte = 0).
+  \item Call [[ENTER_LOCATION]] to redraw the map if the location changed.
+  \item Dispatch [[CHECK_SCENE_EVENTS]] for players~1 and~3.
+  \item Call [[PROCESS_MOB_GROUPS]] to run AI turns for all mob groups.
+\end{itemize}
+When byte~1 of the next record equals \$FF (end sentinel), the pass calls
+[[RANDOM_EVENTS]] and restarts.
 
 <<main entry>>=
     ORG     $0800
@@ -12272,21 +12254,22 @@ MAIN_ENTRY:
     JSR     RANDOM_EVENTS      ; between-round random event dispatch
     JMP     .restart           ; restart the game loop
 @ %def MAIN_ENTRY
-@ Each character in the game world owns a linked list of mob groups, threaded
-through byte~2 of the character record.  [[PROCESS_MOB_GROUPS]] walks this
-list, resolving each link through [[GET_MOB_DATA]] to obtain a pointer to the
-16-byte mob data record.
+@ [[PROCESS_MOB_GROUPS]] walks the mob linked list for the current character,
+processing each group according to its type.
 
-The routine classifies each group by its type field (bits~5--0 of mob data
-byte~6).  Types below~3 are \emph{inactive}---friendly NPCs or party members
-not currently in a scene.  For these, the game displays a brief status message
-via [[SHOW_IDLE_STATUS]] and runs [[AUTO_HEAL]] to gradually restore hit
-points.  Types~3 and above are \emph{active}: the routine sets up the
-character sprite, checks whether the group actually needs a turn, and if so
-enters [[GAME_TURN_LOOP]].
+\paragraph{Group classification.}  Each group's type field
+([[MFIELD_MOB_TYPE]], bits~5--0 of mob data byte~6) determines how it is
+handled:
+\begin{itemize}
+  \item Type $<$ 3 (\emph{inactive}): friendly NPCs or resting party members.
+        [[SHOW_IDLE_STATUS]] prints a status message; [[AUTO_HEAL]] gradually
+        restores hit points.
+  \item Type $\ge$ 3 (\emph{active}): [[START_MOB_TURN]] sets up the sprite
+        and enters [[GAME_TURN_LOOP]] if the group needs a turn.
+\end{itemize}
 
-There is also a 1-in-24 chance (based on a PRNG roll masked with [[$17]]) of
-calling a periodic disk checkpoint at [[$A508]] in the relocated block.
+\paragraph{Disk checkpoint.}  A 1-in-24 PRNG roll (AND \$17) triggers a
+periodic disk checkpoint at \$A508 in the relocated block.
 
 <<process mob groups>>=
     ORG     $0884
@@ -12368,18 +12351,18 @@ SHOW_IDLE_STATUS:
     LDA     #MSG_REST_STRONGER                    ; message $20: idle status text
     JMP     DISPLAY_MESSAGE
 @ %def SHOW_IDLE_STATUS
-@ For active mob groups (type $\geq$~3), [[START_MOB_TURN]] prepares the
-display and enters the turn loop.  It reads the mob's appearance byte (mob
-data byte~4), converts it to a font character number via
-[[APPEARANCE_TO_FONTCHAR]], and stores the result in [[CHAR_SPRITE]].  The
-Y~register after this conversion holds the font group, which doubles as the
-AI behavior mode---this determines whether the mob is player-controlled, a
-friendly NPC, or a hostile creature.
+@ [[START_MOB_TURN]] prepares the display for an active mob group
+(type $\ge$ 3) and enters the turn loop.
 
-The routine then calls [[CHECK_MOB_NEEDS_TURN]] to decide whether this group
-actually requires a turn.  If the carry flag comes back clear, the mob is
-skipped.  Otherwise, the cursor is positioned to row~21, the scene display is
-set up, and control falls through to [[GAME_TURN_LOOP]].
+\paragraph{AI mode derivation.}  The mob's [[MFIELD_APPEARANCE]] (byte~4)
+is converted to a font character via [[APPEARANCE_TO_FONTCHAR]].  The
+Y~register after conversion holds the font group, which doubles as the
+AI behavior mode stored in [[CHAR_AI_MODE]]: 0~=~player-controlled,
+higher values select different NPC AI strategies.
+
+\paragraph{Turn gate.}  [[CHECK_MOB_NEEDS_TURN]] decides whether the group
+actually needs a turn.  If carry is clear, the mob is skipped.  Otherwise
+the scene display is set up and control enters [[GAME_TURN_LOOP]].
 
 <<start mob turn>>=
     ORG     $08DF
@@ -12652,28 +12635,6 @@ INPUT_DIR       EQU     $5A67   ; direction/command from input (1-9)
 TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
 @ %def TURN_START_COL TURN_START_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR TURN_ACTIVE
 
-[[GAME_TURN_LOOP]] is the central routine that executes a single character's
-turn.  It handles both player-controlled characters (where input comes from
-the keyboard or joystick) and AI-controlled mobs (where
-[[AI_CHOOSE_TARGET]] selects a destination and [[NPC_MOVE_AI]] picks
-directions).
-
-The routine begins by recording the character's starting position and
-clearing movement state.  It checks constitution (field~6): characters with
-fewer than~3 HP are restricted from moving.  It also checks for hostile
-encounters at the current position and restricts movement if found.
-
-For AI characters, [[AI_CHOOSE_TARGET]] runs first to pick a target
-position.  Then the movement point budget is computed from field~12's low
-nibble, biased by one extra point if the character's level exceeds its
-steps taken.
-
-The main loop reads directional input (from the player or the AI), applies
-it to the current position, and checks what occupies the destination cell.
-Empty cells allow movement; occupied cells trigger the encounter dispatch
-table described above.  The loop continues until movement points are
-exhausted, the character enters combat, or a special event fires.
-
 <<game turn loop>>=
     ORG     $19AD
 GAME_TURN_LOOP:
@@ -12898,15 +12859,14 @@ MOVE_LOOP:                     ; $1A31 - external entry point
     JMP     HANDLE_EVENT_SLOT        ; EVENT_EMPTY ($FE): empty slot interaction
 @ %def GAME_TURN_LOOP MOVE_LOOP
 @ [[TURN_DISPATCH]] is the decision point after a character finishes moving.
-If [[CHAR_AI_MODE]] is zero, the character is under player control and
-execution jumps to [[TEARDOWN_INPUT]] to present the action menu.  Otherwise,
-the character is AI-controlled: [[SELECT_COMBAT_TARGET]] evaluates the
-situation and returns a status code.  A return of~2 means a hostile is present
-at the same position, so execution enters [[ENTER_COMBAT_STATE]].  A negative
-value means the AI has committed to an attack, jumping to [[START_COMBAT]].
-Any other value means the area is safe, so the character attempts
-[[AUTO_HEAL]] to recover between fights.
-
+Player-controlled characters ([[CHAR_AI_MODE]] = 0) jump to
+[[TEARDOWN_INPUT]] to present the action menu.  AI characters call
+[[SELECT_COMBAT_TARGET]], which returns a status code:
+\begin{itemize}
+  \item 2 — hostile at same position $\to$ [[ENTER_COMBAT_STATE]]
+  \item Negative — AI commits to attack $\to$ [[START_COMBAT]]
+  \item Other — area safe $\to$ [[AUTO_HEAL]]
+\end{itemize}
 
 <<turn dispatch>>=
     ORG     $14A3
@@ -13010,12 +12970,17 @@ RESET_TURN_POS:
     DEC     TURN_TUNE_GUARD
     JMP     TUNE_PLAYER     ; X still $16 from LDX above
 @ %def COMMIT_MOVE RESET_TURN_POS
-@ [[END_TURN]] wraps up a character's turn:
-\begin{enumerate}
-  \item Clears [[TURN_ACTIVE]].
-  \item Calls [[CHECK_AND_RESTRICT]] to update the restricted flag based on the encounter at the character's final position.
-  \item Checks whether the character has enough steps remaining for another action: if [[STEPS_TAKEN]] is zero, loops back to [[TURN_DISPATCH]]; otherwise compares the character's level (field~\$0C, bits~2--0 after ROR) against [[STEPS_TAKEN]], and if the level is high enough, the character gets another turn via [[TURN_DISPATCH]].
-\end{enumerate}
+@ [[END_TURN]] wraps up a character's turn and checks for bonus movement.
+
+\paragraph{Bonus turn.}  After clearing [[TURN_ACTIVE]] and updating the
+restricted flag via [[CHECK_AND_RESTRICT]]:
+\begin{itemize}
+  \item If [[STEPS_TAKEN]] is zero, loops back to [[TURN_DISPATCH]].
+  \item Otherwise, extracts the speed tier from [[MFIELD_LEVEL_ENC]]
+        (bits~2--0 after ROR).  If the speed tier exceeds
+        [[STEPS_TAKEN]], the character gets another turn via
+        [[TURN_DISPATCH]].
+\end{itemize}
 
 <<end turn>>=
     ORG     $1BA7
@@ -13784,16 +13749,20 @@ GET_INPUT_TABLE_PTR:
     LDY     #<GAME_INPUT_TABLE
     RTS
 @ %def GET_INPUT_TABLE_PTR
-@ [[CONFIGURE_INPUT]] patches the game's main input table to enable or disable
-menu options based on the current turn state.  It first calls
-[[CHECK_COMBAT_ELIGIBILITY]], then writes the values of [[SAFE_TO_REST]],
-[[UNDER_LEVEL]], [[MOVE_POINTS]], and [[TURN_ACTIVE]] into specific byte
-offsets within [[GAME_INPUT_TABLE]].  The logic is straightforward: if the
-character has an active encounter ([[UNDER_LEVEL]] is set), the combat options
-(records~2 and~3) are enabled and the flee option (record~4) is disabled;
-otherwise the reverse.  The maximum movement range in the table is set to~3
-or~4 depending on the encounter state.  If [[TURN_ACTIVE]] is zero, the
-movement option (record~1) is also disabled.
+@ [[CONFIGURE_INPUT]] patches [[GAME_INPUT_TABLE]] to enable or disable
+menu options based on the current turn state.
+
+\paragraph{Option patching.}  After calling [[CHECK_COMBAT_ELIGIBILITY]],
+the enable bytes are set as follows:
+\begin{itemize}
+  \item Records 2--3 (combat): enabled when [[UNDER_LEVEL]] is clear
+        (character is in an encounter).
+  \item Record 4 (flee): enabled when [[UNDER_LEVEL]] is set.
+  \item Record 6 (rest): enabled when [[SAFE_TO_REST]] is set.
+  \item Record 1 (movement): set to [[MOVE_POINTS]], but cleared to~0
+        if [[TURN_ACTIVE]] is zero.
+  \item Max movement range: [[UNDER_LEVEL]] + 3 (3 normally, 4 in encounters).
+\end{itemize}
 
 <<configure input>>=
     ORG     $60D2
