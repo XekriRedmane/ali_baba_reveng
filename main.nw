@@ -7173,6 +7173,7 @@ STATS_DAGGR:                  ; $7DFF
 Pascal strings displayed after the stats.
 
 <<stats template data>>=
+    ORG     $7E01
 STATS_PROMPT_KEYBOARD:        ; $7E01
     APSTR "\x09PRESS M TO CONTINUE \x0E" ; \x09=tab, \x0E=ctrl-E (HRCG clear to EOL)
 STATS_PROMPT_JOYSTICK:        ; $7E18
@@ -20806,6 +20807,7 @@ TUNE_PC               EQU     $E4     ; script instruction pointer (2 bytes, $E4
 @ %def TUNE_PC
 
 <<tune player>>=
+    ORG     $7980
 
 .load_ptr:
     LDA     TUNE_TABLE,X   ; low byte
@@ -21589,6 +21591,7 @@ TUNE_PRNG_MASK    EQU     $5A92   ; PRNG mask for action randomization
 After setup, the interpreter initializes its loop counter and PRNG mask:
 
 <<tune player>>=
+    ORG     $798A
 
     STOB    #$00,TUNE_LOOP_CTR ; loop counter = 0
     STOB    #$01,TUNE_PRNG_MASK ; PRNG mask = 1
@@ -21638,6 +21641,7 @@ TUNE_LOOP_ADDR    EQU     $5A8E   ; tune loop address (2 bytes)
 @ %def TUNE_LOOP_ADDR
 
 <<tune player>>=
+    ORG     $799F
 
 .control:
     BAEQ    #$25,.cmd_25              ; set PRNG mask = $0F
@@ -21681,6 +21685,7 @@ TUNE_ACTION_VEC   EQU     $5A93   ; action handler vector (2 bytes)
 @ %def TUNE_GOSUB_ADDR TUNE_ACTION_VEC
 
 <<tune player>>=
+    ORG     $79D6
 
 .cmd_25:                            ; PRNG mask = $0F
     STOB    #$0F,TUNE_PRNG_MASK
@@ -21722,6 +21727,7 @@ XORed with the action byte, introducing randomness.  The action vector
 at [[\DISPATCH_VEC]] is set by the handlers at [[TUNE_ACTION_VEC]].
 
 <<tune player>>=
+    ORG     $7A2E
 
 .action:
     STA     SOUND_DURATION         ; save action byte
