@@ -4227,6 +4227,29 @@ S_PRESS_SPACE:
     DC.B    $8B
 @ %def S_PRESS_SPACE
 
+
+@ The UI text stream is a concatenated display string parsed by
+[[TEXT_RENDERER]] during [[INIT_GAME_DISPLAY]].  It contains HRCG
+control codes, border label position tables (used by
+[[DRAW_BORDER_LABELS]]), the frame pattern, copyright text, and
+decorative font characters.
+
+@ The UI text stream begins with HRCG control codes and viewport
+configuration, parsed by [[TEXT_RENDERER]] when [[INIT_GAME_DISPLAY]]
+sets [[TEXT_STREAM_PTR]] to [[UI_TEXT_STREAM]].
+
+<<ui text stream>>=
+    ORG     $5E55
+UI_TEXT_STREAM:
+    DC.B    $7D               ; HRCG reset to full screen
+    DC.B    $80,$02           ; mode control
+    ; Map viewport bounds (2 sets)
+    DC.B    $2F,$00,$00,$01,$0C,$09,$00,$00,$02,$01,$02,$01,$00,$00
+    DC.B    $2F,$83,$01,$14,$08,$05,$00,$06,$0F,$12,$14,$19,$00,$14
+    DC.B    $08,$09,$05,$16,$05,$13
+    DC.B    $7F
+@ %def UI_TEXT_STREAM
+
 <<init game display>>=
     ORG     $5C6D
 INIT_GAME_DISPLAY:
@@ -4488,30 +4511,6 @@ cycles through positions in [[BORDER_POS_TABLE]], drawing icons at
 each map border cell.  The 3-byte records are (icon, column, row):
 icon=\$00 draws the default border glyph; nonzero icons draw special
 decorations (e.g.\ doors, markers).
-
-
-@ The UI text stream is a concatenated display string parsed by
-[[TEXT_RENDERER]] during [[INIT_GAME_DISPLAY]].  It contains HRCG
-control codes, border label position tables (used by
-[[DRAW_BORDER_LABELS]]), the frame pattern, copyright text, and
-decorative font characters.
-
-@ The UI text stream begins with HRCG control codes and viewport
-configuration, parsed by [[TEXT_RENDERER]] when [[INIT_GAME_DISPLAY]]
-sets [[TEXT_STREAM_PTR]] to [[UI_TEXT_STREAM]].
-
-<<ui text stream>>=
-    ORG     $5E55
-UI_TEXT_STREAM:
-    DC.B    $7D               ; HRCG reset to full screen
-    DC.B    $80,$02           ; mode control
-    ; Map viewport bounds (2 sets)
-    DC.B    $2F,$00,$00,$01,$0C,$09,$00,$00,$02,$01,$02,$01,$00,$00
-    DC.B    $2F,$83,$01,$14,$08,$05,$00,$06,$0F,$12,$14,$19,$00,$14
-    DC.B    $08,$09,$05,$16,$05,$13
-    DC.B    $7F
-@ %def UI_TEXT_STREAM
-
 
 
 @ Border animation state and position data, used by [[<<border animation>>]].
@@ -7118,6 +7117,37 @@ S_PAY_FOR:
     APSTR   "SAVE GAME IN SLOT NUMBER 00"
 @ %def GAME_CONFIG_DATA MENU_OPTION_STRINGS
 
+\section{Character stats display}
+
+[[DISPLAY_CHAR_STATS]] formats and displays the statistics of the
+character whose record is pointed to by [[ENTITY_PTR]] ([[$F8/$F9]]).
+It reads eight fields from the entity record, converts each to decimal
+via [[NUM_TO_DECIMAL]], and writes the digits into a pre-formatted
+string template at [[$7D83]].  After displaying the stats, it waits for
+a keypress (or joystick button if [[INPUT_MODE]] is nonzero), then
+exits via [[CLEAR_MAP]].
+
+\begin{itemize}
+  \item Field 6, bits 5--0: life force (max 63)
+  \item Field 8, bits 3--0: group member count
+  \item Field 7, bits 3--0: plus 1 = weapons
+  \item Field 9, bits 3--0: plus 1 = ducats (gold)
+  \item Field 5, bits 4--0: strength (max 31)
+  \item Field 12, bits 3--0: sword rating
+  \item Field 11, bits 4--0: level/armor
+  \item Fields 13--14: 16-bit dagger/experience value
+\end{itemize}
+
+The routine first clears the digit positions in the template string by
+writing spaces ([[$A0]]), then fills them via [[NUM_TO_DECIMAL]].  After
+a cosmetic fix (suppressing a leading ``0'' in the experience field), it
+scrolls the status line, prints the formatted stats, and enters an
+input wait loop.
+
+<<defines>>=
+LOW_NIBBLE_MASK     EQU     $0F     ; bits 3-0: generic low nibble extraction
+@ %def LOW_NIBBLE_MASK
+
 <<stats template data>>=
     ORG     $7D83
 STATS_TEMPLATE:
@@ -7180,36 +7210,6 @@ STATS_PROMPT_JOYSTICK:        ; $7E18
     APSTR "\x09PUSH BUTTON TO GO ON\x0E" ; \x09=tab, \x0E=ctrl-E (HRCG clear to EOL)
     ; (STATUS_BORDER_DATA follows immediately at $7E2F)
 @ %def STATS_PROMPT_KEYBOARD STATS_PROMPT_JOYSTICK
-\section{Character stats display}
-
-[[DISPLAY_CHAR_STATS]] formats and displays the statistics of the
-character whose record is pointed to by [[ENTITY_PTR]] ([[$F8/$F9]]).
-It reads eight fields from the entity record, converts each to decimal
-via [[NUM_TO_DECIMAL]], and writes the digits into a pre-formatted
-string template at [[$7D83]].  After displaying the stats, it waits for
-a keypress (or joystick button if [[INPUT_MODE]] is nonzero), then
-exits via [[CLEAR_MAP]].
-
-\begin{itemize}
-  \item Field 6, bits 5--0: life force (max 63)
-  \item Field 8, bits 3--0: group member count
-  \item Field 7, bits 3--0: plus 1 = weapons
-  \item Field 9, bits 3--0: plus 1 = ducats (gold)
-  \item Field 5, bits 4--0: strength (max 31)
-  \item Field 12, bits 3--0: sword rating
-  \item Field 11, bits 4--0: level/armor
-  \item Fields 13--14: 16-bit dagger/experience value
-\end{itemize}
-
-The routine first clears the digit positions in the template string by
-writing spaces ([[$A0]]), then fills them via [[NUM_TO_DECIMAL]].  After
-a cosmetic fix (suppressing a leading ``0'' in the experience field), it
-scrolls the status line, prints the formatted stats, and enters an
-input wait loop.
-
-<<defines>>=
-LOW_NIBBLE_MASK     EQU     $0F     ; bits 3-0: generic low nibble extraction
-@ %def LOW_NIBBLE_MASK
 
 <<display char stats>>=
     ORG     $7780
@@ -7808,65 +7808,6 @@ SMITES, WHOPS, WHACKS, BASHES, WHOMPS, WALLOPS, SMASHES,
 CLOBBERS, LAMBASTES.  The table base at \$807D is referenced from
 the attack display routine at \$7E2E.
 
-<<shop table>>=
-    ORG     $7EDD
-SHOP_TABLE:
-    ; === Weapon shop record (41 bytes) ===
-    ; slot 0 [+$00]: AN IRON SWORD (price $0A)
-    DC.W    SHOP_BUY_EFFECT_0
-    DC.W    S_IRON_SWORD
-    DC.B    $0A
-    ; slot 1 [+$05]: A STEEL SWORD (price $32)
-    DC.W    SHOP_BUY_EFFECT_1
-    DC.W    S_STEEL_SWORD
-    DC.B    $32
-    ; slot 2 [+$0A]: display format (masked out)
-    HEX     B7 C5 A0 AE A0
-    ; slot 3 [+$0F]: AN OAK CLUB (price $03)
-    DC.W    SHOP_BUY_EFFECT_2
-    DC.W    S_OAK_CLUB
-    DC.B    $03
-    ; slot 4 [+$14]: display format (masked out)
-    HEX     B2 AE A0 A0 AE
-    ; [+$19]: A STEEL DAGGER (price $0F)
-    DC.W    SHOP_BUY_EFFECT_3
-    DC.W    S_STEEL_DAGGER
-    DC.B    $0F
-    ; [+$1E]: A SHIV (price $0A)
-    DC.W    SHOP_BUY_EFFECT_4
-    DC.W    S_SHIV
-    DC.B    $0A
-    ; [+$23]: display format
-    HEX     B6 A0 B4 A0 C6
-    ; [+$28]: scene number
-    DC.B    $32                ; scene $32 (weapon shop)
-
-    ; === Armor shop record (41 bytes) ===
-    ; slot 0 [+$00]: PLATE ARMOR (price $50)
-    DC.W    XP_AWARD_0
-    DC.W    S_PLATE_ARMOR
-    DC.B    $50
-    ; slot 1 [+$05]: RITHMIL PLATE ARMOR (price $C8)
-    DC.W    XP_AWARD_1
-    DC.W    S_RITHMIL_PLATE
-    DC.B    $C8
-    ; slot 2 [+$0A]: CHAIN MAIL (price $28)
-    DC.W    XP_AWARD_2
-    DC.W    S_CHAIN_MAIL
-    DC.B    $28
-    ; slot 3 [+$0F]: RITHMIL CHAIN MAIL (price $64)
-    DC.W    XP_AWARD_3
-    DC.W    S_RITHMIL_CHAIN
-    DC.B    $64
-    ; slot 4 [+$14]: LEATHER ARMOR (price $08)
-    DC.W    XP_AWARD_4
-    DC.W    S_LEATHER_ARMOR
-    DC.B    $08
-    ; [+$19]: display format
-    HEX     A0 B5 CF AE B5 A0 CB CC B1 CD D0 AF B1 C1 B9
-    ; [+$28]: scene number
-    DC.B    $33                ; scene $33 (armor shop)
-@ %def SHOP_TABLE
 
 <<item name strings>>=
     ORG     $7F2F
@@ -7910,25 +7851,6 @@ MAP_OBJECT_NAMES:
     APSTR   "A TRADING OUTPOST"
 @ %def MAP_OBJECT_NAMES
 
-<<attack verb strings>>=
-    ORG     $803A
-ATTACK_VERB_STRINGS:
-    APSTR   "JABS"
-    APSTR   "POKES"
-    APSTR   "HITS"
-    APSTR   "CLOUTS"
-    APSTR   "POUNDS"
-    APSTR   "SMACKS"
-    APSTR   "SMITES"
-    APSTR   "WHOPS"
-    APSTR   "WHACKS"
-    APSTR   "BASHES"
-    APSTR   "WHOMPS"
-    APSTR   "WALLOPS"
-    APSTR   "SMASHES"
-    APSTR   "CLOBBERS"
-    APSTR   "LAMBASTES"
-@ %def ATTACK_VERB_STRINGS
 
 @ \subsection{Duplicate item/combat strings (\$8133--\$82B4)}
 
@@ -9079,582 +9001,6 @@ Each record is 9~bytes:
 \end{tabular}
 \end{center}
 
-The event list at [[EVENT_PTR]] consists of 3-byte entries (see
-\S\ref{sec:event-format} for the full format).  Byte~0 is a map position
-(\$FE~=~empty slot, \$FF~=~end-of-list); byte~1 encodes the event type
-and status; byte~2 is type-dependent action data.
-
-The map scene~ID (field~5, bits~0--6) is compared with [[LOCATION_FLAG2]]
-(\$5A56); when it changes, [[FILL_MAP]] is called to redraw the map.
-Bit~7 is set on first entry via [[ORA \#$80]] and tested with [[BMI]] to
-skip first-visit logic on subsequent entries.
-
-The sentinel [[FFFF]] in the name pointer marks the end of the table.
-
-<<Location data>>=
-    ORG     $4009
-LOCATION_DATA:
-    ; --- 0: ALI BABA HOME ---
-    DC.W s_ALI_BABA_HOME
-    DC.B $01                 ; mob head $01
-    DC.B 20*6+9              ; min pos (6,9)
-    DC.B 20*9+13             ; max pos (9,13)
-    DC.B $01                 ; map 1
-    DC.W ev_ali_baba_home
-    DC.B $01
-
-    ; --- 1: DUSTY ROAD ---
-    DC.W s_DUSTY_ROAD
-    DC.B $00                 ; no mobs
-    DC.B 20*3+7              ; min pos (3,7)
-    DC.B 20*6+19             ; max pos (6,19)
-    DC.B $01                 ; map 1
-    DC.W ev_dusty_road
-    DC.B $00
-
-    ; --- 2: SULTAN'S PALACE ---
-    DC.W s_SULTANS_PALACE
-    DC.B $3F                 ; mob head $3F
-    DC.B 20*0+0              ; min pos (0,0)
-    DC.B 20*9+7              ; max pos (9,7)
-    DC.B $01                 ; map 1
-    DC.W ev_sultans_palace
-    DC.B $00
-
-    ; --- 3: ROYAL LIBRARY ---
-    DC.W s_ROYAL_LIBRARY
-    DC.B $00                 ; no mobs
-    DC.B 20*0+7              ; min pos (0,7)
-    DC.B 20*3+16             ; max pos (3,16)
-    DC.B $01                 ; map 1
-    DC.W ev_royal_library
-    DC.B $00
-
-    ; --- 4: ASTROLOGER'S LAB ---
-    DC.W s_ASTROLOGERS_LAB
-    DC.B $4A                 ; mob head $4A
-    DC.B 20*0+3              ; min pos (0,3)
-    DC.B 20*9+16             ; max pos (9,16)
-    DC.B $25                 ; map 37
-    DC.W ev_astrologers_lab
-    DC.B $00
-
-    ; --- 5: BEAR CAVE ---
-    DC.W s_BEAR_CAVE
-    DC.B $51                 ; mob head $51
-    DC.B 20*0+0              ; min pos (0,0)
-    DC.B 20*5+14             ; max pos (5,14)
-    DC.B $29                 ; map 41
-    DC.W ev_bear_cave
-    DC.B $00
-
-    ; --- 6: RATS NEST ---
-    DC.W s_RATS_NEST
-    DC.B $52                 ; mob head $52
-    DC.B 20*5+0              ; min pos (5,0)
-    DC.B 20*9+14             ; max pos (9,14)
-    DC.B $29                 ; map 41
-    DC.W ev_rats_nest
-    DC.B $00
-
-    ; --- 7: DRAGON LAIR ---
-    DC.W s_DRAGON_LAIR
-    DC.B $5F                 ; mob head $5F
-    DC.B 20*4+2              ; min pos (4,2)
-    DC.B 20*9+9              ; max pos (9,9)
-    DC.B $49                 ; map 73
-    DC.W ev_dragon_lair
-    DC.B $00
-
-    ; --- 8: GOLD FOR THE LUCKY ---
-    DC.W s_GOLD_FOR_THE_LUCKY
-    DC.B $60                 ; mob head $60
-    DC.B 20*4+9              ; min pos (4,9)
-    DC.B 20*9+16             ; max pos (9,16)
-    DC.B $49                 ; map 73
-    DC.W ev_gold_for_the_lucky
-    DC.B $00
-
-    ; --- 9: SAVE THE WHALES ---
-    DC.W s_SAVE_THE_WHALES
-    DC.B $00                 ; no mobs
-    DC.B 20*0+2              ; min pos (0,2)
-    DC.B 20*4+16             ; max pos (4,16)
-    DC.B $49                 ; map 73
-    DC.W ev_save_the_whales
-    DC.B $00
-
-    ; --- 10: SLIDE ---
-    DC.W s_SLIDE
-    DC.B $00                 ; no mobs
-    DC.B 20*0+1              ; min pos (0,1)
-    DC.B 20*9+3              ; max pos (9,3)
-    DC.B $60                 ; map 96
-    DC.W ev_slide
-    DC.B $00
-
-    ; --- 11: DEEP DARK STAIRWAY ---
-    DC.W s_DEEP_DARK_STAIRWAY
-    DC.B $00                 ; no mobs
-    DC.B 20*1+3              ; min pos (1,3)
-    DC.B 20*7+9              ; max pos (7,9)
-    DC.B $61                 ; map 97
-    DC.W ev_deep_dark_stairway
-    DC.B $00
-
-    ; --- 12: MINOTAUR LABYRINTH ---
-    DC.W s_MINOTAUR_LABYRINTH
-    DC.B $6A                 ; mob head $6A
-    DC.B 20*0+3              ; min pos (0,3)
-    DC.B 20*9+16             ; max pos (9,16)
-    DC.B $62                 ; map 98
-    DC.W ev_minotaur_labyrinth
-    DC.B $00
-
-    ; --- 13: STINGER STREWN CELL ---
-    DC.W s_STINGER_STREWN_CELL
-    DC.B $5C                 ; mob head $5C
-    DC.B 20*5+3              ; min pos (5,3)
-    DC.B 20*9+8              ; max pos (9,8)
-    DC.B $48                 ; map 72
-    DC.W ev_stinger_strewn_cell
-    DC.B $00
-
-    ; --- 14: GUARD ROOM ---
-    DC.W s_GUARD_ROOM
-    DC.B $57                 ; mob head $57
-    DC.B 20*0+3              ; min pos (0,3)
-    DC.B 20*5+16             ; max pos (5,16)
-    DC.B $48                 ; map 72
-    DC.W ev_guard_room
-    DC.B $00
-
-    ; --- 15: LONG WAY FROM HOME ---
-    DC.W s_LONG_WAY_FROM_HOME
-    DC.B $5E                 ; mob head $5E
-    DC.B 20*5+11             ; min pos (5,11)
-    DC.B 20*9+16             ; max pos (9,16)
-    DC.B $48                 ; map 72
-    DC.W ev_long_way_from_home
-    DC.B $00
-
-    ; --- 16: FOREST ---
-    DC.W s_FOREST
-    DC.B $43                 ; mob head $43
-    DC.B 20*0+0              ; min pos (0,0)
-    DC.B 20*9+13             ; max pos (9,13)
-    DC.B $04                 ; map 4
-    DC.W ev_forest
-    DC.B $00
-
-    ; --- 17: VIEW FROM A TREE ---
-    DC.W s_VIEW_FROM_A_TREE
-    DC.B $00                 ; no mobs
-    DC.B 20*1+13             ; min pos (1,13)
-    DC.B 20*7+19             ; max pos (7,19)
-    DC.B $04                 ; map 4
-    DC.W ev_view_from_a_tree
-    DC.B $00
-
-    ; --- 18: FAILING WALL ---
-    DC.W s_FAILING_WALL
-    DC.B $6B                 ; mob head $6B
-    DC.B 20*1+0              ; min pos (1,0)
-    DC.B 20*8+14             ; max pos (8,14)
-    DC.B $64                 ; map 100
-    DC.W ev_failing_wall
-    DC.B $00
-
-    ; --- 19: MINOTAUR PLAYROOM ---
-    DC.W s_MINOTAUR_PLAYROOM
-    DC.B $6C                 ; mob head $6C
-    DC.B 20*1+5              ; min pos (1,5)
-    DC.B 20*8+19             ; max pos (8,19)
-    DC.B $65                 ; map 101
-    DC.W ev_minotaur_playroom
-    DC.B $00
-
-    ; --- 20: THIEVES CAVE ---
-    DC.W s_THIEVES_CAVE
-    DC.B $00                 ; no mobs
-    DC.B 20*0+3              ; min pos (0,3)
-    DC.B 20*9+16             ; max pos (9,16)
-    DC.B $21                 ; map 33
-    DC.W ev_thieves_cave
-    DC.B $00
-
-    ; --- 21: O ---
-    DC.W s_O
-    DC.B $62                 ; mob head $62
-    DC.B 20*1+10             ; min pos (1,10)
-    DC.B 20*8+18             ; max pos (8,18)
-    DC.B $40                 ; map 64
-    DC.W ev_o
-    DC.B $00
-
-    ; --- 22: SPIRAL STAIRCASE ---
-    DC.W s_SPIRAL_STAIRCASE
-    DC.B $00                 ; no mobs
-    DC.B 20*1+6              ; min pos (1,6)
-    DC.B 20*7+10             ; max pos (7,10)
-    DC.B $46                 ; map 70
-    DC.W ev_spiral_staircase
-    DC.B $00
-
-    ; --- 23: Y ---
-    DC.W s_Y
-    DC.B $63                 ; mob head $63
-    DC.B 20*1+1              ; min pos (1,1)
-    DC.B 20*8+18             ; max pos (8,18)
-    DC.B $41                 ; map 65
-    DC.W ev_y
-    DC.B $00
-
-    ; --- 24: MAGIC TOURBILLION ---
-    DC.W s_MAGIC_TOURBILLION
-    DC.B $00                 ; no mobs
-    DC.B 20*5+9              ; min pos (5,9)
-    DC.B 20*9+13             ; max pos (9,13)
-    DC.B $60                 ; map 96
-    DC.W ev_magic_tourbillion
-    DC.B $00
-
-    ; --- 25: G. ---
-    DC.W s_G
-    DC.B $64                 ; mob head $64
-    DC.B 20*1+1              ; min pos (1,1)
-    DC.B 20*8+18             ; max pos (8,18)
-    DC.B $42                 ; map 66
-    DC.W ev_g
-    DC.B $00
-
-    ; --- 26: CRYSTAL CAVE ---
-    DC.W s_CRYSTAL_CAVE
-    DC.B $00                 ; no mobs
-    DC.B 20*2+3              ; min pos (2,3)
-    DC.B 20*8+15             ; max pos (8,15)
-    DC.B $22                 ; map 34
-    DC.W ev_crystal_cave
-    DC.B $00
-
-    ; --- 27: B ---
-    DC.W s_B
-    DC.B $00                 ; no mobs
-    DC.B 20*1+1              ; min pos (1,1)
-    DC.B 20*8+18             ; max pos (8,18)
-    DC.B $43                 ; map 67
-    DC.W ev_b
-    DC.B $00
-
-    ; --- 28: THIEVES CLEARING ---
-    DC.W s_THIEVES_CLEARING
-    DC.B $1B                 ; mob head $1B
-    DC.B 20*4+4              ; min pos (4,4)
-    DC.B 20*9+13             ; max pos (9,13)
-    DC.B $05                 ; map 5
-    DC.W ev_thieves_clearing
-    DC.B $00
-
-    ; --- 29: OLD MINE ROAD ---
-    DC.W s_OLD_MINE_ROAD
-    DC.B $47                 ; mob head $47
-    DC.B 20*1+0              ; min pos (1,0)
-    DC.B 20*4+19             ; max pos (4,19)
-    DC.B $05                 ; map 5
-    DC.W ev_old_mine_road
-    DC.B $00
-
-    ; --- 30: FOOTHILLS CEMETERY ---
-    DC.W s_FOOTHILLS_CEMETERY
-    DC.B $45                 ; mob head $45
-    DC.B 20*1+1              ; min pos (1,1)
-    DC.B 20*8+18             ; max pos (8,18)
-    DC.B $02                 ; map 2
-    DC.W ev_foothills_cemetery
-    DC.B $00
-
-    ; --- 31: I ---
-    DC.W s_I
-    DC.B $68                 ; mob head $68
-    DC.B 20*1+1              ; min pos (1,1)
-    DC.B 20*8+18             ; max pos (8,18)
-    DC.B $44                 ; map 68
-    DC.W ev_i
-    DC.B $00
-
-    ; --- 32: UNDERGROUND STREAM ---
-    DC.W s_UNDERGROUND_STREAM
-    DC.B $00                 ; no mobs
-    DC.B 20*0+7              ; min pos (0,7)
-    DC.B 20*3+14             ; max pos (3,14)
-    DC.B $60                 ; map 96
-    DC.W ev_underground_stream
-    DC.B $00
-
-    ; --- 33: V ---
-    DC.W s_V
-    DC.B $69                 ; mob head $69
-    DC.B 20*1+1              ; min pos (1,1)
-    DC.B 20*8+18             ; max pos (8,18)
-    DC.B $45                 ; map 69
-    DC.W ev_v
-    DC.B $00
-
-    ; --- 34: GEMINI ---
-    DC.W s_GEMINI
-    DC.B $55                 ; mob head $55
-    DC.B 20*0+2              ; min pos (0,2)
-    DC.B 20*4+16             ; max pos (4,16)
-    DC.B $20                 ; map 32
-    DC.W ev_gemini
-    DC.B $00
-
-    ; --- 35: R ---
-    DC.W s_R
-    DC.B $61                 ; mob head $61
-    DC.B 20*1+1              ; min pos (1,1)
-    DC.B 20*8+10             ; max pos (8,10)
-    DC.B $40                 ; map 64
-    DC.W ev_r
-    DC.B $00
-
-    ; --- 36: OLD MINE SHAFT ---
-    DC.W s_OLD_MINE_SHAFT
-    DC.B $00                 ; no mobs
-    DC.B 20*3+4              ; min pos (3,4)
-    DC.B 20*5+14             ; max pos (5,14)
-    DC.B $06                 ; map 6
-    DC.W ev_old_mine_shaft
-    DC.B $00
-
-    ; --- 37: GILDED PATHWAY ---
-    DC.W s_GILDED_PATHWAY
-    DC.B $00                 ; no mobs
-    DC.B 20*0+6              ; min pos (0,6)
-    DC.B 20*9+10             ; max pos (9,10)
-    DC.B $47                 ; map 71
-    DC.W ev_gilded_pathway
-    DC.B $00
-
-    ; --- 38: MINOTAUR'S DEN ---
-    DC.W s_MINOTAURS_DEN
-    DC.B $6D                 ; mob head $6D
-    DC.B 20*3+0              ; min pos (3,0)
-    DC.B 20*9+7              ; max pos (9,7)
-    DC.B $63                 ; map 99
-    DC.W ev_minotaurs_den
-    DC.B $00
-
-    ; --- 39: MINOTAUR'S VAULT ---
-    DC.W s_MINOTAURS_VAULT
-    DC.B $00                 ; no mobs
-    DC.B 20*6+7              ; min pos (6,7)
-    DC.B 20*9+16             ; max pos (9,16)
-    DC.B $63                 ; map 99
-    DC.W ev_minotaurs_vault
-    DC.B $00
-
-    ; --- 40: INNER STAIRCASE ---
-    DC.W s_INNER_STAIRCASE
-    DC.B $00                 ; no mobs
-    DC.B 20*0+11             ; min pos (0,11)
-    DC.B 20*6+16             ; max pos (6,16)
-    DC.B $63                 ; map 99
-    DC.W ev_inner_staircase
-    DC.B $00
-
-    ; --- 41: SECRET PASSAGEWAY ---
-    DC.W s_SECRET_PASSAGEWAY
-    DC.B $00                 ; no mobs
-    DC.B 20*1+0              ; min pos (1,0)
-    DC.B 20*3+11             ; max pos (3,11)
-    DC.B $63                 ; map 99
-    DC.W ev_secret_passageway
-    DC.B $00
-
-    ; --- 42: VIRGO ---
-    DC.W s_VIRGO
-    DC.B $3A                 ; mob head $3A
-    DC.B 20*1+4              ; min pos (1,4)
-    DC.B 20*8+9              ; max pos (8,9)
-    DC.B $26                 ; map 38
-    DC.W ev_virgo
-    DC.B $00
-
-    ; --- 43: LEO ---
-    DC.W s_LEO
-    DC.B $4B                 ; mob head $4B
-    DC.B 20*1+0              ; min pos (1,0)
-    DC.B 20*8+4              ; max pos (8,4)
-    DC.B $26                 ; map 38
-    DC.W ev_leo
-    DC.B $00
-
-    ; --- 44: LIBRA ---
-    DC.W s_LIBRA
-    DC.B $00                 ; no mobs
-    DC.B 20*1+9              ; min pos (1,9)
-    DC.B 20*8+14             ; max pos (8,14)
-    DC.B $26                 ; map 38
-    DC.W ev_libra
-    DC.B $00
-
-    ; --- 45: SCORPIUS ---
-    DC.W s_SCORPIUS
-    DC.B $4C                 ; mob head $4C
-    DC.B 20*1+14             ; min pos (1,14)
-    DC.B 20*8+19             ; max pos (8,19)
-    DC.B $26                 ; map 38
-    DC.W ev_scorpius
-    DC.B $00
-
-    ; --- 46: SAGITTARIUS ---
-    DC.W s_SAGITTARIUS
-    DC.B $12                 ; mob head $12
-    DC.B 20*4+0              ; min pos (4,0)
-    DC.B 20*9+16             ; max pos (9,16)
-    DC.B $27                 ; map 39
-    DC.W ev_sagittarius
-    DC.B $00
-
-    ; --- 47: CAPRICORNUS ---
-    DC.W s_CAPRICORNUS
-    DC.B $00                 ; no mobs
-    DC.B 20*0+0              ; min pos (0,0)
-    DC.B 20*4+16             ; max pos (4,16)
-    DC.B $27                 ; map 39
-    DC.W ev_capricornus
-    DC.B $00
-
-    ; --- 48: AQUARIUS ---
-    DC.W s_AQUARIUS
-    DC.B $00                 ; no mobs
-    DC.B 20*1+15             ; min pos (1,15)
-    DC.B 20*8+19             ; max pos (8,19)
-    DC.B $24                 ; map 36
-    DC.W ev_aquarius
-    DC.B $00
-
-    ; --- 49: PISCES ---
-    DC.W s_PISCES
-    DC.B $00                 ; no mobs
-    DC.B 20*1+11             ; min pos (1,11)
-    DC.B 20*8+15             ; max pos (8,15)
-    DC.B $24                 ; map 36
-    DC.W ev_pisces
-    DC.B $00
-
-    ; --- 50: HALLWAY ---
-    DC.W s_HALLWAY
-    DC.B $00                 ; no mobs
-    DC.B 20*1+8              ; min pos (1,8)
-    DC.B 20*8+11             ; max pos (8,11)
-    DC.B $24                 ; map 36
-    DC.W ev_hallway
-    DC.B $00
-
-    ; --- 51: ARIES ---
-    DC.W s_ARIES
-    DC.B $4E                 ; mob head $4E
-    DC.B 20*1+4              ; min pos (1,4)
-    DC.B 20*8+8              ; max pos (8,8)
-    DC.B $24                 ; map 36
-    DC.W ev_aries
-    DC.B $00
-
-    ; --- 52: TAURUS ---
-    DC.W s_TAURUS
-    DC.B $4D                 ; mob head $4D
-    DC.B 20*1+0              ; min pos (1,0)
-    DC.B 20*8+4              ; max pos (8,4)
-    DC.B $24                 ; map 36
-    DC.W ev_taurus
-    DC.B $00
-
-    ; --- 53: GEMINI (south) ---
-    DC.W s_GEMINI2
-    DC.B $00                 ; no mobs
-    DC.B 20*0+2              ; min pos (0,2)
-    DC.B 20*4+16             ; max pos (4,16)
-    DC.B $20                 ; map 32
-    DC.W ev_gemini2
-    DC.B $00
-
-    ; --- 54: CANCER ---
-    DC.W s_CANCER
-    DC.B $4F                 ; mob head $4F
-    DC.B 20*5+2              ; min pos (5,2)
-    DC.B 20*9+16             ; max pos (9,16)
-    DC.B $20                 ; map 32
-    DC.W ev_cancer
-    DC.B $00
-
-    ; --- 55: THE MOUNTAIN ---
-    DC.W s_THE_MOUNTAIN
-    DC.B $49                 ; mob head $49
-    DC.B 20*0+2              ; min pos (0,2)
-    DC.B 20*9+16             ; max pos (9,16)
-    DC.B $07                 ; map 7
-    DC.W ev_the_mountain
-    DC.B $00
-
-    ; --- 56: SHAHRIAR TREASURY ---
-    DC.W s_SHAHRIAR_TREASURY
-    DC.B $3C                 ; mob head $3C
-    DC.B 20*1+4              ; min pos (1,4)
-    DC.B 20*8+13             ; max pos (8,13)
-    DC.B $03                 ; map 3
-    DC.W ev_shahriar_treasury
-    DC.B $00
-
-    ; --- 57: AIR VENT ---
-    DC.W s_AIR_VENT
-    DC.B $00                 ; no mobs
-    DC.B 20*0+14             ; min pos (0,14)
-    DC.B 20*9+16             ; max pos (9,16)
-    DC.B $28                 ; map 40
-    DC.W ev_air_vent
-    DC.B $00
-
-    ; --- 58: DESERTED TUNNEL ---
-    DC.W s_DESERTED_TUNNEL
-    DC.B $00                 ; no mobs
-    DC.B 20*6+6              ; min pos (6,6)
-    DC.B 20*9+14             ; max pos (9,14)
-    DC.B $28                 ; map 40
-    DC.W ev_deserted_tunnel
-    DC.B $00
-
-    ; --- 59: ROY G. BIV ---
-    DC.W s_ROY_G_BIV
-    DC.B $00                 ; no mobs
-    DC.B 20*3+0              ; min pos (3,0)
-    DC.B 20*9+2              ; max pos (9,2)
-    DC.B $28                 ; map 40
-    DC.W ev_roy_g_biv
-    DC.B $00
-
-    ; --- 60: JACKAL ALTAR ---
-    DC.W s_JACKAL_ALTAR
-    DC.B $50                 ; mob head $50
-    DC.B 20*0+2              ; min pos (0,2)
-    DC.B 20*6+14             ; max pos (6,14)
-    DC.B $28                 ; map 40
-    DC.W ev_jackal_altar
-    DC.B $00
-
-    ; --- 61: ASTROLOGER'S MAZE ---
-    DC.W s_ASTROLOGERS_MAZE
-    DC.B $14                 ; mob head $14
-    DC.B 20*0+3              ; min pos (0,3)
-    DC.B 20*9+16             ; max pos (9,16)
-    DC.B $23                 ; map 35
-    DC.W ev_astrologers_maze
-    DC.B $00
-
-    DC.W $FFFF               ; end sentinel
-    HEX 12 01 00 00 00 00 A0 ; unused padding to $4240
-@ %def LOCATION_DATA
 @ The location name strings follow the data table.  Each is a length-prefixed
 Apple~II string (high-bit ASCII) created by the [[APSTR]] pseudo-op.
 
@@ -11291,24 +10637,6 @@ GET_ENTITY_FONTCHAR:
 
 \section{Entity rendering}
 
-
-<<print font char data>>=
-    ORG     $80A4
-; Self-modifying HRCG control string for 2x2 block character rendering.
-; RENDER_FONT_CHAR patches CHAR_CHARSET and the four glyph codes before each call.
-s_PRINT_FONT_CHAR:
-    HEX     09              ; string length: 9 bytes follow
-    HEX     81              ; ctrl-A: select charset (next byte = selector)
-    HEX     B1              ; CHAR_CHARSET (self-modified: HRCG charset selector)
-    HEX     82              ; ctrl-B: enter block-display mode
-    HEX     A0              ; CHAR_UPPER_LEFT (self-modified: upper-left glyph)
-    HEX     A0              ; CHAR_UPPER_RIGHT (self-modified: upper-right glyph)
-    HEX     83              ; ctrl-C: advance to lower-left of block
-    HEX     A0              ; CHAR_LOWER_LEFT (self-modified: lower-left glyph)
-    HEX     A0              ; CHAR_LOWER_RIGHT (self-modified: lower-right glyph)
-    HEX     84              ; ctrl-D: complete block and emit it
-@ %def s_PRINT_FONT_CHAR
-
 @ [[HRCG_CHARSET1_SEL]] is the HRCG ctrl-A argument that selects custom-font
 group~1: ASCII `1' with the high bit set (\$B1).  [[CHARS_PER_FONT_PAGE]]
 is the number of custom-font characters per HRCG charset page
@@ -11343,6 +10671,23 @@ are patched into [[s_PRINT_FONT_CHAR]], which is then passed to
 [[PRINT_FONTCHAR_AT_TEXT_POS]] is an alternate entry point that omits the
 position conversion, for callers that have already set [[TEXT_COL]] and
 [[TEXT_ROW]].
+
+<<print font char data>>=
+    ORG     $80A4
+; Self-modifying HRCG control string for 2x2 block character rendering.
+; RENDER_FONT_CHAR patches CHAR_CHARSET and the four glyph codes before each call.
+s_PRINT_FONT_CHAR:
+    HEX     09              ; string length: 9 bytes follow
+    HEX     81              ; ctrl-A: select charset (next byte = selector)
+    HEX     B1              ; CHAR_CHARSET (self-modified: HRCG charset selector)
+    HEX     82              ; ctrl-B: enter block-display mode
+    HEX     A0              ; CHAR_UPPER_LEFT (self-modified: upper-left glyph)
+    HEX     A0              ; CHAR_UPPER_RIGHT (self-modified: upper-right glyph)
+    HEX     83              ; ctrl-C: advance to lower-left of block
+    HEX     A0              ; CHAR_LOWER_LEFT (self-modified: lower-left glyph)
+    HEX     A0              ; CHAR_LOWER_RIGHT (self-modified: lower-right glyph)
+    HEX     84              ; ctrl-D: complete block and emit it
+@ %def s_PRINT_FONT_CHAR
 
 <<render font char>>=
     ORG     $7489
@@ -12511,6 +11856,583 @@ screen plays until the player presses a key.  [[CHAR_PTR]] is set to
 When byte~1 of the next record equals \$FF (end sentinel), the pass calls
 [[RANDOM_EVENTS]] and restarts.
 
+The event list at [[EVENT_PTR]] consists of 3-byte entries (see
+\S\ref{sec:event-format} for the full format).  Byte~0 is a map position
+(\$FE~=~empty slot, \$FF~=~end-of-list); byte~1 encodes the event type
+and status; byte~2 is type-dependent action data.
+
+The map scene~ID (field~5, bits~0--6) is compared with [[LOCATION_FLAG2]]
+(\$5A56); when it changes, [[FILL_MAP]] is called to redraw the map.
+Bit~7 is set on first entry via [[ORA \#$80]] and tested with [[BMI]] to
+skip first-visit logic on subsequent entries.
+
+The sentinel [[FFFF]] in the name pointer marks the end of the table.
+
+<<Location data>>=
+    ORG     $4009
+LOCATION_DATA:
+    ; --- 0: ALI BABA HOME ---
+    DC.W s_ALI_BABA_HOME
+    DC.B $01                 ; mob head $01
+    DC.B 20*6+9              ; min pos (6,9)
+    DC.B 20*9+13             ; max pos (9,13)
+    DC.B $01                 ; map 1
+    DC.W ev_ali_baba_home
+    DC.B $01
+
+    ; --- 1: DUSTY ROAD ---
+    DC.W s_DUSTY_ROAD
+    DC.B $00                 ; no mobs
+    DC.B 20*3+7              ; min pos (3,7)
+    DC.B 20*6+19             ; max pos (6,19)
+    DC.B $01                 ; map 1
+    DC.W ev_dusty_road
+    DC.B $00
+
+    ; --- 2: SULTAN'S PALACE ---
+    DC.W s_SULTANS_PALACE
+    DC.B $3F                 ; mob head $3F
+    DC.B 20*0+0              ; min pos (0,0)
+    DC.B 20*9+7              ; max pos (9,7)
+    DC.B $01                 ; map 1
+    DC.W ev_sultans_palace
+    DC.B $00
+
+    ; --- 3: ROYAL LIBRARY ---
+    DC.W s_ROYAL_LIBRARY
+    DC.B $00                 ; no mobs
+    DC.B 20*0+7              ; min pos (0,7)
+    DC.B 20*3+16             ; max pos (3,16)
+    DC.B $01                 ; map 1
+    DC.W ev_royal_library
+    DC.B $00
+
+    ; --- 4: ASTROLOGER'S LAB ---
+    DC.W s_ASTROLOGERS_LAB
+    DC.B $4A                 ; mob head $4A
+    DC.B 20*0+3              ; min pos (0,3)
+    DC.B 20*9+16             ; max pos (9,16)
+    DC.B $25                 ; map 37
+    DC.W ev_astrologers_lab
+    DC.B $00
+
+    ; --- 5: BEAR CAVE ---
+    DC.W s_BEAR_CAVE
+    DC.B $51                 ; mob head $51
+    DC.B 20*0+0              ; min pos (0,0)
+    DC.B 20*5+14             ; max pos (5,14)
+    DC.B $29                 ; map 41
+    DC.W ev_bear_cave
+    DC.B $00
+
+    ; --- 6: RATS NEST ---
+    DC.W s_RATS_NEST
+    DC.B $52                 ; mob head $52
+    DC.B 20*5+0              ; min pos (5,0)
+    DC.B 20*9+14             ; max pos (9,14)
+    DC.B $29                 ; map 41
+    DC.W ev_rats_nest
+    DC.B $00
+
+    ; --- 7: DRAGON LAIR ---
+    DC.W s_DRAGON_LAIR
+    DC.B $5F                 ; mob head $5F
+    DC.B 20*4+2              ; min pos (4,2)
+    DC.B 20*9+9              ; max pos (9,9)
+    DC.B $49                 ; map 73
+    DC.W ev_dragon_lair
+    DC.B $00
+
+    ; --- 8: GOLD FOR THE LUCKY ---
+    DC.W s_GOLD_FOR_THE_LUCKY
+    DC.B $60                 ; mob head $60
+    DC.B 20*4+9              ; min pos (4,9)
+    DC.B 20*9+16             ; max pos (9,16)
+    DC.B $49                 ; map 73
+    DC.W ev_gold_for_the_lucky
+    DC.B $00
+
+    ; --- 9: SAVE THE WHALES ---
+    DC.W s_SAVE_THE_WHALES
+    DC.B $00                 ; no mobs
+    DC.B 20*0+2              ; min pos (0,2)
+    DC.B 20*4+16             ; max pos (4,16)
+    DC.B $49                 ; map 73
+    DC.W ev_save_the_whales
+    DC.B $00
+
+    ; --- 10: SLIDE ---
+    DC.W s_SLIDE
+    DC.B $00                 ; no mobs
+    DC.B 20*0+1              ; min pos (0,1)
+    DC.B 20*9+3              ; max pos (9,3)
+    DC.B $60                 ; map 96
+    DC.W ev_slide
+    DC.B $00
+
+    ; --- 11: DEEP DARK STAIRWAY ---
+    DC.W s_DEEP_DARK_STAIRWAY
+    DC.B $00                 ; no mobs
+    DC.B 20*1+3              ; min pos (1,3)
+    DC.B 20*7+9              ; max pos (7,9)
+    DC.B $61                 ; map 97
+    DC.W ev_deep_dark_stairway
+    DC.B $00
+
+    ; --- 12: MINOTAUR LABYRINTH ---
+    DC.W s_MINOTAUR_LABYRINTH
+    DC.B $6A                 ; mob head $6A
+    DC.B 20*0+3              ; min pos (0,3)
+    DC.B 20*9+16             ; max pos (9,16)
+    DC.B $62                 ; map 98
+    DC.W ev_minotaur_labyrinth
+    DC.B $00
+
+    ; --- 13: STINGER STREWN CELL ---
+    DC.W s_STINGER_STREWN_CELL
+    DC.B $5C                 ; mob head $5C
+    DC.B 20*5+3              ; min pos (5,3)
+    DC.B 20*9+8              ; max pos (9,8)
+    DC.B $48                 ; map 72
+    DC.W ev_stinger_strewn_cell
+    DC.B $00
+
+    ; --- 14: GUARD ROOM ---
+    DC.W s_GUARD_ROOM
+    DC.B $57                 ; mob head $57
+    DC.B 20*0+3              ; min pos (0,3)
+    DC.B 20*5+16             ; max pos (5,16)
+    DC.B $48                 ; map 72
+    DC.W ev_guard_room
+    DC.B $00
+
+    ; --- 15: LONG WAY FROM HOME ---
+    DC.W s_LONG_WAY_FROM_HOME
+    DC.B $5E                 ; mob head $5E
+    DC.B 20*5+11             ; min pos (5,11)
+    DC.B 20*9+16             ; max pos (9,16)
+    DC.B $48                 ; map 72
+    DC.W ev_long_way_from_home
+    DC.B $00
+
+    ; --- 16: FOREST ---
+    DC.W s_FOREST
+    DC.B $43                 ; mob head $43
+    DC.B 20*0+0              ; min pos (0,0)
+    DC.B 20*9+13             ; max pos (9,13)
+    DC.B $04                 ; map 4
+    DC.W ev_forest
+    DC.B $00
+
+    ; --- 17: VIEW FROM A TREE ---
+    DC.W s_VIEW_FROM_A_TREE
+    DC.B $00                 ; no mobs
+    DC.B 20*1+13             ; min pos (1,13)
+    DC.B 20*7+19             ; max pos (7,19)
+    DC.B $04                 ; map 4
+    DC.W ev_view_from_a_tree
+    DC.B $00
+
+    ; --- 18: FAILING WALL ---
+    DC.W s_FAILING_WALL
+    DC.B $6B                 ; mob head $6B
+    DC.B 20*1+0              ; min pos (1,0)
+    DC.B 20*8+14             ; max pos (8,14)
+    DC.B $64                 ; map 100
+    DC.W ev_failing_wall
+    DC.B $00
+
+    ; --- 19: MINOTAUR PLAYROOM ---
+    DC.W s_MINOTAUR_PLAYROOM
+    DC.B $6C                 ; mob head $6C
+    DC.B 20*1+5              ; min pos (1,5)
+    DC.B 20*8+19             ; max pos (8,19)
+    DC.B $65                 ; map 101
+    DC.W ev_minotaur_playroom
+    DC.B $00
+
+    ; --- 20: THIEVES CAVE ---
+    DC.W s_THIEVES_CAVE
+    DC.B $00                 ; no mobs
+    DC.B 20*0+3              ; min pos (0,3)
+    DC.B 20*9+16             ; max pos (9,16)
+    DC.B $21                 ; map 33
+    DC.W ev_thieves_cave
+    DC.B $00
+
+    ; --- 21: O ---
+    DC.W s_O
+    DC.B $62                 ; mob head $62
+    DC.B 20*1+10             ; min pos (1,10)
+    DC.B 20*8+18             ; max pos (8,18)
+    DC.B $40                 ; map 64
+    DC.W ev_o
+    DC.B $00
+
+    ; --- 22: SPIRAL STAIRCASE ---
+    DC.W s_SPIRAL_STAIRCASE
+    DC.B $00                 ; no mobs
+    DC.B 20*1+6              ; min pos (1,6)
+    DC.B 20*7+10             ; max pos (7,10)
+    DC.B $46                 ; map 70
+    DC.W ev_spiral_staircase
+    DC.B $00
+
+    ; --- 23: Y ---
+    DC.W s_Y
+    DC.B $63                 ; mob head $63
+    DC.B 20*1+1              ; min pos (1,1)
+    DC.B 20*8+18             ; max pos (8,18)
+    DC.B $41                 ; map 65
+    DC.W ev_y
+    DC.B $00
+
+    ; --- 24: MAGIC TOURBILLION ---
+    DC.W s_MAGIC_TOURBILLION
+    DC.B $00                 ; no mobs
+    DC.B 20*5+9              ; min pos (5,9)
+    DC.B 20*9+13             ; max pos (9,13)
+    DC.B $60                 ; map 96
+    DC.W ev_magic_tourbillion
+    DC.B $00
+
+    ; --- 25: G. ---
+    DC.W s_G
+    DC.B $64                 ; mob head $64
+    DC.B 20*1+1              ; min pos (1,1)
+    DC.B 20*8+18             ; max pos (8,18)
+    DC.B $42                 ; map 66
+    DC.W ev_g
+    DC.B $00
+
+    ; --- 26: CRYSTAL CAVE ---
+    DC.W s_CRYSTAL_CAVE
+    DC.B $00                 ; no mobs
+    DC.B 20*2+3              ; min pos (2,3)
+    DC.B 20*8+15             ; max pos (8,15)
+    DC.B $22                 ; map 34
+    DC.W ev_crystal_cave
+    DC.B $00
+
+    ; --- 27: B ---
+    DC.W s_B
+    DC.B $00                 ; no mobs
+    DC.B 20*1+1              ; min pos (1,1)
+    DC.B 20*8+18             ; max pos (8,18)
+    DC.B $43                 ; map 67
+    DC.W ev_b
+    DC.B $00
+
+    ; --- 28: THIEVES CLEARING ---
+    DC.W s_THIEVES_CLEARING
+    DC.B $1B                 ; mob head $1B
+    DC.B 20*4+4              ; min pos (4,4)
+    DC.B 20*9+13             ; max pos (9,13)
+    DC.B $05                 ; map 5
+    DC.W ev_thieves_clearing
+    DC.B $00
+
+    ; --- 29: OLD MINE ROAD ---
+    DC.W s_OLD_MINE_ROAD
+    DC.B $47                 ; mob head $47
+    DC.B 20*1+0              ; min pos (1,0)
+    DC.B 20*4+19             ; max pos (4,19)
+    DC.B $05                 ; map 5
+    DC.W ev_old_mine_road
+    DC.B $00
+
+    ; --- 30: FOOTHILLS CEMETERY ---
+    DC.W s_FOOTHILLS_CEMETERY
+    DC.B $45                 ; mob head $45
+    DC.B 20*1+1              ; min pos (1,1)
+    DC.B 20*8+18             ; max pos (8,18)
+    DC.B $02                 ; map 2
+    DC.W ev_foothills_cemetery
+    DC.B $00
+
+    ; --- 31: I ---
+    DC.W s_I
+    DC.B $68                 ; mob head $68
+    DC.B 20*1+1              ; min pos (1,1)
+    DC.B 20*8+18             ; max pos (8,18)
+    DC.B $44                 ; map 68
+    DC.W ev_i
+    DC.B $00
+
+    ; --- 32: UNDERGROUND STREAM ---
+    DC.W s_UNDERGROUND_STREAM
+    DC.B $00                 ; no mobs
+    DC.B 20*0+7              ; min pos (0,7)
+    DC.B 20*3+14             ; max pos (3,14)
+    DC.B $60                 ; map 96
+    DC.W ev_underground_stream
+    DC.B $00
+
+    ; --- 33: V ---
+    DC.W s_V
+    DC.B $69                 ; mob head $69
+    DC.B 20*1+1              ; min pos (1,1)
+    DC.B 20*8+18             ; max pos (8,18)
+    DC.B $45                 ; map 69
+    DC.W ev_v
+    DC.B $00
+
+    ; --- 34: GEMINI ---
+    DC.W s_GEMINI
+    DC.B $55                 ; mob head $55
+    DC.B 20*0+2              ; min pos (0,2)
+    DC.B 20*4+16             ; max pos (4,16)
+    DC.B $20                 ; map 32
+    DC.W ev_gemini
+    DC.B $00
+
+    ; --- 35: R ---
+    DC.W s_R
+    DC.B $61                 ; mob head $61
+    DC.B 20*1+1              ; min pos (1,1)
+    DC.B 20*8+10             ; max pos (8,10)
+    DC.B $40                 ; map 64
+    DC.W ev_r
+    DC.B $00
+
+    ; --- 36: OLD MINE SHAFT ---
+    DC.W s_OLD_MINE_SHAFT
+    DC.B $00                 ; no mobs
+    DC.B 20*3+4              ; min pos (3,4)
+    DC.B 20*5+14             ; max pos (5,14)
+    DC.B $06                 ; map 6
+    DC.W ev_old_mine_shaft
+    DC.B $00
+
+    ; --- 37: GILDED PATHWAY ---
+    DC.W s_GILDED_PATHWAY
+    DC.B $00                 ; no mobs
+    DC.B 20*0+6              ; min pos (0,6)
+    DC.B 20*9+10             ; max pos (9,10)
+    DC.B $47                 ; map 71
+    DC.W ev_gilded_pathway
+    DC.B $00
+
+    ; --- 38: MINOTAUR'S DEN ---
+    DC.W s_MINOTAURS_DEN
+    DC.B $6D                 ; mob head $6D
+    DC.B 20*3+0              ; min pos (3,0)
+    DC.B 20*9+7              ; max pos (9,7)
+    DC.B $63                 ; map 99
+    DC.W ev_minotaurs_den
+    DC.B $00
+
+    ; --- 39: MINOTAUR'S VAULT ---
+    DC.W s_MINOTAURS_VAULT
+    DC.B $00                 ; no mobs
+    DC.B 20*6+7              ; min pos (6,7)
+    DC.B 20*9+16             ; max pos (9,16)
+    DC.B $63                 ; map 99
+    DC.W ev_minotaurs_vault
+    DC.B $00
+
+    ; --- 40: INNER STAIRCASE ---
+    DC.W s_INNER_STAIRCASE
+    DC.B $00                 ; no mobs
+    DC.B 20*0+11             ; min pos (0,11)
+    DC.B 20*6+16             ; max pos (6,16)
+    DC.B $63                 ; map 99
+    DC.W ev_inner_staircase
+    DC.B $00
+
+    ; --- 41: SECRET PASSAGEWAY ---
+    DC.W s_SECRET_PASSAGEWAY
+    DC.B $00                 ; no mobs
+    DC.B 20*1+0              ; min pos (1,0)
+    DC.B 20*3+11             ; max pos (3,11)
+    DC.B $63                 ; map 99
+    DC.W ev_secret_passageway
+    DC.B $00
+
+    ; --- 42: VIRGO ---
+    DC.W s_VIRGO
+    DC.B $3A                 ; mob head $3A
+    DC.B 20*1+4              ; min pos (1,4)
+    DC.B 20*8+9              ; max pos (8,9)
+    DC.B $26                 ; map 38
+    DC.W ev_virgo
+    DC.B $00
+
+    ; --- 43: LEO ---
+    DC.W s_LEO
+    DC.B $4B                 ; mob head $4B
+    DC.B 20*1+0              ; min pos (1,0)
+    DC.B 20*8+4              ; max pos (8,4)
+    DC.B $26                 ; map 38
+    DC.W ev_leo
+    DC.B $00
+
+    ; --- 44: LIBRA ---
+    DC.W s_LIBRA
+    DC.B $00                 ; no mobs
+    DC.B 20*1+9              ; min pos (1,9)
+    DC.B 20*8+14             ; max pos (8,14)
+    DC.B $26                 ; map 38
+    DC.W ev_libra
+    DC.B $00
+
+    ; --- 45: SCORPIUS ---
+    DC.W s_SCORPIUS
+    DC.B $4C                 ; mob head $4C
+    DC.B 20*1+14             ; min pos (1,14)
+    DC.B 20*8+19             ; max pos (8,19)
+    DC.B $26                 ; map 38
+    DC.W ev_scorpius
+    DC.B $00
+
+    ; --- 46: SAGITTARIUS ---
+    DC.W s_SAGITTARIUS
+    DC.B $12                 ; mob head $12
+    DC.B 20*4+0              ; min pos (4,0)
+    DC.B 20*9+16             ; max pos (9,16)
+    DC.B $27                 ; map 39
+    DC.W ev_sagittarius
+    DC.B $00
+
+    ; --- 47: CAPRICORNUS ---
+    DC.W s_CAPRICORNUS
+    DC.B $00                 ; no mobs
+    DC.B 20*0+0              ; min pos (0,0)
+    DC.B 20*4+16             ; max pos (4,16)
+    DC.B $27                 ; map 39
+    DC.W ev_capricornus
+    DC.B $00
+
+    ; --- 48: AQUARIUS ---
+    DC.W s_AQUARIUS
+    DC.B $00                 ; no mobs
+    DC.B 20*1+15             ; min pos (1,15)
+    DC.B 20*8+19             ; max pos (8,19)
+    DC.B $24                 ; map 36
+    DC.W ev_aquarius
+    DC.B $00
+
+    ; --- 49: PISCES ---
+    DC.W s_PISCES
+    DC.B $00                 ; no mobs
+    DC.B 20*1+11             ; min pos (1,11)
+    DC.B 20*8+15             ; max pos (8,15)
+    DC.B $24                 ; map 36
+    DC.W ev_pisces
+    DC.B $00
+
+    ; --- 50: HALLWAY ---
+    DC.W s_HALLWAY
+    DC.B $00                 ; no mobs
+    DC.B 20*1+8              ; min pos (1,8)
+    DC.B 20*8+11             ; max pos (8,11)
+    DC.B $24                 ; map 36
+    DC.W ev_hallway
+    DC.B $00
+
+    ; --- 51: ARIES ---
+    DC.W s_ARIES
+    DC.B $4E                 ; mob head $4E
+    DC.B 20*1+4              ; min pos (1,4)
+    DC.B 20*8+8              ; max pos (8,8)
+    DC.B $24                 ; map 36
+    DC.W ev_aries
+    DC.B $00
+
+    ; --- 52: TAURUS ---
+    DC.W s_TAURUS
+    DC.B $4D                 ; mob head $4D
+    DC.B 20*1+0              ; min pos (1,0)
+    DC.B 20*8+4              ; max pos (8,4)
+    DC.B $24                 ; map 36
+    DC.W ev_taurus
+    DC.B $00
+
+    ; --- 53: GEMINI (south) ---
+    DC.W s_GEMINI2
+    DC.B $00                 ; no mobs
+    DC.B 20*0+2              ; min pos (0,2)
+    DC.B 20*4+16             ; max pos (4,16)
+    DC.B $20                 ; map 32
+    DC.W ev_gemini2
+    DC.B $00
+
+    ; --- 54: CANCER ---
+    DC.W s_CANCER
+    DC.B $4F                 ; mob head $4F
+    DC.B 20*5+2              ; min pos (5,2)
+    DC.B 20*9+16             ; max pos (9,16)
+    DC.B $20                 ; map 32
+    DC.W ev_cancer
+    DC.B $00
+
+    ; --- 55: THE MOUNTAIN ---
+    DC.W s_THE_MOUNTAIN
+    DC.B $49                 ; mob head $49
+    DC.B 20*0+2              ; min pos (0,2)
+    DC.B 20*9+16             ; max pos (9,16)
+    DC.B $07                 ; map 7
+    DC.W ev_the_mountain
+    DC.B $00
+
+    ; --- 56: SHAHRIAR TREASURY ---
+    DC.W s_SHAHRIAR_TREASURY
+    DC.B $3C                 ; mob head $3C
+    DC.B 20*1+4              ; min pos (1,4)
+    DC.B 20*8+13             ; max pos (8,13)
+    DC.B $03                 ; map 3
+    DC.W ev_shahriar_treasury
+    DC.B $00
+
+    ; --- 57: AIR VENT ---
+    DC.W s_AIR_VENT
+    DC.B $00                 ; no mobs
+    DC.B 20*0+14             ; min pos (0,14)
+    DC.B 20*9+16             ; max pos (9,16)
+    DC.B $28                 ; map 40
+    DC.W ev_air_vent
+    DC.B $00
+
+    ; --- 58: DESERTED TUNNEL ---
+    DC.W s_DESERTED_TUNNEL
+    DC.B $00                 ; no mobs
+    DC.B 20*6+6              ; min pos (6,6)
+    DC.B 20*9+14             ; max pos (9,14)
+    DC.B $28                 ; map 40
+    DC.W ev_deserted_tunnel
+    DC.B $00
+
+    ; --- 59: ROY G. BIV ---
+    DC.W s_ROY_G_BIV
+    DC.B $00                 ; no mobs
+    DC.B 20*3+0              ; min pos (3,0)
+    DC.B 20*9+2              ; max pos (9,2)
+    DC.B $28                 ; map 40
+    DC.W ev_roy_g_biv
+    DC.B $00
+
+    ; --- 60: JACKAL ALTAR ---
+    DC.W s_JACKAL_ALTAR
+    DC.B $50                 ; mob head $50
+    DC.B 20*0+2              ; min pos (0,2)
+    DC.B 20*6+14             ; max pos (6,14)
+    DC.B $28                 ; map 40
+    DC.W ev_jackal_altar
+    DC.B $00
+
+    ; --- 61: ASTROLOGER'S MAZE ---
+    DC.W s_ASTROLOGERS_MAZE
+    DC.B $14                 ; mob head $14
+    DC.B 20*0+3              ; min pos (0,3)
+    DC.B 20*9+16             ; max pos (9,16)
+    DC.B $23                 ; map 35
+    DC.W ev_astrologers_maze
+    DC.B $00
+
+    DC.W $FFFF               ; end sentinel
+    HEX 12 01 00 00 00 00 A0 ; unused padding to $4240
+@ %def LOCATION_DATA
+
 <<main entry>>=
     ORG     $0800
 MAIN_ENTRY:
@@ -12569,6 +12491,62 @@ MAIN_ENTRY:
     JSR     RANDOM_EVENTS      ; between-round random event dispatch
     JMP     .restart           ; restart the game loop
 @ %def MAIN_ENTRY
+
+@ [[ATTRACT_SCREEN]] initializes the attract-mode demo.  Called from
+[[MAIN_ENTRY]] on first run ([[TOTAL_MOB_COUNT]] = 0), it sets
+[[ACTIVE_CHAR]] to~1, obtains the mob data pointer for scene~1 via
+[[GET_MOB_DATA]], runs [[SCENE_SETUP]], clears [[LOCATION_POS]], and
+enters [[SCENE_LOOP]] with scene~\$26 (the attract demo).
+
+<<attract screen>>=
+    ORG     $09F4
+ATTRACT_SCREEN:
+    SUBROUTINE ATTRACT_SCREEN
+    ; Initialize attract-mode demo screen.
+    ;
+    ; Behavior:
+    ;   Sets ACTIVE_CHAR to 1, initializes mob data pointer for scene 1,
+    ;   runs scene setup, clears location flag, and enters SCENE_LOOP
+    ;   with scene $26 (attract demo).
+    ;
+    ; Modifies: ACTIVE_CHAR, SCENE_EVENT_RESULT, MOB_PTR, LOCATION_POS
+    ; Clobbers: A, X, Y
+
+    STOB    #$01,ACTIVE_CHAR           ; scene/character index = 1
+    STA     SCENE_EVENT_RESULT         ; mark event as handled
+    JSR     GET_MOB_DATA               ; scene 1 -> MOB_DATA_PTR
+    MOVW    MOB_DATA_PTR,MOB_PTR       ; save pointer
+    JSR     SCENE_SETUP
+    STOB    #$00,LOCATION_POS          ; clear location-change flag
+    JSR     SET_CURSOR_ROW21
+    LDA     #$26                       ; scene $26 (attract demo)
+    JMP     SCENE_LOOP                 ; tail-call
+@ %def ATTRACT_SCREEN
+
+@ [[ATTRACT_LOOP]] is the main loop of the resident bytecode interpreter.
+Each iteration swaps zero-page context and dispatches one bytecode
+instruction.  It runs until the VM exits via [[VM_EXIT_OK]] or
+[[VM_EXIT_ERR]].
+
+<<attract loop>>=
+    ORG     $0569
+ATTRACT_LOOP:
+    SUBROUTINE ATTRACT_LOOP
+    ; Main loop for the resident bytecode interpreter.
+    ;
+    ; Behavior:
+    ;   Each iteration swaps zero-page context ($50-$5F) with the
+    ;   saved VM state, dispatches one bytecode instruction, then
+    ;   loops.  Never returns -- runs until the VM exits via
+    ;   VM_EXIT_OK or VM_EXIT_ERR.
+    ;
+    ; Clobbers: A, X, Y
+
+    JSR     CONTEXT_SWAP
+    JSR     RESIDENT_DISPATCH
+    JMP     ATTRACT_LOOP
+@ %def ATTRACT_LOOP
+
 @ [[PROCESS_MOB_GROUPS]] walks the mob linked list for the current character,
 processing each group according to its type.
 
@@ -17853,6 +17831,26 @@ messages that scale with the magnitude of the value---for example, mapping
 low damage to ``scratches'' and high damage to ``devastating blow.''
 
 
+<<attack verb strings>>=
+    ORG     $803A
+ATTACK_VERB_STRINGS:
+    APSTR   "JABS"
+    APSTR   "POKES"
+    APSTR   "HITS"
+    APSTR   "CLOUTS"
+    APSTR   "POUNDS"
+    APSTR   "SMACKS"
+    APSTR   "SMITES"
+    APSTR   "WHOPS"
+    APSTR   "WHACKS"
+    APSTR   "BASHES"
+    APSTR   "WHOMPS"
+    APSTR   "WALLOPS"
+    APSTR   "SMASHES"
+    APSTR   "CLOBBERS"
+    APSTR   "LAMBASTES"
+@ %def ATTACK_VERB_STRINGS
+
 <<map value to string>>=
     ORG     $11FC
 MAP_VALUE_TO_STRING:
@@ -18810,6 +18808,66 @@ SHOP_ITEM_OFFSET EQU    $5A85   ; offset into shop record (5 per item slot)
 <<zero page defines>>=
 SHOP_DATA_PTR           EQU     $E6     ; ZP pointer to current shop item record (2 bytes)
 @ %def SHOP_DATA_PTR
+
+<<shop table>>=
+    ORG     $7EDD
+SHOP_TABLE:
+    ; === Weapon shop record (41 bytes) ===
+    ; slot 0 [+$00]: AN IRON SWORD (price $0A)
+    DC.W    SHOP_BUY_EFFECT_0
+    DC.W    S_IRON_SWORD
+    DC.B    $0A
+    ; slot 1 [+$05]: A STEEL SWORD (price $32)
+    DC.W    SHOP_BUY_EFFECT_1
+    DC.W    S_STEEL_SWORD
+    DC.B    $32
+    ; slot 2 [+$0A]: display format (masked out)
+    HEX     B7 C5 A0 AE A0
+    ; slot 3 [+$0F]: AN OAK CLUB (price $03)
+    DC.W    SHOP_BUY_EFFECT_2
+    DC.W    S_OAK_CLUB
+    DC.B    $03
+    ; slot 4 [+$14]: display format (masked out)
+    HEX     B2 AE A0 A0 AE
+    ; [+$19]: A STEEL DAGGER (price $0F)
+    DC.W    SHOP_BUY_EFFECT_3
+    DC.W    S_STEEL_DAGGER
+    DC.B    $0F
+    ; [+$1E]: A SHIV (price $0A)
+    DC.W    SHOP_BUY_EFFECT_4
+    DC.W    S_SHIV
+    DC.B    $0A
+    ; [+$23]: display format
+    HEX     B6 A0 B4 A0 C6
+    ; [+$28]: scene number
+    DC.B    $32                ; scene $32 (weapon shop)
+
+    ; === Armor shop record (41 bytes) ===
+    ; slot 0 [+$00]: PLATE ARMOR (price $50)
+    DC.W    XP_AWARD_0
+    DC.W    S_PLATE_ARMOR
+    DC.B    $50
+    ; slot 1 [+$05]: RITHMIL PLATE ARMOR (price $C8)
+    DC.W    XP_AWARD_1
+    DC.W    S_RITHMIL_PLATE
+    DC.B    $C8
+    ; slot 2 [+$0A]: CHAIN MAIL (price $28)
+    DC.W    XP_AWARD_2
+    DC.W    S_CHAIN_MAIL
+    DC.B    $28
+    ; slot 3 [+$0F]: RITHMIL CHAIN MAIL (price $64)
+    DC.W    XP_AWARD_3
+    DC.W    S_RITHMIL_CHAIN
+    DC.B    $64
+    ; slot 4 [+$14]: LEATHER ARMOR (price $08)
+    DC.W    XP_AWARD_4
+    DC.W    S_LEATHER_ARMOR
+    DC.B    $08
+    ; [+$19]: display format
+    HEX     A0 B5 CF AE B5 A0 CB CC B1 CD D0 AF B1 C1 B9
+    ; [+$28]: scene number
+    DC.B    $33                ; scene $33 (armor shop)
+@ %def SHOP_TABLE
 
 <<display shop>>=
     ORG     $70DF
@@ -21965,36 +22023,6 @@ INC_EVENT_THRESHOLD:
     RTS
 
 @ %def TOGGLE_SOUND SETTINGS_DISPLAY_INIT DEC_THRESHOLD_WRAP INC_THRESHOLD_WRAP DEC_EVENT_THRESHOLD INC_EVENT_THRESHOLD
-
-\label{sec:attract_screen}
-
-<<attract screen>>=
-    ORG     $09F4
-ATTRACT_SCREEN:
-    SUBROUTINE ATTRACT_SCREEN
-
-    STOB    #$01,ACTIVE_CHAR ; scene/character index = 1
-    STA     SCENE_EVENT_RESULT ; mark event as handled
-    JSR     GET_MOB_DATA  ; scene 1 pointer -> MOB_DATA_PTR/MOB_DATA_PTR+1
-    MOVW    MOB_DATA_PTR,MOB_PTR ;  MOB_PTR/MOB_PTR+1 = MOB_DATA_PTR/MOB_DATA_PTR+1 (save pointer)
-    JSR     SCENE_SETUP
-    STOB    #$00,LOCATION_POS ; clear location-change flag
-    JSR     SET_CURSOR_ROW21
-    LDA     #$26               ; scene number $26 (38 decimal)
-    JMP     SCENE_LOOP         ; tail-call
-@ %def ATTRACT_SCREEN
-The entry point for the resident interpreter.  Each iteration swaps
-context (zero-page state) and dispatches one bytecode instruction.
-
-<<attract loop>>=
-    ORG     $0569
-ATTRACT_LOOP:
-    SUBROUTINE ATTRACT_LOOP
-
-    JSR     CONTEXT_SWAP
-    JSR     RESIDENT_DISPATCH
-    JMP     ATTRACT_LOOP
-@ %def ATTRACT_LOOP
 
 \chapter{Resident Routines}
 
