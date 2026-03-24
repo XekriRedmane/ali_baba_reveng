@@ -3897,21 +3897,18 @@ MFIELD_NEXT         EQU     $02     ; byte 2: next link pointer
 MFIELD_POSITION     EQU     $03     ; byte 3: map position (packed col/row)
 MFIELD_APPEARANCE   EQU     $04     ; byte 4: appearance index
 MFIELD_STRENGTH     EQU     $05     ; byte 5: bits 4-0 = strength / bits 4-1 = defense
-MFIELD_MOB_TYPE     EQU     $06     ; byte 6: bits 5-0 = mob type (>= 3 = active)
+MFIELD_HP           EQU     $06     ; byte 6: bits 5-0 = hit points, bits 7-6 = flags
 MFIELD_ATTACK       EQU     $07     ; byte 7: attack stat
 MFIELD_XP           EQU     $08     ; byte 8: status (7) | pending XP (6-4) | group count (3-0)
 MFIELD_DEFENSE      EQU     $09     ; byte 9: defense stat
 MFIELD_LEVEL        EQU     $0B     ; byte 11: class/faction (7-5) | level (4-0)
 MFIELD_LEVEL_ENC    EQU     $0C     ; byte 12: level encoding (hi nib = XP mult, lo nib = base)
-MFIELD_GOLD_LO      EQU     $0D     ; byte 13: gold counter low byte
-MFIELD_GOLD_HI      EQU     $0E     ; byte 14: gold counter high byte
+MFIELD_GOLD         EQU     $0D     ; bytes 13-14: gold counter (16-bit, lo/hi)
 MFIELD_CHAR         EQU     $00     ; byte 0: display character
-MFIELD_NAME_LO      EQU     $00     ; byte 0: name pointer low (alias for PCs)
-MFIELD_NAME_HI      EQU     $01     ; byte 1: name pointer high (alias for PCs)
-MFIELD_HP           EQU     $06     ; byte 6: bits 5-0 = HP (alias of MFIELD_MOB_TYPE)
+MFIELD_NAME         EQU     $00     ; bytes 0-1: name pointer (16-bit, lo/hi)
 MFIELD_FLAGS        EQU     $0F     ; byte 15: status flags (bit 2 = combat engaged)
 HP_FLAGS_MASK       EQU     $C0     ; byte 6: mask for flags bits 7-6 (above HP)
-@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP CFIELD_FACTION_MASK MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_MOB_TYPE MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL MFIELD_NAME_LO MFIELD_NAME_HI MFIELD_HP HP_FLAGS_MASK
+@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP CFIELD_FACTION_MASK MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_HP MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL MFIELD_NAME MFIELD_GOLD MFIELD_HP HP_FLAGS_MASK
 
 <<game init>>=
     ORG     $78C7
@@ -7252,7 +7249,7 @@ DISPLAY_CHAR_STATS:
     ; --- Format life force: field 6, bits 5-0 ---
     LDA     #$00
     STA     NUM_VALUE+1                ; high byte = 0
-    LDY     #MFIELD_MOB_TYPE
+    LDY     #MFIELD_HP
     LDA     (ENTITY_PTR),Y            ; field 6
     AND     #HP_MASK                   ; bits 5-0 = life force
     STA     NUM_VALUE
@@ -7312,7 +7309,7 @@ DISPLAY_CHAR_STATS:
     JSR     NUM_TO_DECIMAL
 
     ; --- Format experience: fields 13-14 (16-bit) ---
-    LDY     #MFIELD_GOLD_LO
+    LDY     #MFIELD_GOLD
     LDA     (ENTITY_PTR),Y            ; field 13 (low byte)
     STA     NUM_VALUE
     INY
@@ -8674,11 +8671,11 @@ COPY_PC_NAME_TO_BUF:
     STA     MOB_PTR                    ;  | MOB_PTR = MOB_DATA_PTR
     LDA     MOB_DATA_PTR+1             ;  |
     STA     MOB_PTR+1                  ; /
-    LDY     #MFIELD_NAME_LO            ; byte 0: name ptr low
+    LDY     #MFIELD_NAME            ; byte 0: name ptr low
     LDA     (MOB_PTR),Y                ; load name ptr low
     STA     TARGET_REC                 ; \
     INY                                ;  | TARGET_REC = name string
-    LDA     (MOB_PTR),Y                ;  | (Y = MFIELD_NAME_HI)
+    LDA     (MOB_PTR),Y                ;  | (Y = MFIELD_NAME+1)
     STA     TARGET_REC+1               ; /
     LDA     #<CHAR_SELECT_NAME         ; \
     STA     MOB_DATA_PTR               ;  | MOB_DATA_PTR = display buf
@@ -9610,12 +9607,9 @@ the mob data table and associated name strings.
   runtime).
 \end{itemize}
 
-<<mob data>>=
-    ORG     $4C80
-MOB_DATA_TABLE:
-    INCLUDE "mobdata.asm"
-@ %def MOB_DATA_TABLE
-@
+The 128 mob data records and name strings are documented in
+Chapter~\ref{ch:mob-data}.
+
 @ [[s_PRINT_FONT_CHAR]] at [[$80A4]] is the 10-byte self-modifying HRCG
 control string that [[RENDER_FONT_CHAR]] patches with character-set and
 glyph codes before passing to [[PRINT_STRING]].  It is a 9-byte
@@ -9670,7 +9664,7 @@ the current player.
   \item Increments minimums by one (exclusive border).
   \item Calls [[RANDOM_IN_RANGE]] twice to choose random column and row.
   \item Stores the position in [[MFIELD_POSITION]] of the mob record via
-        [[MOB_PTR]], clears gold ([[MFIELD_GOLD_LO]]/[[MFIELD_GOLD_HI]]),
+        [[MOB_PTR]], clears gold ([[MFIELD_GOLD]]/[[MFIELD_GOLD+1]]),
         and reorders the mob in the linked list.
   \item If [[ACTIVE_CHAR]] equals [[CURRENT_PLAYER]], draws the character.
 \end{enumerate}
@@ -9742,10 +9736,10 @@ SCENE_SETUP:
     MOVW    MOB_PTR,TARGET_REC         ; TARGET_REC = MOB_PTR
     STOB    #$00,SOURCE_CHAR           ; no source character
     JSR     REORDER_CHAR               ; splice into linked list
-    LDY     #MFIELD_GOLD_LO            ; byte 13: gold low byte
+    LDY     #MFIELD_GOLD            ; byte 13: gold low byte
     LDA     #$00                       ; \
     STA     (MOB_PTR),Y                ;  | clear gold counter
-    INY                                ;  | Y = MFIELD_GOLD_HI
+    INY                                ;  | Y = MFIELD_GOLD+1
     STA     (MOB_PTR),Y                ; /
     JSR     CLAMP_CHAR_FIELD           ; enforce byte 6 >= byte 5
     LDA     CURRENT_PLAYER             ; current player index
@@ -12528,14 +12522,14 @@ ATTRACT_LOOP:
 @ [[PROCESS_MOB_GROUPS]] walks the mob linked list for the current character,
 processing each group according to its type.
 
-\paragraph{Group classification.}  Each group's type field
-([[MFIELD_MOB_TYPE]], bits~5--0 of mob data byte~6) determines how it is
+\paragraph{Group classification.}  Each group's hit points
+([[MFIELD_HP]], bits~5--0 of mob data byte~6) determine how it is
 handled:
 \begin{itemize}
-  \item Type $<$ 3 (\emph{inactive}): friendly NPCs or resting party members.
+  \item HP $<$ 3 (\emph{inactive}): the mob goes idle and heals.
         [[SHOW_IDLE_STATUS]] prints a status message; [[AUTO_HEAL]] gradually
         restores hit points.
-  \item Type $\ge$ 3 (\emph{active}): [[START_MOB_TURN]] sets up the sprite
+  \item HP $\ge$ 3 (\emph{active}): [[START_MOB_TURN]] sets up the sprite
         and enters [[GAME_TURN_LOOP]] if the group needs a turn.
 \end{itemize}
 
@@ -12556,8 +12550,8 @@ PROCESS_MOB_GROUPS:
     ;   in CURRENT_ROOM.  Rolls a 1-in-24 PRNG chance to call the disk
     ;   checkpoint at $A508.  Then iterates the linked list: for each mob,
     ;   resolves via GET_MOB_DATA, copies to ENTITY_PTR, reads the next link.
-    ;   Type < 3 (inactive): SHOW_IDLE_STATUS + AUTO_HEAL.
-    ;   Type >= 3 (active): START_MOB_TURN, then reset BLINK_COL to MAP_WIDTH.
+    ;   HP < 3 (inactive): SHOW_IDLE_STATUS + AUTO_HEAL.
+    ;   HP >= 3 (active): START_MOB_TURN, then reset BLINK_COL to MAP_WIDTH.
     ;   Loop continues until the link value is 0.
     ;
     ; Modifies:
@@ -12585,9 +12579,9 @@ PROCESS_MOB_GROUPS:
     LDY     #MFIELD_NEXT
     LDA     (ENTITY_PTR),Y   ; mob data byte 2 = next link
     STA     CURRENT_ROOM     ; save for next iteration
-    LDY     #MFIELD_MOB_TYPE
+    LDY     #MFIELD_HP
     LDA     (ENTITY_PTR),Y   ; mob data byte 6
-    AND     #MOB_TYPE_MASK   ; bits 5-0 = mob type
+    AND     #HP_MASK   ; bits 5-0 = HP
     BAPL    #$03,.active_mob ; type >= 3?
     JSR     SHOW_IDLE_STATUS ; inactive: print name + message
     JSR     AUTO_HEAL        ; heal party members
@@ -15567,9 +15561,9 @@ CHECK_ENCOUNTER:
     JSR     FIND_MOB_AT_SAME_POS   ; find next mob at same position
     BAMI    #$01,.none             ; 0 = none found
     BEQ     .friendly              ; 1 = wrapped (same faction)
-    LDY     #MFIELD_MOB_TYPE       ; result >= 2: found ahead
+    LDY     #MFIELD_HP       ; result >= 2: found ahead
     LDA     (MOB_PTR),Y
-    AND     #MOB_TYPE_MASK         ; bits 5-0 = mob type
+    AND     #HP_MASK         ; bits 5-0 = HP
     BALT    #$03,.search           ; type < 3 = inactive, skip
     JSR     CHECK_HOSTILE
     BAEQ    #$00,.search           ; same faction -> skip
@@ -16473,7 +16467,7 @@ RESOLVE_ATTACK:
 
     ; --- AI: target HP check ---
 .state_done:
-    LDY     #MFIELD_MOB_TYPE       ; byte 6: HP in bits 5-0
+    LDY     #MFIELD_HP       ; byte 6: HP in bits 5-0
     LDA     (MOB_PTR),Y
     AND     #HP_MASK
     BAGE    #$03,.hp_ok            ; HP >= 3 -> not critical
@@ -16796,7 +16790,7 @@ MOB_ATTACK:
 .absorbed:
     INX                            ; $17->$19 or $18->$1A
     INX
-    LDY     #MFIELD_MOB_TYPE       ; byte 6: HP
+    LDY     #MFIELD_HP       ; byte 6: HP
     LDA     (MOB_PTR),Y
     AND     #HP_MASK
     BAMI    #$03,.critical         ; HP < 3 -> critical block
@@ -16888,7 +16882,7 @@ APPLY_DAMAGE:
     LDY     DAMAGE_AMOUNT
     LDX     #$04                   ; tune 2: damage sound
     JSR     TUNE_PLAYER
-    LDY     #MFIELD_MOB_TYPE       ; byte 6: HP + flags
+    LDY     #MFIELD_HP       ; byte 6: HP + flags
     LDA     (EFFECT_REC),Y
     TAX                            ; save original byte
     AND     #HP_MASK               ; isolate HP (bits 5-0)
@@ -16963,7 +16957,7 @@ APPLY_DAMAGE:
     MOVB    CURRENT_PLAYER,SOURCE_CHAR
     MOVW    EFFECT_REC,TARGET_REC
     JSR     REORDER_CHAR           ; remove from group
-    LDWIY    EFFECT_REC,#MFIELD_GOLD_LO,TARGET_REC
+    LDWIY    EFFECT_REC,#MFIELD_GOLD,TARGET_REC
     LDY     #$00                   ; Y=0: subtract mode
     JSR     MODIFY_CHAR_STATS      ; zero out gold
     LDY     #MFIELD_POSITION
@@ -17910,7 +17904,7 @@ AUTO_HEAL:
     ; Modifies: HEAL_NOTIFIED, entity byte 6
     ; Clobbers: A, X, Y
 
-    LDY     #MFIELD_MOB_TYPE       ; byte 6: HP in bits 5-0
+    LDY     #MFIELD_HP       ; byte 6: HP in bits 5-0
     LDA     (ENTITY_PTR),Y
     AND     #HP_MASK               ; isolate HP (bits 5-0)
     BAMI    #$28,.do_heal          ; HP < 40 -> try healing
@@ -17965,7 +17959,7 @@ INCREMENT_HP:
     ; Modifies: entity byte 6, HEAL_NOTIFIED
     ; Clobbers: A, Y
 
-    LDY     #MFIELD_MOB_TYPE       ; byte 6: HP in bits 5-0
+    LDY     #MFIELD_HP       ; byte 6: HP in bits 5-0
     LDA     (ENTITY_PTR),Y
     CLC
     ADC     #$01                   ; HP += 1
@@ -18017,23 +18011,23 @@ MODIFY_CHAR_STATS:
 
     ; --- add or subtract gold ---
     BYEQ    #$00,.subtract
-    LDY     #MFIELD_GOLD_LO        ; \ add NUM_VALUE to gold
+    LDY     #MFIELD_GOLD        ; \ add NUM_VALUE to gold
     LDA     (EFFECT_REC),Y         ;  |
     CLC                            ;  |
     ADC     NUM_VALUE              ;  |
     STA     (EFFECT_REC),Y         ;  |
-    INY                            ;  | Y = MFIELD_GOLD_HI
+    INY                            ;  | Y = MFIELD_GOLD+1
     LDA     (EFFECT_REC),Y         ;  |
     ADC     NUM_VALUE+1            ;  |
     STA     (EFFECT_REC),Y         ; /
     JMP     .aftermath
 .subtract:
-    LDY     #MFIELD_GOLD_LO        ; \ subtract NUM_VALUE from gold
+    LDY     #MFIELD_GOLD        ; \ subtract NUM_VALUE from gold
     SEC                            ;  |
     LDA     (EFFECT_REC),Y         ;  |
     SBC     NUM_VALUE              ;  |
     STA     (EFFECT_REC),Y         ;  |
-    INY                            ;  | Y = MFIELD_GOLD_HI
+    INY                            ;  | Y = MFIELD_GOLD+1
     LDA     (EFFECT_REC),Y         ;  |
     SBC     NUM_VALUE+1            ;  |
     STA     (EFFECT_REC),Y         ; /
@@ -18069,7 +18063,7 @@ MODIFY_CHAR_STATS:
     STY     LEVEL_THRESHOLD        ; \ init 16-bit threshold
     STY     LEVEL_THRESHOLD+1     ; / accumulator to 0
 .outer_loop:
-    LDY     #MFIELD_GOLD_HI
+    LDY     #MFIELD_GOLD+1
     BXEQ    #$00,.store_final      ; no levels remain -> store
     CLC                            ; \ add STAT_SCALE to threshold
     LDA     LEVEL_THRESHOLD        ;  |
@@ -18081,7 +18075,7 @@ MODIFY_CHAR_STATS:
     LDA     (EFFECT_REC),Y         ; gold high byte
     BALT    LEVEL_THRESHOLD+1,.store_final ; gold_hi < thresh_hi -> done
     BNE     .next_iter             ; gold_hi > thresh_hi -> next
-    DEY                            ; Y = MFIELD_GOLD_LO
+    DEY                            ; Y = MFIELD_GOLD
     LDA     (EFFECT_REC),Y         ; gold low byte
     BALT    LEVEL_THRESHOLD,.store_final ; gold_lo < thresh_lo -> done
 .next_iter:
@@ -18183,7 +18177,7 @@ AI_CHOOSE_TARGET:
     ; Behavior:
     ;   Mode 0/1: attempt to join player's party; if no match,
     ;     fall through to mode 2.
-    ;   Mode 2: if strength > mob type, target nearest event;
+    ;   Mode 2: if strength > HP, target nearest event;
     ;     otherwise no target.
     ;   Mode 3: scan group for nearest hostile mob.
     ;   Mode 4: no target (forced movement by NPC_MOVE_AI).
@@ -18232,7 +18226,7 @@ AI_CHOOSE_TARGET:
     INC     TOTAL_MOB_COUNT        ; increment global count
     RTS
 
-    ; --- mode 2: compare strength vs mob type for target ---
+    ; --- mode 2: compare strength vs HP for target ---
 .mode_ge2:
     BNE     .mode_ge3
 .simple_target:
@@ -18240,10 +18234,10 @@ AI_CHOOSE_TARGET:
     LDA     (ENTITY_PTR),Y
     AND     #STRENGTH_MASK
     STA     AI_SCRATCH
-    INY                            ; Y = MFIELD_MOB_TYPE
-    LDA     (ENTITY_PTR),Y        ; mob type (bits 5-0)
-    AND     #MOB_TYPE_MASK
-    BAPL    AI_SCRATCH,.use_encounter ; mob type >= strength -> seek encounter
+    INY                            ; Y = MFIELD_HP
+    LDA     (ENTITY_PTR),Y        ; HP (bits 5-0)
+    AND     #HP_MASK
+    BAPL    AI_SCRATCH,.use_encounter ; HP >= strength -> seek encounter
     STOB    #$00,AI_TARGET_POS     ; no target
     JMP     .done
 .use_encounter:
@@ -19140,7 +19134,7 @@ LEVEL_FLAG_MASK         EQU     $E0     ; byte 11: mask for flag bits 7-5
 PENDING_XP_UNIT         EQU     $10     ; byte 8: one pending XP unit (bit 4)
 FLAGS_CLASS_MASK        EQU     $C0     ; byte 15: mask for class bits 7-6
 FLAGS_STATUS_MASK       EQU     $3F     ; byte 15: mask for status bits 5-0
-MOB_TYPE_MASK           EQU     $3F     ; byte 6: mask for mob type bits 5-0
+HP_MASK             EQU     $3F     ; byte 6: mask for HP bits 5-0
 NPC_APPEARANCE_MIN      EQU     $15     ; appearance >= $15 = NPC, < $15 = player character
 @ %def LEVEL_MASK LEVEL_FLAG_MASK PENDING_XP_UNIT
 
@@ -20401,7 +20395,7 @@ PICKUP_TREASURE:
     JSR     CLEAR_STATUS_SLOTS     ; clear display slots
     STOW    $7BAB,$BA
     JSR     NUM_TO_DECIMAL         ; format quantity
-    LDWIY    ENTITY_PTR,#MFIELD_GOLD_LO,NUM_VALUE ; gold low
+    LDWIY    ENTITY_PTR,#MFIELD_GOLD,NUM_VALUE ; gold low
     STOW    $7BCC,$BA
     JSR     NUM_TO_DECIMAL         ; format gold amount
     JSR     SET_CURSOR_ROW21
@@ -20462,7 +20456,7 @@ PICKUP_TREASURE:
     STA     (ENTITY_PTR),Y
     JMP     .after_trap
 .trap3:
-    LDY     #MFIELD_GOLD_LO
+    LDY     #MFIELD_GOLD
     LDA     #$00
     STA     (ENTITY_PTR),Y        ; zero gold low
     INY
@@ -23503,6 +23497,2655 @@ DISK_VM_SCRATCH:
     HEX     a0 a0       ; $B5FA-$B5FB
     HEX     00 00 00 01 ; $B5FC-$B5FF
 @ %def DISK_VM_SAVED_STATE DISK_VM_SCRATCH
+@ \chapter{Mob Data}
+\label{ch:mob-data}
+
+The region \$4C80--\$5AFF holds the mob data table (128 records
+$\times$ 16~bytes), associated name strings, and residual diagnostic
+text.  This data is loaded from tracks \$07--\$09, DXR-decrypted
+during boot, and remains at these addresses throughout the game.
+
+\input{mob_font_data}
+
+\section{Mob data records (\$4C80--\$547F)}
+
+Each record is 16~bytes.  [[GET_MOB_DATA]] indexes into the table
+via the base pointer at [[$4000/$4001]].
+
+\begin{center}
+\begin{tabular}{cll}
+\toprule
+\thead{Offset} & \thead{Field} & \thead{Description} \\
+\midrule
+\$00--\$01 & MFIELD\_NAME     & 16-bit pointer to name string (DC.W) \\
+\$02       & Next link        & Index of next mob in group chain \\
+\$03       & Position         & Map position (row $\times$ 20 + col) \\
+\$04       & Appearance       & Font character index ($\div$ 21 = group) \\
+\$05       & Strength         & Bits 4--0 = strength / defense \\
+\$06       & MFIELD\_HP       & Bits 5--0 = hit points, bits 7--6 = flags \\
+\$07       & Attack           & Attack rating \\
+\$08       & XP / group       & Bit 7 = status, 6--4 = pending XP, 3--0 = group count \\
+\$09       & Defense          & Defense rating \\
+\$0A       & (unused)         & \\
+\$0B       & Level            & Bits 7--5 = faction, 4--0 = level (0--31) \\
+\$0C       & Level encoding   & Hi nibble = XP multiplier, lo = base \\
+\$0D--\$0E & MFIELD\_GOLD     & 16-bit gold counter, ducats (DC.W) \\
+\$0F       & Flags            & Status flags (bit 2 = combat engaged) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Appearance groups.}
+[[APPEARANCE_TO_FONTCHAR]] divides the appearance index by~21 to
+determine the font group.  Groups 0--2 and~7 are friendly; groups
+3--6 are hostile.
+
+<<mob data records>>=
+    ORG     $4C80
+MOB_DATA_TABLE:
+@ \noindent\mobchar{1} \textbf{ALI BABA} (font character~1, group~0 --- friendly)
+
+<<mob data records>>=
+    ; --- mob 0: ALI BABA ($4C80) ---
+    DC.W    s_ALI_BABA              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $AB              ; +MFIELD_POSITION (row 8, col 11)
+    DC.B    $00              ; +MFIELD_APPEARANCE (fontchar=1, group=0 friendly)
+    DC.B    $0C              ; +MFIELD_STRENGTH (12)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $01              ; +MFIELD_ATTACK (1)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $00              ; +MFIELD_DEFENSE (0)
+    DC.B    $00              ; +$0A
+    DC.B    $10              ; +MFIELD_LEVEL (faction=0 level=16)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{1} \textbf{SCHEHERAZADE} (font character~1, group~0)
+
+<<mob data records>>=
+    ; --- mob 1: SCHEHERAZADE ($4C90) ---
+    DC.W    s_SCHEHERAZADE              ; +MFIELD_NAME
+    DC.B    $08              ; +MFIELD_NEXT (8)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $00              ; +MFIELD_APPEARANCE (fontchar=1, group=0 friendly)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $14              ; +MFIELD_LEVEL (faction=0 level=20)
+    DC.B    $09              ; +MFIELD_LEVEL_ENC (xpmult=0, base=9)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{1} \textbf{HAROUD EL-LARGE} (font character~1, group~0)
+
+<<mob data records>>=
+    ; --- mob 2: HAROUD EL-LARGE ($4CA0) ---
+    DC.W    s_HAROUD_EL_LARGE              ; +MFIELD_NAME
+    DC.B    $07              ; +MFIELD_NEXT (7)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $00              ; +MFIELD_APPEARANCE (fontchar=1, group=0 friendly)
+    DC.B    $12              ; +MFIELD_STRENGTH (18)
+    DC.B    $12              ; +MFIELD_HP (18)
+    DC.B    $09              ; +MFIELD_ATTACK (9)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{1} \textbf{BAIRAM MEDIO} (font character~1, group~0)
+
+<<mob data records>>=
+    ; --- mob 3: BAIRAM MEDIO ($4CB0) ---
+    DC.W    s_BAIRAM_MEDIO              ; +MFIELD_NAME
+    DC.B    $09              ; +MFIELD_NEXT (9)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $00              ; +MFIELD_APPEARANCE (fontchar=1, group=0 friendly)
+    DC.B    $0E              ; +MFIELD_STRENGTH (14)
+    DC.B    $0E              ; +MFIELD_HP (14)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{1} \textbf{ABOU HASSAN} (font character~1, group~0)
+
+<<mob data records>>=
+    ; --- mob 4: ABOU HASSAN ($4CC0) ---
+    DC.W    s_ABOU_HASSAN              ; +MFIELD_NAME
+    DC.B    $06              ; +MFIELD_NEXT (6)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $00              ; +MFIELD_APPEARANCE (fontchar=1, group=0 friendly)
+    DC.B    $0D              ; +MFIELD_STRENGTH (13)
+    DC.B    $0D              ; +MFIELD_HP (13)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $32              ; +MFIELD_XP (st=0 xp=3 grp=2)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $0B              ; +MFIELD_LEVEL (faction=0 level=11)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{2} \textbf{LUTHIEN} (font character~2, group~0 --- friendly)
+
+<<mob data records>>=
+    ; --- mob 5: LUTHIEN ($4CD0) ---
+    DC.W    s_LUTHIEN              ; +MFIELD_NAME
+    DC.B    $0C              ; +MFIELD_NEXT (12)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $01              ; +MFIELD_APPEARANCE (fontchar=2, group=0 friendly)
+    DC.B    $06              ; +MFIELD_STRENGTH (6)
+    DC.B    $09              ; +MFIELD_HP (9)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $54              ; +MFIELD_LEVEL (faction=2 level=20)
+    DC.B    $0B              ; +MFIELD_LEVEL_ENC (xpmult=0, base=11)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{2} \textbf{HUAN} (font character~2, group~0)
+
+<<mob data records>>=
+    ; --- mob 6: HUAN ($4CE0) ---
+    DC.W    s_HUAN              ; +MFIELD_NAME
+    DC.B    $0D              ; +MFIELD_NEXT (13)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $01              ; +MFIELD_APPEARANCE (fontchar=2, group=0 friendly)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $4A              ; +MFIELD_LEVEL (faction=2 level=10)
+    DC.B    $09              ; +MFIELD_LEVEL_ENC (xpmult=0, base=9)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{2} \textbf{CELEGORM} (font character~2, group~0)
+
+<<mob data records>>=
+    ; --- mob 7: CELEGORM ($4CF0) ---
+    DC.W    s_CELEGORM              ; +MFIELD_NAME
+    DC.B    $0B              ; +MFIELD_NEXT (11)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $01              ; +MFIELD_APPEARANCE (fontchar=2, group=0 friendly)
+    DC.B    $0D              ; +MFIELD_STRENGTH (13)
+    DC.B    $0D              ; +MFIELD_HP (13)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $4D              ; +MFIELD_LEVEL (faction=2 level=13)
+    DC.B    $0A              ; +MFIELD_LEVEL_ENC (xpmult=0, base=10)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{2} \textbf{CURUFIN} (font character~2, group~0)
+
+<<mob data records>>=
+    ; --- mob 8: CURUFIN ($4D00) ---
+    DC.W    s_CURUFIN              ; +MFIELD_NAME
+    DC.B    $0A              ; +MFIELD_NEXT (10)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $01              ; +MFIELD_APPEARANCE (fontchar=2, group=0 friendly)
+    DC.B    $0C              ; +MFIELD_STRENGTH (12)
+    DC.B    $0C              ; +MFIELD_HP (12)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $23              ; +MFIELD_XP (st=0 xp=2 grp=3)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $4B              ; +MFIELD_LEVEL (faction=2 level=11)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{4} \textbf{ELDO} (font character~4, group~0 --- friendly)
+
+<<mob data records>>=
+    ; --- mob 9: ELDO ($4D10) ---
+    DC.W    s_ELDO              ; +MFIELD_NAME
+    DC.B    $11              ; +MFIELD_NEXT (17)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $03              ; +MFIELD_APPEARANCE (fontchar=4, group=0 friendly)
+    DC.B    $06              ; +MFIELD_STRENGTH (6)
+    DC.B    $16              ; +MFIELD_HP (22)
+    DC.B    $03              ; +MFIELD_ATTACK (3)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $03              ; +MFIELD_DEFENSE (3)
+    DC.B    $00              ; +$0A
+    DC.B    $54              ; +MFIELD_LEVEL (faction=2 level=20)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{4} \textbf{MERRYWATER} (font character~4, group~0)
+
+<<mob data records>>=
+    ; --- mob 10: MERRYWATER ($4D20) ---
+    DC.W    s_MERRYWATER              ; +MFIELD_NAME
+    DC.B    $0E              ; +MFIELD_NEXT (14)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $03              ; +MFIELD_APPEARANCE (fontchar=4, group=0 friendly)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $18              ; +MFIELD_HP (24)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $52              ; +MFIELD_LEVEL (faction=2 level=18)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{4} \textbf{STILBO} (font character~4, group~0)
+
+<<mob data records>>=
+    ; --- mob 11: STILBO ($4D30) ---
+    DC.W    s_STILBO              ; +MFIELD_NAME
+    DC.B    $10              ; +MFIELD_NEXT (16)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $03              ; +MFIELD_APPEARANCE (fontchar=4, group=0 friendly)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $1A              ; +MFIELD_HP (26)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $21              ; +MFIELD_XP (st=0 xp=2 grp=1)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $4F              ; +MFIELD_LEVEL (faction=2 level=15)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{4} \textbf{CINDER} (font character~4, group~0)
+
+<<mob data records>>=
+    ; --- mob 12: CINDER ($4D40) ---
+    DC.W    s_CINDER              ; +MFIELD_NAME
+    DC.B    $0F              ; +MFIELD_NEXT (15)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $03              ; +MFIELD_APPEARANCE (fontchar=4, group=0 friendly)
+    DC.B    $09              ; +MFIELD_STRENGTH (9)
+    DC.B    $19              ; +MFIELD_HP (25)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $32              ; +MFIELD_XP (st=0 xp=3 grp=2)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $4F              ; +MFIELD_LEVEL (faction=2 level=15)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{3} \textbf{JATTE} (font character~3, group~0 --- friendly)
+
+<<mob data records>>=
+    ; --- mob 13: JATTE ($4D50) ---
+    DC.W    s_JATTE              ; +MFIELD_NAME
+    DC.B    $04              ; +MFIELD_NEXT (4)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $02              ; +MFIELD_APPEARANCE (fontchar=3, group=0 friendly)
+    DC.B    $14              ; +MFIELD_STRENGTH (20)
+    DC.B    $1A              ; +MFIELD_HP (26)
+    DC.B    $0A              ; +MFIELD_ATTACK (10)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $08              ; +MFIELD_LEVEL (faction=0 level=8)
+    DC.B    $05              ; +MFIELD_LEVEL_ENC (xpmult=0, base=5)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{3} \textbf{THORA} (font character~3, group~0)
+
+<<mob data records>>=
+    ; --- mob 14: THORA ($4D60) ---
+    DC.W    s_THORA              ; +MFIELD_NAME
+    DC.B    $1D              ; +MFIELD_NEXT (29)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $02              ; +MFIELD_APPEARANCE (fontchar=3, group=0 friendly)
+    DC.B    $11              ; +MFIELD_STRENGTH (17)
+    DC.B    $15              ; +MFIELD_HP (21)
+    DC.B    $09              ; +MFIELD_ATTACK (9)
+    DC.B    $21              ; +MFIELD_XP (st=0 xp=2 grp=1)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{3} \textbf{OG} (font character~3, group~0)
+
+<<mob data records>>=
+    ; --- mob 15: OG ($4D70) ---
+    DC.W    s_OG              ; +MFIELD_NAME
+    DC.B    $02              ; +MFIELD_NEXT (2)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $02              ; +MFIELD_APPEARANCE (fontchar=3, group=0 friendly)
+    DC.B    $0D              ; +MFIELD_STRENGTH (13)
+    DC.B    $12              ; +MFIELD_HP (18)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $32              ; +MFIELD_XP (st=0 xp=3 grp=2)
+    DC.B    $03              ; +MFIELD_DEFENSE (3)
+    DC.B    $00              ; +$0A
+    DC.B    $0D              ; +MFIELD_LEVEL (faction=0 level=13)
+    DC.B    $05              ; +MFIELD_LEVEL_ENC (xpmult=0, base=5)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{3} \textbf{ULVA} (font character~3, group~0)
+
+<<mob data records>>=
+    ; --- mob 16: ULVA ($4D80) ---
+    DC.W    s_ULVA              ; +MFIELD_NAME
+    DC.B    $03              ; +MFIELD_NEXT (3)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $02              ; +MFIELD_APPEARANCE (fontchar=3, group=0 friendly)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $14              ; +MFIELD_HP (20)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $43              ; +MFIELD_XP (st=0 xp=4 grp=3)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $04              ; +MFIELD_LEVEL_ENC (xpmult=0, base=4)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{COGIA HOUSSAIN} (font character~5, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 17: COGIA HOUSSAIN ($4D90) ---
+    DC.W    s_COGIA_HOUSSAIN              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $84              ; +MFIELD_POSITION (row 6, col 12)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $09              ; +MFIELD_ATTACK (9)
+    DC.B    $03              ; +MFIELD_XP (st=0 xp=0 grp=3)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $4E              ; +MFIELD_LEVEL (faction=2 level=14)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $00C8              ; +MFIELD_GOLD (200 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{OMAR} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 18: OMAR ($4DA0) ---
+    DC.W    s_OMAR              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $70              ; +MFIELD_POSITION (row 5, col 12)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $09              ; +MFIELD_DEFENSE (9)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $000F              ; +MFIELD_GOLD (15 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{MAHMUD} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 19: MAHMUD ($4DB0) ---
+    DC.W    s_MAHMUD              ; +MFIELD_NAME
+    DC.B    $13              ; +MFIELD_NEXT (19)
+    DC.B    $A8              ; +MFIELD_POSITION (row 8, col 8)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $10              ; +MFIELD_LEVEL (faction=0 level=16)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $000A              ; +MFIELD_GOLD (10 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{ABUL-FATH} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 20: ABUL-FATH ($4DC0) ---
+    DC.W    s_ABUL_FATH              ; +MFIELD_NAME
+    DC.B    $24              ; +MFIELD_NEXT (36)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $02              ; +MFIELD_DEFENSE (2)
+    DC.B    $00              ; +$0A
+    DC.B    $10              ; +MFIELD_LEVEL (faction=0 level=16)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{IBRAHIM} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 21: IBRAHIM ($4DD0) ---
+    DC.W    s_IBRAHIM              ; +MFIELD_NAME
+    DC.B    $1C              ; +MFIELD_NEXT (28)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0005              ; +MFIELD_GOLD (5 ducats)
+    DC.B    $80              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{JALAL-UD-DIN} (font character~5, group~4)
+
+<<mob data records>>=
+    ; --- mob 22: JALAL-UD-DIN ($4DE0) ---
+    DC.W    s_JALAL_UD_DIN              ; +MFIELD_NAME
+    DC.B    $1E              ; +MFIELD_NEXT (30)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $58              ; +MFIELD_APPEARANCE (fontchar=5, group=4 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $02              ; +MFIELD_XP (st=0 xp=0 grp=2)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $06              ; +MFIELD_LEVEL (faction=0 level=6)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0005              ; +MFIELD_GOLD (5 ducats)
+    DC.B    $80              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{SALAMAN} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 23: SALAMAN ($4DF0) ---
+    DC.W    s_SALAMAN              ; +MFIELD_NAME
+    DC.B    $6E              ; +MFIELD_NEXT (110)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $06              ; +MFIELD_STRENGTH (6)
+    DC.B    $06              ; +MFIELD_HP (6)
+    DC.B    $03              ; +MFIELD_ATTACK (3)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $80              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{ABSAL} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 24: ABSAL ($4E00) ---
+    DC.W    s_ABSAL              ; +MFIELD_NAME
+    DC.B    $3B              ; +MFIELD_NEXT (59)
+    DC.B    $A5              ; +MFIELD_POSITION (row 8, col 5)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $03              ; +MFIELD_ATTACK (3)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $000A              ; +MFIELD_GOLD (10 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{JAMI} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 25: JAMI ($4E10) ---
+    DC.W    s_JAMI              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $A7              ; +MFIELD_POSITION (row 8, col 7)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0C              ; +MFIELD_STRENGTH (12)
+    DC.B    $0C              ; +MFIELD_HP (12)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $03              ; +MFIELD_DEFENSE (3)
+    DC.B    $00              ; +$0A
+    DC.B    $0C              ; +MFIELD_LEVEL (faction=0 level=12)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $000A              ; +MFIELD_GOLD (10 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{NIZAM UL MULK} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 26: NIZAM UL MULK ($4E20) ---
+    DC.W    s_NIZAM_UL_MULK              ; +MFIELD_NAME
+    DC.B    $19              ; +MFIELD_NEXT (25)
+    DC.B    $92              ; +MFIELD_POSITION (row 7, col 6)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0E              ; +MFIELD_STRENGTH (14)
+    DC.B    $0E              ; +MFIELD_HP (14)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0014              ; +MFIELD_GOLD (20 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{ALP ARSLAN} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 27: ALP ARSLAN ($4E30) ---
+    DC.W    s_ALP_ARSLAN              ; +MFIELD_NAME
+    DC.B    $17              ; +MFIELD_NEXT (23)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $06              ; +MFIELD_STRENGTH (6)
+    DC.B    $06              ; +MFIELD_HP (6)
+    DC.B    $03              ; +MFIELD_ATTACK (3)
+    DC.B    $02              ; +MFIELD_XP (st=0 xp=0 grp=2)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $80              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{MALIK} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 28: MALIK ($4E40) ---
+    DC.W    s_MALIK              ; +MFIELD_NAME
+    DC.B    $18              ; +MFIELD_NEXT (24)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $80              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{TOGHRUL BEG} (font character~5, group~4)
+
+<<mob data records>>=
+    ; --- mob 29: TOGHRUL BEG ($4E50) ---
+    DC.W    s_TOGHRUL_BEG              ; +MFIELD_NAME
+    DC.B    $6F              ; +MFIELD_NEXT (111)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $58              ; +MFIELD_APPEARANCE (fontchar=5, group=4 hostile)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $0C              ; +MFIELD_LEVEL (faction=0 level=12)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $80              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{MOWAFFAK} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 30: MOWAFFAK ($4E60) ---
+    DC.W    s_MOWAFFAK              ; +MFIELD_NAME
+    DC.B    $21              ; +MFIELD_NEXT (33)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $09              ; +MFIELD_DEFENSE (9)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{ABD-US-SAMAD} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 31: ABD-US-SAMAD ($4E70) ---
+    DC.W    s_ABD_US_SAMAD              ; +MFIELD_NAME
+    DC.B    $26              ; +MFIELD_NEXT (38)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0F              ; +MFIELD_STRENGTH (15)
+    DC.B    $0F              ; +MFIELD_HP (15)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $09              ; +MFIELD_LEVEL (faction=0 level=9)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{HAKIM} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 32: HAKIM ($4E80) ---
+    DC.W    s_HAKIM              ; +MFIELD_NAME
+    DC.B    $25              ; +MFIELD_NEXT (37)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0E              ; +MFIELD_STRENGTH (14)
+    DC.B    $0E              ; +MFIELD_HP (14)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $02              ; +MFIELD_XP (st=0 xp=0 grp=2)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $08              ; +MFIELD_LEVEL (faction=0 level=8)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{HASAN BEN SABBAH} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 33: HASAN BEN SABBAH ($4E90) ---
+    DC.W    s_HASAN_BEN_SABBAH              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $56              ; +MFIELD_POSITION (row 4, col 6)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0D              ; +MFIELD_STRENGTH (13)
+    DC.B    $0D              ; +MFIELD_HP (13)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $03              ; +MFIELD_XP (st=0 xp=0 grp=3)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $09              ; +MFIELD_LEVEL (faction=0 level=9)
+    DC.B    $04              ; +MFIELD_LEVEL_ENC (xpmult=0, base=4)
+    DC.W    $0019              ; +MFIELD_GOLD (25 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{ALI} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 34: ALI ($4EA0) ---
+    DC.W    s_ALI              ; +MFIELD_NAME
+    DC.B    $7B              ; +MFIELD_NEXT (123)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $14              ; +MFIELD_STRENGTH (20)
+    DC.B    $14              ; +MFIELD_HP (20)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $09              ; +MFIELD_DEFENSE (9)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0064              ; +MFIELD_GOLD (100 ducats)
+    DC.B    $E0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{KHORASSAN} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 35: KHORASSAN ($4EB0) ---
+    DC.W    s_KHORASSAN              ; +MFIELD_NAME
+    DC.B    $73              ; +MFIELD_NEXT (115)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0D              ; +MFIELD_STRENGTH (13)
+    DC.B    $0D              ; +MFIELD_HP (13)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $0D              ; +MFIELD_LEVEL (faction=0 level=13)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{KHWAJAH NIZAMI} (font character~5, group~4)
+
+<<mob data records>>=
+    ; --- mob 36: KHWAJAH NIZAMI ($4EC0) ---
+    DC.W    s_KHWAJAH_NIZAMI              ; +MFIELD_NAME
+    DC.B    $70              ; +MFIELD_NEXT (112)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $58              ; +MFIELD_APPEARANCE (fontchar=5, group=4 hostile)
+    DC.B    $0C              ; +MFIELD_STRENGTH (12)
+    DC.B    $0C              ; +MFIELD_HP (12)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $0C              ; +MFIELD_LEVEL (faction=0 level=12)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{HAFIZ} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 37: HAFIZ ($4ED0) ---
+    DC.W    s_HAFIZ              ; +MFIELD_NAME
+    DC.B    $72              ; +MFIELD_NEXT (114)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0B              ; +MFIELD_STRENGTH (11)
+    DC.B    $0B              ; +MFIELD_HP (11)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $02              ; +MFIELD_XP (st=0 xp=0 grp=2)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $0B              ; +MFIELD_LEVEL (faction=0 level=11)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $000A              ; +MFIELD_GOLD (10 ducats)
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{JELALUDDIN} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 38: JELALUDDIN ($4EE0) ---
+    DC.W    s_JELALUDDIN              ; +MFIELD_NAME
+    DC.B    $71              ; +MFIELD_NEXT (113)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $10              ; +MFIELD_LEVEL (faction=0 level=16)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $000A              ; +MFIELD_GOLD (10 ducats)
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{KWADRACH} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 39: KWADRACH ($4EF0) ---
+    DC.W    s_KWADRACH              ; +MFIELD_NAME
+    DC.B    $74              ; +MFIELD_NEXT (116)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $09              ; +MFIELD_STRENGTH (9)
+    DC.B    $09              ; +MFIELD_HP (9)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $0F              ; +MFIELD_LEVEL (faction=0 level=15)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $000A              ; +MFIELD_GOLD (10 ducats)
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{ATTAR} (font character~5, group~4)
+
+<<mob data records>>=
+    ; --- mob 40: ATTAR ($4F00) ---
+    DC.W    s_ATTAR              ; +MFIELD_NAME
+    DC.B    $7C              ; +MFIELD_NEXT (124)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $58              ; +MFIELD_APPEARANCE (fontchar=5, group=4 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $09              ; +MFIELD_DEFENSE (9)
+    DC.B    $00              ; +$0A
+    DC.B    $10              ; +MFIELD_LEVEL (faction=0 level=16)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $0014              ; +MFIELD_GOLD (20 ducats)
+    DC.B    $E0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{PEHLEVI} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 41: PEHLEVI ($4F10) ---
+    DC.W    s_PEHLEVI              ; +MFIELD_NAME
+    DC.B    $7F              ; +MFIELD_NEXT (127)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0E              ; +MFIELD_STRENGTH (14)
+    DC.B    $0E              ; +MFIELD_HP (14)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $14              ; +MFIELD_LEVEL (faction=0 level=20)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0014              ; +MFIELD_GOLD (20 ducats)
+    DC.B    $E0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{JAMSHYD} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 42: JAMSHYD ($4F20) ---
+    DC.W    s_JAMSHYD              ; +MFIELD_NAME
+    DC.B    $7A              ; +MFIELD_NEXT (122)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $14              ; +MFIELD_STRENGTH (20)
+    DC.B    $14              ; +MFIELD_HP (20)
+    DC.B    $09              ; +MFIELD_ATTACK (9)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $0A              ; +MFIELD_DEFENSE (10)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $001E              ; +MFIELD_GOLD (30 ducats)
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{IRAM} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 43: IRAM ($4F30) ---
+    DC.W    s_IRAM              ; +MFIELD_NAME
+    DC.B    $33              ; +MFIELD_NEXT (51)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $000A              ; +MFIELD_GOLD (10 ducats)
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{KAIKOBAD} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 44: KAIKOBAD ($4F40) ---
+    DC.W    s_KAIKOBAD              ; +MFIELD_NAME
+    DC.B    $76              ; +MFIELD_NEXT (118)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0C              ; +MFIELD_STRENGTH (12)
+    DC.B    $0C              ; +MFIELD_HP (12)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $12              ; +MFIELD_LEVEL (faction=0 level=18)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $000A              ; +MFIELD_GOLD (10 ducats)
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{KAIKHOSRU} (font character~5, group~4)
+
+<<mob data records>>=
+    ; --- mob 45: KAIKHOSRU ($4F50) ---
+    DC.W    s_KAIKHOSRU              ; +MFIELD_NAME
+    DC.B    $31              ; +MFIELD_NEXT (49)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $58              ; +MFIELD_APPEARANCE (fontchar=5, group=4 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $14              ; +MFIELD_LEVEL (faction=0 level=20)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $003C              ; +MFIELD_GOLD (60 ducats)
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{RUSTUM} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 46: RUSTUM ($4F60) ---
+    DC.W    s_RUSTUM              ; +MFIELD_NAME
+    DC.B    $78              ; +MFIELD_NEXT (120)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $12              ; +MFIELD_STRENGTH (18)
+    DC.B    $12              ; +MFIELD_HP (18)
+    DC.B    $09              ; +MFIELD_ATTACK (9)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $09              ; +MFIELD_DEFENSE (9)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $0032              ; +MFIELD_GOLD (50 ducats)
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{HATIM TAI} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 47: HATIM TAI ($4F70) ---
+    DC.W    s_HATIM_TAI              ; +MFIELD_NAME
+    DC.B    $2D              ; +MFIELD_NEXT (45)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0C              ; +MFIELD_STRENGTH (12)
+    DC.B    $0C              ; +MFIELD_HP (12)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $02              ; +MFIELD_XP (st=0 xp=0 grp=2)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0028              ; +MFIELD_GOLD (40 ducats)
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{BAHRAM} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 48: BAHRAM ($4F80) ---
+    DC.W    s_BAHRAM              ; +MFIELD_NAME
+    DC.B    $80              ; +MFIELD_NEXT (128)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0D              ; +MFIELD_STRENGTH (13)
+    DC.B    $0D              ; +MFIELD_HP (13)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $03              ; +MFIELD_XP (st=0 xp=0 grp=3)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $0F              ; +MFIELD_LEVEL (faction=0 level=15)
+    DC.B    $05              ; +MFIELD_LEVEL_ENC (xpmult=0, base=5)
+    DC.W    $003C              ; +MFIELD_GOLD (60 ducats)
+    DC.B    $E0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{DINARZADE} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 49: DINARZADE ($4F90) ---
+    DC.W    s_DINARZADE              ; +MFIELD_NAME
+    DC.B    $77              ; +MFIELD_NEXT (119)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $03              ; +MFIELD_XP (st=0 xp=0 grp=3)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $05              ; +MFIELD_LEVEL_ENC (xpmult=0, base=5)
+    DC.W    $0019              ; +MFIELD_GOLD (25 ducats)
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{SHAHZENAN} (font character~5, group~4)
+
+<<mob data records>>=
+    ; --- mob 50: SHAHZENAN ($4FA0) ---
+    DC.W    s_SHAHZENAN              ; +MFIELD_NAME
+    DC.B    $75              ; +MFIELD_NEXT (117)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $58              ; +MFIELD_APPEARANCE (fontchar=5, group=4 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $04              ; +MFIELD_XP (st=0 xp=0 grp=4)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $0C              ; +MFIELD_LEVEL (faction=0 level=12)
+    DC.B    $04              ; +MFIELD_LEVEL_ENC (xpmult=0, base=4)
+    DC.W    $0019              ; +MFIELD_GOLD (25 ducats)
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{DOUBAN} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 51: DOUBAN ($4FB0) ---
+    DC.W    s_DOUBAN              ; +MFIELD_NAME
+    DC.B    $32              ; +MFIELD_NEXT (50)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $0F              ; +MFIELD_STRENGTH (15)
+    DC.B    $0F              ; +MFIELD_HP (15)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $0D              ; +MFIELD_LEVEL (faction=0 level=13)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $0019              ; +MFIELD_GOLD (25 ducats)
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{FEROZE} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 52: FEROZE ($4FC0) ---
+    DC.W    s_FEROZE              ; +MFIELD_NAME
+    DC.B    $79              ; +MFIELD_NEXT (121)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $02              ; +MFIELD_XP (st=0 xp=0 grp=2)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0019              ; +MFIELD_GOLD (25 ducats)
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{AHMED} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 53: AHMED ($4FD0) ---
+    DC.W    s_AHMED              ; +MFIELD_NAME
+    DC.B    $27              ; +MFIELD_NEXT (39)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $02              ; +MFIELD_XP (st=0 xp=0 grp=2)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0005              ; +MFIELD_GOLD (5 ducats)
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{PERIE BANOU} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 54: PERIE BANOU ($4FE0) ---
+    DC.W    s_PERIE_BANOU              ; +MFIELD_NAME
+    DC.B    $35              ; +MFIELD_NEXT (53)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $07              ; +MFIELD_STRENGTH (7)
+    DC.B    $07              ; +MFIELD_HP (7)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $03              ; +MFIELD_XP (st=0 xp=0 grp=3)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $0D              ; +MFIELD_LEVEL (faction=0 level=13)
+    DC.B    $05              ; +MFIELD_LEVEL_ENC (xpmult=0, base=5)
+    DC.W    $0005              ; +MFIELD_GOLD (5 ducats)
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{HAROUN AL-RASCHID} (font character~5, group~3)
+
+<<mob data records>>=
+    ; --- mob 55: HAROUN AL-RASCHID ($4FF0) ---
+    DC.W    s_HAROUN_AL_RASCHID              ; +MFIELD_NAME
+    DC.B    $28              ; +MFIELD_NEXT (40)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $43              ; +MFIELD_APPEARANCE (fontchar=5, group=3 hostile)
+    DC.B    $06              ; +MFIELD_STRENGTH (6)
+    DC.B    $06              ; +MFIELD_HP (6)
+    DC.B    $03              ; +MFIELD_ATTACK (3)
+    DC.B    $04              ; +MFIELD_XP (st=0 xp=0 grp=4)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $0C              ; +MFIELD_LEVEL (faction=0 level=12)
+    DC.B    $04              ; +MFIELD_LEVEL_ENC (xpmult=0, base=4)
+    DC.W    $0005              ; +MFIELD_GOLD (5 ducats)
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{5} \textbf{CODADAD} (font character~5, group~4)
+
+<<mob data records>>=
+    ; --- mob 56: CODADAD ($5000) ---
+    DC.W    s_CODADAD              ; +MFIELD_NAME
+    DC.B    $36              ; +MFIELD_NEXT (54)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $58              ; +MFIELD_APPEARANCE (fontchar=5, group=4 hostile)
+    DC.B    $0C              ; +MFIELD_STRENGTH (12)
+    DC.B    $0C              ; +MFIELD_HP (12)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0005              ; +MFIELD_GOLD (5 ducats)
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{15} \textbf{MORGIANA} (font character~15, group~1 --- friendly)
+
+<<mob data records>>=
+    ; --- mob 57: MORGIANA ($5010) ---
+    DC.W    s_MORGIANA              ; +MFIELD_NAME
+    DC.B    $22              ; +MFIELD_NEXT (34)
+    DC.B    $6B              ; +MFIELD_POSITION (row 5, col 7)
+    DC.B    $23              ; +MFIELD_APPEARANCE (fontchar=15, group=1 friendly)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $58              ; +MFIELD_LEVEL (faction=2 level=24)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{33} \textbf{ABDALLA} (font character~33, group~1 --- friendly)
+
+<<mob data records>>=
+    ; --- mob 58: ABDALLA ($5020) ---
+    DC.W    s_ABDALLA              ; +MFIELD_NAME
+    DC.B    $1A              ; +MFIELD_NEXT (26)
+    DC.B    $AC              ; +MFIELD_POSITION (row 8, col 12)
+    DC.B    $15              ; +MFIELD_APPEARANCE (fontchar=33, group=1 friendly)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $02              ; +MFIELD_DEFENSE (2)
+    DC.B    $00              ; +$0A
+    DC.B    $0C              ; +MFIELD_LEVEL (faction=0 level=12)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{33} \textbf{ENCHANTED STATUE} (font character~33, group~3)
+
+<<mob data records>>=
+    ; --- mob 59: ENCHANTED STATUE ($5030) ---
+    DC.W    s_ENCHANTED_STATUE              ; +MFIELD_NAME
+    DC.B    $3D              ; +MFIELD_NEXT (61)
+    DC.B    $57              ; +MFIELD_POSITION (row 4, col 7)
+    DC.B    $3F              ; +MFIELD_APPEARANCE (fontchar=33, group=3 hostile)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $8C              ; +MFIELD_LEVEL (faction=4 level=12)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{7} \textbf{TAN RAT} (font character~7, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 60: TAN RAT ($5040) ---
+    DC.W    s_TAN_RAT              ; +MFIELD_NAME
+    DC.B    $3E              ; +MFIELD_NEXT (62)
+    DC.B    $91              ; +MFIELD_POSITION (row 7, col 5)
+    DC.B    $45              ; +MFIELD_APPEARANCE (fontchar=7, group=3 hostile)
+    DC.B    $03              ; +MFIELD_STRENGTH (3)
+    DC.B    $03              ; +MFIELD_HP (3)
+    DC.B    $02              ; +MFIELD_ATTACK (2)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $02              ; +MFIELD_DEFENSE (2)
+    DC.B    $00              ; +$0A
+    DC.B    $4A              ; +MFIELD_LEVEL (faction=2 level=10)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{7} \textbf{GRAY RAT} (font character~7, group~3)
+
+<<mob data records>>=
+    ; --- mob 61: GRAY RAT ($5050) ---
+    DC.W    s_GRAY_RAT              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $92              ; +MFIELD_POSITION (row 7, col 6)
+    DC.B    $45              ; +MFIELD_APPEARANCE (fontchar=7, group=3 hostile)
+    DC.B    $03              ; +MFIELD_STRENGTH (3)
+    DC.B    $03              ; +MFIELD_HP (3)
+    DC.B    $02              ; +MFIELD_ATTACK (2)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $02              ; +MFIELD_DEFENSE (2)
+    DC.B    $00              ; +$0A
+    DC.B    $48              ; +MFIELD_LEVEL (faction=2 level=8)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $80              ; +MFIELD_FLAGS
+@ \noindent\mobchar{33} \textbf{SULTAN SHAHRIAR} (font character~33, group~3)
+
+<<mob data records>>=
+    ; --- mob 62: SULTAN SHAHRIAR ($5060) ---
+    DC.W    s_SULTAN_SHAHRIAR              ; +MFIELD_NAME
+    DC.B    $41              ; +MFIELD_NEXT (65)
+    DC.B    $65              ; +MFIELD_POSITION (row 5, col 1)
+    DC.B    $3F              ; +MFIELD_APPEARANCE (fontchar=33, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $02              ; +MFIELD_XP (st=0 xp=0 grp=2)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $10              ; +MFIELD_LEVEL (faction=0 level=16)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $0032              ; +MFIELD_GOLD (50 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{15} \textbf{PRINCESS BUDDIR} (font character~15, group~1)
+
+<<mob data records>>=
+    ; --- mob 63: PRINCESS BUDDIR ($5070) ---
+    DC.W    s_PRINCESS_BUDDIR              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $2D              ; +MFIELD_POSITION (row 2, col 5)
+    DC.B    $23              ; +MFIELD_APPEARANCE (fontchar=15, group=1 friendly)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $00              ; +MFIELD_ATTACK (0)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $00              ; +MFIELD_DEFENSE (0)
+    DC.B    $00              ; +$0A
+    DC.B    $0F              ; +MFIELD_LEVEL (faction=0 level=15)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $000A              ; +MFIELD_GOLD (10 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{33} \textbf{SULTANS RIGHT GUARD} (font character~33, group~3)
+
+<<mob data records>>=
+    ; --- mob 64: SULTANS RIGHT GUARD ($5080) ---
+    DC.W    s_SULTANS_RIGHT_GUARD              ; +MFIELD_NAME
+    DC.B    $42              ; +MFIELD_NEXT (66)
+    DC.B    $7A              ; +MFIELD_POSITION (row 6, col 2)
+    DC.B    $3F              ; +MFIELD_APPEARANCE (fontchar=33, group=3 hostile)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $02              ; +MFIELD_DEFENSE (2)
+    DC.B    $00              ; +$0A
+    DC.B    $CB              ; +MFIELD_LEVEL (faction=6 level=11)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{33} \textbf{SULTANS LEFT GUARD} (font character~33, group~3)
+
+<<mob data records>>=
+    ; --- mob 65: SULTANS LEFT GUARD ($5090) ---
+    DC.W    s_SULTANS_LEFT_GUARD              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $52              ; +MFIELD_POSITION (row 4, col 2)
+    DC.B    $3F              ; +MFIELD_APPEARANCE (fontchar=33, group=3 hostile)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $03              ; +MFIELD_DEFENSE (3)
+    DC.B    $00              ; +$0A
+    DC.B    $CA              ; +MFIELD_LEVEL (faction=6 level=10)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{16} \textbf{TIGER} (font character~16, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 66: TIGER ($50A0) ---
+    DC.W    s_TIGER              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $7A              ; +MFIELD_POSITION (row 6, col 2)
+    DC.B    $4E              ; +MFIELD_APPEARANCE (fontchar=16, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $0C              ; +MFIELD_HP (12)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $81              ; +MFIELD_XP (st=1 xp=0 grp=1)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $52              ; +MFIELD_LEVEL (faction=2 level=18)
+    DC.B    $0A              ; +MFIELD_LEVEL_ENC (xpmult=0, base=10)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{33} \textbf{WITLESS ZOMBIE} (font character~33, group~4)
+
+<<mob data records>>=
+    ; --- mob 67: WITLESS ZOMBIE ($50B0) ---
+    DC.W    s_WITLESS_ZOMBIE              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $73              ; +MFIELD_POSITION (row 5, col 15)
+    DC.B    $54              ; +MFIELD_APPEARANCE (fontchar=33, group=4 hostile)
+    DC.B    $0B              ; +MFIELD_STRENGTH (11)
+    DC.B    $0B              ; +MFIELD_HP (11)
+    DC.B    $03              ; +MFIELD_ATTACK (3)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $86              ; +MFIELD_LEVEL (faction=4 level=6)
+    DC.B    $03              ; +MFIELD_LEVEL_ENC (xpmult=0, base=3)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $80              ; +MFIELD_FLAGS
+@ \noindent\mobchar{33} \textbf{SMALL ZOMBIE} (font character~33, group~3)
+
+<<mob data records>>=
+    ; --- mob 68: SMALL ZOMBIE ($50C0) ---
+    DC.W    s_SMALL_ZOMBIE              ; +MFIELD_NAME
+    DC.B    $46              ; +MFIELD_NEXT (70)
+    DC.B    $88              ; +MFIELD_POSITION (row 6, col 16)
+    DC.B    $3F              ; +MFIELD_APPEARANCE (fontchar=33, group=3 hostile)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $02              ; +MFIELD_ATTACK (2)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $89              ; +MFIELD_LEVEL (faction=4 level=9)
+    DC.B    $03              ; +MFIELD_LEVEL_ENC (xpmult=0, base=3)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{33} \textbf{BIG ZOMBIE} (font character~33, group~3)
+
+<<mob data records>>=
+    ; --- mob 69: BIG ZOMBIE ($50D0) ---
+    DC.W    s_BIG_ZOMBIE              ; +MFIELD_NAME
+    DC.B    $44              ; +MFIELD_NEXT (68)
+    DC.B    $9A              ; +MFIELD_POSITION (row 7, col 14)
+    DC.B    $3F              ; +MFIELD_APPEARANCE (fontchar=33, group=3 hostile)
+    DC.B    $0D              ; +MFIELD_STRENGTH (13)
+    DC.B    $0D              ; +MFIELD_HP (13)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $87              ; +MFIELD_LEVEL (faction=4 level=7)
+    DC.B    $03              ; +MFIELD_LEVEL_ENC (xpmult=0, base=3)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{7} \textbf{CALICO RAT} (font character~7, group~3)
+
+<<mob data records>>=
+    ; --- mob 70: CALICO RAT ($50E0) ---
+    DC.W    s_CALICO_RAT              ; +MFIELD_NAME
+    DC.B    $48              ; +MFIELD_NEXT (72)
+    DC.B    $4D              ; +MFIELD_POSITION (row 3, col 17)
+    DC.B    $45              ; +MFIELD_APPEARANCE (fontchar=7, group=3 hostile)
+    DC.B    $03              ; +MFIELD_STRENGTH (3)
+    DC.B    $03              ; +MFIELD_HP (3)
+    DC.B    $02              ; +MFIELD_ATTACK (2)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $03              ; +MFIELD_DEFENSE (3)
+    DC.B    $00              ; +$0A
+    DC.B    $4D              ; +MFIELD_LEVEL (faction=2 level=13)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $84              ; +MFIELD_FLAGS
+@ \noindent\mobchar{19} \textbf{HOOT OWL} (font character~19, group~2 --- friendly)
+
+<<mob data records>>=
+    ; --- mob 71: HOOT OWL ($50F0) ---
+    DC.W    s_HOOT_OWL              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $47              ; +MFIELD_POSITION (row 3, col 11)
+    DC.B    $3C              ; +MFIELD_APPEARANCE (fontchar=19, group=2 friendly)
+    DC.B    $05              ; +MFIELD_STRENGTH (5)
+    DC.B    $05              ; +MFIELD_HP (5)
+    DC.B    $01              ; +MFIELD_ATTACK (1)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $00              ; +MFIELD_DEFENSE (0)
+    DC.B    $00              ; +$0A
+    DC.B    $4C              ; +MFIELD_LEVEL (faction=2 level=12)
+    DC.B    $09              ; +MFIELD_LEVEL_ENC (xpmult=0, base=9)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{14} \textbf{MOUNTAIN SCORPION} (font character~14, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 72: MOUNTAIN SCORPION ($5100) ---
+    DC.W    s_MOUNTAIN_SCORPION              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $5F              ; +MFIELD_POSITION (row 4, col 15)
+    DC.B    $4C              ; +MFIELD_APPEARANCE (fontchar=14, group=3 hostile)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $06              ; +MFIELD_HP (6)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $81              ; +MFIELD_XP (st=1 xp=0 grp=1)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $09              ; +MFIELD_LEVEL (faction=0 level=9)
+    DC.B    $05              ; +MFIELD_LEVEL_ENC (xpmult=0, base=5)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{20} \textbf{UNICORN} (font character~20, group~7 --- friendly)
+
+<<mob data records>>=
+    ; --- mob 73: UNICORN ($5110) ---
+    DC.W    s_UNICORN              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $81              ; +MFIELD_POSITION (row 6, col 9)
+    DC.B    $A6              ; +MFIELD_APPEARANCE (fontchar=20, group=7 friendly)
+    DC.B    $12              ; +MFIELD_STRENGTH (18)
+    DC.B    $12              ; +MFIELD_HP (18)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $58              ; +MFIELD_LEVEL (faction=2 level=24)
+    DC.B    $0C              ; +MFIELD_LEVEL_ENC (xpmult=0, base=12)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $80              ; +MFIELD_FLAGS
+@ \noindent\mobchar{16} \textbf{LEO} (font character~16, group~3)
+
+<<mob data records>>=
+    ; --- mob 74: LEO ($5120) ---
+    DC.W    sm_LEO              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $66              ; +MFIELD_POSITION (row 5, col 2)
+    DC.B    $4E              ; +MFIELD_APPEARANCE (fontchar=16, group=3 hostile)
+    DC.B    $0E              ; +MFIELD_STRENGTH (14)
+    DC.B    $0E              ; +MFIELD_HP (14)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $81              ; +MFIELD_XP (st=1 xp=0 grp=1)
+    DC.B    $09              ; +MFIELD_DEFENSE (9)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $0A              ; +MFIELD_LEVEL_ENC (xpmult=0, base=10)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{14} \textbf{SCORPIUS} (font character~14, group~3)
+
+<<mob data records>>=
+    ; --- mob 75: SCORPIUS ($5130) ---
+    DC.W    sm_SCORPIUS              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $75              ; +MFIELD_POSITION (row 5, col 17)
+    DC.B    $4C              ; +MFIELD_APPEARANCE (fontchar=14, group=3 hostile)
+    DC.B    $0C              ; +MFIELD_STRENGTH (12)
+    DC.B    $0F              ; +MFIELD_HP (15)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $53              ; +MFIELD_XP (st=0 xp=5 grp=3)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $0D              ; +MFIELD_LEVEL (faction=0 level=13)
+    DC.B    $04              ; +MFIELD_LEVEL_ENC (xpmult=0, base=4)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{18} \textbf{STATUE OF TAURUS} (font character~18, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 76: STATUE OF TAURUS ($5140) ---
+    DC.W    s_STATUE_OF_TAURUS              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $52              ; +MFIELD_POSITION (row 4, col 2)
+    DC.B    $50              ; +MFIELD_APPEARANCE (fontchar=18, group=3 hostile)
+    DC.B    $14              ; +MFIELD_STRENGTH (20)
+    DC.B    $14              ; +MFIELD_HP (20)
+    DC.B    $00              ; +MFIELD_ATTACK (0)
+    DC.B    $81              ; +MFIELD_XP (st=1 xp=0 grp=1)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $14              ; +MFIELD_LEVEL (faction=0 level=20)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $0032              ; +MFIELD_GOLD (50 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{13} \textbf{ARIES, THE RAM} (font character~13, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 77: ARIES, THE RAM ($5150) ---
+    DC.W    s_ARIES_THE_RAM              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $56              ; +MFIELD_POSITION (row 4, col 6)
+    DC.B    $4B              ; +MFIELD_APPEARANCE (fontchar=13, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $0F              ; +MFIELD_LEVEL (faction=0 level=15)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{17} \textbf{CANCER, THE CRAB} (font character~17, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 78: CANCER, THE CRAB ($5160) ---
+    DC.W    s_CANCER_THE_CRAB              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $94              ; +MFIELD_POSITION (row 7, col 8)
+    DC.B    $4F              ; +MFIELD_APPEARANCE (fontchar=17, group=3 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $04              ; +MFIELD_XP (st=0 xp=0 grp=4)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $CA              ; +MFIELD_LEVEL (faction=6 level=10)
+    DC.B    $03              ; +MFIELD_LEVEL_ENC (xpmult=0, base=3)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{16} \textbf{WEREJACKAL} (font character~16, group~3)
+
+<<mob data records>>=
+    ; --- mob 79: WEREJACKAL ($5170) ---
+    DC.W    s_WEREJACKAL              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $3F              ; +MFIELD_POSITION (row 3, col 3)
+    DC.B    $4E              ; +MFIELD_APPEARANCE (fontchar=16, group=3 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $07              ; +MFIELD_DEFENSE (7)
+    DC.B    $00              ; +$0A
+    DC.B    $4D              ; +MFIELD_LEVEL (faction=2 level=13)
+    DC.B    $09              ; +MFIELD_LEVEL_ENC (xpmult=0, base=9)
+    DC.W    $0032              ; +MFIELD_GOLD (50 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{6} \textbf{CAVEBEAR} (font character~6, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 80: CAVEBEAR ($5180) ---
+    DC.W    s_CAVEBEAR              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $2E              ; +MFIELD_POSITION (row 2, col 6)
+    DC.B    $44              ; +MFIELD_APPEARANCE (fontchar=6, group=3 hostile)
+    DC.B    $12              ; +MFIELD_STRENGTH (18)
+    DC.B    $18              ; +MFIELD_HP (24)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $86              ; +MFIELD_LEVEL (faction=4 level=6)
+    DC.B    $04              ; +MFIELD_LEVEL_ENC (xpmult=0, base=4)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{7} \textbf{CAVE RAT} (font character~7, group~3)
+
+<<mob data records>>=
+    ; --- mob 81: CAVE RAT ($5190) ---
+    DC.W    s_CAVE_RAT              ; +MFIELD_NAME
+    DC.B    $53              ; +MFIELD_NEXT (83)
+    DC.B    $98              ; +MFIELD_POSITION (row 7, col 12)
+    DC.B    $45              ; +MFIELD_APPEARANCE (fontchar=7, group=3 hostile)
+    DC.B    $06              ; +MFIELD_STRENGTH (6)
+    DC.B    $06              ; +MFIELD_HP (6)
+    DC.B    $03              ; +MFIELD_ATTACK (3)
+    DC.B    $81              ; +MFIELD_XP (st=1 xp=0 grp=1)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $4F              ; +MFIELD_LEVEL (faction=2 level=15)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{7} \textbf{BROWN RAT} (font character~7, group~3)
+
+<<mob data records>>=
+    ; --- mob 82: BROWN RAT ($51A0) ---
+    DC.W    s_BROWN_RAT              ; +MFIELD_NAME
+    DC.B    $54              ; +MFIELD_NEXT (84)
+    DC.B    $AB              ; +MFIELD_POSITION (row 8, col 11)
+    DC.B    $45              ; +MFIELD_APPEARANCE (fontchar=7, group=3 hostile)
+    DC.B    $03              ; +MFIELD_STRENGTH (3)
+    DC.B    $03              ; +MFIELD_HP (3)
+    DC.B    $02              ; +MFIELD_ATTACK (2)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $02              ; +MFIELD_DEFENSE (2)
+    DC.B    $00              ; +$0A
+    DC.B    $4A              ; +MFIELD_LEVEL (faction=2 level=10)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{7} \textbf{BLACK RAT} (font character~7, group~3)
+
+<<mob data records>>=
+    ; --- mob 83: BLACK RAT ($51B0) ---
+    DC.W    s_BLACK_RAT              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $AD              ; +MFIELD_POSITION (row 8, col 13)
+    DC.B    $45              ; +MFIELD_APPEARANCE (fontchar=7, group=3 hostile)
+    DC.B    $03              ; +MFIELD_STRENGTH (3)
+    DC.B    $03              ; +MFIELD_HP (3)
+    DC.B    $02              ; +MFIELD_ATTACK (2)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $02              ; +MFIELD_DEFENSE (2)
+    DC.B    $00              ; +$0A
+    DC.B    $47              ; +MFIELD_LEVEL (faction=2 level=7)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{33} \textbf{GEMINI I} (font character~33, group~7)
+
+<<mob data records>>=
+    ; --- mob 84: GEMINI I ($51C0) ---
+    DC.W    s_GEMINI_I              ; +MFIELD_NAME
+    DC.B    $56              ; +MFIELD_NEXT (86)
+    DC.B    $1C              ; +MFIELD_POSITION (row 1, col 8)
+    DC.B    $93              ; +MFIELD_APPEARANCE (fontchar=33, group=7 friendly)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0F              ; +MFIELD_HP (15)
+    DC.B    $0F              ; +MFIELD_ATTACK (15)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $0F              ; +MFIELD_DEFENSE (15)
+    DC.B    $00              ; +$0A
+    DC.B    $10              ; +MFIELD_LEVEL (faction=0 level=16)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{33} \textbf{GEMINI II} (font character~33, group~7)
+
+<<mob data records>>=
+    ; --- mob 85: GEMINI II ($51D0) ---
+    DC.W    s_GEMINI_II              ; +MFIELD_NAME
+    DC.B    $40              ; +MFIELD_NEXT (64)
+    DC.B    $44              ; +MFIELD_POSITION (row 3, col 8)
+    DC.B    $93              ; +MFIELD_APPEARANCE (fontchar=33, group=7 friendly)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0F              ; +MFIELD_HP (15)
+    DC.B    $0F              ; +MFIELD_ATTACK (15)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $0F              ; +MFIELD_DEFENSE (15)
+    DC.B    $00              ; +$0A
+    DC.B    $10              ; +MFIELD_LEVEL (faction=0 level=16)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{12} \textbf{SWORD OF DAMOCLES} (font character~12, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 86: SWORD OF DAMOCLES ($51E0) ---
+    DC.W    s_SWORD_OF_DAMOCLES              ; +MFIELD_NAME
+    DC.B    $59              ; +MFIELD_NEXT (89)
+    DC.B    $1C              ; +MFIELD_POSITION (row 1, col 8)
+    DC.B    $4A              ; +MFIELD_APPEARANCE (fontchar=12, group=3 hostile)
+    DC.B    $0F              ; +MFIELD_STRENGTH (15)
+    DC.B    $0F              ; +MFIELD_HP (15)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $00              ; +MFIELD_DEFENSE (0)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{12} \textbf{TWO EDGED SWORD} (font character~12, group~3)
+
+<<mob data records>>=
+    ; --- mob 87: TWO EDGED SWORD ($51F0) ---
+    DC.W    s_TWO_EDGED_SWORD              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $1E              ; +MFIELD_POSITION (row 1, col 10)
+    DC.B    $4A              ; +MFIELD_APPEARANCE (fontchar=12, group=3 hostile)
+    DC.B    $0F              ; +MFIELD_STRENGTH (15)
+    DC.B    $0F              ; +MFIELD_HP (15)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $00              ; +MFIELD_DEFENSE (0)
+    DC.B    $00              ; +$0A
+    DC.B    $07              ; +MFIELD_LEVEL (faction=0 level=7)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{7} \textbf{WERERAT} (font character~7, group~3)
+
+<<mob data records>>=
+    ; --- mob 88: WERERAT ($5200) ---
+    DC.W    s_WERERAT              ; +MFIELD_NAME
+    DC.B    $5B              ; +MFIELD_NEXT (91)
+    DC.B    $55              ; +MFIELD_POSITION (row 4, col 5)
+    DC.B    $45              ; +MFIELD_APPEARANCE (fontchar=7, group=3 hostile)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $81              ; +MFIELD_XP (st=1 xp=0 grp=1)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $4C              ; +MFIELD_LEVEL (faction=2 level=12)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{7} \textbf{SEWER RAT} (font character~7, group~3)
+
+<<mob data records>>=
+    ; --- mob 89: SEWER RAT ($5210) ---
+    DC.W    s_SEWER_RAT              ; +MFIELD_NAME
+    DC.B    $58              ; +MFIELD_NEXT (88)
+    DC.B    $5A              ; +MFIELD_POSITION (row 4, col 10)
+    DC.B    $45              ; +MFIELD_APPEARANCE (fontchar=7, group=3 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $82              ; +MFIELD_XP (st=1 xp=0 grp=2)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $48              ; +MFIELD_LEVEL (faction=2 level=8)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{7} \textbf{JUNGLE RAT} (font character~7, group~3)
+
+<<mob data records>>=
+    ; --- mob 90: JUNGLE RAT ($5220) ---
+    DC.W    s_JUNGLE_RAT              ; +MFIELD_NAME
+    DC.B    $5A              ; +MFIELD_NEXT (90)
+    DC.B    $5E              ; +MFIELD_POSITION (row 4, col 14)
+    DC.B    $45              ; +MFIELD_APPEARANCE (fontchar=7, group=3 hostile)
+    DC.B    $09              ; +MFIELD_STRENGTH (9)
+    DC.B    $09              ; +MFIELD_HP (9)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $81              ; +MFIELD_XP (st=1 xp=0 grp=1)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $4A              ; +MFIELD_LEVEL (faction=2 level=10)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{14} \textbf{GIANT SCORPION} (font character~14, group~4)
+
+<<mob data records>>=
+    ; --- mob 91: GIANT SCORPION ($5230) ---
+    DC.W    s_GIANT_SCORPION              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $7C              ; +MFIELD_POSITION (row 6, col 4)
+    DC.B    $61              ; +MFIELD_APPEARANCE (fontchar=14, group=4 hostile)
+    DC.B    $0C              ; +MFIELD_STRENGTH (12)
+    DC.B    $0C              ; +MFIELD_HP (12)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $82              ; +MFIELD_XP (st=1 xp=0 grp=2)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $0B              ; +MFIELD_LEVEL (faction=0 level=11)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{8} \textbf{WEREWOLF} (font character~8, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 92: WEREWOLF ($5240) ---
+    DC.W    s_WEREWOLF              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $87              ; +MFIELD_POSITION (row 6, col 15)
+    DC.B    $46              ; +MFIELD_APPEARANCE (fontchar=8, group=3 hostile)
+    DC.B    $0E              ; +MFIELD_STRENGTH (14)
+    DC.B    $0E              ; +MFIELD_HP (14)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $81              ; +MFIELD_XP (st=1 xp=0 grp=1)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $0C              ; +MFIELD_LEVEL (faction=0 level=12)
+    DC.B    $0A              ; +MFIELD_LEVEL_ENC (xpmult=0, base=10)
+    DC.W    $0064              ; +MFIELD_GOLD (100 ducats)
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{6} \textbf{GRIZZLY BEAR} (font character~6, group~3)
+
+<<mob data records>>=
+    ; --- mob 93: GRIZZLY BEAR ($5250) ---
+    DC.W    s_GRIZZLY_BEAR              ; +MFIELD_NAME
+    DC.B    $5D              ; +MFIELD_NEXT (93)
+    DC.B    $99              ; +MFIELD_POSITION (row 7, col 13)
+    DC.B    $44              ; +MFIELD_APPEARANCE (fontchar=6, group=3 hostile)
+    DC.B    $14              ; +MFIELD_STRENGTH (20)
+    DC.B    $1E              ; +MFIELD_HP (30)
+    DC.B    $09              ; +MFIELD_ATTACK (9)
+    DC.B    $82              ; +MFIELD_XP (st=1 xp=0 grp=2)
+    DC.B    $0B              ; +MFIELD_DEFENSE (11)
+    DC.B    $00              ; +$0A
+    DC.B    $C5              ; +MFIELD_LEVEL (faction=6 level=5)
+    DC.B    $04              ; +MFIELD_LEVEL_ENC (xpmult=0, base=4)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{9} \textbf{GREEN DRAGON} (font character~9, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 94: GREEN DRAGON ($5260) ---
+    DC.W    s_GREEN_DRAGON              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $67              ; +MFIELD_POSITION (row 5, col 3)
+    DC.B    $47              ; +MFIELD_APPEARANCE (fontchar=9, group=3 hostile)
+    DC.B    $1F              ; +MFIELD_STRENGTH (31)
+    DC.B    $30              ; +MFIELD_HP (48)
+    DC.B    $0C              ; +MFIELD_ATTACK (12)
+    DC.B    $85              ; +MFIELD_XP (st=1 xp=0 grp=5)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $89              ; +MFIELD_LEVEL (faction=4 level=9)
+    DC.B    $1C              ; +MFIELD_LEVEL_ENC (xpmult=1, base=12)
+    DC.W    $012C              ; +MFIELD_GOLD (300 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{12} \textbf{MECHANICAL SWORD} (font character~12, group~4)
+
+<<mob data records>>=
+    ; --- mob 95: MECHANICAL SWORD ($5270) ---
+    DC.W    s_MECHANICAL_SWORD              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $71              ; +MFIELD_POSITION (row 5, col 13)
+    DC.B    $5F              ; +MFIELD_APPEARANCE (fontchar=12, group=4 hostile)
+    DC.B    $05              ; +MFIELD_STRENGTH (5)
+    DC.B    $05              ; +MFIELD_HP (5)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $01              ; +MFIELD_DEFENSE (1)
+    DC.B    $00              ; +$0A
+    DC.B    $22              ; +MFIELD_LEVEL (faction=1 level=2)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{9} \textbf{VERY YOUNG DRAGON} (font character~9, group~3)
+
+<<mob data records>>=
+    ; --- mob 96: VERY YOUNG DRAGON ($5280) ---
+    DC.W    s_VERY_YOUNG_DRAGON              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $90              ; +MFIELD_POSITION (row 7, col 4)
+    DC.B    $47              ; +MFIELD_APPEARANCE (fontchar=9, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $81              ; +MFIELD_XP (st=1 xp=0 grp=1)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $CA              ; +MFIELD_LEVEL (faction=6 level=10)
+    DC.B    $0A              ; +MFIELD_LEVEL_ENC (xpmult=0, base=10)
+    DC.W    $0064              ; +MFIELD_GOLD (100 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{12} \textbf{ENCHANTED SWORD} (font character~12, group~3)
+
+<<mob data records>>=
+    ; --- mob 97: ENCHANTED SWORD ($5290) ---
+    DC.W    s_ENCHANTED_SWORD              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $87              ; +MFIELD_POSITION (row 6, col 15)
+    DC.B    $4A              ; +MFIELD_APPEARANCE (fontchar=12, group=3 hostile)
+    DC.B    $01              ; +MFIELD_STRENGTH (1)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $02              ; +MFIELD_DEFENSE (2)
+    DC.B    $00              ; +$0A
+    DC.B    $0D              ; +MFIELD_LEVEL (faction=0 level=13)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{10} \textbf{THE BLOB} (font character~10, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 98: THE BLOB ($52A0) ---
+    DC.W    s_THE_BLOB              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $87              ; +MFIELD_POSITION (row 6, col 15)
+    DC.B    $48              ; +MFIELD_APPEARANCE (fontchar=10, group=3 hostile)
+    DC.B    $16              ; +MFIELD_STRENGTH (22)
+    DC.B    $18              ; +MFIELD_HP (24)
+    DC.B    $03              ; +MFIELD_ATTACK (3)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $07              ; +MFIELD_LEVEL (faction=0 level=7)
+    DC.B    $03              ; +MFIELD_LEVEL_ENC (xpmult=0, base=3)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{11} \textbf{SUN WANDERER} (font character~11, group~4 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 99: SUN WANDERER ($52B0) ---
+    DC.W    s_SUN_WANDERER              ; +MFIELD_NAME
+    DC.B    $66              ; +MFIELD_NEXT (102)
+    DC.B    $3F              ; +MFIELD_POSITION (row 3, col 3)
+    DC.B    $5E              ; +MFIELD_APPEARANCE (fontchar=11, group=4 hostile)
+    DC.B    $05              ; +MFIELD_STRENGTH (5)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $03              ; +MFIELD_ATTACK (3)
+    DC.B    $04              ; +MFIELD_XP (st=0 xp=0 grp=4)
+    DC.B    $03              ; +MFIELD_DEFENSE (3)
+    DC.B    $00              ; +$0A
+    DC.B    $11              ; +MFIELD_LEVEL (faction=0 level=17)
+    DC.B    $13              ; +MFIELD_LEVEL_ENC (xpmult=1, base=3)
+    DC.W    $0028              ; +MFIELD_GOLD (40 ducats)
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{11} \textbf{EARTH WANDERER} (font character~11, group~4)
+
+<<mob data records>>=
+    ; --- mob 100: EARTH WANDERER ($52C0) ---
+    DC.W    s_EARTH_WANDERER              ; +MFIELD_NAME
+    DC.B    $67              ; +MFIELD_NEXT (103)
+    DC.B    $5C              ; +MFIELD_POSITION (row 4, col 12)
+    DC.B    $5E              ; +MFIELD_APPEARANCE (fontchar=11, group=4 hostile)
+    DC.B    $05              ; +MFIELD_STRENGTH (5)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $03              ; +MFIELD_ATTACK (3)
+    DC.B    $04              ; +MFIELD_XP (st=0 xp=0 grp=4)
+    DC.B    $03              ; +MFIELD_DEFENSE (3)
+    DC.B    $00              ; +$0A
+    DC.B    $11              ; +MFIELD_LEVEL (faction=0 level=17)
+    DC.B    $05              ; +MFIELD_LEVEL_ENC (xpmult=0, base=5)
+    DC.W    $0019              ; +MFIELD_GOLD (25 ducats)
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{11} \textbf{SKY WANDERER} (font character~11, group~4)
+
+<<mob data records>>=
+    ; --- mob 101: SKY WANDERER ($52D0) ---
+    DC.W    s_SKY_WANDERER              ; +MFIELD_NAME
+    DC.B    $65              ; +MFIELD_NEXT (101)
+    DC.B    $7F              ; +MFIELD_POSITION (row 6, col 7)
+    DC.B    $5E              ; +MFIELD_APPEARANCE (fontchar=11, group=4 hostile)
+    DC.B    $05              ; +MFIELD_STRENGTH (5)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $03              ; +MFIELD_ATTACK (3)
+    DC.B    $04              ; +MFIELD_XP (st=0 xp=0 grp=4)
+    DC.B    $03              ; +MFIELD_DEFENSE (3)
+    DC.B    $00              ; +$0A
+    DC.B    $11              ; +MFIELD_LEVEL (faction=0 level=17)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $0023              ; +MFIELD_GOLD (35 ducats)
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{19} \textbf{LOST BARN OWL} (font character~19, group~2)
+
+<<mob data records>>=
+    ; --- mob 102: LOST BARN OWL ($52E0) ---
+    DC.W    s_LOST_BARN_OWL              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $88              ; +MFIELD_POSITION (row 6, col 16)
+    DC.B    $3C              ; +MFIELD_APPEARANCE (fontchar=19, group=2 friendly)
+    DC.B    $05              ; +MFIELD_STRENGTH (5)
+    DC.B    $06              ; +MFIELD_HP (6)
+    DC.B    $01              ; +MFIELD_ATTACK (1)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $01              ; +MFIELD_DEFENSE (1)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $09              ; +MFIELD_LEVEL_ENC (xpmult=0, base=9)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{10} \textbf{SLIME} (font character~10, group~3)
+
+<<mob data records>>=
+    ; --- mob 103: SLIME ($52F0) ---
+    DC.W    s_SLIME              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $4C              ; +MFIELD_POSITION (row 3, col 16)
+    DC.B    $48              ; +MFIELD_APPEARANCE (fontchar=10, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $14              ; +MFIELD_HP (20)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $0D              ; +MFIELD_LEVEL (faction=0 level=13)
+    DC.B    $02              ; +MFIELD_LEVEL_ENC (xpmult=0, base=2)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{15} \textbf{SUCCUBUS} (font character~15, group~3)
+
+<<mob data records>>=
+    ; --- mob 104: SUCCUBUS ($5300) ---
+    DC.W    s_SUCCUBUS              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $58              ; +MFIELD_POSITION (row 4, col 8)
+    DC.B    $4D              ; +MFIELD_APPEARANCE (fontchar=15, group=3 hostile)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $01              ; +MFIELD_ATTACK (1)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $09              ; +MFIELD_DEFENSE (9)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $15              ; +MFIELD_LEVEL_ENC (xpmult=1, base=5)
+    DC.W    $0064              ; +MFIELD_GOLD (100 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{18} \textbf{STATUE OF MINOTAUR} (font character~18, group~3)
+
+<<mob data records>>=
+    ; --- mob 105: STATUE OF MINOTAUR ($5310) ---
+    DC.W    s_STATUE_OF_MINOTAUR              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $5E              ; +MFIELD_POSITION (row 4, col 14)
+    DC.B    $50              ; +MFIELD_APPEARANCE (fontchar=18, group=3 hostile)
+    DC.B    $14              ; +MFIELD_STRENGTH (20)
+    DC.B    $1E              ; +MFIELD_HP (30)
+    DC.B    $0A              ; +MFIELD_ATTACK (10)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $8B              ; +MFIELD_LEVEL (faction=4 level=11)
+    DC.B    $00              ; +MFIELD_LEVEL_ENC (xpmult=0, base=0)
+    DC.W    $00FA              ; +MFIELD_GOLD (250 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{10} \textbf{OOZING STENCHBEAST} (font character~10, group~3)
+
+<<mob data records>>=
+    ; --- mob 106: OOZING STENCHBEAST ($5320) ---
+    DC.W    s_OOZING_STENCHBEAST              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $70              ; +MFIELD_POSITION (row 5, col 12)
+    DC.B    $48              ; +MFIELD_APPEARANCE (fontchar=10, group=3 hostile)
+    DC.B    $1F              ; +MFIELD_STRENGTH (31)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $02              ; +MFIELD_ATTACK (2)
+    DC.B    $83              ; +MFIELD_XP (st=1 xp=0 grp=3)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $CB              ; +MFIELD_LEVEL (faction=6 level=11)
+    DC.B    $04              ; +MFIELD_LEVEL_ENC (xpmult=0, base=4)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{18} \textbf{SON OF MINOTAUR} (font character~18, group~3)
+
+<<mob data records>>=
+    ; --- mob 107: SON OF MINOTAUR ($5330) ---
+    DC.W    s_SON_OF_MINOTAUR              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $62              ; +MFIELD_POSITION (row 4, col 18)
+    DC.B    $50              ; +MFIELD_APPEARANCE (fontchar=18, group=3 hostile)
+    DC.B    $14              ; +MFIELD_STRENGTH (20)
+    DC.B    $14              ; +MFIELD_HP (20)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $82              ; +MFIELD_XP (st=1 xp=0 grp=2)
+    DC.B    $0A              ; +MFIELD_DEFENSE (10)
+    DC.B    $00              ; +$0A
+    DC.B    $0C              ; +MFIELD_LEVEL (faction=0 level=12)
+    DC.B    $19              ; +MFIELD_LEVEL_ENC (xpmult=1, base=9)
+    DC.W    $012C              ; +MFIELD_GOLD (300 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{18} \textbf{MINOTAUR} (font character~18, group~3)
+
+<<mob data records>>=
+    ; --- mob 108: MINOTAUR ($5340) ---
+    DC.W    s_MINOTAUR              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $7B              ; +MFIELD_POSITION (row 6, col 3)
+    DC.B    $50              ; +MFIELD_APPEARANCE (fontchar=18, group=3 hostile)
+    DC.B    $18              ; +MFIELD_STRENGTH (24)
+    DC.B    $18              ; +MFIELD_HP (24)
+    DC.B    $09              ; +MFIELD_ATTACK (9)
+    DC.B    $83              ; +MFIELD_XP (st=1 xp=0 grp=3)
+    DC.B    $0B              ; +MFIELD_DEFENSE (11)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $37              ; +MFIELD_LEVEL_ENC (xpmult=3, base=7)
+    DC.W    $02EE              ; +MFIELD_GOLD (750 ducats)
+    DC.B    $00              ; +MFIELD_FLAGS
+@ \noindent\mobchar{19} \textbf{BARN OWL} (font character~19, group~2)
+
+<<mob data records>>=
+    ; --- mob 109: BARN OWL ($5350) ---
+    DC.W    s_BARN_OWL              ; +MFIELD_NAME
+    DC.B    $16              ; +MFIELD_NEXT (22)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $3C              ; +MFIELD_APPEARANCE (fontchar=19, group=2 friendly)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $01              ; +MFIELD_ATTACK (1)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $01              ; +MFIELD_DEFENSE (1)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $0C              ; +MFIELD_LEVEL_ENC (xpmult=0, base=12)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $80              ; +MFIELD_FLAGS
+@ \noindent\mobchar{19} \textbf{BABY OWL} (font character~19, group~2)
+
+<<mob data records>>=
+    ; --- mob 110: BABY OWL ($5360) ---
+    DC.W    s_BABY_OWL              ; +MFIELD_NAME
+    DC.B    $1F              ; +MFIELD_NEXT (31)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $3C              ; +MFIELD_APPEARANCE (fontchar=19, group=2 friendly)
+    DC.B    $04              ; +MFIELD_STRENGTH (4)
+    DC.B    $04              ; +MFIELD_HP (4)
+    DC.B    $00              ; +MFIELD_ATTACK (0)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $00              ; +MFIELD_DEFENSE (0)
+    DC.B    $00              ; +$0A
+    DC.B    $07              ; +MFIELD_LEVEL (faction=0 level=7)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $80              ; +MFIELD_FLAGS
+@ \noindent\mobchar{34} \textbf{GANADRINIL} (font character~34, group~7 --- friendly)
+
+<<mob data records>>=
+    ; --- mob 111: GANADRINIL ($5370) ---
+    DC.W    s_GANADRINIL              ; +MFIELD_NAME
+    DC.B    $20              ; +MFIELD_NEXT (32)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $94              ; +MFIELD_APPEARANCE (fontchar=34, group=7 friendly)
+    DC.B    $0A              ; +MFIELD_STRENGTH (10)
+    DC.B    $0A              ; +MFIELD_HP (10)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $50              ; +MFIELD_LEVEL (faction=2 level=16)
+    DC.B    $09              ; +MFIELD_LEVEL_ENC (xpmult=0, base=9)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{34} \textbf{LISSOM} (font character~34, group~7)
+
+<<mob data records>>=
+    ; --- mob 112: LISSOM ($5380) ---
+    DC.W    s_LISSOM              ; +MFIELD_NAME
+    DC.B    $38              ; +MFIELD_NEXT (56)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $94              ; +MFIELD_APPEARANCE (fontchar=34, group=7 friendly)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $08              ; +MFIELD_HP (8)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $54              ; +MFIELD_LEVEL (faction=2 level=20)
+    DC.B    $0B              ; +MFIELD_LEVEL_ENC (xpmult=0, base=11)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{19} \textbf{DOCTOR WHO} (font character~19, group~2)
+
+<<mob data records>>=
+    ; --- mob 113: DOCTOR WHO ($5390) ---
+    DC.W    s_DOCTOR_WHO              ; +MFIELD_NAME
+    DC.B    $15              ; +MFIELD_NEXT (21)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $3C              ; +MFIELD_APPEARANCE (fontchar=19, group=2 friendly)
+    DC.B    $06              ; +MFIELD_STRENGTH (6)
+    DC.B    $06              ; +MFIELD_HP (6)
+    DC.B    $02              ; +MFIELD_ATTACK (2)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $02              ; +MFIELD_DEFENSE (2)
+    DC.B    $00              ; +$0A
+    DC.B    $0F              ; +MFIELD_LEVEL (faction=0 level=15)
+    DC.B    $0C              ; +MFIELD_LEVEL_ENC (xpmult=0, base=12)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{12} \textbf{BANE OF THIEVES} (font character~12, group~7)
+
+<<mob data records>>=
+    ; --- mob 114: BANE OF THIEVES ($53A0) ---
+    DC.W    s_BANE_OF_THIEVES              ; +MFIELD_NAME
+    DC.B    $39              ; +MFIELD_NEXT (57)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $9E              ; +MFIELD_APPEARANCE (fontchar=12, group=7 friendly)
+    DC.B    $08              ; +MFIELD_STRENGTH (8)
+    DC.B    $0C              ; +MFIELD_HP (12)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $4C              ; +MFIELD_LEVEL (faction=2 level=12)
+    DC.B    $05              ; +MFIELD_LEVEL_ENC (xpmult=0, base=5)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{33} \textbf{ALADDIN} (font character~33, group~7)
+
+<<mob data records>>=
+    ; --- mob 115: ALADDIN ($53B0) ---
+    DC.W    s_ALADDIN              ; +MFIELD_NAME
+    DC.B    $37              ; +MFIELD_NEXT (55)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $93              ; +MFIELD_APPEARANCE (fontchar=33, group=7 friendly)
+    DC.B    $0E              ; +MFIELD_STRENGTH (14)
+    DC.B    $0E              ; +MFIELD_HP (14)
+    DC.B    $09              ; +MFIELD_ATTACK (9)
+    DC.B    $03              ; +MFIELD_XP (st=0 xp=0 grp=3)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $0B              ; +MFIELD_LEVEL (faction=0 level=11)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $A0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{19} \textbf{RING EYED OWL} (font character~19, group~2)
+
+<<mob data records>>=
+    ; --- mob 116: RING EYED OWL ($53C0) ---
+    DC.W    s_RING_EYED_OWL              ; +MFIELD_NAME
+    DC.B    $34              ; +MFIELD_NEXT (52)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $3C              ; +MFIELD_APPEARANCE (fontchar=19, group=2 friendly)
+    DC.B    $07              ; +MFIELD_STRENGTH (7)
+    DC.B    $07              ; +MFIELD_HP (7)
+    DC.B    $02              ; +MFIELD_ATTACK (2)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $03              ; +MFIELD_DEFENSE (3)
+    DC.B    $00              ; +$0A
+    DC.B    $0E              ; +MFIELD_LEVEL (faction=0 level=14)
+    DC.B    $0C              ; +MFIELD_LEVEL_ENC (xpmult=0, base=12)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{6} \textbf{BLACK BEAR} (font character~6, group~3)
+
+<<mob data records>>=
+    ; --- mob 117: BLACK BEAR ($53D0) ---
+    DC.W    s_BLACK_BEAR              ; +MFIELD_NAME
+    DC.B    $2B              ; +MFIELD_NEXT (43)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $44              ; +MFIELD_APPEARANCE (fontchar=6, group=3 hostile)
+    DC.B    $14              ; +MFIELD_STRENGTH (20)
+    DC.B    $14              ; +MFIELD_HP (20)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $83              ; +MFIELD_XP (st=1 xp=0 grp=3)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $CA              ; +MFIELD_LEVEL (faction=6 level=10)
+    DC.B    $04              ; +MFIELD_LEVEL_ENC (xpmult=0, base=4)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{6} \textbf{BROWN BEAR} (font character~6, group~4)
+
+<<mob data records>>=
+    ; --- mob 118: BROWN BEAR ($53E0) ---
+    DC.W    s_BROWN_BEAR              ; +MFIELD_NAME
+    DC.B    $2F              ; +MFIELD_NEXT (47)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $59              ; +MFIELD_APPEARANCE (fontchar=6, group=4 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $10              ; +MFIELD_HP (16)
+    DC.B    $04              ; +MFIELD_ATTACK (4)
+    DC.B    $82              ; +MFIELD_XP (st=1 xp=0 grp=2)
+    DC.B    $06              ; +MFIELD_DEFENSE (6)
+    DC.B    $00              ; +$0A
+    DC.B    $CA              ; +MFIELD_LEVEL (faction=6 level=10)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{35} \textbf{WAUKA} (font character~35, group~3 --- hostile)
+
+<<mob data records>>=
+    ; --- mob 119: WAUKA ($53F0) ---
+    DC.W    s_WAUKA              ; +MFIELD_NAME
+    DC.B    $2E              ; +MFIELD_NEXT (46)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $41              ; +MFIELD_APPEARANCE (fontchar=35, group=3 hostile)
+    DC.B    $12              ; +MFIELD_STRENGTH (18)
+    DC.B    $12              ; +MFIELD_HP (18)
+    DC.B    $09              ; +MFIELD_ATTACK (9)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $0C              ; +MFIELD_LEVEL (faction=0 level=12)
+    DC.B    $06              ; +MFIELD_LEVEL_ENC (xpmult=0, base=6)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{35} \textbf{TROG} (font character~35, group~3)
+
+<<mob data records>>=
+    ; --- mob 120: TROG ($5400) ---
+    DC.W    s_TROG              ; +MFIELD_NAME
+    DC.B    $30              ; +MFIELD_NEXT (48)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $41              ; +MFIELD_APPEARANCE (fontchar=35, group=3 hostile)
+    DC.B    $12              ; +MFIELD_STRENGTH (18)
+    DC.B    $12              ; +MFIELD_HP (18)
+    DC.B    $09              ; +MFIELD_ATTACK (9)
+    DC.B    $01              ; +MFIELD_XP (st=0 xp=0 grp=1)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $0A              ; +MFIELD_LEVEL (faction=0 level=10)
+    DC.B    $05              ; +MFIELD_LEVEL_ENC (xpmult=0, base=5)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{20} \textbf{NELL} (font character~20, group~7)
+
+<<mob data records>>=
+    ; --- mob 121: NELL ($5410) ---
+    DC.W    s_NELL              ; +MFIELD_NAME
+    DC.B    $2C              ; +MFIELD_NEXT (44)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $A6              ; +MFIELD_APPEARANCE (fontchar=20, group=7 friendly)
+    DC.B    $12              ; +MFIELD_STRENGTH (18)
+    DC.B    $12              ; +MFIELD_HP (18)
+    DC.B    $07              ; +MFIELD_ATTACK (7)
+    DC.B    $81              ; +MFIELD_XP (st=1 xp=0 grp=1)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $54              ; +MFIELD_LEVEL (faction=2 level=20)
+    DC.B    $0A              ; +MFIELD_LEVEL_ENC (xpmult=0, base=10)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $C0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{20} \textbf{EQUUS} (font character~20, group~7)
+
+<<mob data records>>=
+    ; --- mob 122: EQUUS ($5420) ---
+    DC.W    s_EQUUS              ; +MFIELD_NAME
+    DC.B    $7E              ; +MFIELD_NEXT (126)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $A6              ; +MFIELD_APPEARANCE (fontchar=20, group=7 friendly)
+    DC.B    $14              ; +MFIELD_STRENGTH (20)
+    DC.B    $14              ; +MFIELD_HP (20)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $82              ; +MFIELD_XP (st=1 xp=0 grp=2)
+    DC.B    $05              ; +MFIELD_DEFENSE (5)
+    DC.B    $00              ; +$0A
+    DC.B    $5A              ; +MFIELD_LEVEL (faction=2 level=26)
+    DC.B    $09              ; +MFIELD_LEVEL_ENC (xpmult=0, base=9)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $E0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{19} \textbf{WHITE OWL} (font character~19, group~2)
+
+<<mob data records>>=
+    ; --- mob 123: WHITE OWL ($5430) ---
+    DC.W    s_WHITE_OWL              ; +MFIELD_NAME
+    DC.B    $2A              ; +MFIELD_NEXT (42)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $3C              ; +MFIELD_APPEARANCE (fontchar=19, group=2 friendly)
+    DC.B    $04              ; +MFIELD_STRENGTH (4)
+    DC.B    $04              ; +MFIELD_HP (4)
+    DC.B    $01              ; +MFIELD_ATTACK (1)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $01              ; +MFIELD_DEFENSE (1)
+    DC.B    $00              ; +$0A
+    DC.B    $0F              ; +MFIELD_LEVEL (faction=0 level=15)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $E0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{9} \textbf{WHITE DRAGON} (font character~9, group~7)
+
+<<mob data records>>=
+    ; --- mob 124: WHITE DRAGON ($5440) ---
+    DC.W    s_WHITE_DRAGON              ; +MFIELD_NAME
+    DC.B    $29              ; +MFIELD_NEXT (41)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $9B              ; +MFIELD_APPEARANCE (fontchar=9, group=7 friendly)
+    DC.B    $1F              ; +MFIELD_STRENGTH (31)
+    DC.B    $30              ; +MFIELD_HP (48)
+    DC.B    $0C              ; +MFIELD_ATTACK (12)
+    DC.B    $83              ; +MFIELD_XP (st=1 xp=0 grp=3)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $CD              ; +MFIELD_LEVEL (faction=6 level=13)
+    DC.B    $0D              ; +MFIELD_LEVEL_ENC (xpmult=0, base=13)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $E0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{18} \textbf{SONNY BOY MINOTAUR} (font character~18, group~4)
+
+<<mob data records>>=
+    ; --- mob 125: SONNY BOY MINOTAUR ($5450) ---
+    DC.W    s_SONNY_BOY_MINOTAUR              ; +MFIELD_NAME
+    DC.B    $00              ; +MFIELD_NEXT (0)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $65              ; +MFIELD_APPEARANCE (fontchar=18, group=4 hostile)
+    DC.B    $12              ; +MFIELD_STRENGTH (18)
+    DC.B    $16              ; +MFIELD_HP (22)
+    DC.B    $06              ; +MFIELD_ATTACK (6)
+    DC.B    $81              ; +MFIELD_XP (st=1 xp=0 grp=1)
+    DC.B    $08              ; +MFIELD_DEFENSE (8)
+    DC.B    $00              ; +$0A
+    DC.B    $0B              ; +MFIELD_LEVEL (faction=0 level=11)
+    DC.B    $08              ; +MFIELD_LEVEL_ENC (xpmult=0, base=8)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $E0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{18} \textbf{DAUNTLESS MINNIE} (font character~18, group~3)
+
+<<mob data records>>=
+    ; --- mob 126: DAUNTLESS MINNIE ($5460) ---
+    DC.W    s_DAUNTLESS_MINNIE              ; +MFIELD_NAME
+    DC.B    $23              ; +MFIELD_NEXT (35)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $50              ; +MFIELD_APPEARANCE (fontchar=18, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $15              ; +MFIELD_HP (21)
+    DC.B    $08              ; +MFIELD_ATTACK (8)
+    DC.B    $83              ; +MFIELD_XP (st=1 xp=0 grp=3)
+    DC.B    $09              ; +MFIELD_DEFENSE (9)
+    DC.B    $00              ; +$0A
+    DC.B    $0D              ; +MFIELD_LEVEL (faction=0 level=13)
+    DC.B    $0A              ; +MFIELD_LEVEL_ENC (xpmult=0, base=10)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $E0              ; +MFIELD_FLAGS
+@ \noindent\mobchar{18} \textbf{BULL} (font character~18, group~3)
+
+<<mob data records>>=
+    ; --- mob 127: BULL ($5470) ---
+    DC.W    s_BULL              ; +MFIELD_NAME
+    DC.B    $7D              ; +MFIELD_NEXT (125)
+    DC.B    $00              ; +MFIELD_POSITION (unplaced)
+    DC.B    $50              ; +MFIELD_APPEARANCE (fontchar=18, group=3 hostile)
+    DC.B    $10              ; +MFIELD_STRENGTH (16)
+    DC.B    $14              ; +MFIELD_HP (20)
+    DC.B    $05              ; +MFIELD_ATTACK (5)
+    DC.B    $00              ; +MFIELD_XP (st=0 xp=0 grp=0)
+    DC.B    $04              ; +MFIELD_DEFENSE (4)
+    DC.B    $00              ; +$0A
+    DC.B    $CA              ; +MFIELD_LEVEL (faction=6 level=10)
+    DC.B    $07              ; +MFIELD_LEVEL_ENC (xpmult=0, base=7)
+    DC.W    $0000              ; +MFIELD_GOLD
+    DC.B    $E0              ; +MFIELD_FLAGS
+@ %def MOB_DATA_TABLE
+
+
+@ \section{Mob name strings (\$5480--\$59C8)}
+
+128 length-prefixed high-ASCII name strings, one per mob record.
+The name pointer in bytes 0--1 of each mob record points into
+this table.
+
+<<mob name strings>>=
+    ORG     $5480
+s_ALI_BABA:
+    APSTR "ALI BABA"
+s_SCHEHERAZADE:
+    APSTR "SCHEHERAZADE"
+s_HAROUD_EL_LARGE:
+    APSTR "HAROUD EL-LARGE"
+s_BAIRAM_MEDIO:
+    APSTR "BAIRAM MEDIO"
+s_ABOU_HASSAN:
+    APSTR "ABOU HASSAN"
+s_LUTHIEN:
+    APSTR "LUTHIEN"
+s_HUAN:
+    APSTR "HUAN"
+s_CELEGORM:
+    APSTR "CELEGORM"
+s_CURUFIN:
+    APSTR "CURUFIN"
+s_ELDO:
+    APSTR "ELDO"
+s_MERRYWATER:
+    APSTR "MERRYWATER"
+s_STILBO:
+    APSTR "STILBO"
+s_CINDER:
+    APSTR "CINDER"
+s_JATTE:
+    APSTR "JATTE"
+s_THORA:
+    APSTR "THORA"
+s_OG:
+    APSTR "OG"
+s_ULVA:
+    APSTR "ULVA"
+s_COGIA_HOUSSAIN:
+    APSTR "COGIA HOUSSAIN"
+s_OMAR:
+    APSTR "OMAR"
+s_MAHMUD:
+    APSTR "MAHMUD"
+s_ABUL_FATH:
+    APSTR "ABUL-FATH"
+s_IBRAHIM:
+    APSTR "IBRAHIM"
+s_JALAL_UD_DIN:
+    APSTR "JALAL-UD-DIN"
+s_SALAMAN:
+    APSTR "SALAMAN"
+s_ABSAL:
+    APSTR "ABSAL"
+s_JAMI:
+    APSTR "JAMI"
+s_NIZAM_UL_MULK:
+    APSTR "NIZAM UL MULK"
+s_ALP_ARSLAN:
+    APSTR "ALP ARSLAN"
+s_MALIK:
+    APSTR "MALIK"
+s_TOGHRUL_BEG:
+    APSTR "TOGHRUL BEG"
+s_MOWAFFAK:
+    APSTR "MOWAFFAK"
+s_ABD_US_SAMAD:
+    APSTR "ABD-US-SAMAD"
+s_HAKIM:
+    APSTR "HAKIM"
+s_HASAN_BEN_SABBAH:
+    APSTR "HASAN BEN SABBAH"
+s_ALI:
+    APSTR "ALI"
+s_KHORASSAN:
+    APSTR "KHORASSAN"
+s_KHWAJAH_NIZAMI:
+    APSTR "KHWAJAH NIZAMI"
+s_HAFIZ:
+    APSTR "HAFIZ"
+s_JELALUDDIN:
+    APSTR "JELALUDDIN"
+s_KWADRACH:
+    APSTR "KWADRACH"
+s_ATTAR:
+    APSTR "ATTAR"
+s_PEHLEVI:
+    APSTR "PEHLEVI"
+s_JAMSHYD:
+    APSTR "JAMSHYD"
+s_IRAM:
+    APSTR "IRAM"
+s_KAIKOBAD:
+    APSTR "KAIKOBAD"
+s_KAIKHOSRU:
+    APSTR "KAIKHOSRU"
+s_RUSTUM:
+    APSTR "RUSTUM"
+s_HATIM_TAI:
+    APSTR "HATIM TAI"
+s_BAHRAM:
+    APSTR "BAHRAM"
+s_DINARZADE:
+    APSTR "DINARZADE"
+s_SHAHZENAN:
+    APSTR "SHAHZENAN"
+s_DOUBAN:
+    APSTR "DOUBAN"
+s_FEROZE:
+    APSTR "FEROZE"
+s_AHMED:
+    APSTR "AHMED"
+s_PERIE_BANOU:
+    APSTR "PERIE BANOU"
+s_HAROUN_AL_RASCHID:
+    APSTR "HAROUN AL-RASCHID"
+s_CODADAD:
+    APSTR "CODADAD"
+s_MORGIANA:
+    APSTR "MORGIANA"
+s_ABDALLA:
+    APSTR "ABDALLA"
+s_ENCHANTED_STATUE:
+    APSTR "ENCHANTED STATUE"
+s_TAN_RAT:
+    APSTR "TAN RAT"
+s_GRAY_RAT:
+    APSTR "GRAY RAT"
+s_SULTAN_SHAHRIAR:
+    APSTR "SULTAN SHAHRIAR"
+s_PRINCESS_BUDDIR:
+    APSTR "PRINCESS BUDDIR"
+s_SULTANS_RIGHT_GUARD:
+    APSTR "SULTANS RIGHT GUARD"
+s_SULTANS_LEFT_GUARD:
+    APSTR "SULTANS LEFT GUARD"
+s_TIGER:
+    APSTR "TIGER"
+s_WITLESS_ZOMBIE:
+    APSTR "WITLESS ZOMBIE"
+s_SMALL_ZOMBIE:
+    APSTR "SMALL ZOMBIE"
+s_BIG_ZOMBIE:
+    APSTR "BIG ZOMBIE"
+s_CALICO_RAT:
+    APSTR "CALICO RAT"
+s_HOOT_OWL:
+    APSTR "HOOT OWL"
+s_MOUNTAIN_SCORPION:
+    APSTR "MOUNTAIN SCORPION"
+s_UNICORN:
+    APSTR "UNICORN"
+sm_LEO:
+    APSTR "LEO"
+sm_SCORPIUS:
+    APSTR "SCORPIUS"
+s_STATUE_OF_TAURUS:
+    APSTR "STATUE OF TAURUS"
+s_ARIES_THE_RAM:
+    APSTR "ARIES, THE RAM"
+s_CANCER_THE_CRAB:
+    APSTR "CANCER, THE CRAB"
+s_WEREJACKAL:
+    APSTR "WEREJACKAL"
+s_CAVEBEAR:
+    APSTR "CAVEBEAR"
+s_CAVE_RAT:
+    APSTR "CAVE RAT"
+s_BROWN_RAT:
+    APSTR "BROWN RAT"
+s_BLACK_RAT:
+    APSTR "BLACK RAT"
+s_GEMINI_I:
+    APSTR "GEMINI I"
+s_GEMINI_II:
+    APSTR "GEMINI II"
+s_SWORD_OF_DAMOCLES:
+    APSTR "SWORD OF DAMOCLES"
+s_TWO_EDGED_SWORD:
+    APSTR "TWO EDGED SWORD"
+s_WERERAT:
+    APSTR "WERERAT"
+s_SEWER_RAT:
+    APSTR "SEWER RAT"
+s_JUNGLE_RAT:
+    APSTR "JUNGLE RAT"
+s_GIANT_SCORPION:
+    APSTR "GIANT SCORPION"
+s_WEREWOLF:
+    APSTR "WEREWOLF"
+s_GRIZZLY_BEAR:
+    APSTR "GRIZZLY BEAR"
+s_GREEN_DRAGON:
+    APSTR "GREEN DRAGON"
+s_MECHANICAL_SWORD:
+    APSTR "MECHANICAL SWORD"
+s_VERY_YOUNG_DRAGON:
+    APSTR "VERY YOUNG DRAGON"
+s_ENCHANTED_SWORD:
+    APSTR "ENCHANTED SWORD"
+s_THE_BLOB:
+    APSTR "THE BLOB"
+s_SUN_WANDERER:
+    APSTR "SUN WANDERER"
+s_EARTH_WANDERER:
+    APSTR "EARTH WANDERER"
+s_SKY_WANDERER:
+    APSTR "SKY WANDERER"
+s_LOST_BARN_OWL:
+    APSTR "LOST BARN OWL"
+s_SLIME:
+    APSTR "SLIME"
+s_SUCCUBUS:
+    APSTR "SUCCUBUS"
+s_STATUE_OF_MINOTAUR:
+    APSTR "STATUE OF MINOTAUR"
+s_OOZING_STENCHBEAST:
+    APSTR "OOZING STENCHBEAST"
+s_SON_OF_MINOTAUR:
+    APSTR "SON OF MINOTAUR"
+s_MINOTAUR:
+    APSTR "MINOTAUR"
+s_BARN_OWL:
+    APSTR "BARN OWL"
+s_BABY_OWL:
+    APSTR "BABY OWL"
+s_GANADRINIL:
+    APSTR "GANADRINIL"
+s_LISSOM:
+    APSTR "LISSOM"
+s_DOCTOR_WHO:
+    APSTR "DOCTOR WHO"
+s_BANE_OF_THIEVES:
+    APSTR "BANE OF THIEVES"
+s_ALADDIN:
+    APSTR "ALADDIN"
+s_RING_EYED_OWL:
+    APSTR "RING EYED OWL"
+s_BLACK_BEAR:
+    APSTR "BLACK BEAR"
+s_BROWN_BEAR:
+    APSTR "BROWN BEAR"
+s_WAUKA:
+    APSTR "WAUKA"
+s_TROG:
+    APSTR "TROG"
+s_NELL:
+    APSTR "NELL"
+s_EQUUS:
+    APSTR "EQUUS"
+s_WHITE_OWL:
+    APSTR "WHITE OWL"
+s_WHITE_DRAGON:
+    APSTR "WHITE DRAGON"
+s_SONNY_BOY_MINOTAUR:
+    APSTR "SONNY BOY MINOTAUR"
+s_DAUNTLESS_MINNIE:
+    APSTR "DAUNTLESS MINNIE"
+s_BULL:
+    APSTR "BULL"
+@ %def s_ALI_BABA s_SCHEHERAZADE s_HAROUD_EL_LARGE s_BAIRAM_MEDIO s_ABOU_HASSAN s_LUTHIEN s_HUAN s_CELEGORM s_CURUFIN s_ELDO s_MERRYWATER s_STILBO s_CINDER s_JATTE s_THORA s_OG s_ULVA s_COGIA_HOUSSAIN s_OMAR s_MAHMUD s_ABUL_FATH s_IBRAHIM s_JALAL_UD_DIN s_SALAMAN s_ABSAL s_JAMI s_NIZAM_UL_MULK s_ALP_ARSLAN s_MALIK s_TOGHRUL_BEG s_MOWAFFAK s_ABD_US_SAMAD s_HAKIM s_HASAN_BEN_SABBAH s_ALI s_KHORASSAN s_KHWAJAH_NIZAMI s_HAFIZ s_JELALUDDIN s_KWADRACH s_ATTAR s_PEHLEVI s_JAMSHYD s_IRAM s_KAIKOBAD s_KAIKHOSRU s_RUSTUM s_HATIM_TAI s_BAHRAM s_DINARZADE s_SHAHZENAN s_DOUBAN s_FEROZE s_AHMED s_PERIE_BANOU s_HAROUN_AL_RASCHID s_CODADAD s_MORGIANA s_ABDALLA s_ENCHANTED_STATUE s_TAN_RAT s_GRAY_RAT s_SULTAN_SHAHRIAR s_PRINCESS_BUDDIR s_SULTANS_RIGHT_GUARD s_SULTANS_LEFT_GUARD s_TIGER s_WITLESS_ZOMBIE s_SMALL_ZOMBIE s_BIG_ZOMBIE s_CALICO_RAT s_HOOT_OWL s_MOUNTAIN_SCORPION s_UNICORN sm_LEO sm_SCORPIUS s_STATUE_OF_TAURUS s_ARIES_THE_RAM s_CANCER_THE_CRAB s_WEREJACKAL s_CAVEBEAR s_CAVE_RAT s_BROWN_RAT s_BLACK_RAT s_GEMINI_I s_GEMINI_II s_SWORD_OF_DAMOCLES s_TWO_EDGED_SWORD s_WERERAT s_SEWER_RAT s_JUNGLE_RAT s_GIANT_SCORPION s_WEREWOLF s_GRIZZLY_BEAR s_GREEN_DRAGON s_MECHANICAL_SWORD s_VERY_YOUNG_DRAGON s_ENCHANTED_SWORD s_THE_BLOB s_SUN_WANDERER s_EARTH_WANDERER s_SKY_WANDERER s_LOST_BARN_OWL s_SLIME s_SUCCUBUS s_STATUE_OF_MINOTAUR s_OOZING_STENCHBEAST s_SON_OF_MINOTAUR s_MINOTAUR s_BARN_OWL s_BABY_OWL s_GANADRINIL s_LISSOM s_DOCTOR_WHO s_BANE_OF_THIEVES s_ALADDIN s_RING_EYED_OWL s_BLACK_BEAR s_BROWN_BEAR s_WAUKA s_TROG s_NELL s_EQUUS s_WHITE_OWL s_WHITE_DRAGON s_SONNY_BOY_MINOTAUR s_DAUNTLESS_MINNIE s_BULL
+
+@ \section{Residual diagnostic text (\$59C9--\$5AFF)}
+
+Debug/diagnostic text from development, unused at runtime.
+
+<<mob residual data>>=
+    ORG     $59C9
+RESIDUAL_DEBUG_TEXT:
+; --- Residual diagnostic text ---
+    HEX     D3 D4 C1 A0 C1 D2 C7 8D A0 CC C4 C1 A0 A3 BE D3
+    HEX     CC C6 D3 D0 C4 8D A0 D3 D4 C1 A0 D4 C5 CD D0 8D
+    HEX     A0 CC C4 C1 A0 A3 BC D3 CC C6 D3 D0 C4 8D A0 D3
+    HEX     D4 C1 A0 D4 C5 CD D0 AB B1 8D A0 CA D3 D2 A0 D3
+    HEX     C8 CF D7 CE CD 8D A0 CC C4 D9 A0 A3 B1 B1 8D A0
+    HEX     CC C4 C1 A0 A8 C1 C3 D4 CF D2 A9 AC D9 8D A0 C1
+    HEX     CE C4 A0 A3 A4 B1 C6 8D A0 D3 D4 C1 A0 C1 D2 C7
+    HEX     8D A0 CC C4 C1 A0 A3 BE D3 CC C6 C4 D8 8D A0 D3
+    HEX     D4 C1 A0 D4 C5 CD D0 8D A0 CC C4 C1 A0 A3 BC D3
+    HEX     CC C6 C4 D8 8D A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1
+    HEX     8D A0 CA D3 D2 A0 D3 C8 CF D7 CE CD 8D A0 CC C4
+    HEX     D9 A0 A3 B1 B3 8D A0 CC C4 C1 A0 A8 C1 C3 D4 CF
+    HEX     D2 A9 AC D9 8D A0 D3 D4 C1 A0 C1 D2 C7 8D A0 C9
+    HEX     CE D9 8D A0 CC C4 C1 A0 A8 C1 C3 D4 CF D2 A9 AC
+    HEX     D9 8D A0 D3 D4 C1 A0 C1 D2 C7 AB B1 8D A0 CC C4
+    HEX     C1 A0 A3 BE D3 CC C6 C4 D5 C3 8D A0 D3 D4 C1 A0
+    HEX     D4 C5 CD D0 8D A0 CC C4 C1 A0 A3 BC D3 CC C6 C4
+    HEX     D5 C3 8D A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1 8D A0
+    HEX     CA D3 D2 A0 D3 C8 CF D7 CE CD 8D A0 CC C4 C1 A0
+    HEX     D3 CC C6 C4 D5 C3 AB
+@ %def RESIDUAL_DEBUG_TEXT
+
 
 @ \chapter{Dead Code}
 
@@ -23833,7 +26476,9 @@ The following root chunks produce the assembly files when tangled.
 <<Location data>>
 <<Location names>>
 <<Location events>>
-<<mob data>>
+<<mob data records>>
+<<mob name strings>>
+<<mob residual data>>
 <<init game state>>
 <<border animation>>
 <<init game display>>

@@ -191,7 +191,7 @@ Page offset: F   8   1   9   2   A   3   B   4   C   5   D   6   E   7   0
 - 16-byte mob data records at ($4000/$4001) base (GET_MOB_DATA)
 - Mob data byte 8: bit 7 = status flag, bits 6-4 = pending XP (0-7), bits 3-0 = group count (0-4)
 - Mob data byte 5: bits 4-0 = strength; char record byte 5 bits 4-1 = defense
-- Mob data byte 6: bits 5-0 = mob type (>= 3 = active); byte $0F bit 2 = combat engaged flag
+- Mob data byte 6: bits 5-0 = HP (< 3 = inactive/healing, >= 3 = active); byte $0F bit 2 = combat engaged flag
 - Mob data byte 11: bits 7-5 = class/faction flags, bits 4-0 = level (0-31)
 - Groups linked via mob data byte 2 (next pointer), byte 3 = map position
 
