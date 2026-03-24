@@ -18638,11 +18638,14 @@ CANDIDATE_POS       EQU     $5A15   ; position of event being evaluated
     ; --- Event record field offsets (3-byte entries) ---
 EVFIELD_POSITION    EQU     $00     ; byte 0: packed map position
 EVFIELD_TYPE        EQU     $01     ; byte 1: event type (>= $C0 = activated)
+EVFIELD_VALUE       EQU     $02     ; byte 2: event value (low byte)
 EVENT_RECORD_SIZE   EQU     $03     ; size of one event list entry (3 bytes)
 EVENT_ACTIVATED     EQU     $C0     ; event type threshold: >= $C0 = already activated
+EVENT_ACCUM_MAX     EQU     $D1     ; event types < this are accumulable ($C0-$D0)
+EVENT_VALUE_HI_MASK EQU     $07     ; mask for value high bits stored in type byte
 EVENT_EMPTY         EQU     $FE     ; event list: empty slot marker
 EVENT_END           EQU     $FF     ; event list: end-of-list marker
-@ %def NEAREST_DIST NEAREST_POS CANDIDATE_POS EVFIELD_POSITION EVFIELD_TYPE EVENT_RECORD_SIZE EVENT_ACTIVATED EVENT_EMPTY EVENT_END
+@ %def NEAREST_DIST NEAREST_POS CANDIDATE_POS EVFIELD_POSITION EVFIELD_TYPE EVFIELD_VALUE EVENT_RECORD_SIZE EVENT_ACTIVATED EVENT_ACCUM_MAX EVENT_VALUE_HI_MASK EVENT_EMPTY EVENT_END
 
 <<find nearest event>>=
     ORG     $138D
@@ -20619,6 +20622,10 @@ The scan processes each slot as follows:
   continues scanning.
 \end{itemize}
 
+<<zero page defines>>=
+EVENT_SAVED_POS         EQU     $BA     ; saved map position for event insert (aliased)
+@ %def EVENT_SAVED_POS
+
 <<update event list>>=
     ORG     $1260
 UPDATE_EVENT_LIST:
@@ -20640,7 +20647,7 @@ UPDATE_EVENT_LIST:
     ;     else -> advance to next entry
     ; Clobbers: A, Y
 
-    STA     $BA                    ; save position
+    STA     EVENT_SAVED_POS        ; save position
     LDA     #$00
     BANE    NUM_VALUE,.has_value
     BANE    NUM_VALUE+1,.has_value
@@ -20648,49 +20655,49 @@ UPDATE_EVENT_LIST:
 .has_value:
     LDWIY    CHAR_PTR,#CFIELD_EVENTS,EVENT_PTR ; event list ptr
 .scan:
-    LDY     #$00
+    LDY     #EVFIELD_POSITION
     LDA     (EVENT_PTR),Y          ; byte 0 = position
-    BANE    #$FF,.not_end
+    BANE    #EVENT_END,.not_end    ; $FF = end of list
     JSR     SET_CURSOR_ROW21
     LDA     #MSG_ARMOR_WORTHLESS
     JMP     DISPLAY_MESSAGE        ; list full message
 .not_end:
-    BANE    #$FE,.check_match
-    ; Empty slot: insert new entry
-    LDA     $BA
+    BANE    #EVENT_EMPTY,.check_match ; $FE = empty slot
+    ; --- Insert new entry into empty slot ---
+    LDA     EVENT_SAVED_POS
     STA     (EVENT_PTR),Y          ; byte 0 = position
-    INY
+    INY                            ; Y = EVFIELD_TYPE
     LDA     NUM_VALUE+1
-    AND     #$07
-    ORA     #$C0                   ; byte 1 = type | high bits
+    AND     #EVENT_VALUE_HI_MASK   ; keep high 3 bits of value
+    ORA     #EVENT_ACTIVATED       ; mark as activated ($C0+)
     STA     (EVENT_PTR),Y
-    INY
+    INY                            ; Y = EVFIELD_VALUE
     LDA     NUM_VALUE
     STA     (EVENT_PTR),Y          ; byte 2 = value low
     RTS
 .check_match:
-    BANE    $BA,.next              ; same position?
-    INY
+    BANE    EVENT_SAVED_POS,.next  ; same position?
+    INY                            ; Y = EVFIELD_TYPE
     LDA     (EVENT_PTR),Y          ; byte 1 = type
-    BPL     .next                  ; not activated
-    BAMI    #$C0,.next             ; below $C0
-    BAPL    #$D1,.next             ; above $D0
-    ; Add to existing entry
+    BPL     .next                  ; not activated (< $80)
+    BAMI    #EVENT_ACTIVATED,.next ; below $C0
+    BAPL    #EVENT_ACCUM_MAX,.next ; above $D0 -> not accumulable
+    ; --- Add value to existing entry ---
     CLC
     LDA     NUM_VALUE
-    INY
+    INY                            ; Y = EVFIELD_VALUE
     ADC     (EVENT_PTR),Y          ; byte 2 += value low
     STA     (EVENT_PTR),Y
-    DEY
+    DEY                            ; Y = EVFIELD_TYPE
     LDA     NUM_VALUE+1
-    AND     #$07
+    AND     #EVENT_VALUE_HI_MASK   ; high 3 bits of value
     ADC     (EVENT_PTR),Y          ; byte 1 += value high
     STA     (EVENT_PTR),Y
     RTS
 .next:
     CLC
     LDA     EVENT_PTR
-    ADC     #$03                   ; next 3-byte entry
+    ADC     #EVENT_RECORD_SIZE     ; next 3-byte entry
     STA     EVENT_PTR
     BCC     .no_carry
     INC     EVENT_PTR+1
