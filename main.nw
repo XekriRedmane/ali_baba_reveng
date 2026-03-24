@@ -3917,6 +3917,18 @@ HP_FLAGS_MASK       EQU     $C0     ; byte 6: mask for flags bits 7-6 (above HP)
     ORG     $78C7
 GAME_INIT:
     SUBROUTINE GAME_INIT
+    ; Initialize the game from cold start.
+    ;
+    ; Behavior:
+    ;   1. Sets reset vector to $A56F and disables blink cursor.
+    ;   2. Relocates hi-res staging data to runtime addresses ($9600+, $B300+).
+    ;   3. Switches to hi-res graphics mode and initializes HRCG, disk IOB,
+    ;      text window, game display, map, and input mode.
+    ;   4. Clears location/entity state, inits world and mob count.
+    ;
+    ; Modifies: reset vector ($03F2), BLINK_COL, LOCATION_POS, LOCATION_STYLE,
+    ;   ENTITY_PTR+1, CURRENT_PLAYER, DISPATCH_VEC, display softswitches
+    ; Clobbers: A, X, Y
 
     LDX     #$6F                   ; \
     LDY     #$A5                   ;  | reset vector = $A56F
@@ -3980,6 +3992,15 @@ COPY_DEST               EQU     $BA     ; block copy destination pointer (2 byte
     ORG     $6DA5
 RELOCATE_HIRES_STAGING:
     SUBROUTINE RELOCATE_HIRES_STAGING
+    ; Block-copy staged data from hi-res page to runtime addresses.
+    ;
+    ; Behavior:
+    ;   1. Copies $2000-$32FF to $9600-$A8FF (19 pages: HRCG + font).
+    ;   2. Copies $3300-$3FFF to $B300-$BFFF (13 pages: disk I/O).
+    ;   3. Zeroes each source byte after copying, clearing the hi-res page.
+    ;
+    ; Modifies: COPY_SRC, COPY_DEST, $2000-$3FFF (zeroed), $9600-$A8FF, $B300-$BFFF
+    ; Clobbers: A, X, Y
 
     STOB    #$00,COPY_DEST ; dest = $9600
     STA     COPY_SRC      ; \  src  = $2000
@@ -4060,6 +4081,14 @@ complete the HRCG startup.
     ORG     $791A
 INIT_HRCG:
     SUBROUTINE INIT_HRCG
+    ; Patch and initialize the HRCG character generator library.
+    ;
+    ; Behavior:
+    ;   1. Patches $94B6 to RTS and $92D5-$92D7 to NOPs.
+    ;   2. Tail-calls HRCG_INIT to complete initialization.
+    ;
+    ; Modifies: $94B6, $92D5-$92D7
+    ; Clobbers: A
 
     STOB    #$60,$94B6 ; RTS opcode
     STOB    #$EA,$92D5 ; NOP opcode
@@ -4114,6 +4143,16 @@ S_COPYRIGHT:
     ORG     $5B00
 INIT_GAME_STATE:
     SUBROUTINE INIT_GAME_STATE
+    ; Set up game display, dispatch vector, and play opening tune.
+    ;
+    ; Behavior:
+    ;   1. Calls INIT_GAME_DISPLAY to draw the main screen layout.
+    ;   2. Sets DISPATCH_VEC to GAME_ACTION_HANDLER.
+    ;   3. Patches character renderer at $80A6 and jump at $7A49-$7A4B.
+    ;   4. Plays tune 6 (attract/opening music).
+    ;
+    ; Modifies: DISPATCH_VEC, INPUT_MODE, $80A6, $7A49-$7A4B
+    ; Clobbers: A, X, Y
 
     JSR     INIT_GAME_DISPLAY     ; set up game display / UI
     STOW    GAME_ACTION_HANDLER,DISPATCH_VEC ; $F6/DISPATCH_VEC+1 = game action handler
@@ -4192,6 +4231,16 @@ S_PRESS_SPACE:
     ORG     $5C6D
 INIT_GAME_DISPLAY:
     SUBROUTINE INIT_GAME_DISPLAY
+    ; Draw the game's main screen layout with borders and decorations.
+    ;
+    ; Behavior:
+    ;   1. Clears the hi-res screen, renders UI background from UI_TEXT_STREAM.
+    ;   2. Draws 2x2 border characters at fixed positions and border labels/icons.
+    ;   3. Prints copyright string (row 21) and press-space prompt (row 23).
+    ;   4. Switches to charset 5 and draws decorative strings on the right panel.
+    ;
+    ; Modifies: TEXT_ROW, TEXT_COL, TEXT_STREAM_PTR, FONT_CHARNUM, FONT_CHARSET
+    ; Clobbers: A, X, Y
 
     LDA     #$90                           ; HRCG control: clear hi-res screen
     JSR     ROM_COUT1
@@ -4329,6 +4378,16 @@ BORDER_STR_HORIZ:
     ORG     $5CFD
 DRAW_BORDER_LABELS:
     SUBROUTINE DRAW_BORDER_LABELS
+    ; Draw border label strings at predefined positions in three loops.
+    ;
+    ; Behavior:
+    ;   1. Selects HRCG charset 2.
+    ;   2. Loop 1: draws horizontal border strings at 6 positions.
+    ;   3. Loop 2: draws left vertical border strings at 10 positions.
+    ;   4. Loop 3: draws right vertical border strings at 10 positions.
+    ;
+    ; Modifies: TEXT_COL, TEXT_ROW, PRINT_STRING_ADDR, BORDER_LOOP_CTR
+    ; Clobbers: A, X, Y
 
     ; Select HRCG charset 2
     LDA     #$81 ; ctrl-A
@@ -4544,6 +4603,18 @@ the border positions, wrapping from \$15 back to \$05.
     ORG     $5B2A
 GAME_ACTION_HANDLER:
     SUBROUTINE GAME_ACTION_HANDLER
+    ; Border animation handler invoked via DISPATCH_VEC during idle loop.
+    ;
+    ; Behavior:
+    ;   1. Runs a 3-pass loop: each pass dispatches three border handlers
+    ;      (A, B, C) that swap/draw 2x2 icons along the border.
+    ;   2. Between passes, randomly places icons via ANIM_BORDER_ICONS_A/B.
+    ;   3. Each pass advances the animation index via TICK_BORDER_ANIM
+    ;      and plays tune notes via TUNE_ADVANCE between handler calls.
+    ;
+    ; Modifies: BORDER_ANIM_SAVE, BORDER_ANIM_INDEX, FONT_CHARNUM,
+    ;   DISPATCH_VEC, border position tables
+    ; Clobbers: A, X, Y
 
     ; --- Main entry: 3-pass border animation loop ---
 .restart:
@@ -4736,6 +4807,12 @@ WORLD_INIT_DATA         EQU     $62B9   ; world initialization data table
     ORG     $62E5
 INIT_WORLD:
     SUBROUTINE INIT_WORLD
+    ; Pass world initialization data to the game setup loop.
+    ;
+    ; Behavior:
+    ;   Loads X/Y with the address of WORLD_INIT_DATA and tail-calls INPUT_LOOP.
+    ;
+    ; Clobbers: X, Y
 
     LDX     #>WORLD_INIT_DATA ; \ X/Y = pointer to init data
     LDY     #<WORLD_INIT_DATA ; /
@@ -4769,6 +4846,13 @@ RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
     ORG     $6C2E
 INIT_DISK_IOB:
     SUBROUTINE INIT_DISK_IOB
+    ; Set the zero-page RWTS IOB pointer to the IOB address.
+    ;
+    ; Behavior:
+    ;   Stores the address of RWTS_IOB ($B7E8) into RWTS_IOB_PTR ($08/$09).
+    ;
+    ; Modifies: RWTS_IOB_PTR
+    ; Clobbers: A, Y
 
     LDA     #>RWTS_IOB     ; \ set RWTS IOB pointer
     LDY     #<RWTS_IOB     ;  | $08/$09 = $B7E8
@@ -4791,6 +4875,18 @@ repositioned, and message~\$2F (joystick confirmation) is displayed.
     ORG     $084E
 SELECT_INPUT_MODE:
     SUBROUTINE SELECT_INPUT_MODE
+    ; Prompt the player to choose keyboard or joystick input.
+    ;
+    ; Behavior:
+    ;   1. Displays the input mode prompt message.
+    ;   2. Polls keyboard and paddle button 1 in a tight loop.
+    ;   3. Space bar selects keyboard (INPUT_MODE=0); paddle button
+    ;      state change selects joystick (INPUT_MODE=1).
+    ;
+    ; Outputs:
+    ;   INPUT_MODE — 0 for keyboard, 1 for joystick
+    ; Modifies: INPUT_MODE
+    ; Clobbers: A, X, Y
 
     LDA     #MSG_INPUT_PROMPT           ; message $38: input mode prompt
     JSR     DISPLAY_MESSAGE
@@ -4842,6 +4938,16 @@ TOTAL_MOB_COUNT     EQU     $5A01   ; total mobs across all groups (excl. group 
     ORG     $0C51
 INIT_MOB_COUNT:
     SUBROUTINE INIT_MOB_COUNT
+    ; Sum mob counts from all character group records into TOTAL_MOB_COUNT.
+    ;
+    ; Behavior:
+    ;   Starts at character record 1, walks 9-byte records summing
+    ;   byte 8 (group member count) until end sentinel (byte 1 = $FF).
+    ;
+    ; Outputs:
+    ;   TOTAL_MOB_COUNT — total mobs across groups 1+
+    ; Modifies: TOTAL_MOB_COUNT, CHAR_PTR
+    ; Clobbers: A, Y
 
     STOB    #$00,TOTAL_MOB_COUNT ; clear total
     STOW    $4009,CHAR_PTR ; $FA/$FB = $4009 (record 1)
@@ -6140,6 +6246,16 @@ pointer.
     ORG     $7758
 PRINT_STRING_AT_ADDR:
     SUBROUTINE PRINT_STRING_AT_ADDR
+    ; Set string pointer and print a length-prefixed string.
+    ;
+    ; Inputs:
+    ;   X — low byte of string address
+    ;   Y — high byte of string address
+    ;
+    ; Behavior:
+    ;   Stores X/Y into PRINT_STRING_ADDR, then falls through to PRINT_STRING.
+    ;
+    ; Clobbers: A, X, Y
 
     STX     PRINT_STRING_ADDR
     STY     PRINT_STRING_ADDR+1
@@ -6155,6 +6271,16 @@ PRINT_STRING_AT_ADDR:
     ORG     $775C
 PRINT_STRING:
     SUBROUTINE PRINT_STRING
+    ; Print a length-prefixed string via COUT1.
+    ;
+    ; Inputs:
+    ;   PRINT_STRING_ADDR — pointer to length-prefixed string
+    ;
+    ; Behavior:
+    ;   Reads the first byte as a length count, then outputs each
+    ;   subsequent byte through ROM_COUT1.
+    ;
+    ; Clobbers: A, X, Y
 
     LDY     #$00
     LDA     (PRINT_STRING_ADDR),Y ; first byte = length
@@ -6176,6 +6302,13 @@ Sends Ctrl-A and [['0']] to COUT (selects character set~0 in the HRCG):
     ORG     $774E
 PRINT_CTRL_AB:
     SUBROUTINE PRINT_CTRL_AB
+    ; Select character set 0 in the HRCG.
+    ;
+    ; Behavior:
+    ;   Sends Ctrl-A ($81) followed by '0' ($B0) to ROM_COUT1,
+    ;   which selects the standard character set.
+    ;
+    ; Clobbers: A
 
     LDA     #$81 ; Ctrl-A with high bit
     JSR     ROM_COUT1
@@ -6191,6 +6324,13 @@ This is distinct from [[SET_NORMAL_VIDEO]] at [[$75F9]] which uses
     ORG     $7735
 PRINT_CTRL_N:
     SUBROUTINE PRINT_CTRL_N
+    ; Set normal video mode via COUT1.
+    ;
+    ; Behavior:
+    ;   Sends Ctrl-N ($8E) to ROM_COUT1 to restore normal
+    ;   (non-inverse) video output.
+    ;
+    ; Clobbers: A
 
     LDA     #$8E      ; Ctrl-N with high bit
     JMP     ROM_COUT1 ; output via COUT1
@@ -6201,6 +6341,12 @@ Ali Baba provides several convenience routines which translate to HRCG control c
     ORG     $7730
 SET_INVERSE_VIDEO:
     SUBROUTINE SET_INVERSE_VIDEO
+    ; Set inverse video mode via COUT1.
+    ;
+    ; Behavior:
+    ;   Sends Ctrl-I ($89) to ROM_COUT1 to enable inverse video output.
+    ;
+    ; Clobbers: A
 
     LDA     #$89        ; ctrl-I
     JMP     ROM_COUT1
@@ -6217,6 +6363,13 @@ scrolls) and the map area (which wraps or is managed manually).
     ORG     $773A
 SET_TEXT_WINDOW_WRAP:
     SUBROUTINE SET_TEXT_WINDOW_WRAP
+    ; Enable text window wrap mode.
+    ;
+    ; Behavior:
+    ;   Sends Ctrl-O then Ctrl-W to ROM_COUT1, enabling wrap mode
+    ;   so text wraps to the top of the window instead of scrolling.
+    ;
+    ; Clobbers: A
 
     LDA     #$8F ; ctrl-O
     JSR     ROM_COUT1
@@ -6225,6 +6378,13 @@ SET_TEXT_WINDOW_WRAP:
 
 SET_TEXT_WINDOW_SCROLL:
     SUBROUTINE SET_TEXT_WINDOW_SCROLL
+    ; Enable text window scroll mode.
+    ;
+    ; Behavior:
+    ;   Sends Ctrl-O then Ctrl-S to ROM_COUT1, clearing the wrap
+    ;   flag and restoring normal scroll behavior.
+    ;
+    ; Clobbers: A
 
     LDA     #$8F ; ctrl-O
     JSR     ROM_COUT1
@@ -6245,6 +6405,14 @@ bottom three rows used for status messages and player input.
     ORG     $792D
 SET_TEXT_WINDOW_UPPER_LEFT_ALL:
     SUBROUTINE SET_TEXT_WINDOW_UPPER_LEFT_ALL
+    ; Set text window origin to row 0, col 0 (full screen).
+    ;
+    ; Behavior:
+    ;   Sets TEXT_ROW to 0 and TEXT_COL to 0, then sends Ctrl-V
+    ;   to ROM_COUT1 to reposition the HRCG text window.
+    ;
+    ; Modifies: TEXT_ROW, TEXT_COL
+    ; Clobbers: A
 
     LDA     #0
     JMP     SET_TEXT_WINDOW_UPPER_LEFT
@@ -6272,6 +6440,14 @@ share all code from [[$76C4]] onward.
     ORG     $76BE
 SET_CURSOR_ROW21:
     SUBROUTINE SET_CURSOR_ROW21
+    ; Position cursor at row 21 and configure status area.
+    ;
+    ; Behavior:
+    ;   Sets TEXT_ROW to 21 and TEXT_COL to 0, then sends charset
+    ;   select and Ctrl-F to ROM_COUT1 to position the cursor.
+    ;
+    ; Modifies: TEXT_ROW, TEXT_COL
+    ; Clobbers: A
 
     LDA     #$15     ; WNDBTM = 21
     BNE     .shared  ; always taken (stretchy branch)
@@ -6293,6 +6469,17 @@ the screen.
     ORG     $7705
 PRINT_BOTTOM_CENTERED:
     SUBROUTINE PRINT_BOTTOM_CENTERED
+    ; Print a centered string at the bottom of the screen.
+    ;
+    ; Inputs:
+    ;   PRINT_STRING_ADDR — pointer to length-prefixed string
+    ;
+    ; Behavior:
+    ;   Sets cursor to row 23, col 0, then falls through to
+    ;   PRINT_CENTERED_PLUS_COL.
+    ;
+    ; Modifies: TEXT_ROW, TEXT_COL
+    ; Clobbers: A, X, Y
 
     STOB    #$17,TEXT_ROW
     STOB    #$00,TEXT_COL
@@ -6306,6 +6493,18 @@ current cursor's column. If the column is zero, the routine would center the tex
     ORG     $7710
 PRINT_CENTERED_PLUS_COL:
     SUBROUTINE PRINT_CENTERED_PLUS_COL
+    ; Center and print a string, offset by current column.
+    ;
+    ; Inputs:
+    ;   PRINT_STRING_ADDR — pointer to length-prefixed string
+    ;   TEXT_COL — additional column offset added to centering
+    ;
+    ; Behavior:
+    ;   Computes (40 - string_length) / 2 + TEXT_COL as the starting
+    ;   column, selects charset 0, then prints the string.
+    ;
+    ; Modifies: TEXT_COL
+    ; Clobbers: A, X, Y
 
     LDA     #40
     SEC
@@ -6355,6 +6554,19 @@ NUM_VALUE               EQU     $BC     ; 16-bit numeric value for division (2 b
     ORG     $0DA1
 NUM_TO_DECIMAL:
     SUBROUTINE NUM_TO_DECIMAL
+    ; Convert a 16-bit value to up to 5 ASCII decimal digits.
+    ;
+    ; Inputs:
+    ;   NUM_VALUE — 16-bit unsigned value to convert
+    ;   DECIMAL_OUT_PTR — pointer to output buffer
+    ;
+    ; Behavior:
+    ;   Divides NUM_VALUE by 10000, 1000, 100, 10, and 1 via
+    ;   repeated subtraction, storing high-ASCII digit characters
+    ;   at DECIMAL_OUT_PTR with leading zeros suppressed.
+    ;
+    ; Modifies: NUM_VALUE, NUM_DIVISOR, NUM_DIGIT, NUM_LEADING
+    ; Clobbers: A, X, Y
 
     LDY     #$00                ; output index = 0
     STY     NUM_LEADING         ; leading-zero flag = 0 (suppress)
@@ -6479,6 +6691,19 @@ MSG_LINE_COUNT          EQU     $5A57   ; lines printed so far
     ORG     $761E
 DISPLAY_MESSAGE:
     SUBROUTINE DISPLAY_MESSAGE
+    ; Display a game message by index from the message table.
+    ;
+    ; Inputs:
+    ;   A — message index (0-based)
+    ;
+    ; Behavior:
+    ;   Skips through the message table to find the indexed entry,
+    ;   then prints each sub-string centered on row 23. Multi-line
+    ;   messages scroll the status area between lines and pause
+    ;   with animation between groups.
+    ;
+    ; Modifies: PRINT_STRING_ADDR
+    ; Clobbers: A, X, Y
 
     TAX                           ; X = message index
     MOVW    MSG_TABLE_PTR,PRINT_STRING_ADDR ; load table base into PRINT_STRING_ADDR/PRINT_STRING_ADDR+1
@@ -6563,6 +6788,16 @@ preserving the rest of the display.
     ORG     $769B
 SCROLL_STATUS_LINE:
     SUBROUTINE SCROLL_STATUS_LINE
+    ; Scroll the bottom status area up by one line.
+    ;
+    ; Behavior:
+    ;   Switches to scroll mode, confines the window to rows 21-23,
+    ;   positions cursor at row 23, sends $83 to trigger a scroll-up,
+    ;   then restores full-screen wrap mode.
+    ;
+    ; Modifies: TEXT_ROW, TEXT_COL
+    ; Clobbers: A
+
     ; Text display: init HRCG, set window bottom, output char $83, reset
     JSR     SET_TEXT_WINDOW_SCROLL
     JSR     SET_TEXT_WINDOW_UPPER_LEFT_LOW
@@ -6623,6 +6858,17 @@ SOUND_DURATION          EQU     $E2     ; sound duration / tune parameter byte
     ORG     $7A7F
 PLAY_HIGH_TONE:
     SUBROUTINE PLAY_HIGH_TONE
+    ; Play a high-frequency tone via the speaker.
+    ;
+    ; Inputs:
+    ;   SOUND_FREQ — pitch delay counter
+    ;   SOUND_DURATION — number of full cycles to play
+    ;
+    ; Behavior:
+    ;   Toggles the speaker with an inner delay loop. Frequency is
+    ;   approximately 510204 / (5*X + 12) Hz.
+    ;
+    ; Clobbers: A, X, Y
 
 .cycle:
     LDY     #$0A           ; 10 speaker toggles per cycle
@@ -6656,6 +6902,18 @@ TONE_PADDING            EQU     $E3     ; byte used for cycle padding in PLAY_LO
     ORG     $7A91
 PLAY_LOW_TONE:
     SUBROUTINE PLAY_LOW_TONE
+    ; Play a low-frequency tone via the speaker.
+    ;
+    ; Inputs:
+    ;   SOUND_FREQ — pitch delay counter
+    ;   SOUND_DURATION — number of full cycles to play
+    ;
+    ; Behavior:
+    ;   Same structure as PLAY_HIGH_TONE but with extra cycle padding,
+    ;   producing a lower octave. Frequency is approximately
+    ;   510204 / (10*X + 31) Hz.
+    ;
+    ; Clobbers: A, X, Y
 
 .cycle:
     LDY     #$0A           ; 10 toggles per cycle
@@ -7848,6 +8106,18 @@ PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random 
 ; ---------------------------------------------------------------
 STEP_PRNG:
     SUBROUTINE STEP_PRNG
+    ; Advance the PRNG state using LCG formula: val = 69*val + $53.
+    ;
+    ; Behavior:
+    ;   Multiplies PRNG_STATE by 69 via shift-and-add, adds $53,
+    ;   stores result in both PRNG_STATE and PRNG_OUTPUT.
+    ;
+    ; Outputs:
+    ;   A — new PRNG value
+    ;   PRNG_OUTPUT — same value
+    ; Modifies: PRNG_STATE, PRNG_OUTPUT, PRNG_TEMP
+    ; Clobbers: A
+
     ; Advance the PRNG: state = 69*state + $53, output = state >> 1.
     ;
     ; Output: PRNG_STATE updated, PRNG_OUTPUT = state >> 1, A = PRNG_OUTPUT
@@ -8267,6 +8537,17 @@ WAIT_DURATION           EQU     $7AAD   ; ROM WAIT duration parameter
     ORG     $0D58
 CALL_ROM_WAIT:
     SUBROUTINE CALL_ROM_WAIT
+    ; Call the Apple II ROM WAIT routine.
+    ;
+    ; Inputs:
+    ;   A — delay parameter (passed to ROM WAIT at $FCA8)
+    ;
+    ; Behavior:
+    ;   Tail-calls the ROM WAIT routine. Delay is approximately
+    ;   (26 + 27*A + 5*A*A) / 2 microseconds.
+    ;
+    ; Clobbers: A
+
     ; Load WAIT_DURATION and tail-call ROM WAIT ($FCA8).
     ;
     ; Clobbers: A
@@ -8668,6 +8949,16 @@ TARGET_REC              EQU     $BC     ; secondary entity record pointer in com
 ; -----------------------------------------------
 SAVE_ZP_POINTERS:
     SUBROUTINE SAVE_ZP_POINTERS
+    ; Save key zero-page pointers to shadow locations.
+    ;
+    ; Behavior:
+    ;   Copies PRINT_STRING_ADDR ($BC), ENTITY_PTR ($F8),
+    ;   CHAR_REC ($BE), and MOB_PTR ($F4) to their respective
+    ;   SAVED_* shadow locations in the $5A page.
+    ;
+    ; Modifies: SAVED_BC, SAVED_F8, SAVED_BE, SAVED_F4
+    ; Clobbers: A
+
     ; Save ZP pointers $F4-$FB to SAVED_* variables.
     ;
     ; Clobbers: A
@@ -8697,6 +8988,15 @@ or other operation that may have clobbered them.
 ; -----------------------------------------------
 RESTORE_ZP_POINTERS:
     SUBROUTINE RESTORE_ZP_POINTERS
+    ; Restore key zero-page pointers from shadow locations.
+    ;
+    ; Behavior:
+    ;   Copies SAVED_BC, SAVED_F8, SAVED_BE, and SAVED_F4 back
+    ;   to their respective zero-page pointer locations.
+    ;
+    ; Modifies: PRINT_STRING_ADDR, ENTITY_PTR, CHAR_REC, MOB_PTR (2 bytes each)
+    ; Clobbers: A
+
     ; Restore ZP pointers $F4-$FB from SAVED_* variables.
     ;
     ; Clobbers: A
@@ -10221,6 +10521,7 @@ the message string area as a graceful degradation.
 
 <<load scene data>>=
     ORG     $6DD8
+SCENE_LOADER_START:
 LOAD_SCENE_DATA:
     SUBROUTINE LOAD_SCENE_DATA
     ; Load scene text data from disk.
@@ -10242,13 +10543,14 @@ LOAD_SCENE_DATA:
     BCS     .error
     RTS                             ; success
 
+INTEGRITY_FAIL_ADDR:
 .error:
     LDY     PRNG_OUTPUT             ; use PRNG as index
     JSR     STEP_PRNG               ; advance PRNG
     LDA     PRNG_OUTPUT             ; load new PRNG byte
     STA     $9AA6,Y                 ; fill into message area
     RTS
-@ %def LOAD_SCENE_DATA
+@ %def SCENE_LOADER_START LOAD_SCENE_DATA INTEGRITY_FAIL_ADDR
 @ \subsection{Load map tiles (\$746C)}
 
 [[LOAD_MAP_TILES]] extracts the 2-bit style index from bits~7--6 of
@@ -10736,6 +11038,18 @@ DISK_WRITE:
                                ; fall through
 RWTS_DISPATCH:
     SUBROUTINE RWTS_DISPATCH
+    ; Dispatch an RWTS disk command.
+    ;
+    ; Inputs:
+    ;   A — RWTS command ($01=read, $02=write)
+    ;
+    ; Behavior:
+    ;   Stores the command at IOB+$0C, clears the volume field
+    ;   at IOB+$03 (accept any volume), then calls RWTS_ENTRY.
+    ;
+    ; Outputs:
+    ;   C — clear=success, set=error (from RWTS)
+    ; Clobbers: A, Y
 
     LDY     #$0C
     STA     ($08),Y            ; IOB+$0C = command (A)
@@ -13739,6 +14053,14 @@ registers to [[SETUP_INPUT]] to initialize the standard action menu.
     ORG     $60CD
 GET_INPUT_TABLE_PTR:
     SUBROUTINE GET_INPUT_TABLE_PTR
+    ; Return a pointer to GAME_INPUT_TABLE.
+    ;
+    ; Outputs:
+    ;   X — high byte of GAME_INPUT_TABLE
+    ;   Y — low byte of GAME_INPUT_TABLE
+    ;
+    ; Clobbers: X, Y
+
     ; Return the address of GAME_INPUT_TABLE in X (hi) and Y (lo).
     ;
     ; Outputs:
@@ -13941,6 +14263,14 @@ GAME_SETTINGS_TABLE:
     ORG     $61F1
 MENU_GAME_SETTINGS:
     SUBROUTINE MENU_GAME_SETTINGS
+    ; Enter the game settings menu.
+    ;
+    ; Behavior:
+    ;   Patches max_range to 1 in GAME_SETTINGS_TABLE, then enters
+    ;   INPUT_LOOP with the settings table pointer.
+    ;
+    ; Clobbers: A, X, Y
+
     LDA     #$01
     STA     GAME_SETTINGS_TABLE+1 ; patch max_range = 1
 MENU_GAME_SETTINGS_ENTER:
@@ -13964,6 +14294,16 @@ MENU_SETTINGS_INIT:
     ORG     $6209
 SETTINGS_SPEED_UP:
     SUBROUTINE SETTINGS_SPEED_UP
+    ; Increase game speed by one step (clamped to max).
+    ;
+    ; Behavior:
+    ;   Increments $7ABD (game speed), clamps to the maximum at $7ABC,
+    ;   then re-enters the settings menu. SETTINGS_SPEED_DOWN decrements
+    ;   (clamped to 1).
+    ;
+    ; Modifies: $7ABD
+    ; Clobbers: A, X
+
     JSR     $6071              ; patch menu record
     INC     $7ABD              ; speed++
     LDA     $7ABD
@@ -14369,6 +14709,16 @@ ENTER_CHAR_SELECT:
 
 CHAR_SELECT_INIT:
     SUBROUTINE CHAR_SELECT_INIT
+    ; Initialize the character selection menu.
+    ;
+    ; Behavior:
+    ;   Finds the first player character via FIND_FIRST_PC. If none
+    ;   found, displays a message and returns to the move loop.
+    ;   Otherwise configures the menu table based on whether
+    ;   CURRENT_PLAYER is Ali Baba and enters INPUT_LOOP.
+    ;
+    ; Clobbers: A, X, Y
+
     JSR     FIND_FIRST_PC      ; find first player character
     BCC     CHAR_SELECT_HOME   ; carry clear -> found, enter init path
     JSR     SET_CURSOR_ROW21   ; no PCs: position cursor
@@ -14448,6 +14798,13 @@ menu---for example, during shop interactions or special scenes.
     ORG     $6458
 START_GAME_INPUT:
     SUBROUTINE START_GAME_INPUT
+    ; Enter the alternative input loop (shops/special scenes).
+    ;
+    ; Behavior:
+    ;   Loads ALT_INPUT_TABLE pointer into X/Y and tail-calls INPUT_LOOP.
+    ;
+    ; Clobbers: A, X, Y
+
     LDX     #>ALT_INPUT_TABLE
     LDY     #<ALT_INPUT_TABLE
     JMP     INPUT_LOOP
@@ -14502,6 +14859,18 @@ save/load menu ([[SAVE_LOAD_TABLE]]).
     ORG     $69C8
 CONTINUE_GAME:
     SUBROUTINE CONTINUE_GAME
+    ; Load a saved game from the appropriate disk.
+    ;
+    ; Inputs:
+    ;   SLOT_NUMBER — save slot index
+    ;
+    ; Behavior:
+    ;   If slot is on game disk, verifies disk and reads save data.
+    ;   If slot is on scenario disk, prompts for insert, verifies
+    ;   signature, reads data, then re-verifies game disk.
+    ;
+    ; Clobbers: A, X, Y
+
     LDA     SLOT_NUMBER
     CMP     GAME_DISK_SLOTS
     BCS     .scenario          ; slot >= 1 -> scenario disk needed
@@ -14544,6 +14913,16 @@ preserve a deterministic entity sequence.
     ORG     $69FD
 SHUFFLE_ENTITIES:
     SUBROUTINE SHUFFLE_ENTITIES
+    ; Randomize entity order by repeated unlink-and-reappend.
+    ;
+    ; Behavior:
+    ;   Each iteration walks a random distance (0-63) into the linked
+    ;   list at $4000, unlinks the reached node, then re-appends it
+    ;   at the end. Recurses until SHUFFLE_COUNT < 0.
+    ;
+    ; Modifies: entity linked list (byte 2 pointers)
+    ; Clobbers: A, X, Y
+
     DEC     SHUFFLE_COUNT
     BPL     .go
     RTS
@@ -14610,6 +14989,18 @@ SCENARIO_INIT_FLAG  EQU     $6A58   ; self-modifying: 0=first scenario save, 1=i
     ORG     $6A47
 SAVE_GAME:
     SUBROUTINE SAVE_GAME
+    ; Save current game state to game or scenario disk.
+    ;
+    ; Inputs:
+    ;   SLOT_NUMBER — save slot index
+    ;
+    ; Behavior:
+    ;   If slot is on game disk, verifies disk and writes save data.
+    ;   If slot is on scenario disk, shows intro scene on first use,
+    ;   sets SCENARIO_INIT_FLAG, then enters scenario disk handler.
+    ;
+    ; Clobbers: A, X, Y
+
     LDA     SLOT_NUMBER
     CMP     GAME_DISK_SLOTS
     BCS     .scenario          ; slot >= 1 -> scenario disk
@@ -14672,6 +15063,15 @@ SCENARIO_INSERT_PROMPT:
 
 FORMAT_SCENARIO_DISK:
     SUBROUTINE FORMAT_SCENARIO_DISK
+    ; Format and initialize a blank scenario disk for saving.
+    ;
+    ; Behavior:
+    ;   Checks for existing signature, formats track if needed,
+    ;   writes signature and game data. Re-prompts for game disk
+    ;   and returns to the move loop on completion.
+    ;
+    ; Clobbers: A, X, Y
+
     JSR     VERIFY_GAME_DISK   ; check game disk inserted
     BCC     SCENARIO_INSERT_PROMPT ; not game disk -> prompt
     JSR     VERIFY_DISK_SIGNATURE ; check "ALI" signature
@@ -14769,6 +15169,16 @@ FORMAT_DISK_TRACK:
 
 WRITE_DISK_SIGNATURE:
     SUBROUTINE WRITE_DISK_SIGNATURE
+    ; Write the 3-byte "ALI" signature to the scenario disk.
+    ;
+    ; Behavior:
+    ;   Copies DISK_SIGNATURE into SCENE_TEXT_DATA, configures IOB,
+    ;   then attempts up to 3 disk writes.
+    ;
+    ; Outputs:
+    ;   C — clear on success, set on failure
+    ; Clobbers: A, X, Y
+
     LDA     #$02               ; retry counter
     STA     $BF
     LDX     #$02
@@ -14790,6 +15200,16 @@ WRITE_DISK_SIGNATURE:
 
 VERIFY_DISK_SIGNATURE:
     SUBROUTINE VERIFY_DISK_SIGNATURE
+    ; Read and verify the "ALI" disk signature.
+    ;
+    ; Behavior:
+    ;   Configures IOB, reads the signature sector with up to 3
+    ;   retries, and compares 3 bytes against DISK_SIGNATURE.
+    ;
+    ; Outputs:
+    ;   C — clear if signature matches, set on mismatch or error
+    ; Clobbers: A, X, Y
+
     JSR     SETUP_DATA_IOB     ; set IOB buffer = $5C00
     LDA     #$02               ; retry counter
     STA     $BF
@@ -14841,6 +15261,16 @@ SETUP_DATA_IOB:
 
 VERIFY_GAME_DISK:
     SUBROUTINE VERIFY_GAME_DISK
+    ; Verify that the inserted disk is the game disk.
+    ;
+    ; Behavior:
+    ;   Reads track $11 sector $00 via RWTS with up to 3 retries.
+    ;   Checks that the first three bytes are $03, $0F, $10 (VTOC).
+    ;
+    ; Outputs:
+    ;   C — clear if game disk confirmed, set on mismatch
+    ; Clobbers: A, X, Y
+
     JSR     SETUP_DATA_IOB
     LDA     GAME_SIG_TRACK     ; track $11
     LDY     #$04
@@ -14884,6 +15314,17 @@ through consecutive sectors.  Returns A=0 on success, A=1 on failure.
     ORG     $6B72
 WRITE_GAME_DATA:
     SUBROUTINE WRITE_GAME_DATA
+    ; Write 26 sectors of game data to disk from $4000+.
+    ;
+    ; Behavior:
+    ;   Configures IOB for the current save slot, then writes
+    ;   SAVE_SECTOR_COUNT consecutive sectors, advancing buffer
+    ;   and sector after each. Retries once on error.
+    ;
+    ; Outputs:
+    ;   A — 0 on success, 1 on failure
+    ; Clobbers: A, X, Y
+
     LDA     #$02               ; outer retry counter
     STA     $BF
     JSR     SETUP_SLOT_IOB     ; calculate track from slot
@@ -14928,6 +15369,15 @@ increments the track (IOB+4), starting the next track.
     ORG     $6B95
 READ_GAME_DATA:
     SUBROUTINE READ_GAME_DATA
+    ; Read 26 sectors of game data from disk into $4000+.
+    ;
+    ; Behavior:
+    ;   Configures IOB for the current save slot, then reads
+    ;   SAVE_SECTOR_COUNT consecutive sectors. Retries once on
+    ;   error; on persistent failure, cold-restarts the system.
+    ;
+    ; Clobbers: A, X, Y
+
     LDA     #$02               ; outer retry counter
     STA     $BF
     JSR     SETUP_SLOT_IOB
@@ -14951,6 +15401,18 @@ READ_GAME_DATA:
 
 SETUP_SLOT_IOB:
     SUBROUTINE SETUP_SLOT_IOB
+    ; Configure the RWTS IOB for a save-slot disk operation.
+    ;
+    ; Inputs:
+    ;   SLOT_NUMBER — save slot index
+    ;
+    ; Behavior:
+    ;   Determines game vs scenario disk, computes starting track
+    ;   as slot*2 + base, sets IOB fields: track, sector 0,
+    ;   buffer at $4000.
+    ;
+    ; Clobbers: A, X, Y
+
     LDX     #$00               ; disk index 0 (game disk)
     LDA     SLOT_NUMBER
     CMP     GAME_DISK_SLOTS
@@ -14980,6 +15442,14 @@ SETUP_SLOT_IOB:
 
 ADVANCE_SECTOR:
     SUBROUTINE ADVANCE_SECTOR
+    ; Advance IOB to the next sector and buffer page.
+    ;
+    ; Behavior:
+    ;   Increments the buffer page (IOB+9) and sector (IOB+5).
+    ;   If sector reaches 13, wraps to 0 and increments track.
+    ;
+    ; Clobbers: A, X, Y
+
     LDY     #$09
     LDA     (RWTS_IOB_PTR),Y   ; buffer page
     TAX
@@ -15021,6 +15491,19 @@ position, it sets [[SAFE_TO_REST]] to enable the rest option.
     ORG     $750C
 CHECK_COMBAT_ELIGIBILITY:
     SUBROUTINE CHECK_COMBAT_ELIGIBILITY
+    ; Check whether the current entity is eligible to enter combat.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR — pointer to the entity record
+    ;
+    ; Behavior:
+    ;   Extracts level threshold from byte 12; if STEPS_TAKEN is below
+    ;   it, sets UNDER_LEVEL. Otherwise checks strength, adjacent
+    ;   threats, and encounter state. Sets SAFE_TO_REST=1 if no threats.
+    ;
+    ; Outputs: SAFE_TO_REST, UNDER_LEVEL
+    ; Clobbers: A, X, Y
+
     STOB    #$00,SAFE_TO_REST
     STA     UNDER_LEVEL
     LDY     #$0C
@@ -15561,6 +16044,15 @@ called with~2 to record the new state.
 ; ---------------------------------------------------------------
 ENTER_COMBAT_STATE:
     SUBROUTINE ENTER_COMBAT_STATE
+    ; Transition the current entity to combat-ready state (state 2).
+    ;
+    ; Behavior:
+    ;   Evaluates the encounter at the entity's position, clears the
+    ;   restricted flag, then re-sets it if no hostile is co-located.
+    ;   Sets the character state to 2 (combat ready).
+    ;
+    ; Clobbers: A, Y
+
     ; Transition entity to combat-ready state (state 2).
     ; Checks encounter, clears/sets restricted flag.
     ; Clobbers: A, Y
@@ -16958,6 +17450,14 @@ with an event slot that requires a higher strength or special item.
 ; SHOW_LOCKED_MSG — display locked/blocked message, reset to idle
 SHOW_LOCKED_MSG:
     SUBROUTINE SHOW_LOCKED_MSG
+    ; Display the locked/statue message and reset entity to idle.
+    ;
+    ; Behavior:
+    ;   Positions cursor at row 21, prints the mob name, scrolls the
+    ;   status line, displays the statue message, and sets state to 0.
+    ;
+    ; Clobbers: A, Y
+
     ; Display "locked container" message and reset state.
     ; Clobbers: A, Y
     JSR     SET_CURSOR_ROW21        ; position cursor
@@ -16978,6 +17478,18 @@ so they cannot simply walk away.
 ; SET_TARGET_RESTRICTED — pin mob at current position
 SET_TARGET_RESTRICTED:
     SUBROUTINE SET_TARGET_RESTRICTED
+    ; Set the combat-engaged flag (bit 2) on the mob at MOB_PTR.
+    ;
+    ; Inputs:
+    ;   MOB_PTR — pointer to the mob record
+    ;
+    ; Behavior:
+    ;   ORs bit 2 into byte 15 of the mob record, marking it as
+    ;   pinned in combat.
+    ;
+    ; Modifies: mob record byte 15
+    ; Clobbers: A, Y
+
     ; Set restricted flag (bit 2) on entity at MOB_PTR byte 15.
     ; Clobbers: A, Y
     LDY     #MFIELD_FLAGS           ; byte 15: status flags
@@ -19109,8 +19621,19 @@ SCENE_EVENT_RESULT      EQU     $423E   ; nonzero = event fully handled
 
 <<check scene events>>=
     ORG     $6DFA
+SCENE_LOADER_END:
 CHECK_SCENE_EVENTS:
     SUBROUTINE CHECK_SCENE_EVENTS
+    ; Scene event dispatcher for players 1 and 3.
+    ;
+    ; Behavior:
+    ;   Scans mob groups for hostile encounters via SCAN_FOR_HOSTILE.
+    ;   Dispatches to SCENE_LOOP with mode 4-8 depending on player
+    ;   number and encounter state. Processes mob groups on hostile
+    ;   encounters.
+    ;
+    ; Clobbers: A, X, Y
+
     ; Scene event dispatcher for players 1 & 3.  Checks encounter
     ; state and dispatches to SCENE_LOOP with mode 4-8 based on
     ; game state flags.  Called from MAIN_ENTRY's character loop.
@@ -19148,7 +19671,7 @@ CHECK_SCENE_EVENTS:
     JSR     SCROLL_STATUS_LINE
     LDA     #$08
     JMP     SCENE_LOOP                   ; mode 8: combat resolution
-@ %def CHECK_SCENE_EVENTS
+@ %def SCENE_LOADER_END CHECK_SCENE_EVENTS
 
 @ [[CHECK_LOCATION_MATCH]] loads the character record for [[ACTIVE_CHAR]]
 and compares its position with [[LOCATION_POS]].  If they match, it clears
@@ -19159,6 +19682,16 @@ This ensures the display updates when an event changes the scene.
     ORG     $672E
 CHECK_LOCATION_MATCH:
     SUBROUTINE CHECK_LOCATION_MATCH
+    ; Check if the active character's position matches LOCATION_POS.
+    ;
+    ; Behavior:
+    ;   Loads the character record for ACTIVE_CHAR, compares position
+    ;   with LOCATION_POS. If they match, clears LOCATION_POS to force
+    ;   a map redraw on the next ENTER_LOCATION.
+    ;
+    ; Modifies: LOCATION_POS (cleared on match)
+    ; Clobbers: A, X, Y
+
     ; Load char record for ACTIVE_CHAR ($5A29), check if DATA_PTR matches
     ; LOCATION_POS.  If so, clear LOCATION_POS to force a redraw.
     LDA     ACTIVE_CHAR
@@ -19181,6 +19714,17 @@ after finding a match, so it catches all hostiles.
     ORG     $6E5A
 SCAN_FOR_HOSTILE:
     SUBROUTINE SCAN_FOR_HOSTILE
+    ; Scan the mob group chain for hostile encounters.
+    ;
+    ; Behavior:
+    ;   Walks the linked list of mob groups via byte 2 (next pointer).
+    ;   Sets SCENE_FOUND_FLAG=1 when the target group is encountered.
+    ;   Calls CHECK_HOSTILE on each group; sets SCENE_HOSTILE_FLAG
+    ;   nonzero if any hostile is found.
+    ;
+    ; Outputs: SCENE_FOUND_FLAG, SCENE_HOSTILE_FLAG
+    ; Clobbers: A, X, Y
+
     ; Scan mob groups starting from SCENE_GROUP_IDX for hostile encounters.
     ; Sets SCENE_FOUND_FLAG=1 if the group matches, SCENE_HOSTILE_FLAG
     ; nonzero if a hostile is found.
@@ -19217,6 +19761,15 @@ the player~3 record pointer.
     ORG     $6E9E
 PROCESS_SCENE_GROUPS:
     SUBROUTINE PROCESS_SCENE_GROUPS
+    ; Process mob groups $3F, $41, $42 for hostile reordering.
+    ;
+    ; Behavior:
+    ;   Saves the player 3 record pointer, then calls SCAN_AND_REORDER
+    ;   for groups $3F, $41, and $42 (skipping $40). Restores the
+    ;   current player's record pointer on exit.
+    ;
+    ; Clobbers: A, X, Y
+
     ; Process mob groups $3F, $41, $42 with SCAN_AND_REORDER,
     ; bookended by LOAD_CHAR_TO_FA for save/restore.
     STOB    #$03,SOURCE_CHAR
@@ -19242,6 +19795,17 @@ into the matching group.
     ORG     $6ED5
 SCAN_AND_REORDER:
     SUBROUTINE SCAN_AND_REORDER
+    ; Scan for hostile in the current group and reorder if found.
+    ;
+    ; Inputs:
+    ;   SCENE_GROUP_IDX — group index to scan
+    ;
+    ; Behavior:
+    ;   Calls SCAN_FOR_HOSTILE; if SCENE_FOUND_FLAG is set, copies
+    ;   MOB_PTR into TARGET_REC and calls REORDER_CHAR.
+    ;
+    ; Clobbers: A, X, Y
+
     ; Call SCAN_FOR_HOSTILE for current SCENE_GROUP_IDX.
     ; If a match is found, copy MOB_PTR/MOB_PTR+1 -> TARGET_REC/TARGET_REC+1 and reorder.
     JSR     SCAN_FOR_HOSTILE
@@ -19273,6 +19837,19 @@ displays message~\$37 and returns to [[MOVE_LOOP]].
     ORG     $6EE9
 FLUSH_PENDING_XP:
     SUBROUTINE FLUSH_PENDING_XP
+    ; Flush pending XP from entity byte 8 into the level in byte 11.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR — pointer to the entity record
+    ;
+    ; Behavior:
+    ;   Extracts bits 6-4 of byte 8 as pending XP (0-7), clears the
+    ;   pending bits, and adds the XP to byte 11 (level). Displays
+    ;   the XP gained message, or exits to MOVE_LOOP if none pending.
+    ;
+    ; Modifies: entity bytes 8 and 11
+    ; Clobbers: A, X, Y
+
     LDY     #$08
     LDA     (ENTITY_PTR),Y     ; byte 8: status|pending_xp|group_count
     TAX                        ; save original
@@ -19327,6 +19904,19 @@ DROP_DISPLAY_BUF    EQU     $7CEB   ; 5-byte decimal display buffer
     ORG     $6F17
 INIT_DROP_GOLD:
     SUBROUTINE INIT_DROP_GOLD
+    ; Initialize the drop gold binary search interface.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR — pointer to the entity record
+    ;
+    ; Behavior:
+    ;   Calls FIND_MSB on the entity's gold to set DROP_AMOUNT to the
+    ;   highest power-of-2. Copies to DROP_STEP and halves it, then
+    ;   enters the drop gold menu. If no gold, displays a message.
+    ;
+    ; Modifies: DROP_AMOUNT, DROP_STEP
+    ; Clobbers: A, X, Y
+
     LDA     #$00
     STA     DROP_AMOUNT
     LDY     #$0E
@@ -19363,6 +19953,16 @@ via [[NUM_TO_DECIMAL]].
     ORG     $6F52
 INIT_DROP_DISPLAY:
     SUBROUTINE INIT_DROP_DISPLAY
+    ; Format the drop gold display buffer with the current amount.
+    ;
+    ; Behavior:
+    ;   Clears DROP_DISPLAY_BUF with spaces, copies DROP_AMOUNT into
+    ;   NUM_VALUE, sets DECIMAL_OUT_PTR to DROP_DISPLAY_BUF, and calls
+    ;   NUM_TO_DECIMAL.
+    ;
+    ; Modifies: DROP_DISPLAY_BUF, NUM_VALUE, DECIMAL_OUT_PTR
+    ; Clobbers: A, X
+
     LDX     #$04
     LDA     #$20               ; space
 .clear:
@@ -19453,6 +20053,20 @@ it displays message~\$2C (gold lost/stolen) instead.
     ORG     $6FB5
 DROP_GOLD_EXEC:
     SUBROUTINE DROP_GOLD_EXEC
+    ; Execute the gold drop transaction.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR — pointer to the entity record
+    ;   DROP_AMOUNT — amount of gold to drop
+    ;
+    ; Behavior:
+    ;   Subtracts DROP_AMOUNT from entity's gold, then subtracts a
+    ;   random loss (1-25). If gold remains, creates a gold event on
+    ;   the map. Exits via JMP MOVE_LOOP.
+    ;
+    ; Modifies: entity gold, event list
+    ; Clobbers: A, X, Y
+
     LDA     DROP_AMOUNT
     STA     $BC
     LDA     DROP_AMOUNT+1
@@ -19507,6 +20121,19 @@ the step ([[DROP_STEP\_LO]]/[[DROP_STEP\_HI]]).
     ORG     $7005
 FIND_MSB:
     SUBROUTINE FIND_MSB
+    ; Find the most significant set bit in A.
+    ;
+    ; Inputs:
+    ;   A — value to scan
+    ;
+    ; Behavior:
+    ;   Starting from bit 7, rotates A left and checks each bit.
+    ;   Returns the mask of the first set bit found.
+    ;
+    ; Outputs:
+    ;   X — single-bit mask of the MSB (e.g., $40 for bit 6)
+    ; Clobbers: A, X
+
     SEC
     LDX     #$80               ; start with bit 7 mask
 .test:
@@ -20536,6 +21163,17 @@ strobe and returns the key in~A.
     ORG     $A44C
 READ_KEYBOARD:
     SUBROUTINE READ_KEYBOARD
+    ; Poll keyboard with idle processing between checks.
+    ;
+    ; Behavior:
+    ;   Clears keyboard strobe and updates map display. Periodically
+    ;   verifies code integrity (1-in-64 chance). Steps the PRNG
+    ;   and runs animation delay until a keypress is detected.
+    ;
+    ; Outputs:
+    ;   A — key code (high bit set)
+    ; Clobbers: A, X, Y
+
     LDA     #$FF
     STA     $C010              ; clear keyboard strobe
     JSR     $0D30              ; update map position
@@ -20574,6 +21212,20 @@ after 2~retries it returns carry set; on success carry clear.
     ORG     $A478
 LOAD_SCENE_FROM_DISK:
     SUBROUTINE LOAD_SCENE_FROM_DISK
+    ; Load a scene's text data sector from disk into SCENE_TEXT_DATA.
+    ;
+    ; Inputs:
+    ;   SCENE_NUMBER — scene index to load
+    ;
+    ; Behavior:
+    ;   Computes target track/sector from base + scene number, sets
+    ;   RWTS IOB buffer to $5C00, and attempts disk read with up
+    ;   to 2 retries on failure.
+    ;
+    ; Outputs:
+    ;   C — clear on success, set on failure
+    ; Clobbers: A, X, Y
+
     JSR     DISK_RTS           ; no-op (placeholder)
     LDA     #$00
     LDY     #$08
@@ -20626,6 +21278,19 @@ failure it jumps to the [[COLD_RESTART]] error handler.
     ORG     $A4BE
 SETUP_AND_READ_DISK:
     SUBROUTINE SETUP_AND_READ_DISK
+    ; Set up RWTS IOB and read one sector into $A400.
+    ;
+    ; Inputs:
+    ;   X — track number
+    ;   A — sector number
+    ;
+    ; Behavior:
+    ;   Stores track/sector into RWTS IOB, sets buffer to $A400.
+    ;   Attempts disk read with up to 2 retries. On persistent
+    ;   failure, jumps to COLD_RESTART (does not return).
+    ;
+    ; Clobbers: A, X, Y
+
     LDY     #$05
     STA     (RWTS_IOB_PTR),Y   ; IOB+5 = sector (A)
     DEY
@@ -20651,21 +21316,33 @@ SETUP_AND_READ_DISK:
 
 @ \subsection{Integrity verification (\$A4E2--\$A56E)}
 
-[[INTEGRITY_DATA]] holds two pairs of expected checksum values
-(4~bytes total) at \$A4E2--\$A4E5, stored as self-modifying
-operands.
+<<zero page defines>>=
+CKSUM_START             EQU     $BA     ; checksum range start pointer (2 bytes, aliased)
+CKSUM_END               EQU     $BE     ; checksum range end pointer (2 bytes, aliased)
+@ %def CKSUM_START CKSUM_END
 
-[[VERIFY_INTEGRITY]] computes a checksum over \$B300--\$B443 (the
-disk I/O routines) using [[COMPUTE_CHECKSUM]], and compares the
-result with the first expected pair at [[INTEGRITY_DATA]].  If they
-mismatch, it jumps to [[GAME_INIT]] (\$6DED) to reinitialize.
+\paragraph{INTEGRITY\_DATA (\$A4E2).}
+Holds two pairs of expected checksum values (4~bytes total), stored
+as self-modifying operands.
 
-[[VERIFY_DISK_IO]] computes a checksum over \$6DD8--\$6DFA (the
-scene loader) and compares with the second expected pair.
+\paragraph{VERIFY\_INTEGRITY (\$A4E6).}
+Computes a checksum over [[DISK_IO_START]]--[[DISK_IO_END]] (the disk
+I/O routines) using [[COMPUTE_CHECKSUM]], and compares the result with
+the first expected pair at [[INTEGRITY_DATA]].  On mismatch, jumps to
+[[INTEGRITY_FAIL_ADDR]] to reinitialize.
 
-[[COMPUTE_CHECKSUM]] accumulates a running XOR/ADD checksum over the
-byte range \$BA/\$BB through \$BE/\$BF.  It returns the 16-bit
-result in A (low) and Y (high).
+\paragraph{VERIFY\_DISK\_IO (\$A4F8).}
+Computes a checksum over [[SCENE_LOADER_START]]--[[SCENE_LOADER_END]]
+(the scene loader) and compares with the second expected pair.
+
+\paragraph{COMPUTE\_CHECKSUM (\$A50E).}
+Accumulates a running XOR/ADD checksum over the byte range
+[[CKSUM_START]]/[[CKSUM_START]]+1 through [[CKSUM_END]]/[[CKSUM_END]]+1.
+\begin{itemize}
+\item Odd-indexed bytes are ADCed into [[CKSUM_ACC]].
+\item Even-indexed bytes are ADCed into [[CKSUM_ACC+1]], then EORed into [[CKSUM_ACC]].
+\item Returns the 16-bit result in A~(low) and Y~(high).
+\end{itemize}
 
 <<integrity verification>>=
     ORG     $A4E2
@@ -20674,14 +21351,25 @@ INTEGRITY_DATA:
 
 VERIFY_INTEGRITY:
     SUBROUTINE VERIFY_INTEGRITY
-    LDA     #$00               ; \ range: $B300-$B443
-    STA     $BA                ;  |
-    LDA     #$B3               ;  |
-    STA     $BB                ;  |
-    LDA     #$43               ;  |
-    STA     $BE                ;  |
-    LDA     #$B4               ;  |
-    STA     $BF                ; /
+    ; Verify checksum of disk I/O routines.
+    ;
+    ; Behavior:
+    ;   Computes a 16-bit XOR/ADD checksum over DISK_IO_START to
+    ;   DISK_IO_END via COMPUTE_CHECKSUM.  Compares against expected
+    ;   values at INTEGRITY_DATA.  On mismatch, jumps to
+    ;   INTEGRITY_FAIL_ADDR (does not return).
+    ;
+    ; Modifies: CKSUM_START, CKSUM_END, CKSUM_ACC, CKSUM_ACC+1
+    ; Clobbers: A, X, Y
+
+    LDA     #<DISK_IO_START    ; \ range: DISK_IO_START to DISK_IO_END
+    STA     CKSUM_START        ;  |
+    LDA     #>DISK_IO_START    ;  |
+    STA     CKSUM_START+1      ;  |
+    LDA     #<DISK_IO_END      ;  |
+    STA     CKSUM_END          ;  |
+    LDA     #>DISK_IO_END      ;  |
+    STA     CKSUM_END+1        ; /
     JSR     COMPUTE_CHECKSUM
     CMP     INTEGRITY_DATA     ; compare low byte
     BNE     .fail
@@ -20690,17 +21378,17 @@ VERIFY_INTEGRITY:
     BNE     .fail
     RTS                        ; checksums match
 .fail:
-    JMP     $6DED              ; GAME_INIT: reinitialize
+    JMP     INTEGRITY_FAIL_ADDR ; reinitialize on mismatch
 
 VERIFY_DISK_IO:
-    LDA     #$D8               ; \ range: $6DD8-$6DFA
-    STA     $BA                ;  |
-    LDA     #$6D               ;  |
-    STA     $BB                ;  |
-    LDA     #$FA               ;  |
-    STA     $BE                ;  |
-    LDA     #$6D               ;  |
-    STA     $BF                ; /
+    LDA     #<SCENE_LOADER_START ; \ range: SCENE_LOADER_START to SCENE_LOADER_END
+    STA     CKSUM_START          ;  |
+    LDA     #>SCENE_LOADER_START ;  |
+    STA     CKSUM_START+1        ;  |
+    LDA     #<SCENE_LOADER_END ;  |
+    STA     CKSUM_END          ;  |
+    LDA     #>SCENE_LOADER_END ;  |
+    STA     CKSUM_END+1          ; /
     JSR     COMPUTE_CHECKSUM
     CMP     INTEGRITY_DATA+2   ; compare low byte
     BNE     .fail
@@ -20709,50 +21397,69 @@ VERIFY_DISK_IO:
     BNE     .fail
     RTS
     ; unreachable padding (overwritten at runtime as checksum accumulators)
-    HEX     B1 A0
+CKSUM_ACC:
+    DC.B    $B1                ; checksum accumulator low (self-modifying)
+    DC.B    $A0                ; checksum accumulator high (+1)
 
 COMPUTE_CHECKSUM:
     SUBROUTINE COMPUTE_CHECKSUM
+    ; Compute a 16-bit checksum over a memory range.
+    ;
+    ; Inputs:
+    ;   CKSUM_START/+1 — start address (inclusive)
+    ;   CKSUM_END/+1   — end address (exclusive)
+    ;
+    ; Behavior:
+    ;   Iterates byte-by-byte. Odd bytes are ADCed into CKSUM_ACC;
+    ;   even bytes are ADCed into CKSUM_ACC+1 then EORed into
+    ;   CKSUM_ACC.
+    ;
+    ; Outputs:
+    ;   A — checksum low byte
+    ;   Y — checksum high byte
+    ; Modifies: CKSUM_START (advanced to end), CKSUM_ACC, CKSUM_ACC+1
+    ; Clobbers: A, Y
+
     CLC
     LDY     #$00
-    STY     $A527              ; checksum low = 0 (self-modifying)
-    STY     $A528              ; checksum high = 0
+    STY     CKSUM_ACC       ; checksum low = 0
+    STY     CKSUM_ACC+1       ; checksum high = 0
 .loop:
-    LDA     ($BA),Y
-    ADC     $A527
-    STA     $A527
+    LDA     (CKSUM_START),Y
+    ADC     CKSUM_ACC
+    STA     CKSUM_ACC
     JSR     .advance           ; advance pointer
     BCS     .done              ; reached end -> return
-    LDA     ($BA),Y
-    ADC     $A528
-    STA     $A528
-    EOR     $A527
-    STA     $A527
+    LDA     (CKSUM_START),Y
+    ADC     CKSUM_ACC+1
+    STA     CKSUM_ACC+1
+    EOR     CKSUM_ACC
+    STA     CKSUM_ACC
     JSR     .advance
     BCC     .loop              ; not done -> continue
 
 .done:
-    LDA     $A527              ; return checksum low in A
-    LDY     $A528              ; return checksum high in Y
+    LDA     CKSUM_ACC       ; return checksum low in A
+    LDY     CKSUM_ACC+1       ; return checksum high in Y
     RTS
 
 .advance:
-    INC     $BA
+    INC     CKSUM_START
     BNE     .no_carry
-    INC     $BB
+    INC     CKSUM_START+1
 .no_carry:
-    LDA     $BA
-    CMP     $BE
+    LDA     CKSUM_START
+    CMP     CKSUM_END
     BNE     .not_end
-    LDA     $BB
-    CMP     $BF
+    LDA     CKSUM_START+1
+    CMP     CKSUM_END+1
     BNE     .not_end
     SEC                        ; reached end of range
     RTS
 .not_end:
     CLC
     RTS
-@ %def INTEGRITY_DATA VERIFY_INTEGRITY VERIFY_DISK_IO COMPUTE_CHECKSUM
+@ %def INTEGRITY_DATA VERIFY_INTEGRITY VERIFY_DISK_IO CKSUM_ACC COMPUTE_CHECKSUM
 
 @ \subsection{Cold restart error handler (\$A56F--\$A58F)}
 
@@ -20764,6 +21471,15 @@ COMPUTE_CHECKSUM:
     ORG     $A56F
 COLD_RESTART:
     SUBROUTINE COLD_RESTART
+    ; Wipe program memory and reboot from disk.
+    ;
+    ; Behavior:
+    ;   Zeros all memory from $0800 through $A56F, then jumps to
+    ;   the Disk II boot ROM at $C600 to restart. Does not return.
+    ;
+    ; Modifies: $0800-$A56F
+    ; Clobbers: A, Y
+
     LDA     #$00
     STA     $BE
     LDA     #$08
@@ -21003,6 +21719,16 @@ which exits the entire [[TUNE_PLAYER]] call.
     ORG     $7A4F
 TUNE_ADVANCE:
     SUBROUTINE TUNE_ADVANCE
+    ; Advance the tune player by one step.
+    ;
+    ; Behavior:
+    ;   Increments the tune program counter, then checks for user
+    ;   input if in attract mode. Returns early if input detected;
+    ;   otherwise halves WAIT_LOOP_COUNT and jumps back to the
+    ;   tune interpreter fetch loop.
+    ;
+    ; Modifies: TUNE_PC, WAIT_LOOP_COUNT
+    ; Clobbers: A, X
 
     JSR     TUNE_INC_PC       ; advance tune pointer
     LDA     ATTRACT_FLAG        ; attract_flag
@@ -21042,6 +21768,14 @@ TUNE_ACTION_INDIRECT:
     ORG     $7A77
 TUNE_INC_PC:
     SUBROUTINE TUNE_INC_PC
+    ; Increment the 16-bit tune program counter.
+    ;
+    ; Behavior:
+    ;   Increments TUNE_PC low byte; if it wraps to zero,
+    ;   increments TUNE_PC+1 high byte.
+    ;
+    ; Modifies: TUNE_PC
+    ; Clobbers: none (flags only)
 
     INC     TUNE_PC
     BEQ     .carry
@@ -21058,6 +21792,17 @@ The soft-switch reads at [[$C050]]--[[$C057]] configure the Apple II display:
 into HGR mode showing the framebuffer at [[$2000]]--[[$3FFF]].
 
 \subsection{Sound and settings routines (\$0984--\$09F3)}
+
+<<defines>>=
+S_SOUND_CHAR1       EQU     $7B0F   ; 'N'/'F' position in "SOUND IS ON/OFF" label
+S_SOUND_CHAR2       EQU     $7B10   ; ' '/'F' position in "SOUND IS ON/OFF" label
+S_DANGER_OUT        EQU     $7B22   ; DECIMAL_OUT_PTR target for danger level display
+RTS_OPCODE          EQU     $60     ; RTS instruction byte (used to disable tone routines)
+LDY_OPCODE          EQU     $A0     ; LDY immediate byte (original tone routine entry)
+MAX_THRESHOLD       EQU     $63     ; maximum EVENT_THRESHOLD value (99 decimal)
+SCENE_RETIRE        EQU     $23     ; scene number for character retirement
+@ %def S_SOUND_CHAR1 S_SOUND_CHAR2 S_DANGER_OUT RTS_OPCODE LDY_OPCODE MAX_THRESHOLD SCENE_RETIRE
+
 
 [[TOGGLE_SOUND]] (\$0984) is the handler for the ``SOUND IS ON'' menu
 option.  It checks whether [[PLAY_HIGH_TONE]] starts with \$60 (RTS,
@@ -21084,15 +21829,15 @@ random event probability (clamped to 0--99).
 TOGGLE_SOUND:
     SUBROUTINE TOGGLE_SOUND
     ; Check current state: PLAY_HIGH_TONE byte = $60 (RTS) means off
-    LDA     #$60              ; RTS opcode
+    LDA     #RTS_OPCODE       ; RTS opcode
     CMP     PLAY_HIGH_TONE    ; is sound disabled?
     BNE     .turn_off
     ; --- Enable sound ---
     LDA     #$CE              ; 'N' (high-bit ASCII)
-    STA     $7B0F             ; patch "OFF" -> "ON "
-    LDA     #$A0              ; ' ' (space) / LDY opcode
-    STA     $7B10             ; trailing space
-    LDA     #$A0              ; LDY #$xx opcode (restores original)
+    STA     S_SOUND_CHAR1     ; patch "OFF" -> "ON "
+    LDA     #LDY_OPCODE       ; ' ' (space) / LDY opcode
+    STA     S_SOUND_CHAR2             ; trailing space
+    LDA     #LDY_OPCODE       ; LDY #$xx opcode (restores original)
 .patch_tones:
     STA     PLAY_HIGH_TONE    ; patch PLAY_HIGH_TONE entry byte
     STA     PLAY_LOW_TONE     ; patch PLAY_LOW_TONE entry byte
@@ -21100,24 +21845,24 @@ TOGGLE_SOUND:
 .turn_off:
     ; --- Disable sound ---
     LDA     #$C6              ; 'F' (high-bit ASCII)
-    STA     $7B0F             ; patch "ON " -> "OFF"
-    STA     $7B10             ;
-    LDA     #$60              ; RTS opcode
+    STA     S_SOUND_CHAR1     ; patch "ON " -> "OFF"
+    STA     S_SOUND_CHAR2             ;
+    LDA     #RTS_OPCODE       ; RTS opcode
     BNE     .patch_tones      ; -> STA PLAY_HIGH_TONE / PLAY_LOW_TONE
 
     ; --- Initialize settings display ---
 SETTINGS_DISPLAY_INIT:
     LDA     #$20              ; \ clear danger digit area
-    STA     $7B24             ;  |
-    STA     $7B25             ;  |
-    STA     $7B26             ; /
+    STA     S_DANGER_OUT+2    ;  |
+    STA     S_DANGER_OUT+3    ;  |
+    STA     S_DANGER_OUT+4             ; /
     LDA     #$00
     STA     NUM_VALUE+1       ; high byte = 0
     LDA     EVENT_THRESHOLD   ; current threshold value
     STA     NUM_VALUE         ; -> NUM_VALUE
-    LDA     #$22              ; \ DECIMAL_OUT_PTR = $7B22
-    STA     DECIMAL_OUT_PTR   ;  | (danger display area)
-    LDA     #$7B              ;  |
+    LDA     #<S_DANGER_OUT    ; \ DECIMAL_OUT_PTR -> S_DANGER_OUT
+    STA     DECIMAL_OUT_PTR   ;  |
+    LDA     #>S_DANGER_OUT    ;  |
     STA     DECIMAL_OUT_PTR+1 ; /
     JMP     NUM_TO_DECIMAL    ; format and return
 
@@ -21142,7 +21887,7 @@ DEC_EVENT_THRESHOLD:
     ; --- Increment EVENT_THRESHOLD (clamp to 99) ---
 INC_EVENT_THRESHOLD:
     LDA     EVENT_THRESHOLD
-    CMP     #$63              ; 99 decimal
+    CMP     #MAX_THRESHOLD    ; 99 decimal
     BCS     .inc_done         ; already at max
     INC     EVENT_THRESHOLD
 .inc_done:
@@ -21153,7 +21898,7 @@ RETIRE_CHARACTER:
     LDA     #$00
     STA     ACTIVE_CHAR       ; clear active character
     JSR     REORDER_CURRENT_CHAR
-    LDA     #$23              ; scene $23
+    LDA     #SCENE_RETIRE     ; retirement scene
     JMP     SCENE_LOOP
 @ %def TOGGLE_SOUND SETTINGS_DISPLAY_INIT DEC_THRESHOLD_WRAP INC_THRESHOLD_WRAP DEC_EVENT_THRESHOLD INC_EVENT_THRESHOLD RETIRE_CHARACTER
 
@@ -21231,6 +21976,10 @@ STUB_ENTRY:
     JMP     ATTRACT_LOOP
 @ %def STUB_ENTRY
 
+<<defines>>=
+RES_ABORT_NIBBLE        EQU     $07F6   ; last nibble stored on keyboard abort
+@ %def RES_ABORT_NIBBLE
+
 @ [[READ_DATA_FIELD]] reads a disk data field from the drive.  It
 searches for the D5~AA~AD prologue, reads 342~(\$156) bytes of
 encoded data (checking each against \$AF), then reads 256~(\$100)
@@ -21239,7 +21988,7 @@ clear on success, carry set on error.  The entry at [[READ_DATA_FIELD_AD]]
 (\$051E) skips the D5~AA search and checks only for the AD~byte.
 
 During reading, [[BIT \$C000]] polls the keyboard---if a key is
-pressed, the read is aborted and the nibble is stored at [[$07F6]].
+pressed, the read is aborted and the nibble is stored at [[RES_ABORT_NIBBLE]].
 
 <<read data field>>=
     ORG     $0503
@@ -21311,7 +22060,7 @@ READ_DATA_FIELD_AD:
     CLC                       ; carry clear = success
     RTS
 .abort:
-    STA     $07F6             ; save nibble that caused abort
+    STA     RES_ABORT_NIBBLE  ; save nibble that caused abort
     SEC                       ; carry set = error
     RTS
 @ %def READ_DATA_FIELD READ_DATA_FIELD_AD
@@ -21344,6 +22093,18 @@ provide VM-to-native exit points and bytecode decryption:
 
 The address at \$0678 doubles as RWTS scratch storage during disk
 operations.
+
+<<zero page defines>>=
+VM_SCRATCH              EQU     $50     ; decoded nibble / scratch (base of VM ZP range $50-$5F)
+VM_IP                   EQU     $52     ; bytecode instruction pointer (2 bytes, lo/hi)
+VM_OPERAND              EQU     $54     ; decoded address/operand (2 bytes, lo/hi)
+VM_ACC                  EQU     $56     ; VM accumulator
+@ %def VM_SCRATCH VM_IP VM_OPERAND VM_ACC
+
+<<defines>>=
+RES_ZP_SHADOW           EQU     $07E5   ; saved ZP $50-$5F for resident VM context swap (16 bytes)
+RES_ERROR_COUNT         EQU     $07E2   ; error accumulator (resident copy-protection verifier)
+@ %def RES_ZP_SHADOW RES_ERROR_COUNT
 
 <<resident data and bytecodes>>=
     ORG     $0572
@@ -21388,13 +22149,13 @@ RESIDENT_BYTECODES:
     VMCALL1 $FCA8             ; /
     VMLD    $C0EE             ; set drive to read mode
     VMLDI   $00
-    VMST    $07E2             ; clear error counter
+    VMST    RES_ERROR_COUNT   ; clear error counter
     VMCALL  .vm_read_one      ; \ read 4 sectors at
     VMCALL  .vm_read_one      ;  | different half-track
     VMCALL  .vm_read_one      ;  | positions
     VMCALL  .vm_read_one      ; /
     VMLD    $C0E8             ; motor off
-    VMLD    $07E3             ; return error status
+    VMLD    RES_ERROR_COUNT+1 ; return error status
     VMRET
 
     ; --- VM subroutine: read one sector + seek half track ---
@@ -21451,17 +22212,17 @@ SEARCH_ADDR_FIELD_RES:
     SEC
     RTS
 .found_96:
-    ; --- Decode 4&4 nibble data (2 pairs -> $50) ---
+    ; --- Decode 4&4 nibble data (2 pairs -> VM_SCRATCH) ---
     LDY     #$02              ; 2 pairs to decode
 .decode_pair:
     LDA     DISK_DATA_REG     ; \ wait for even nibble
     BPL     *-3               ; /
     ROL                       ; shift into position
-    STA     $50               ; save
+    STA     VM_SCRATCH        ; save
     LDA     DISK_DATA_REG     ; \ wait for odd nibble
     BPL     *-3               ; /
-    AND     $50               ; combine
-    STA     $50               ; decoded byte
+    AND     VM_SCRATCH        ; combine
+    STA     VM_SCRATCH        ; decoded byte
     DEY
     STX     RES_RETRY_COUNT ; save retry count
     BPL     .decode_pair      ; next pair
@@ -21478,8 +22239,8 @@ READ_AND_VERIFY_RES:
     JSR     READ_DATA_FIELD   ; read data field
 .read_done:
     LDA     #$00
-    ADC     $07E2             ; accumulate errors
-    STA     $07E2
+    ADC     RES_ERROR_COUNT   ; accumulate errors
+    STA     RES_ERROR_COUNT
     LDA     $C0E0             ; \ reset drive phases
     LDA     $C0E2             ;  |
     LDA     $C0E4             ;  |
@@ -21534,8 +22295,9 @@ DECRYPT_HIGH_BYTE:
     EOR     #$D9                         ; decrypt high byte of address
     RTS
 @ %def RESIDENT_BYTECODES VM_EXIT_OK VM_EXIT_ERR DECRYPT_HIGH_BYTE
-Swaps 16 bytes between zero page [[$50]]--[[$5F]] and [[$07E5]]--[[$07F4]].
-This gives the resident interpreter its own private set of zero-page
+Swaps 16 bytes between zero page [[VM_SCRATCH]]--[[VM_SCRATCH]]+\$0F and
+[[RES_ZP_SHADOW]]--[[RES_ZP_SHADOW]]+\$0F.
+  This gives the resident interpreter its own private set of zero-page
 temporaries that don't interfere with the main program.
 
 <<context swap>>=
@@ -21545,12 +22307,12 @@ CONTEXT_SWAP:
 
     LDX     #$0F
 .loop:
-    LDA     $50,X  ; load ZP byte
-    PHA            ; save on stack
-    LDA     $7E5,X ; load shadow byte
-    STA     $50,X  ; -> ZP
-    PLA            ; recover old ZP byte
-    STA     $7E5,X ; -> shadow
+    LDA     VM_SCRATCH,X            ; load ZP byte
+    PHA                             ; save on stack
+    LDA     RES_ZP_SHADOW,X         ; load shadow byte
+    STA     VM_SCRATCH,X            ; -> ZP
+    PLA                             ; recover old ZP byte
+    STA     RES_ZP_SHADOW,X         ; -> shadow
     DEX
     BPL     .loop
     RTS
@@ -21570,7 +22332,7 @@ RESIDENT_DISPATCH_TABLE:
 Dispatches one bytecode instruction using a stack trick.  X and Y hold
 the bytecode pointer from the previous iteration.  They are pushed onto
 the stack at entry, then [[PULL_TWO_RET_ADDRS]] rearranges the stack
-so the saved X/Y values end up in [[$52/$53]] as the new bytecode pointer.
+so the saved X/Y values end up in [[VM_IP]]/[[VM_IP]]+1 as the new bytecode pointer.
 
 <<resident dispatch>>=
     ORG     $06B3
@@ -21583,18 +22345,18 @@ RESIDENT_DISPATCH:
     PHA                              ; /
     JSR     PULL_TWO_RET_ADDRS       ; rearrange stack, jump to .resume
 
-    ; Control returns here via JMP ($54):
+    ; Control returns here via JMP (VM_OPERAND):
 .resume:
-    PULB    $52 ; recover saved Y
-    PULB    $53 ;  recover saved X
+    PULB    VM_IP                    ; recover saved Y -> IP low
+    PULB    VM_IP+1                  ; recover saved X -> IP high
 
     LDY     #$04                     ; skip 4 bytes
 RESIDENT_DISPATCH_FETCH:
 .fetch:
-    LDA     ($52),Y                  ; read opcode
+    LDA     (VM_IP),Y                ; read opcode
     INY
     BNE     .no_carry
-    INC     $53
+    INC     VM_IP+1
 .no_carry:
     TAX                              ; opcode -> X (also saves position)
     LDA     RESIDENT_DISPATCH_TABLE,X
@@ -21609,11 +22371,12 @@ Decodes an address and redirects execution there.
 RESIDENT_DECODE_DISPATCH:
     SUBROUTINE RESIDENT_DECODE_DISPATCH
 
-    JSR     DECODE_ENCRYPTED_ADDR   ; -> $54/$55
-    MOVW    $54,$52 ;  $52/$53 = decoded address
+    JSR     DECODE_ENCRYPTED_ADDR    ; -> VM_OPERAND/VM_OPERAND+1
+RES_VM_SET_IP:
+    MOVW    VM_OPERAND,VM_IP         ; VM_IP = decoded address
     LDY     #$00
-    JMP     RESIDENT_DISPATCH_FETCH ; fetch from new location
-@ %def RESIDENT_DECODE_DISPATCH
+    JMP     RESIDENT_DISPATCH_FETCH  ; fetch from new location
+@ %def RESIDENT_DECODE_DISPATCH RES_VM_SET_IP
 @
 
 \begin{center}
@@ -21646,34 +22409,41 @@ RESIDENT_DECODE_DISPATCH:
 Opcodes \$09 and \$0D share the same handler (\$07A2).
 
 Decodes a 2-byte encrypted address from the bytecode stream.
-Uses the same XOR scheme as the EALDR VM.  The decoded address is
-left in [[$54/$55]].
+Uses the same XOR scheme as the EALDR VM (low byte XOR [[RES_XOR_LO]],
+high byte XOR [[RES_XOR_HI]]).  The decoded address is left in
+[[VM_OPERAND]]/[[VM_OPERAND]]+1.
+
+<<defines>>=
+RES_XOR_LO              EQU     $03     ; bytecode encryption XOR key (low byte)
+RES_XOR_HI              EQU     $D9     ; bytecode encryption XOR key (high byte)
+RES_XOR_IMM             EQU     $4C     ; bytecode encryption XOR key (immediate operand)
+@ %def RES_XOR_LO RES_XOR_HI RES_XOR_IMM
 
 <<decode encrypted addr>>=
     ORG     $0710
 DECODE_ENCRYPTED_ADDR:
     SUBROUTINE DECODE_ENCRYPTED_ADDR
 
-    LDA     ($52),Y ; read low byte
-    EOR     #$03    ; decrypt
+    LDA     (VM_IP),Y               ; read low byte
+    EOR     #RES_XOR_LO             ; decrypt
     INY
     BNE     .no_carry1
-    INC     $53
+    INC     VM_IP+1
 .no_carry1:
-    STA     $54     ; decoded low
-    LDA     ($52),Y ; read high byte
+    STA     VM_OPERAND              ; decoded low
+    LDA     (VM_IP),Y               ; read high byte
     INY
     BNE     .no_carry2
-    INC     $53
+    INC     VM_IP+1
 .no_carry2:
-    EOR     #$D9    ; decrypt
-    STA     $55     ; decoded high
+    EOR     #RES_XOR_HI             ; decrypt
+    STA     VM_OPERAND+1            ; decoded high
     RTS
 @ %def DECODE_ENCRYPTED_ADDR
 
 @ The resident EALDR VM opcode handlers.  Each reads its arguments via
 [[DECODE_ENCRYPTED_ADDR]] and returns to the dispatch loop at~\$06C2.
-VM state: [[$52/$53]]=IP, [[$54/$55]]=decoded address, [[$56]]=accumulator.
+VM state: [[VM_IP]]/[[VM_IP]]+1=IP, [[VM_OPERAND]]/[[VM_OPERAND]]+1=decoded address, [[VM_ACC]]=accumulator.
 
 Note: the VMBEQ handler at \$075A contains a [[BNE +0]] (no-op branch)---
 this is one of the Passport crack patches that disables copy-protection
@@ -21691,137 +22461,137 @@ RES_VM_CALL1:
     JSR     DECODE_ENCRYPTED_ADDR
     TYA                       ; \ save bytecode position
     PHA                       ; /
-    LDA     $56               ; A = VM accumulator
-    JSR     RES_VM_CALL1_IND  ; call via ($54)
-    STA     $56               ; result -> VM acc
+    LDA     VM_ACC                  ; A = VM accumulator
+    JSR     RES_VM_CALL1_IND        ; call via (VM_OPERAND)
+    STA     VM_ACC                  ; result -> VM acc
     PLA                       ; \ restore Y
     TAY                       ; /
-    JMP     $06C2             ; dispatch next
+    JMP     RESIDENT_DISPATCH_FETCH ; dispatch next
 
     ; --- PULL_TWO_RET_ADDRS ($0738) ---
     ; Rearranges stack for RESIDENT_DISPATCH: pulls own and caller's
     ; return addresses, increments each (RTS pushes addr-1), and
-    ; jumps through ($54).
+    ; jumps through (VM_OPERAND).
 PULL_TWO_RET_ADDRS:
-    PULB    $54               ; own return addr (low)
-    PULB    $55               ; own return addr (high)
-    PULB    $52               ; caller's return addr (low)
-    PULB    $53               ; caller's return addr (high)
-    INC     $52
-    INC     $54
+    PULB    VM_OPERAND              ; own return addr (low)
+    PULB    VM_OPERAND+1            ; own return addr (high)
+    PULB    VM_IP                   ; caller's return addr (low)
+    PULB    VM_IP+1                 ; caller's return addr (high)
+    INC     VM_IP
+    INC     VM_OPERAND
     BNE     .no_inc
-    INC     $55
+    INC     VM_OPERAND+1
 .no_inc:
-    JMP     ($0054)           ; jump through decoded addr
+    JMP     (VM_OPERAND)            ; jump through decoded addr
 
     ; --- $08: VMCALL0 (terminal jump to native code) ---
 RES_VM_CALL0:
     JSR     DECODE_ENCRYPTED_ADDR
 RES_VM_CALL1_IND:
-    JMP     ($0054)           ; indirect jump through $54/$55
+    JMP     (VM_OPERAND)            ; indirect jump through VM_OPERAND
 
     ; --- $02: VMBEQ (branch if acc == 0) ---
 RES_VM_VMBEQ:
     JSR     DECODE_ENCRYPTED_ADDR
-    LDA     $56               ; test VM accumulator
-    BNE     *+2               ; PATCHED: BNE +0 = no-op (was branch to GOTO)
-    JMP     $06C2             ; always: dispatch next (branch disabled)
+    LDA     VM_ACC                  ; test VM accumulator
+    BNE     *+2                     ; PATCHED: BNE +0 = no-op (was branch to GOTO)
+    JMP     RESIDENT_DISPATCH_FETCH ; always: dispatch next (branch disabled)
 
     ; --- $03: VMLDI (load immediate -> acc) ---
 RES_VM_VMLDI:
-    LDA     ($52),Y           ; read immediate byte
+    LDA     (VM_IP),Y               ; read immediate byte
     INY
     BNE     .no_carry1
-    INC     $53
+    INC     VM_IP+1
 .no_carry1:
-    EOR     #$4C              ; decrypt
-    STA     $56               ; -> VM acc
-    JMP     $06C2
+    EOR     #RES_XOR_IMM            ; decrypt
+    STA     VM_ACC                  ; -> VM acc
+    JMP     RESIDENT_DISPATCH_FETCH
 
     ; --- $04: VMLD (load from memory -> acc) ---
 RES_VM_VMLD:
     JSR     DECODE_ENCRYPTED_ADDR
     LDX     #$00
-    LDA     ($54,X)           ; acc = *(addr)
-    STA     $56
-    JMP     $06C2
+    LDA     (VM_OPERAND,X)          ; acc = *(addr)
+    STA     VM_ACC
+    JMP     RESIDENT_DISPATCH_FETCH
 
     ; --- $0C: VMADD (acc += *(addr)) ---
 RES_VM_VMADD:
     JSR     DECODE_ENCRYPTED_ADDR
-    LDA     $56               ; acc
+    LDA     VM_ACC                  ; acc
     CLC
-    ADC     $54               ; + decoded low byte
-    STA     $54
+    ADC     VM_OPERAND              ; + decoded low byte
+    STA     VM_OPERAND
     BCC     .no_carry2
-    INC     $55
+    INC     VM_OPERAND+1
 .no_carry2:
-    JMP     RES_VM_VMLD+3     ; -> LDX #$00 / LDA ($54,X) / ...
+    JMP     RES_VM_VMLD+3           ; -> LDX #$00 / LDA (VM_OPERAND,X) / ...
 
     ; --- $05: VMCALL (VM subroutine call) ---
 RES_VM_VMCALL:
     JSR     DECODE_ENCRYPTED_ADDR
     TYA                       ; \ compute return address:
     CLC                       ;  | IP + Y offset
-    ADC     $52               ;  |
-    STA     $52               ;  |
-    BCC     .no_carry3        ;  |
-    INC     $53               ; /
+    ADC     VM_IP                   ;  |
+    STA     VM_IP                   ;  |
+    BCC     .no_carry3              ;  |
+    INC     VM_IP+1                 ; /
 .no_carry3:
-    LDA     $52               ; \ push return IP
-    PHA                       ;  |
-    LDA     $53               ;  |
+    LDA     VM_IP                   ; \ push return IP
+    PHA                             ;  |
+    LDA     VM_IP+1                 ;  |
     PHA                       ; /
     LDY     #$00              ; reset Y
-    JMP     $0703             ; set IP = $54/$55, dispatch
+    JMP     RES_VM_SET_IP           ; set IP = VM_OPERAND, dispatch
 
     ; --- $09: VMRET (return from VM subroutine) ---
 RES_VM_VMRET:
     PLA                       ; \ pop return IP
-    STA     $53               ;  | (high byte first)
-    PLA                       ;  |
-    STA     $52               ; /
+    STA     VM_IP+1                 ;  | (high byte first)
+    PLA                             ;  |
+    STA     VM_IP                   ; /
     LDY     #$00
-    JMP     $06C2             ; dispatch next
+    JMP     RESIDENT_DISPATCH_FETCH ; dispatch next
 
     ; --- $06: VMST (store acc to memory) ---
 RES_VM_VMST:
     JSR     DECODE_ENCRYPTED_ADDR
-    LDA     $56               ; VM acc
+    LDA     VM_ACC                  ; VM acc
     LDX     #$00
-    STA     ($54,X)           ; *(addr) = acc
-    JMP     $06C2
+    STA     (VM_OPERAND,X)          ; *(addr) = acc
+    JMP     RESIDENT_DISPATCH_FETCH
 
     ; --- $07: VMSUBI (acc -= immediate) ---
 RES_VM_VMSUBI:
-    LDA     ($52),Y           ; read immediate byte
+    LDA     (VM_IP),Y               ; read immediate byte
     INY
     BNE     .no_carry4
-    INC     $53
+    INC     VM_IP+1
 .no_carry4:
-    EOR     #$4C              ; decrypt
-    STA     $54               ; temp
-    LDA     $56               ; acc
+    EOR     #RES_XOR_IMM            ; decrypt
+    STA     VM_OPERAND              ; temp
+    LDA     VM_ACC                  ; acc
     SEC
-    SBC     $54               ; acc - immediate
-    STA     $56
-    JMP     $06C2
+    SBC     VM_OPERAND              ; acc - immediate
+    STA     VM_ACC
+    JMP     RESIDENT_DISPATCH_FETCH
 
     ; --- $0A: VMINC (*(addr)++, result -> acc) ---
 RES_VM_VMINC:
     JSR     DECODE_ENCRYPTED_ADDR
     LDX     #$00
-    LDA     ($54,X)           ; load byte
+    LDA     (VM_OPERAND,X)          ; load byte
     CLC
-    ADC     #$01              ; increment
-    STA     ($54,X)           ; store back
-    STA     $56               ; -> VM acc
-    JMP     $06C2
+    ADC     #$01                    ; increment
+    STA     (VM_OPERAND,X)          ; store back
+    STA     VM_ACC                  ; -> VM acc
+    JMP     RESIDENT_DISPATCH_FETCH
 @ %def RES_VM_VMASL RES_VM_CALL1 RES_VM_CALL0 RES_VM_CALL1_IND RES_VM_VMBEQ RES_VM_VMLDI RES_VM_VMLD RES_VM_VMADD RES_VM_VMCALL RES_VM_VMRET RES_VM_VMST RES_VM_VMSUBI RES_VM_VMINC
 
 [[PULL_TWO_RET_ADDRS]] pulls both return addresses from the stack
 (its own and the caller's), increments each by 1 (since RTS pushes
-addr\textminus{}1), and jumps through [[$54/$55]] back to the code
+addr\textminus{}1), and jumps through [[VM_OPERAND]]/[[VM_OPERAND]]+1 back to the code
 after the [[JSR]] in [[RESIDENT_DISPATCH]].
 
 @ [[PULL_TWO_RET_ADDRS]] is now part of [[<<resident vm handlers>>]]
@@ -21914,10 +22684,11 @@ entry (set by the caller) to indicate a read operation.
 
 <<disk read field>>=
     ORG     $B300
+DISK_IO_START:
 DISK_READ_FIELD:
     JMP     DISK_VM_LOOP ; enter VM interpreter
     NOP                  ; pad
-@ %def DISK_READ_FIELD
+@ %def DISK_IO_START DISK_READ_FIELD
 Searches for the standard data field prologue ([[D5 AA AD]]) on
 the disk, then reads all 342 nibbles (86~secondary + 256~primary) and
 verifies each byte equals~[[$AF]].  Finally checks the data epilogue
@@ -21932,7 +22703,8 @@ prologue and verifying the data field contents.
 
 <<defines>>=
 DISK_DATA_REG           EQU     $C0EC   ; disk controller data register (active slot)
-@ %def DISK_DATA_REG
+DISK_BAD_NIBBLE         EQU     $B5F6   ; stores mismatched nibble from VERIFY_DATA_FIELD
+@ %def DISK_DATA_REG DISK_BAD_NIBBLE
 
 <<verify data field>>=
     ORG     $B304
@@ -21998,7 +22770,7 @@ VERIFY_DATA_FIELD:
     RTS
 
 .bad_nibble:
-    STA     $B5F6            ; save mismatched nibble for diagnostics
+    STA     DISK_BAD_NIBBLE  ; save mismatched nibble for diagnostics
     SEC                      ; carry set = error
     RTS
 @ %def VERIFY_DATA_FIELD
@@ -22171,6 +22943,7 @@ SEARCH_ADDR_FIELD:
     BPL     *-3
     AND     $50                ; combine: result = decoded byte
     STA     $50                ; last decoded value (sector on final iter)
+DISK_IO_END:
     DEY
     STX     DISK_RETRY_COUNT ; save remaining retry count
     BPL     .decode_pair       ; Y: 2->1->0->FF (3 iterations)
@@ -22181,7 +22954,7 @@ SEARCH_ADDR_FIELD:
 
 DISK_RETRY_COUNT:
     DC.B    3                  ; $B44D: outer retry counter (default 3)
-@ %def SEARCH_ADDR_FIELD DISK_RETRY_COUNT
+@ %def SEARCH_ADDR_FIELD DISK_IO_END DISK_RETRY_COUNT
 Three bytes between the dispatch trampoline and the saved state.
 [[$B5E2]] is the error accumulator used by [[READ_AND_VERIFY]]
 to count failed sector reads across multiple attempts.
@@ -22645,7 +23418,7 @@ zero-page values on each VM entry and exit.  Bytes~11--13 (\$5B--\$5D)
 hold initial values [[$4A $4C $4E]].
 
 Bytes at~[[$B5F5--$B5FF]] are additional VM workspace:
-[[$B5F6]] stores a mismatched nibble from [[VERIFY_DATA_FIELD]].
+[[DISK_BAD_NIBBLE]] (\$B5F6) stores a mismatched nibble from [[VERIFY_DATA_FIELD]].
 
 <<disk vm saved state>>=
     ORG     $B5E5
