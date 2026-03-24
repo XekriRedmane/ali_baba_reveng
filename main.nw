@@ -863,7 +863,7 @@ BOOT1_SECTOR_COUNT:
 BOOT1_ENTRY:
     SUBROUTINE BOOT1_ENTRY
 
-    STOW    $C600,SOFTEV ;  reset vector = $C600 (reboot)
+    STOW    DISK_BOOT_ROM,SOFTEV ;  reset vector = $C600 (reboot)
     EOR     #$A5            ;  PWREDUP = $00 EOR $C6 EOR $A5 = $63
     STA     PWREDUP
     STOB    #$00,BOOT1_ERROR_FLAG ; clear error flag
@@ -2352,7 +2352,7 @@ EALDR_REBOOT:
     SBC      #$01
     BNE      .delay
     STOW    $C1C5,$0400 ; 'E'
-    JMP      $C600 ; reboot from Disk II
+    JMP      DISK_BOOT_ROM ; reboot from Disk II
 @ %def EALDR_REBOOT
 
 
@@ -21463,9 +21463,19 @@ COMPUTE_CHECKSUM:
 
 @ \subsection{Cold restart error handler (\$A56F--\$A58F)}
 
+<<zero page defines>>=
+CLEAR_PTR               EQU     $BE     ; memory-clear pointer (2 bytes, aliased)
+@ %def CLEAR_PTR
+
+<<defines>>=
+DISK_BOOT_ROM           EQU     $C600   ; Disk II boot ROM entry point
+WIPE_END_PAGE           EQU     $A5     ; page past last full page to clear ($A500)
+WIPE_TAIL_LEN           EQU     $6F     ; bytes to clear in final partial page ($A500-$A56E)
+@ %def DISK_BOOT_ROM WIPE_END_PAGE WIPE_TAIL_LEN
+
 [[COLD_RESTART]] is the fatal error handler.  It clears memory from
-\$0800 to \$A46F (the entire program area), then jumps to \$C600
-(the Disk~II boot ROM) to restart the system from disk.
+[[MAIN_ENTRY]] (\$0800) to [[COLD_RESTART]] (\$A56F), then jumps to
+[[DISK_BOOT_ROM]] (\$C600) to restart the system from disk.
 
 <<cold restart>>=
     ORG     $A56F
@@ -21474,55 +21484,75 @@ COLD_RESTART:
     ; Wipe program memory and reboot from disk.
     ;
     ; Behavior:
-    ;   Zeros all memory from $0800 through $A56F, then jumps to
-    ;   the Disk II boot ROM at $C600 to restart. Does not return.
+    ;   Zeros all memory from MAIN_ENTRY ($0800) through COLD_RESTART
+    ;   ($A56F), then jumps to DISK_BOOT_ROM. Does not return.
     ;
-    ; Modifies: $0800-$A56F
+    ; Modifies: $0800-$A56F, CLEAR_PTR
     ; Clobbers: A, Y
 
-    LDA     #$00
-    STA     $BE
-    LDA     #$08
-    STA     $BF
+    LDA     #<MAIN_ENTRY       ; \ CLEAR_PTR = $0800
+    STA     CLEAR_PTR          ;  |
+    LDA     #>MAIN_ENTRY       ;  |
+    STA     CLEAR_PTR+1        ; /
     LDY     #$00
 .clear:
-    STA     ($BE),Y
+    STA     (CLEAR_PTR),Y
     DEY
     BNE     .clear
-    INC     $BF
-    LDA     $BF
-    CMP     #$A5               ; stop at page $A5
+    INC     CLEAR_PTR+1
+    LDA     CLEAR_PTR+1
+    CMP     #WIPE_END_PAGE     ; stop at page $A5
     BNE     .clear
-    LDY     #$6F
+    LDY     #WIPE_TAIL_LEN
 .clear_tail:
-    STA     ($BE),Y            ; clear $A500-$A56F
+    STA     (CLEAR_PTR),Y      ; clear $A500-$A56E
     DEY
     BNE     .clear_tail
-    JMP     $C600              ; reboot from Disk II
+    JMP     DISK_BOOT_ROM      ; reboot from Disk II
 @ %def COLD_RESTART
 
 @ \subsection{Pointer advance helpers (\$A590--\$A5BB)}
 
 These are small utility routines for advancing pointers and comparing
 against end-of-range boundaries.  They duplicate logic from
-[[COMPUTE_CHECKSUM]] but use different ZP addresses.
+[[COMPUTE_CHECKSUM]]'s [[.advance]] but use different ZP pointer pairs.
+All three routines are unreferenced dead code --- zero callers in the
+binary.
+
+\paragraph{LOAD\_END\_OFFSET (\$A590).}
+Loads~Y from \$A563, which is the [[BNE]] operand byte inside
+[[COMPUTE_CHECKSUM]].  No callers exist; always returns the
+disk-image branch offset.
+
+\paragraph{ADVANCE\_BA (\$A594).}
+Increments the 16-bit pointer at [[CKSUM_START]] and compares against
+[[CKSUM_END]].  Returns carry set when the end is reached.
+
+\paragraph{ADVANCE\_1A (\$A5AA).}
+Same as [[ADVANCE_CKSUM_START]] but using the ZP pointer pair
+[[RANGE_CTR]]/[[RANGE_CTR]]+1 vs [[RANGE_END]]/[[RANGE_END]]+1.
+
+<<zero page defines>>=
+RANGE_CTR               EQU     $1A     ; range counter pointer (2 bytes, dead code)
+RANGE_END               EQU     $1E     ; range end pointer (2 bytes, dead code)
+@ %def RANGE_CTR RANGE_END
 
 <<pointer helpers>>=
     ORG     $A590
 LOAD_END_OFFSET:
-    LDY     $A563              ; load end boundary (self-modifying operand)
+    LDY     $A563              ; BNE operand inside COMPUTE_CHECKSUM (dead code)
     RTS
 
-ADVANCE_BA:
-    INC     $BA
+ADVANCE_CKSUM_START:
+    INC     CKSUM_START
     BNE     .no_carry
-    INC     $BB
+    INC     CKSUM_START+1
 .no_carry:
-    LDA     $BA
-    CMP     $BE
+    LDA     CKSUM_START
+    CMP     CKSUM_END
     BNE     .not_end
-    LDA     $BB
-    CMP     $BF
+    LDA     CKSUM_START+1
+    CMP     CKSUM_END+1
     BNE     .not_end
     SEC
     RTS
@@ -21530,20 +21560,20 @@ ADVANCE_BA:
     CLC
     RTS
 
-ADVANCE_1A:
-    INC     $1B
-    LDA     $1A
-    CMP     $1E
+ADVANCE_RANGE_CTR:
+    INC     RANGE_CTR+1
+    LDA     RANGE_CTR
+    CMP     RANGE_END
     BNE     .not_end2
-    LDA     $1B
-    CMP     $1F
+    LDA     RANGE_CTR+1
+    CMP     RANGE_END+1
     BNE     .not_end2
     SEC
     RTS
 .not_end2:
     CLC
     RTS
-@ %def ADVANCE_BA ADVANCE_1A
+@ %def LOAD_END_OFFSET ADVANCE_CKSUM_START ADVANCE_RANGE_CTR
 
 @ [[TUNE_LOOP_CTR]] counts iterations of the script's built-in loop
 construct.  [[TUNE_PRNG_MASK]] controls action randomization: the
