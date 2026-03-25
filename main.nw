@@ -7087,9 +7087,12 @@ MENU_OPTION_STRINGS:
     APSTR   "REST"
     APSTR   "DEFEND"
     APSTR   "STOP"
+S_CHEST_OPENS:
     APSTR   "THE TREASURE CHEST OPENS UP"
     ; Treasure display (digit fields overwritten at runtime)
+S_REVEAL_GOLD:
     APSTR   "TO REVEAL   L k0 GOLD DUCATS."
+S_NOW_HAVE_GOLD:
     APSTR   "YOU NOW HAVE  dOR 0 DUCATS."
     DC.B    $00                ; separator
     APSTR   "CONTINUE GAME NUMBER NN"
@@ -20395,14 +20398,14 @@ PICKUP_TREASURE:
     LDY     #MFIELD_APPEARANCE
     LDA     (ENTITY_PTR),Y         ; char field 4 = appearance
     BAGE    #$15,.mark_used        ; inventory full -> skip
-    JSR     CLEAR_STATUS_SLOTS     ; clear display slots
-    STOW    $7BAB,$BA
+    JSR     CLEAR_TREASURE_DIGITS  ; clear display digit fields
+    STOW    S_REVEAL_DIGITS,DECIMAL_OUT_PTR ; output -> quantity digits
     JSR     NUM_TO_DECIMAL         ; format quantity
     LDWIY    ENTITY_PTR,#MFIELD_GOLD,NUM_VALUE ; gold low
-    STOW    $7BCC,$BA
+    STOW    S_NOW_HAVE_DIGITS,DECIMAL_OUT_PTR ; output -> gold digits
     JSR     NUM_TO_DECIMAL         ; format gold amount
     JSR     SET_CURSOR_ROW21
-    STOW    $7B84,NUM_VALUE
+    STOW    S_CHEST_OPENS,NUM_VALUE ; message pointer
     JSR     CLEAR_AND_DISPLAY      ; display pickup message
 .mark_used:
     LDY     #$00
@@ -20544,34 +20547,40 @@ INC_FIELD_COUNTER:
     STA     (ENTITY_PTR),Y
     RTS
 @ %def INC_FIELD5_COUNTER INC_FIELD_COUNTER
-@ \subsection{Clear status display slots (\$6593)}
+@ \subsection{Clear treasure digit fields (\$6593)}
 
-[[CLEAR_STATUS_SLOTS]] fills two 5-byte regions of the display buffer
-(\$7BAB--\$7BAF and \$7BCC--\$7BD0) with spaces.  These regions hold the
-formatted quantity and gold amount strings used by [[PICKUP_TREASURE]]'s
-display message, and clearing them ensures no stale digits remain from a
-previous interaction.
+[[CLEAR_TREASURE_DIGITS]] clears the two 5-byte digit fields in the
+treasure pickup message strings: the quantity area in [[S_REVEAL_GOLD]]
+and the gold amount area in [[S_NOW_HAVE_GOLD]].  Called before
+[[NUM_TO_DECIMAL]] formats new values into these buffers.
 
-<<clear status slots>>=
+<<defines>>=
+S_REVEAL_DIGITS     EQU     S_REVEAL_GOLD+11   ; 5-byte quantity digit field
+S_NOW_HAVE_DIGITS   EQU     S_NOW_HAVE_GOLD+14 ; 5-byte gold digit field
+@ %def S_REVEAL_DIGITS S_NOW_HAVE_DIGITS
+
+<<clear treasure digits>>=
     ORG     $6593
-CLEAR_STATUS_SLOTS:
-    SUBROUTINE CLEAR_AND_DISPLAY
-    ; Clear two 5-byte display buffer regions.
+CLEAR_TREASURE_DIGITS:
+    SUBROUTINE CLEAR_TREASURE_DIGITS
+    ; Clear the digit fields in the treasure pickup message strings.
     ;
-    ; Input:  none
-    ; Output: $7BAB-$7BAF and $7BCC-$7BD0
-    ;         filled with spaces ($20)
+    ; Behavior:
+    ;   Fills S_REVEAL_DIGITS (5 bytes) and S_NOW_HAVE_DIGITS (5 bytes)
+    ;   with spaces to erase stale digits before formatting new values.
+    ;
+    ; Modifies: S_REVEAL_DIGITS, S_NOW_HAVE_DIGITS
     ; Clobbers: A, X
 
     LDA     #$20                   ; space character
     LDX     #$04                   ; 5 bytes (index 4..0)
 .loop:
-    STA     $7BAB,X                ; quantity display slot
-    STA     $7BCC,X                ; gold display slot
+    STA     S_REVEAL_DIGITS,X      ; quantity digit field
+    STA     S_NOW_HAVE_DIGITS,X    ; gold digit field
     DEX
     BPL     .loop
     RTS
-@ %def CLEAR_STATUS_SLOTS
+@ %def CLEAR_TREASURE_DIGITS
 @ \subsection{Clear and display message (\$65A1)}
 
 [[CLEAR_AND_DISPLAY]] zeroes the message line counter at~\$5A57 and
@@ -20582,7 +20591,7 @@ multi-part display sequence.
 <<clear and display>>=
     ORG     $65A1
 CLEAR_AND_DISPLAY:
-    SUBROUTINE MODIFY_CURRENT_STATS
+    SUBROUTINE CLEAR_AND_DISPLAY
     ; Clear message state and display message.
     ;
     ; Input:  NUM_VALUE -- message address
@@ -26542,7 +26551,7 @@ The following root chunks produce the assembly files when tangled.
 <<check threats here>>
 <<pickup treasure>>
 <<inc field5 counter>>
-<<clear status slots>>
+<<clear treasure digits>>
 <<clear and display>>
 <<random events>>
 <<event pick mob>>
