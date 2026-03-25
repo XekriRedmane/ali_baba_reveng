@@ -7730,22 +7730,121 @@ DEC_WAIT_IF_NONZERO:
     RTS
 @ %def IDLE_ANIM_HANDLER DEC_WAIT_IF_NONZERO
 
-<<fill 4000>>=
+@ Character record table header: bytes 0--1 are the mob data base
+pointer (\$4C80), bytes 2--8 are the first 9-byte record (group 0 header).
+
+<<char record header>>=
     ORG     $4000
-    HEX     80 4C 05 9F A0 A6 9A C9 B0
-<<fill 5F5E>>=
+CHAR_RECORD_HEADER:
+    DC.W    MOB_DATA_TABLE         ; $4000: mob data base pointer ($4C80)
+    DC.B    $05                    ; $4002: CURRENT_PLAYER init (5)
+    DC.B    $9F                    ; $4003: position
+    DC.B    $A0                    ; $4004: appearance
+    DC.B    $A6                    ; $4005: strength
+    DC.B    $9A                    ; $4006: HP
+    DC.B    $C9                    ; $4007: attack
+    DC.B    $B0                    ; $4008: XP/group
+@ %def CHAR_RECORD_HEADER
+@ Input callback jump vector, used by [[JMP (INPUT_JMP_VEC)]] at [[$5F5B]].
+
+<<input jump vector>>=
     ORG     $5F5E
-    HEX     E4 A3
-<<fill 6071>>=
+INPUT_JMP_VEC:
+    DC.W    $A3E4                  ; input callback address (runtime-modified)
+@ %def INPUT_JMP_VEC
+@ [[STORE_SELECTION_TO_RECORD]] saves [[CURRENT_SELECTION]] into byte~1
+of the menu descriptor record at [[MENU_DESC_PTR]].  Called by menu
+adjustment handlers (speed, danger, slot, character browse) to persist
+the current selection index back into the table.
+
+<<zero page defines>>=
+MENU_DESC_PTR           EQU     $C0     ; menu descriptor table pointer (2 bytes, $C0/$C1)
+@ %def MENU_DESC_PTR
+
+<<store selection to record>>=
     ORG     $6071
-    HEX     98 48 A0 01 AD AB 5A 91 C0 68 A8 60
-<<fill 71AC>>=
+STORE_SELECTION_TO_RECORD:
+    ; Store CURRENT_SELECTION into byte 1 of the menu descriptor record.
+    ;
+    ; Inputs:
+    ;   MENU_DESC_PTR — pointer to menu descriptor table
+    ;   CURRENT_SELECTION — current selection index
+    ;
+    ; Behavior:
+    ;   Saves Y, writes CURRENT_SELECTION into (MENU_DESC_PTR)+1, restores Y.
+    ;
+    ; Clobbers: A
+
+    TYA                        ; \ save Y
+    PHA                        ; /
+    LDY     #$01               ; byte 1 of descriptor
+    LDA     CURRENT_SELECTION
+    STA     (MENU_DESC_PTR),Y  ; write selection to record
+    PLA                        ; \ restore Y
+    TAY                        ; /
+    RTS
+@ %def STORE_SELECTION_TO_RECORD
+@ [[SHOP_BUY_HANDLER]] is the buy action handler referenced from
+the shop record table at [[$6442]].  It compares the entity's gold
+([[MFIELD_GOLD]]) against [[SHOP_PRICE]]; if insufficient, displays
+message~\$31 (``can't afford'') and returns to the shop menu.
+Otherwise it copies the price into [[NUM_VALUE]], calls the shop's
+deduct routine, displays message~\$26 (``bought''), then jumps
+through the item's effect handler pointer in the shop record.
+
+<<shop buy handler>>=
     ORG     $71AC
-    HEX     A0 0E B1 F8 CD 82 5A 90 0A D0 13 88 B1 F8 CD 81
-    HEX     5A B0 0B 20 BE 76 A9 31 20 1E 76 4C 94 71 AD 81
-    HEX     5A 85 BC AD 82 5A 85 BD A0 00 20 D4 70 20 BE 76
-    HEX     A9 26 20 1E 76 AC 85 5A B1 E6 85 BC C8 B1 E6 85
-    HEX     BD 6C BC 00
+SHOP_BUY_HANDLER:
+    SUBROUTINE SHOP_BUY_HANDLER
+    ; Handle the "buy" action in the shop menu.
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR — buyer's entity record
+    ;   SHOP_PRICE/+1 — item price
+    ;   SHOP_DATA_PTR — pointer to current shop record
+    ;   SHOP_ITEM_OFFSET — offset to current item's handler
+    ;
+    ; Behavior:
+    ;   Compares gold (bytes $0D/$0E) against SHOP_PRICE.
+    ;   If gold < price, displays "can't afford" and returns.
+    ;   Otherwise deducts price and jumps to item effect handler.
+    ;
+    ; Clobbers: A, X, Y
+
+    ; --- Compare gold against price ---
+    LDY     #MFIELD_GOLD+1         ; byte $0E: gold high
+    LDA     (ENTITY_PTR),Y
+    CMP     SHOP_PRICE+1           ; compare high byte
+    BCC     .cant_afford           ; gold < price
+    BNE     .can_afford            ; gold > price
+    DEY                            ; byte $0D: gold low
+    LDA     (ENTITY_PTR),Y
+    CMP     SHOP_PRICE             ; compare low byte
+    BCS     .can_afford
+.cant_afford:
+    JSR     SET_CURSOR_ROW21
+    LDA     #$31                   ; message: "can't afford"
+    JSR     DISPLAY_MESSAGE
+    JMP     $7194                  ; return to shop menu
+.can_afford:
+    ; --- Deduct price and execute purchase ---
+    LDA     SHOP_PRICE             ; \ NUM_VALUE = price
+    STA     NUM_VALUE              ;  |
+    LDA     SHOP_PRICE+1           ;  |
+    STA     NUM_VALUE+1            ; /
+    LDY     #$00
+    JSR     $70D4                  ; deduct price from gold
+    JSR     SET_CURSOR_ROW21
+    LDA     #$26                   ; message: "bought"
+    JSR     DISPLAY_MESSAGE
+    LDY     SHOP_ITEM_OFFSET       ; \ load item effect handler
+    LDA     (SHOP_DATA_PTR),Y      ;  | from shop record
+    STA     NUM_VALUE              ;  |
+    INY                            ;  |
+    LDA     (SHOP_DATA_PTR),Y      ;  |
+    STA     NUM_VALUE+1            ; /
+    JMP     (NUM_VALUE)            ; execute item effect
+@ %def SHOP_BUY_HANDLER
 @ [[CHECK_INPUT]] polls the keyboard and joystick for input.
 
 \paragraph{Keyboard mode.}
@@ -7905,10 +8004,30 @@ JOY_TO_ZONE:
     LDA     #$00               ; above low threshold = low zone
     RTS
 @ %def CHECK_INPUT DIR_KEYS_UPPER DIR_KEYS_LOWER DIR_KEYS_CTRL JOY_DELAY JOY_AXIS_X JOY_AXIS_Y JOY_THRESH_LO JOY_THRESH_HI JOY_TO_ZONE
+@ Dead code: loops through character records starting from
+[[CURRENT_PLAYER]], clearing bit~7 of byte~5 ([[MFIELD_STRENGTH]])
+on each record until the end sentinel is reached.  Zero callers.
+
 <<fill 793F>>=
     ORG     $793F
-    HEX     AD 02 5A 20 53 10 A0 01 B1 BE C9 FF D0 01 60 A0
-    HEX     05 B1 BE 29 7F 91 BE EE 02 5A D0 E4
+CLEAR_STRENGTH_FLAGS:
+    ; Dead code: clear bit 7 of MFIELD_STRENGTH on all characters.
+.loop:
+    LDA     CURRENT_PLAYER
+    JSR     GET_CHAR_RECORD        ; CHAR_REC = record for index A
+    LDY     #$01
+    LDA     (CHAR_REC),Y           ; byte 1: type
+    CMP     #$FF                   ; end sentinel?
+    BNE     .not_end
+    RTS
+.not_end:
+    LDY     #MFIELD_STRENGTH
+    LDA     (CHAR_REC),Y           ; byte 5: strength
+    AND     #$7F                   ; clear bit 7
+    STA     (CHAR_REC),Y
+    INC     CURRENT_PLAYER
+    BNE     .loop                  ; always taken
+@ %def CLEAR_STRENGTH_FLAGS
 <<fill 80E5>>=
     ORG     $80E5
     HEX     80 02 23 C1 04 00 24 C1 04 00 24 09 A4 32 A4 37
@@ -7916,12 +8035,20 @@ JOY_TO_ZONE:
     HEX     25 23 60 10 00 24 25 1F 22 3F 05 50 04 80 02 23
     HEX     C1 04 00 24 81 C8 E7 6D 9D 81 28 EB 6D A8 81 64
     HEX     EF 6D BB 81 08 FF ED ED EF E6 FD ED EF
+@ Dead code: original HRCG entry point, bypassed by [[INIT_HRCG]] patches.
+
 <<fill 92A5>>=
     ORG     $92A5
-    HEX     4C B4 92
+HRCG_ORIGINAL_ENTRY:
+    JMP     HRCG_PRINT_VERSION     ; dead: original entry before patch
+@ %def HRCG_ORIGINAL_ENTRY
+@ Residual string fragment: high-bit ASCII ``]AND'' followed by a null.
+
 <<fill A6B3>>=
     ORG     $A6B3
-    HEX     5D 41 4E C4 00
+RESIDUAL_AND_STRING:
+    HEX     5D 41 4E C4 00         ; "]AND\0" (unused)
+@ %def RESIDUAL_AND_STRING
 <<fill A725>>=
     ORG     $A725
     HEX     BD 43 50 D8 00 0E DC 43 50 D9 00 0E BC 44 45 C3
@@ -13612,9 +13739,8 @@ in-place action.
 into [[INPUT_JMP_VEC]] and executes it via [[JMP (INPUT_JMP_VEC)]].
 
 <<defines>>=
-INPUT_JMP_VEC   EQU     $5F5E   ; indirect jump vector for input callbacks
 CURRENT_SELECTION EQU   $5AAB   ; current menu selection index
-@ %def INPUT_JMP_VEC CURRENT_SELECTION
+@ %def CURRENT_SELECTION
 
 @ [[READ_KEYBOARD]] at [[$A44C]] is the keyboard input routine in the
 relocated block (\$9600--\$A8FF).  [[INPUT_LOOP]] calls it to wait for
@@ -14447,7 +14573,7 @@ SETTINGS_SPEED_UP:
     ; Modifies: $7ABD
     ; Clobbers: A, X
 
-    JSR     $6071              ; patch menu record
+    JSR     STORE_SELECTION_TO_RECORD
     INC     $7ABD              ; speed++
     LDA     $7ABD
     CMP     $7ABC              ; at max?
@@ -14458,19 +14584,19 @@ SETTINGS_SPEED_UP:
     JMP     MENU_GAME_SETTINGS_ENTER ; re-enter settings menu
 
 SETTINGS_SPEED_DOWN:
-    JSR     $6071              ; patch menu record
+    JSR     STORE_SELECTION_TO_RECORD
     DEC     $7ABD              ; speed--
     BNE     .done              ; nonzero -> ok
     INC     $7ABD              ; clamp to 1
     BNE     .done              ; (always taken)
 
 SETTINGS_DANGER_UP:
-    JSR     $6071              ; patch menu record
+    JSR     STORE_SELECTION_TO_RECORD
     JSR     $09CF              ; increment danger threshold
     JMP     MENU_GAME_SETTINGS_ENTER
 
 SETTINGS_DANGER_DOWN:
-    JSR     $6071              ; patch menu record
+    JSR     STORE_SELECTION_TO_RECORD
     JSR     $09CB              ; decrement danger threshold
     JMP     MENU_GAME_SETTINGS_ENTER
 @ %def SETTINGS_SPEED_UP SETTINGS_SPEED_DOWN SETTINGS_DANGER_UP SETTINGS_DANGER_DOWN
@@ -14547,11 +14673,11 @@ MENU_DROP_GOLD_INIT:
     RTS
 
 MENU_DROP_INC:
-    JSR     $6071              ; patch menu record
+    JSR     STORE_SELECTION_TO_RECORD
     JMP     ADJ_DROP_INC       ; binary search: subtract step
 
 MENU_DROP_DEC:
-    JSR     $6071              ; patch menu record
+    JSR     STORE_SELECTION_TO_RECORD
     JMP     ADJ_DROP_DEC       ; binary search: add step
 @ %def DROP_GOLD_TABLE MENU_DROP_GOLD MENU_DROP_GOLD_INIT MENU_DROP_INC MENU_DROP_DEC
 
@@ -14638,7 +14764,7 @@ SLOT_DEC:
     INC     SLOT_NUMBER        ; undo: wrap 0 -> 1
 
 SLOT_UPDATE:
-    JSR     $6071              ; patch menu record
+    JSR     STORE_SELECTION_TO_RECORD
     JMP     FORMAT_SLOT_NUMBER
 
 SLOT_INC_ENTER:
@@ -14870,12 +14996,12 @@ CHAR_SELECT_INIT:
     JMP     MOVE_LOOP          ; back to main loop
 
 CHAR_SELECT_NEXT:
-    JSR     $6071              ; patch menu record
+    JSR     STORE_SELECTION_TO_RECORD
     JSR     FIND_NEXT_PC_WRAP  ; advance to next PC
     JMP     ENTER_CHAR_SELECT
 
 CHAR_SELECT_PREV:
-    JSR     $6071              ; patch menu record
+    JSR     STORE_SELECTION_TO_RECORD
     JSR     FIND_PREV_PC       ; retreat to previous PC
     JMP     ENTER_CHAR_SELECT
 
@@ -14921,7 +15047,7 @@ ALT_INPUT_TABLE:
     ; rec0: PAY [amount] FOR [item]
     HEX     01 05 03 02 00 00
     DC.W    S_PAY_FOR          ; "PAY 000000 FOR ..."
-    DC.W    $71AC              ; buy handler
+    DC.W    SHOP_BUY_HANDLER   ; buy handler
     ; rec1: BUY SOMETHING ELSE
     HEX     01 2D 01 03 00 00
     DC.W    $7D23              ; "BUY SOMETHING ELSE"
@@ -26657,7 +26783,7 @@ The following root chunks produce the assembly files when tangled.
 <<dispatch on mode>>
 <<orphaned encounter handler>>
 <<zeroed hires page>>
-<<fill 4000>>
+<<char record header>>
 <<Location data>>
 <<Location names>>
 <<Location events>>
@@ -26678,7 +26804,7 @@ The following root chunks produce the assembly files when tangled.
 <<copyright string>>
 <<boot display strings>>
 <<input loop>>
-<<fill 5F5E>>
+<<input jump vector>>
 <<setup input>>
 <<draw input options>>
 <<calc record ptr>>
@@ -26691,7 +26817,7 @@ The following root chunks produce the assembly files when tangled.
 <<clear input buffer>>
 <<render input buffer>>
 <<copy record data>>
-<<fill 6071>>
+<<store selection to record>>
 <<game input table>>
 <<teardown input>>
 <<get input table ptr>>
@@ -26769,7 +26895,7 @@ The following root chunks produce the assembly files when tangled.
 <<modify char stats>>
 <<modify current stats>>
 <<display shop>>
-<<fill 71AC>>
+<<shop buy handler>>
 <<advance shop ptr>>
 <<add price component>>
 <<shop buy effects>>
