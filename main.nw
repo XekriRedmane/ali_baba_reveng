@@ -8008,7 +8008,7 @@ JOY_TO_ZONE:
 [[CURRENT_PLAYER]], clearing bit~7 of byte~5 ([[MFIELD_STRENGTH]])
 on each record until the end sentinel is reached.  Zero callers.
 
-<<fill 793F>>=
+<<clear strength flags>>=
     ORG     $793F
 CLEAR_STRENGTH_FLAGS:
     ; Dead code: clear bit 7 of MFIELD_STRENGTH on all characters.
@@ -8028,7 +8028,7 @@ CLEAR_STRENGTH_FLAGS:
     INC     CURRENT_PLAYER
     BNE     .loop                  ; always taken
 @ %def CLEAR_STRENGTH_FLAGS
-<<fill 80E5>>=
+<<tune bytecode data tail>>=
     ORG     $80E5
     HEX     80 02 23 C1 04 00 24 C1 04 00 24 09 A4 32 A4 37
     HEX     A4 FC A3 3C A4 24 1F 26 23 C1 05 22 50 06 3F 08
@@ -8037,19 +8037,19 @@ CLEAR_STRENGTH_FLAGS:
     HEX     EF 6D BB 81 08 FF ED ED EF E6 FD ED EF
 @ Dead code: original HRCG entry point, bypassed by [[INIT_HRCG]] patches.
 
-<<fill 92A5>>=
+<<hrcg original entry>>=
     ORG     $92A5
 HRCG_ORIGINAL_ENTRY:
     JMP     HRCG_PRINT_VERSION     ; dead: original entry before patch
 @ %def HRCG_ORIGINAL_ENTRY
 @ Residual string fragment: high-bit ASCII ``]AND'' followed by a null.
 
-<<fill A6B3>>=
+<<residual and string>>=
     ORG     $A6B3
 RESIDUAL_AND_STRING:
     HEX     5D 41 4E C4 00         ; "]AND\0" (unused)
 @ %def RESIDUAL_AND_STRING
-<<fill A725>>=
+<<entity item tables cont>>=
     ORG     $A725
     HEX     BD 43 50 D8 00 0E DC 43 50 D9 00 0E BC 44 45 C3
     HEX     00 AA BE 44 45 D8 10 00 CA 44 45 D9 10 00 88 45
@@ -8061,7 +8061,7 @@ RESIDUAL_AND_STRING:
     HEX     10 00 08 50 4C C1 10 00 68 50 4C D0 10 00 28 52
     HEX     4F CC 04 AA 1E 52 4F D2 04 AA 5E 52 54 C9 10 00
     HEX     40 52 54 D3 10 00 60 53 42 C3 00
-<<fill A8CE>>=
+<<pre-init data>>=
     ORG     $A8CE
     HEX     00 00 01 00 03 33 33 32 33 13 A5 13 02 15 02 00
     HEX     A3 1C 32 00 4C 14 00 BD C9 00 C0 04 00 3C 80 00
@@ -26931,7 +26931,7 @@ The following root chunks produce the assembly files when tangled.
 <<init stub>>
 <<init hrcg>>
 <<set text window upper left>>
-<<fill 793F>>
+<<clear strength flags>>
 <<tune player>>
 <<tune action indirect>>
 <<tune advance>>
@@ -26950,7 +26950,7 @@ The following root chunks produce the assembly files when tangled.
 <<print font char data>>
 <<tune pointer table>>
 <<tune bytecode>>
-<<fill 80E5>>
+<<tune bytecode data tail>>
 <<hrcg control prefix>>
 <<duplicate item strings>>
 <<hrcg control tail>>
@@ -26959,7 +26959,7 @@ The following root chunks produce the assembly files when tangled.
 <<tune bytecodes copy>>
 <<border bitmap data>>
 <<font data>>
-<<fill 92A5>>
+<<hrcg original entry>>
 <<hrcg init>>
 <<hrcg version string>>
 <<hrcg params>>
@@ -27001,11 +27001,11 @@ The following root chunks produce the assembly files when tangled.
 <<cold restart>>
 <<pointer helpers>>
 <<display and dos data>>
-<<fill A6B3>>
+<<residual and string>>
 <<entity item tables>>
-<<fill A725>>
+<<entity item tables cont>>
 <<extended entity data>>
-<<fill A8CE>>
+<<pre-init data>>
 <<runtime data area>>
 <<disk read field>>
 <<verify data field>>
