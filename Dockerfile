@@ -44,6 +44,12 @@ RUN git clone https://github.com/bethington/ghidra-mcp.git /tmp/ghidra-mcp \
     && sed -i 's/if parsed.hostname in \["localhost", "127.0.0.1", "::1"\]/if parsed.hostname in ["localhost", "127.0.0.1", "::1", "host.docker.internal"]/' /opt/ghidra_12.0.3_PUBLIC/bridge_mcp_ghidra.py \
     && rm -rf /tmp/ghidra-mcp
 
+# Install GitHub CLI
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update && apt-get install -y gh \
+    && rm -rf /var/lib/apt/lists/*
+
 # Build dasm from source
 RUN git clone https://github.com/dasm-assembler/dasm.git /tmp/dasm \
     && cd /tmp/dasm \
