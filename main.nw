@@ -7682,11 +7682,53 @@ The following HEX chunks fill byte-level gaps between documented
 routines.  They represent undocumented code and data awaiting detailed
 analysis.
 
-<<fill 0D5E>>=
+@ [[IDLE_ANIM_HANDLER]] runs idle processing during the keyboard poll
+loop.  In keyboard mode ([[INPUT_MODE]]=0), it calls [[CALL_ROM_WAIT]]
+to burn time and decrements [[WAIT_LOOP_COUNT]].  When the wait count
+reaches zero, it checks the animation frame via [[ANIM_CHECK_FRAME]],
+ticks the counter, and loops.  In joystick mode, it runs a fixed
+12-iteration countdown via [[DEC_WAIT_IF_NONZERO]].
+
+<<idle anim handler>>=
     ORG     $0D5E
-    HEX     AD 8C 5A F0 0C AD 00 5A D0 10 20 58 0D CE 8C 5A
-    HEX     60 20 36 0D 20 1E 0D 4C 5E 0D A2 0C 20 81 0D CA
-    HEX     D0 FA 60 AD 8C 5A F0 03 CE 8C 5A 60
+IDLE_ANIM_HANDLER:
+    SUBROUTINE IDLE_ANIM_HANDLER
+    ; Idle animation handler called during keyboard polling.
+    ;
+    ; Behavior:
+    ;   Keyboard mode: burns time via CALL_ROM_WAIT, decrements
+    ;   WAIT_LOOP_COUNT.  On expiry, checks frame and loops.
+    ;   Joystick mode: runs 12 iterations of DEC_WAIT_IF_NONZERO.
+    ;
+    ; Clobbers: A, X
+
+    LDA     WAIT_LOOP_COUNT        ; anything to wait for?
+    BEQ     .expired               ; zero -> frame check
+    LDA     INPUT_MODE
+    BNE     .joystick              ; nonzero -> joystick mode
+    ; --- keyboard mode ---
+    JSR     CALL_ROM_WAIT          ; burn time
+    DEC     WAIT_LOOP_COUNT        ; count down
+    RTS
+.expired:
+    JSR     ANIM_CHECK_FRAME       ; check/advance animation frame
+    JSR     TICK_ANIM_COUNTER      ; tick counter, reload wait
+    JMP     IDLE_ANIM_HANDLER      ; loop
+.joystick:
+    LDX     #$0C                   ; 12 iterations
+.joy_loop:
+    JSR     DEC_WAIT_IF_NONZERO    ; decrement if nonzero
+    DEX
+    BNE     .joy_loop
+    RTS
+
+DEC_WAIT_IF_NONZERO:
+    LDA     WAIT_LOOP_COUNT
+    BEQ     .done
+    DEC     WAIT_LOOP_COUNT
+.done:
+    RTS
+@ %def IDLE_ANIM_HANDLER DEC_WAIT_IF_NONZERO
 
 <<fill 4000>>=
     ORG     $4000
@@ -7704,44 +7746,176 @@ analysis.
     HEX     5A 85 BC AD 82 5A 85 BD A0 00 20 D4 70 20 BE 76
     HEX     A9 26 20 1E 76 AC 85 5A B1 E6 85 BC C8 B1 E6 85
     HEX     BD 6C BC 00
-<<fill 755E>>=
+@ [[CHECK_INPUT]] polls the keyboard and joystick for input.
+
+\paragraph{Keyboard mode.}
+Reads [[$C000]]; if a key is pressed, compares it against three 5-byte
+direction key tables (uppercase IJKM+space, lowercase ijkm+CR, and
+control variants).  If matched, returns the direction index (0--4) in~A
+with the N~flag clear.  Unmatched keys clear the strobe and return with
+N~set.
+
+\paragraph{Joystick mode.}
+If [[INPUT_MODE]] is nonzero, first checks the paddle button ([[$C061]]);
+if pressed, returns 0 (fire).  Otherwise reads both paddles via the ROM
+[[PREAD]] routine ([[$FB1E]]), converts each axis to a zone (0=low, 1=center,
+2=high) using the threshold tables at [[JOY_THRESH_LO]]/[[JOY_THRESH_HI]],
+and maps the two zones to a direction index (1=up, 2=down, 3=left, 4=right).
+If both axes are centered, re-checks the paddle button.
+
+<<defines>>=
+JOY_SETTLE_DELAY    EQU     $7AAE   ; paddle settle delay parameter (in config data)
+@ %def JOY_SETTLE_DELAY
+
+<<check input>>=
     ORG     $755E
-    HEX     AD 00 C0 10 2E AA AD 00 5A D0 3B 8A A2 04 DD 82
-    HEX     75 F0 0F DD 87 75 F0 0A DD 8C 75 F0 05 CA 10 EE
-    HEX     30 16 8A 60 A0 C9 CD CA CB 8D E9 ED EA EB 9B 8B
-    HEX     8A 88 95 AD 00 5A D0 0E A9
-<<fill 7598>>=
-    ORG     $7598
-    HEX     8D 10 C0 60 AD 61 C0 10 F5 A9 00 60 20 F7 75 A2
-    HEX     00 20 1E FB AD FE 75 20 06 76 8D FE 75 20 F7 75
-    HEX     A2 01 20 1E FB AD
-<<fill 75BF>>=
-    ORG     $75BF
-    HEX     75 20 06 76 8D
-<<fill 75C5>>=
-    ORG     $75C5
-    HEX     75 C9 01 F0 19 30 0C AD FE 75 C9 01 D0 21 A2 01
-    HEX     4C 80 75 AD FE 75 C9 01 D0 15 A2 02 D0 F2 AD FE
-    HEX     75 C9 01 F0 0A 10 04 A2 04 D0 E5 A2 03 D0 E1 4C
-    HEX     9C 75 AD AE 7A 20 A8 FC 60 01 01 1A 1D 1D 03 03
-    HEX     06 AA 98 4A 4A 4A DD 00 76 B0 0B DD 03 76 B0 03
-    HEX     A9 02 60 A9 01 60 A9 00 60
+CHECK_INPUT:
+    SUBROUTINE CHECK_INPUT
+    ; Poll keyboard/joystick for directional or fire input.
+    ;
+    ; Outputs:
+    ;   A — direction index (0=fire, 1=up, 2=down, 3=left, 4=right)
+    ;       or raw key code for non-direction keys
+    ;   N flag — clear if input available, set if none
+    ; Clobbers: A, X, Y
+
+    ; --- Check keyboard ---
+    LDA     $C000              ; read keyboard register
+    BPL     .no_key            ; no key pressed
+    TAX                        ; save key code
+    LDA     INPUT_MODE
+    BNE     .joy_read          ; joystick mode -> read paddles
+    TXA                        ; restore key code
+    ; --- Match against direction key tables ---
+    LDX     #$04               ; 5 entries (index 4..0)
+.check_keys:
+    CMP     DIR_KEYS_UPPER,X
+    BEQ     .found_dir
+    CMP     DIR_KEYS_LOWER,X
+    BEQ     .found_dir
+    CMP     DIR_KEYS_CTRL,X
+    BEQ     .found_dir
+    DEX
+    BPL     .check_keys
+    BMI     .no_match          ; no direction key matched
+.found_dir:
+    TXA                        ; direction index -> A (N clear)
+    RTS
+
+    ; --- Direction key lookup tables ---
+    ; Index: 0=fire, 1=up, 2=down, 3=left, 4=right
+DIR_KEYS_UPPER:
+    DC.B    $A0,$C9,$CD,$CA,$CB ; space, I, M, J, K
+DIR_KEYS_LOWER:
+    DC.B    $8D,$E9,$ED,$EA,$EB ; CR, i, m, j, k
+DIR_KEYS_CTRL:
+    DC.B    $9B,$8B,$8A,$88,$95 ; ESC, ctrl-K, ctrl-J, ctrl-H, ctrl-U
+
+    ; --- No key ---
+.no_key:
+    LDA     INPUT_MODE
+    BNE     .joy_read          ; joystick mode -> read paddles
+.no_match:
+    LDA     #$FF               ; \ clear keyboard strobe
+    STA     $C010              ; / (A=$FF -> N set = no input)
+    RTS
+.check_button:
+    LDA     $C061              ; read paddle button
+    BPL     .no_match          ; not pressed -> no input
+    LDA     #$00               ; button = fire (index 0, N clear)
+    RTS
+
+    ; --- Joystick axis reading ---
+.joy_read:
+    JSR     JOY_DELAY          ; wait for paddle settle
+    LDX     #$00               ; paddle 0 (horizontal)
+    JSR     $FB1E              ; PREAD: Y = paddle 0 value
+    LDA     JOY_AXIS_X         ; \ map X-axis value to zone
+    JSR     JOY_TO_ZONE        ;  |
+    STA     JOY_AXIS_X         ; / store zone (0/1/2)
+    JSR     JOY_DELAY
+    LDX     #$01               ; paddle 1 (vertical)
+    JSR     $FB1E              ; PREAD: Y = paddle 1 value
+    LDA     JOY_AXIS_Y         ; \ map Y-axis value to zone
+    JSR     JOY_TO_ZONE        ;  |
+    STA     JOY_AXIS_Y         ; / store zone (0/1/2)
+    ; --- Map zones to direction ---
+    CMP     #$01
+    BEQ     .y_center          ; Y center -> check X
+    BMI     .y_low             ; Y low -> up candidate
+    ; Y high (zone 2) -> check X for disambiguation
+    LDA     JOY_AXIS_X
+    CMP     #$01
+    BNE     .no_dir            ; X not center -> ambiguous
+    LDX     #$01               ; X center + Y high = up
+.joy_dir:
+    JMP     .found_dir
+.y_low:
+    LDA     JOY_AXIS_X
+    CMP     #$01
+    BNE     .no_dir            ; X not center -> ambiguous
+    LDX     #$02               ; X center + Y low = down
+    BNE     .joy_dir           ; always -> relay to .found_dir
+.y_center:
+    LDA     JOY_AXIS_X
+    CMP     #$01
+    BEQ     .no_dir            ; both center -> no direction
+    BPL     .x_high
+    LDX     #$04               ; X low + Y center = right
+    BNE     .joy_dir
+.x_high:
+    LDX     #$03               ; X high + Y center = left
+    BNE     .joy_dir
+.no_dir:
+    JMP     .check_button      ; no direction -> check fire button
+
+    ; --- Joystick delay ---
+JOY_DELAY:
+    LDA     JOY_SETTLE_DELAY   ; paddle settle delay
+    JSR     ROM_WAIT
+    RTS
+
+    ; --- Joystick axis threshold data ---
+JOY_AXIS_X:
+    DC.B    $01                ; X-axis zone (runtime storage)
+JOY_AXIS_Y:
+    DC.B    $01                ; Y-axis zone (runtime storage)
+JOY_THRESH_LO:
+    DC.B    $1A,$1D,$1D        ; low thresholds (horiz, vert, vert)
+JOY_THRESH_HI:
+    DC.B    $03,$03,$06        ; high thresholds (horiz, vert, vert)
+
+    ; --- Map paddle value to zone (0=low, 1=center, 2=high) ---
+JOY_TO_ZONE:
+    TAX                        ; save old zone
+    TYA                        ; A = paddle value (from PREAD)
+    LSR                        ; \ divide by 8
+    LSR                        ;  |
+    LSR                        ; /
+    CMP     JOY_THRESH_LO,X   ; above low threshold?
+    BCS     .zone_hi_check     ; yes -> check high
+    CMP     JOY_THRESH_HI,X   ; above high threshold?
+    BCS     .zone_center       ; yes -> center
+    LDA     #$02               ; below both = high zone
+    RTS
+.zone_center:
+    LDA     #$01               ; between thresholds = center
+    RTS
+.zone_hi_check:
+    LDA     #$00               ; above low threshold = low zone
+    RTS
+@ %def CHECK_INPUT DIR_KEYS_UPPER DIR_KEYS_LOWER DIR_KEYS_CTRL JOY_DELAY JOY_AXIS_X JOY_AXIS_Y JOY_THRESH_LO JOY_THRESH_HI JOY_TO_ZONE
 <<fill 793F>>=
     ORG     $793F
-    HEX     AD 02 5A 20 53 10 A0 01 B1 BE C9
-<<fill 794B>>=
-    ORG     $794B
-    HEX     D0 01 60 A0 05 B1 BE 29 7F 91 BE EE 02 5A D0 E4
+    HEX     AD 02 5A 20 53 10 A0 01 B1 BE C9 FF D0 01 60 A0
+    HEX     05 B1 BE 29 7F 91 BE EE 02 5A D0 E4
 <<fill 80E5>>=
     ORG     $80E5
     HEX     80 02 23 C1 04 00 24 C1 04 00 24 09 A4 32 A4 37
     HEX     A4 FC A3 3C A4 24 1F 26 23 C1 05 22 50 06 3F 08
     HEX     25 23 60 10 00 24 25 1F 22 3F 05 50 04 80 02 23
     HEX     C1 04 00 24 81 C8 E7 6D 9D 81 28 EB 6D A8 81 64
-    HEX     EF 6D BB 81 08
-<<fill 812B>>=
-    ORG     $812B
-    HEX     ED ED EF E6 FD ED EF
+    HEX     EF 6D BB 81 08 FF ED ED EF E6 FD ED EF
 <<fill 92A5>>=
     ORG     $92A5
     HEX     4C B4 92
@@ -7752,29 +7926,19 @@ analysis.
     ORG     $A725
     HEX     BD 43 50 D8 00 0E DC 43 50 D9 00 0E BC 44 45 C3
     HEX     00 AA BE 44 45 D8 10 00 CA 44 45 D9 10 00 88 45
-    HEX     4F D2 00
-<<fill A749>>=
-    ORG     $A749
-    HEX     3D 49 4E C3 00 AA DE 49 4E D8 10 00 E8 49 4E D9
-    HEX     10 00 C8 4A 4D D0 01 08 3C 4A 53 D2 00 08 10 4C
-    HEX     44 C1 00
-<<fill A76D>>=
-    ORG     $A76D
-    HEX     9D 4C 44 D8 02 4E 9E 4C 44 D9 00 AE 9C 4C 53 D2
-    HEX     04 AA 3E 4E 4F D0 10 00 EA 4F 52 C1 00
-<<fill A78B>>=
-    ORG     $A78B
-    HEX     FD 50 48 C1 10 00 48 50 48 D0 10 00 08 50 4C C1
-    HEX     10 00 68 50 4C D0 10 00 28 52 4F CC 04 AA 1E 52
-    HEX     4F D2 04 AA 5E 52 54 C9 10 00 40 52 54 D3 10 00
-    HEX     60 53 42 C3 00
+    HEX     4F D2 00 FF 3D 49 4E C3 00 AA DE 49 4E D8 10 00
+    HEX     E8 49 4E D9 10 00 C8 4A 4D D0 01 08 3C 4A 53 D2
+    HEX     00 08 10 4C 44 C1 00 FF 9D 4C 44 D8 02 4E 9E 4C
+    HEX     44 D9 00 AE 9C 4C 53 D2 04 AA 3E 4E 4F D0 10 00
+    HEX     EA 4F 52 C1 00 FF FD 50 48 C1 10 00 48 50 48 D0
+    HEX     10 00 08 50 4C C1 10 00 68 50 4C D0 10 00 28 52
+    HEX     4F CC 04 AA 1E 52 4F D2 04 AA 5E 52 54 C9 10 00
+    HEX     40 52 54 D3 10 00 60 53 42 C3 00
 <<fill A8CE>>=
     ORG     $A8CE
     HEX     00 00 01 00 03 33 33 32 33 13 A5 13 02 15 02 00
     HEX     A3 1C 32 00 4C 14 00 BD C9 00 C0 04 00 3C 80 00
-<<fill A8EF>>=
-    ORG     $A8EF
-    HEX     14 00
+    HEX     FF 14 00
 
 @ \subsection{Equipment and combat data}
 
@@ -8420,6 +8584,7 @@ ANIM_TICK_AND_WAIT:
 
     JSR     TICK_ANIM_COUNTER  ; tick counter, reload wait count
     JSR     TIMED_WAIT         ; burn time
+ANIM_CHECK_FRAME:
     LDA     ANIM_FRAME_CTR     ; did frame counter expire?
     BEQ     .advance           ; yes -> advance animation
     RTS                        ; no -> return
@@ -8430,7 +8595,7 @@ ANIM_TICK_AND_WAIT:
     LDA     ANIM_FRAME_TABLE,X ; look up frame duration
     STA     ANIM_FRAME_CTR     ; reset frame counter
     RTS
-@ %def ANIM_TICK_AND_WAIT
+@ %def ANIM_TICK_AND_WAIT ANIM_CHECK_FRAME
 
 @ [[TIMED_WAIT]] calls the ROM [[WAIT]] wrapper [[CALL_ROM_WAIT]]
 repeatedly, decrementing [[WAIT_LOOP_COUNT]] until it reaches zero.
@@ -9806,8 +9971,8 @@ SCENE_LOOP:
     JSR     LOAD_SCENE_DATA            ; reload scene text from disk
 
 .display:
-    JSR     $A478                      ; keyboard/timing check (relocated block)
-    BCS     .exit                      ; carry set = key pressed
+    JSR     LOAD_SCENE_FROM_DISK       ; load scene text from disk
+    BCS     .exit                      ; carry set = disk error
 
     JSR     DISPLAY_STATUS_BAR         ; refresh status bar
     STOW    SCENE_TEXT_DATA,TEXT_STREAM_PTR ; point at scene data
@@ -20349,8 +20514,8 @@ treasure path.
 
 \paragraph{Special chest (byte~1 = \$D1).}
 This type triggers scene~\$0B, increments the 5-bit counters in both
-field~5 and field~11 (via [[INC_FIELD5_COUNTER]] and
-[[INC_FIELD_COUNTER]]), and then rolls a 1-in-3 chance for a bonus
+field~5 and field~11 (via [[INC_STRENGTH]] and
+[[INC_LEVEL]]), and then rolls a 1-in-3 chance for a bonus
 scene~\$0C (a lucky find).  On the bonus path, the event slot is marked
 empty.
 
@@ -20435,7 +20600,7 @@ PICKUP_TREASURE:
     LDA     TRAP_TYPE
     BAMI    #$01,.trap0            ; trap 0: lose 1-5 HP
     BEQ     .trap1                 ; trap 1: lose 2-9 HP
-    BAEQ    #$02,.trap2            ; trap 2: decrement counter
+    BAEQ    #$02,.trap2            ; trap 2: decrement level
     BNE     .trap3                 ; trap 3: zero gold
 .trap0:
     LDA     #$05
@@ -20454,7 +20619,7 @@ PICKUP_TREASURE:
 .trap2:
     LDY     #MFIELD_LEVEL
     LDA     (ENTITY_PTR),Y        ; char field 11 = level
-    AND     #$1F
+    AND     #LEVEL_MASK            ; isolate level bits 4-0
     BEQ     .after_trap            ; already zero
     LDA     (ENTITY_PTR),Y
     SEC
@@ -20489,8 +20654,8 @@ PICKUP_TREASURE:
 .handle_d1:
     LDA     #$0B
     JSR     SCENE_LOOP             ; show scene $0B
-    JSR     INC_FIELD5_COUNTER     ; inc field 5 counter
-    JSR     INC_FIELD_COUNTER      ; inc field 11 counter
+    JSR     INC_STRENGTH     ; inc field 5 counter
+    JSR     INC_LEVEL      ; inc field 11 counter
     LDA     #$03
     JSR     RANDOM_IN_RANGE        ; random(3)
     BAEQ    #$00,.lucky
@@ -20500,53 +20665,55 @@ PICKUP_TREASURE:
     JSR     SCENE_LOOP             ; show bonus scene $0C
     JMP     .mark_used             ; mark event used
 @ %def PICKUP_TREASURE
-@ \subsection{5-bit field counter increment}
+@ \subsection{Increment strength / level}
 
-[[INC_FIELD5_COUNTER]] and [[INC_FIELD_COUNTER]] increment a 5-bit counter
-packed into the low bits of a character record field.
+[[INC_STRENGTH]] and [[INC_LEVEL]] increment a 5-bit counter
+packed into the low bits of a character record field, capped at~31.
 
 \begin{itemize}
-\item [[INC_FIELD5_COUNTER]] targets field~5 ([[MFIELD_STRENGTH]], the
-  defense/experience counter).
-\item [[INC_FIELD_COUNTER]] targets field~11 ([[MFIELD_LEVEL]], the
-  level counter).
+\item [[INC_STRENGTH]] increments [[MFIELD_STRENGTH]] (byte~5, bits~4--0).
+\item [[INC_LEVEL]] increments [[MFIELD_LEVEL]] (byte~11, bits~4--0).
 \end{itemize}
 
-Both entry points share a common body that isolates the low 5~bits,
-checks whether the value has already reached the maximum of~31, and if
-not, adds~1 to the full byte.  This works correctly because the upper
-bits are preserved by the addition as long as the low field does not
-overflow past~31.
+The upper bits of the byte are preserved because the addition does not
+overflow past the 5-bit boundary (the cap at~31 prevents it).
 
-<<inc field5 counter>>=
+<<inc strength>>=
     ORG     $657B
-INC_FIELD5_COUNTER:
-    SUBROUTINE INC_FIELD5_COUNTER
-    ; Increment a 5-bit counter in a char record field.
+INC_STRENGTH:
+    SUBROUTINE INC_STRENGTH
+    ; Increment a 5-bit counter in a character record field.
     ;
-    ; Entry: INC_FIELD5_COUNTER -- field 5 (MFIELD_STRENGTH)
-    ;        INC_FIELD_COUNTER  -- field 11 (MFIELD_LEVEL)
-    ; Input:  ENTITY_PTR -- current character
-    ; Output: field low 5 bits incremented (capped at 31)
+    ; Entry points:
+    ;   INC_STRENGTH — increments MFIELD_STRENGTH (byte 5)
+    ;   INC_LEVEL    — increments MFIELD_LEVEL (byte 11)
+    ;
+    ; Inputs:
+    ;   ENTITY_PTR — pointer to entity record
+    ;
+    ; Behavior:
+    ;   Isolates bits 4-0, checks if already at max (31),
+    ;   and if not, adds 1 to the full byte (preserving upper bits).
+    ;
     ; Clobbers: A, X, Y
 
-    LDY     #MFIELD_STRENGTH       ; field 5
+    LDY     #MFIELD_STRENGTH       ; byte 5: strength
     JMP     .body
-INC_FIELD_COUNTER:
-    LDY     #MFIELD_LEVEL          ; field 11
+INC_LEVEL:
+    LDY     #MFIELD_LEVEL          ; byte 11: level
 .body:
     LDA     (ENTITY_PTR),Y
-    TAX
-    AND     #$1F                   ; isolate low 5 bits
-    BANE    #$1F,.inc              ; already at max?
+    TAX                            ; save original byte
+    AND     #LEVEL_MASK            ; isolate low 5 bits
+    BANE    #LEVEL_MASK,.inc       ; already at max (31)?
     RTS
 .inc:
     CLC
-    TXA
-    ADC     #$01                   ; increment full byte
+    TXA                            ; restore original byte
+    ADC     #$01                   ; increment (preserves upper bits)
     STA     (ENTITY_PTR),Y
     RTS
-@ %def INC_FIELD5_COUNTER INC_FIELD_COUNTER
+@ %def INC_STRENGTH INC_LEVEL
 @ \subsection{Clear treasure digit fields}
 
 [[CLEAR_TREASURE_DIGITS]] clears the two 5-byte digit fields in the
@@ -21223,24 +21390,26 @@ DISK_RTS:
 
 @ \subsection{Read keyboard}
 
-[[READ_KEYBOARD]] clears the keyboard strobe, calls [[COLROW_TO_POS]]
-(\$0D30) to update the map position, then enters a polling loop.
-It checks [[PRNG_OUTPUT]] (\$5A18) masked with \$7E; if zero, it
-calls the integrity check routine at [[$A4E6]].  Then it steps the
-PRNG, calls an animation delay at [[$755E]], and loops until a
-keypress is detected (BPL on \$C000).  On keypress it clears the
-strobe and returns the key in~A.
+[[READ_KEYBOARD]] polls for a keypress while running idle processing.
+It ticks the animation, steps the PRNG, and periodically verifies
+code integrity (1-in-64 chance per call via [[VERIFY_INTEGRITY]]).
+The main poll loop calls [[$755E]] (undocumented keyboard/joystick
+input handler) and [[$0D5E]] (undocumented idle animation handler)
+each iteration.  On keypress it calls [[$0D36]] (the frame-check
+entry of [[ANIM_TICK_AND_WAIT]]) before returning the key code.
 
 <<read keyboard routine>>=
     ORG     $A44C
 READ_KEYBOARD:
     SUBROUTINE READ_KEYBOARD
-    ; Poll keyboard with idle processing between checks.
+    ; Poll for keyboard input with idle animation processing.
     ;
     ; Behavior:
-    ;   Clears keyboard strobe and updates map display. Periodically
-    ;   verifies code integrity (1-in-64 chance). Steps the PRNG
-    ;   and runs animation delay until a keypress is detected.
+    ;   1. Clears keyboard strobe, ticks animation via ANIM_TICK_AND_WAIT.
+    ;   2. 1-in-64 chance: calls VERIFY_INTEGRITY (PRNG AND $7E == 0).
+    ;   3. Poll loop: steps PRNG, checks keyboard/joystick via $755E.
+    ;      On no input, runs idle handler at $0D5E and loops.
+    ;   4. On keypress: clears strobe, runs frame check, returns key.
     ;
     ; Outputs:
     ;   A — key code (high bit set)
@@ -21248,25 +21417,25 @@ READ_KEYBOARD:
 
     LDA     #$FF
     STA     $C010              ; clear keyboard strobe
-    JSR     $0D30              ; update map position
+    JSR     ANIM_TICK_AND_WAIT ; tick animation + burn time
     LDA     PRNG_OUTPUT
-    AND     #$7E
+    AND     #$7E               ; 1-in-64 chance (bits 6-1 all zero)
     BNE     .display
-    JSR     VERIFY_INTEGRITY
+    JSR     VERIFY_INTEGRITY   ; periodic integrity check
 
 .display:
-    JSR     $0D1E              ; display update
+    JSR     TICK_ANIM_COUNTER  ; tick animation counter
 .poll:
     JSR     STEP_PRNG
-    JSR     $755E              ; animation delay
-    BPL     .got_key           ; key available
-    JSR     $0D5E              ; idle processing
+    JSR     CHECK_INPUT         ; poll keyboard/joystick for input
+    BPL     .got_key           ; key available (N flag clear)
+    JSR     IDLE_ANIM_HANDLER  ; run idle animation
     JMP     .poll
 
 .got_key:
     STA     $C010              ; clear keyboard strobe
     PHA
-    JSR     $0D36              ; post-input processing
+    JSR     ANIM_CHECK_FRAME   ; check frame counter (skip tick/wait)
     PLA
     RTS
 @ %def READ_KEYBOARD
@@ -26423,7 +26592,7 @@ The following root chunks produce the assembly files when tangled.
 <<anim tick and wait>>
 <<timed wait>>
 <<call rom wait>>
-<<fill 0D5E>>
+<<idle anim handler>>
 <<print mob name>>
 <<colrow to pos>>
 <<num to decimal>>
@@ -26550,7 +26719,7 @@ The following root chunks produce the assembly files when tangled.
 <<start game input>>
 <<check threats here>>
 <<pickup treasure>>
-<<inc field5 counter>>
+<<inc strength>>
 <<clear treasure digits>>
 <<clear and display>>
 <<random events>>
@@ -26615,10 +26784,7 @@ The following root chunks produce the assembly files when tangled.
 <<draw blink alt>>
 <<draw blink char>>
 <<check combat eligibility>>
-<<fill 755E>>
-<<fill 7598>>
-<<fill 75BF>>
-<<fill 75C5>>
+<<check input>>
 <<display message>>
 <<scroll status line>>
 <<clear map>>
@@ -26640,7 +26806,6 @@ The following root chunks produce the assembly files when tangled.
 <<init hrcg>>
 <<set text window upper left>>
 <<fill 793F>>
-<<fill 794B>>
 <<tune player>>
 <<tune action indirect>>
 <<tune advance>>
@@ -26660,7 +26825,6 @@ The following root chunks produce the assembly files when tangled.
 <<tune pointer table>>
 <<tune bytecode>>
 <<fill 80E5>>
-<<fill 812B>>
 <<hrcg control prefix>>
 <<duplicate item strings>>
 <<hrcg control tail>>
@@ -26714,12 +26878,8 @@ The following root chunks produce the assembly files when tangled.
 <<fill A6B3>>
 <<entity item tables>>
 <<fill A725>>
-<<fill A749>>
-<<fill A76D>>
-<<fill A78B>>
 <<extended entity data>>
 <<fill A8CE>>
-<<fill A8EF>>
 <<runtime data area>>
 <<disk read field>>
 <<verify data field>>
