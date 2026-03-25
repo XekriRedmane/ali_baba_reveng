@@ -3581,7 +3581,7 @@ region anyway.
 \end{tabular}
 \end{center}
 
-\subsection{Group 2: game data (\$4000--\$95FF)}
+\subsection{Group 2: game data}
 
 \begin{center}
 \begin{tabular}{ccll}
@@ -3598,7 +3598,7 @@ region anyway.
 \end{tabular}
 \end{center}
 
-\subsection{Group 3: main program (\$0800--\$3FFF)}
+\subsection{Group 3: main program}
 
 \begin{center}
 \begin{tabular}{ccll}
@@ -3613,7 +3613,7 @@ region anyway.
 \end{tabular}
 \end{center}
 
-\subsection{DXR decryption (\$4000--\$67FE)}
+\subsection{DXR decryption}
 
 After loading, the VM decrypts every other byte from [[$4000]] to [[$67FE]]
 (5120 iterations, stepping by~2).  The XOR key for each byte comes from
@@ -4027,7 +4027,7 @@ RELOCATE_HIRES_STAGING:
     JMP     .copy
 @ %def RELOCATE_HIRES_STAGING
 
-@ \subsection{Zeroed hi-res page (\$2000--\$3FFF)}
+@ \subsection{Zeroed hi-res page}
 
 After [[RELOCATE_HIRES_STAGING]] copies \$2000--\$32FF to
 \$9600--\$A8FF and \$3300--\$3FFF to \$B300--\$BFFF, it clears
@@ -4588,7 +4588,7 @@ BORDER_POS_TABLE:
     DC.B    $00,$0B,$19       ;  |
     DC.B    $00,$0B,$18       ; /
 @ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE
-\subsection{Border animation handler (\$5B2A)}
+\subsection{Border animation handler}
 
 [[GAME_ACTION_HANDLER]] at [[$5B2A]] is called via [[DISPATCH_VEC]]
 between tune notes.  It animates the game border by cycling through
@@ -7033,7 +7033,7 @@ STATS_DEXT_OUT      EQU     STATS_DEXT-3     ; $7DF0: dexterity output
 STATS_DAGGR_OUT     EQU     STATS_DAGGR-3    ; $7DFC: dagger output
 @ %def STATS_LIFE_OUT STATS_STR_OUT STATS_DUCATS_OUT STATS_SPEED_OUT STATS_SWORD_OUT STATS_WEAP_OUT STATS_DEXT_OUT STATS_DAGGR_OUT
 
-@ \subsection{Game configuration and menu strings (\$7AAC--\$7D82)}
+@ \subsection{Game configuration and menu strings}
 
 The region \$7AAC--\$7D82 contains game configuration variables and
 the complete set of menu option display strings.
@@ -7600,7 +7600,7 @@ DISPLAY_FRAME_DATA:
     HEX     08 00 41 44 C3 00
 @ %def DISPLAY_FRAME_DATA
 
-@ \subsection{Runtime data area (\$A8F2--\$B2FF)}
+@ \subsection{Runtime data area}
 
 The region \$A8F2--\$B2FF is a 2,574-byte runtime data area,
 initialized to mostly zeros in the disk image.  The first 14~bytes
@@ -7776,7 +7776,7 @@ analysis.
     ORG     $A8EF
     HEX     14 00
 
-@ \subsection{Equipment and combat data (\$7EDD--\$80A3)}
+@ \subsection{Equipment and combat data}
 
 This region contains interleaved lookup tables and string data used
 by the shop, combat, and entity display systems.
@@ -7861,7 +7861,7 @@ MAP_OBJECT_NAMES:
 @ %def MAP_OBJECT_NAMES
 
 
-@ \subsection{Duplicate item/combat strings (\$8133--\$82B4)}
+@ \subsection{Duplicate item/combat strings}
 
 The region \$8133--\$82B4 is a second copy of the equipment and combat
 string data, used by the ``See Your Lot'' display and entity
@@ -7941,7 +7941,7 @@ HRCG_CTRL_TAIL:
     HEX     09 81 B1 82 DB FF
 @ %def HRCG_CTRL_TAIL
 
-@ \subsection{HRCG data and border bitmaps (\$82B5--\$83A4)}
+@ \subsection{HRCG data and border bitmaps}
 
 \paragraph{HRCG control continuation (\$82B5--\$82BE).}
 10~bytes of HRCG mode/address control data.
@@ -8564,7 +8564,7 @@ CLAMP_CHAR_FIELD:
     RTS
 @ %def CLAMP_CHAR_FIELD
 
-\subsection{Character selection browsing (\$0AAE--\$0B61)}
+\subsection{Character selection browsing}
 
 These routines implement character selection browsing for the scene event
 menu.  They walk the mob linked list (starting from the head pointer at
@@ -8914,7 +8914,7 @@ RESTORE_ZP_CONTEXT:
 
 \section{Character and location records}
 
-\subsection{Character record pointer (\$1053)}
+\subsection{Character record pointer}
 
 [[GET_CHAR_RECORD]] computes a zero-page pointer to a character's 9-byte
 record in the character table, given a 0-based index in~A.
@@ -9631,7 +9631,7 @@ CHAR_CHARSET        EQU     $80A6
 CHAR_UPPER_LEFT     EQU     $80A8
 @ %def CHAR_LOWER_LEFT CHAR_LOWER_RIGHT CHAR_UPPER_RIGHT CHAR_CHARSET CHAR_UPPER_LEFT
 
-@ \subsection{Plot character (\$5DB0)}
+@ \subsection{Plot character}
 
 [[PLOT_CHAR]] renders a single custom font glyph at a given text
 coordinate.  It stores the character number, column, and row, forces
@@ -9654,7 +9654,7 @@ PLOT_CHAR:
 
 \chapter{Map and Scene}
 
-@ \subsection{Scene setup (\$0A17)}
+@ \subsection{Scene setup}
 
 [[SCENE_SETUP]] places a mob at a random position within the location's
 bounding box, updates the linked list, and draws the character if it is
@@ -9754,7 +9754,7 @@ SCENE_SETUP:
     RTS
 @ %def SCENE_SETUP
 \label{sec:scene_loop}
-@ \subsection{Scene loop (\$6C37)}
+@ \subsection{Scene loop}
 
 [[SCENE_LOOP]] is the main scene display loop, called with the scene
 number in~A.  It loops until the user presses a key or all scene
@@ -9834,7 +9834,7 @@ SCENE_LOOP:
     JSR     DISPLAY_MESSAGE            ; "breaks free" message
     JMP     .done
 @ %def SCENE_LOOP
-@ \subsection{Load scene data (\$6DD8)}
+@ \subsection{Load scene data}
 
 [[LOAD_SCENE_DATA]] reads scene data from disk into the \$5C00 region.
 It asserts the disk motor on, sets the IOB track field, dispatches RWTS,
@@ -9873,7 +9873,7 @@ INTEGRITY_FAIL_ADDR:
     STA     $9AA6,Y                 ; fill into message area
     RTS
 @ %def SCENE_LOADER_START LOAD_SCENE_DATA INTEGRITY_FAIL_ADDR
-@ \subsection{Load map tiles (\$746C)}
+@ \subsection{Load map tiles}
 
 [[LOAD_MAP_TILES]] extracts the 2-bit style index from bits~7--6 of
 [[LOCATION_STYLE]] and uses it to look up three tile characters from
@@ -9918,7 +9918,7 @@ LOAD_MAP_TILES:
     RTS
 @ %def LOAD_MAP_TILES
 
-@ \subsection{Setup scene display (\$0901)}
+@ \subsection{Setup scene display}
 
 [[SETUP_SCENE_DISPLAY]] prepares the display for a character's scene turn.
 If [[CHAR_AI_MODE]] is nonzero (AI-controlled), sets [[AI_WAIT_FLAG]] to
@@ -9957,7 +9957,7 @@ SETUP_SCENE_DISPLAY:
     STA     WAIT_LOOP_COUNT         ; store final wait count
     JMP     TIMED_WAIT              ; wait and return
 @ %def SETUP_SCENE_DISPLAY
-@ \subsection{Enter location (\$72A7)}
+@ \subsection{Enter location}
 
 [[ENTER_LOCATION]] sets up the viewport when the player enters a new
 location.  If [[CHAR_PTR]] low byte matches [[LOCATION_POS]], the
@@ -10052,7 +10052,7 @@ ENTER_LOCATION:
 .skip_entities:
     RTS
 @ %def ENTER_LOCATION
-@ \subsection{Check at boundary (\$0BFA)}
+@ \subsection{Check at boundary}
 
 [[CHECK_AT_BOUNDARY]] tests whether [[LOCATION_ID]] lies on any viewport
 edge.  Converts the position to column/row, compares against all four
@@ -10086,7 +10086,7 @@ CHECK_AT_BOUNDARY:
     STOW2    $0001,DATA_PTR        ; boundary: result = 1
     RTS
 @ %def CHECK_AT_BOUNDARY
-@ \subsection{Fill map (\$743B)}
+@ \subsection{Fill map}
 
 [[FILL_MAP]] fills the entire $20\times10$ map grid with [[MAP_FILL_CHAR]].
 It renders the glyph once via [[RENDER_FONT_CHAR]] to build the HRCG
@@ -10122,7 +10122,7 @@ FILL_MAP:
     JSR     PRINT_STRING            ; stamp pre-built glyph
     JMP     .loop
 @ %def FILL_MAP
-@ \subsection{Clear map (\$76B0)}
+@ \subsection{Clear map}
 
 [[CLEAR_MAP]] loads bytes~0--1 of the record at [[CHAR_PTR]] (the name
 string pointer) into [[PRINT_STRING_ADDR]] and tail-calls
@@ -10135,7 +10135,7 @@ CLEAR_MAP:
     LDWIY    CHAR_PTR,#$00,PRINT_STRING_ADDR ; bytes 0-1: name ptr -> PRINT_STRING_ADDR
     JMP     SETUP_TEXT_POS
 @ %def CLEAR_MAP
-@ \subsection{Draw map column (\$7323)}
+@ \subsection{Draw map column}
 
 [[DRAW_MAP_COL]] draws a single map cell at [[FONT_COL]]/[[FONT_ROW]].
 Computes the linear position inline (col + row $\times$ [[MAP_WIDTH]])
@@ -10167,7 +10167,7 @@ DRAW_MAP_COL:
     JSR     RENDER_FONT_CHAR       ; draw it
     RTS
 @ %def DRAW_MAP_COL
-@ \subsection{Draw map entities (\$733B)}
+@ \subsection{Draw map entities}
 
 [[DRAW_MAP_ENTITIES]] overlays entity icons on the map.  Three phases:
 
@@ -10298,7 +10298,7 @@ DRAW_MAP_ENTITIES:
     BNE     .mob_loop
     RTS
 @ %def DRAW_MAP_ENTITIES
-@ \subsection{Draw map icon (\$740B)}
+@ \subsection{Draw map icon}
 
 [[DRAW_MAP_ICON_B]] renders an entity icon, flashes it briefly with the
 blink alternate frame, waits for [[BLINK_DELAY]] ticks, restores the
@@ -10335,7 +10335,7 @@ DRAW_MAP_ICON_B:
     STOB    #MAP_WIDTH,BLINK_COL   ; disable blink cursor (sentinel = 20)
     RTS
 @ %def DRAW_MAP_ICON_B
-@ \subsection{RWTS command dispatch (\$6C12--\$6C35)}
+@ \subsection{RWTS command dispatch}
 
 [[DISK_READ]] and [[DISK_WRITE]] are thin wrappers that set the RWTS
 command code (IOB+\$0C: 1=read, 2=write) and fall through to
@@ -10626,7 +10626,7 @@ CHARS_PER_FONT_PAGE EQU     $18     ; custom font chars per HRCG charset page (9
 GLYPH_BASE          EQU     $20     ; first glyph code in any HRCG charset (ASCII space)
 @ %def HRCG_CHARSET1_SEL CHARS_PER_FONT_PAGE GLYPH_BASE
 
-@ \subsection{Render font character (\$7489)}
+@ \subsection{Render font character}
 
 [[RENDER_FONT_CHAR]] draws one $2\times2$ custom-font character on the
 hi-res screen.
@@ -10721,7 +10721,7 @@ PRINT_FONTCHAR_AT_TEXT_POS:
     STOW    s_PRINT_FONT_CHAR,PRINT_STRING_ADDR ; aim string ptr at control string
     JMP     PRINT_STRING                ; HRCG renders the 2x2 block
 @ %def RENDER_FONT_CHAR PRINT_FONTCHAR_AT_TEXT_POS
-@ \subsection{Font position to text position (\$7723)}
+@ \subsection{Font position to text position}
 
 [[FONT_POS_TO_TEXT_POS]] converts a logical font position ([[FONT_COL]],
 [[FONT_ROW]]) to HRCG text cursor coordinates.  Each custom font character
@@ -10748,7 +10748,7 @@ FONT_POS_TO_TEXT_POS:
     STA     TEXT_ROW             ; store HRCG cursor row
     RTS
 @ %def FONT_POS_TO_TEXT_POS
-@ \subsection{Find entity at position (\$0B62)}
+@ \subsection{Find entity at position}
 
 [[FIND_ENTITY_AT_POS]] searches for the entity (mob or player character)
 occupying a given map position.
@@ -10886,7 +10886,7 @@ FIND_ENTITY_AT_POS:
     STA     .load1+2                   ; /
     RTS
 @ %def FIND_ENTITY_AT_POS
-@ \subsection{Draw character at position (\$1156)}
+@ \subsection{Draw character at position}
 
 [[DRAW_CHAR_AT_POS]] converts a map position to a font cursor location,
 resolves the occupying entity, and renders its font character.
@@ -10911,7 +10911,7 @@ DRAW_CHAR_AT_POS:
     JSR     GET_ENTITY_FONTCHAR ; entity data -> font char number
     JMP     RENDER_FONT_CHAR    ; tail-call: render and return
 @ %def DRAW_CHAR_AT_POS
-@ \subsection{Draw blink alternate (\$74CB)}
+@ \subsection{Draw blink alternate}
 
 [[DRAW_BLINK_ALT]] temporarily swaps [[BLINK_CHAR]] for the alternate
 character [[BLINK_ALT_CHAR]], draws it via [[DRAW_BLINK_CHAR]], then
@@ -10936,7 +10936,7 @@ DRAW_BLINK_ALT:
     PULB    BLINK_CHAR              ; restore sprite char
     RTS
 @ %def DRAW_BLINK_ALT
-@ \subsection{Draw blink character (\$74DD)}
+@ \subsection{Draw blink character}
 
 [[DRAW_BLINK_NORMAL]] sets normal video mode via [[PRINT_CTRL_N]], then
 falls through into [[DRAW_BLINK_CHAR]].  Called by [[ANIM_TICK_AND_WAIT]]
@@ -10979,7 +10979,7 @@ DRAW_BLINK_CHAR:
     PULW    PRINT_STRING_ADDR       ; restore caller's string pointer
     RTS
 @ %def DRAW_BLINK_NORMAL DRAW_BLINK_CHAR
-@ \subsection{Set blink target (\$16A3)}
+@ \subsection{Set blink target}
 
 [[SET_BLINK_TARGET]] loads [[BLINK_COL]], [[BLINK_ROW]], and [[BLINK_CHAR]]
 from the current combatant so the blink cursor tracks the active entity.
@@ -14077,7 +14077,7 @@ CONFIGURE_INPUT:
     RTS
 @ %def CONFIGURE_INPUT
 
-\subsection{Menu handler routines (\$6101--\$62E4)}
+\subsection{Menu handler routines}
 
 The main game menu at [[GAME_INPUT_TABLE]] dispatches to sub-menus and
 actions throughout the \$6101--\$62E4 region.  Each sub-menu has a
@@ -14416,7 +14416,7 @@ SAVE_LOAD_TABLE:
     DC.W    SLOT_DEC_ENTER
 @ %def SAVE_LOAD_TABLE
 
-@ \subsection{Save/load slot routines (\$62EC--\$633F)}
+@ \subsection{Save/load slot routines}
 
 [[SAVE_LOAD_INIT]] is the initialization callback for the save/load menu
 ([[SAVE_LOAD_TABLE]]).  It calls [[FORMAT_SLOT_NUMBER]] to display the
@@ -14505,7 +14505,7 @@ FORMAT_SLOT_NUMBER:
     RTS
 @ %def SLOT_INC SLOT_DEC SLOT_UPDATE SLOT_INC_ENTER SLOT_DEC_ENTER FORMAT_SLOT_NUMBER
 
-@ \subsection{Save game slot menu (\$6340--\$637E)}
+@ \subsection{Save game slot menu}
 
 The save game slot menu is entered from the ``SAVE GAME'' option in the
 game settings menu.  It presents four options:
@@ -14561,7 +14561,7 @@ SLOT_INC_REENTER:
     JMP     ENTER_SAVE_GAME_SLOT
 @ %def ENTER_SAVE_GAME_SLOT SLOT_DEC_REENTER SLOT_INC_REENTER
 
-@ \subsection{Scenario disk menu (\$637F--\$63A7)}
+@ \subsection{Scenario disk menu}
 
 The scenario disk menu presents three options for managing save game
 disks.  It is invoked from event script~59 (ROY G.~BIV):
@@ -14601,7 +14601,7 @@ ENTER_SCENARIO_DISK:
     JMP     INPUT_LOOP
 @ %def ENTER_SCENARIO_DISK
 
-@ \subsection{Character selection menu (\$63A8--\$6457)}
+@ \subsection{Character selection menu}
 
 The character selection menu is used when the player is asked to choose
 a character---for example, when an NPC offers to join the party (``ADD
@@ -14740,7 +14740,7 @@ CHAR_SELECT_HOME:
     JMP     ENTER_CHAR_SELECT
 @ %def ENTER_CHAR_SELECT CHAR_SELECT_INIT CHAR_SELECT_NEXT CHAR_SELECT_PREV CHAR_SELECT_HERE CHAR_SELECT_HOME
 
-@ \subsection{Alternative input table (\$6436--\$6457)}
+@ \subsection{Alternative input table}
 
 The alternative input table is used by [[START_GAME_INPUT]] for shop
 interactions and special scenes.  It has three options: ``PAY [amount]
@@ -14790,7 +14790,7 @@ START_GAME_INPUT:
 
 @ \section{Save/Load Disk I/O}
 
-\subsection{Disk I/O data (\$7AC5--\$7ACF)}
+\subsection{Disk I/O data}
 
 The save/load system uses a block of configuration data in the menu
 option strings area.  [[GAME_DISK_SLOTS]] determines how many save
@@ -14817,7 +14817,7 @@ DISK_SIGNATURE      EQU     $7ACC   ; 3-byte "ALI" signature (high ASCII)
 SHUFFLE_COUNT       EQU     $7ACF   ; entity shuffle iterations (100)
 @ %def GAME_DISK_SLOTS SAVE_TRACK_BASE SAVE_SECTOR_COUNT GAME_SIG_TRACK GAME_SIG_SECTOR DISK_SIGNATURE SHUFFLE_COUNT
 
-@ \subsection{Continue game handler (\$69C8--\$69FC)}
+@ \subsection{Continue game handler}
 
 [[CONTINUE_GAME]] is the handler for the ``CONTINUE'' option in the
 save/load menu ([[SAVE_LOAD_TABLE]]).
@@ -14874,7 +14874,7 @@ CONTINUE_GAME:
     JMP     INIT_WORLD         ; back to save/load menu
 @ %def CONTINUE_GAME
 
-@ \subsection{Shuffle entities (\$69FD--\$6A46)}
+@ \subsection{Shuffle entities}
 
 [[SHUFFLE_ENTITIES]] randomly reorders the entity linked list by
 performing [[SHUFFLE_COUNT]] (100) iterations of a pick-and-relink
@@ -14946,7 +14946,7 @@ SHUFFLE_ENTITIES:
     JMP     SHUFFLE_ENTITIES   ; next iteration
 @ %def SHUFFLE_ENTITIES
 
-@ \subsection{Save game handler (\$6A47--\$6A6D)}
+@ \subsection{Save game handler}
 
 [[SAVE_GAME]] is the handler for the ``SAVE GAME IN SLOT NUMBER NN''
 option in the save game slot menu.
@@ -15000,7 +15000,7 @@ SAVE_GAME:
     JMP     ENTER_SCENARIO_DISK
 @ %def SAVE_GAME
 
-@ \subsection{Scenario disk handlers (\$6A6E--\$6AB6)}
+@ \subsection{Scenario disk handlers}
 
 [[CANCEL_SCENARIO]] cancels the scenario disk menu and returns to
 [[MOVE_LOOP]] after verifying the game disk.
@@ -15087,7 +15087,7 @@ DISPLAY_INSERT_MSG:
     JMP     DISPLAY_MESSAGE
 @ %def CANCEL_SCENARIO SCENARIO_INSERT_PROMPT FORMAT_SCENARIO_DISK USE_SCENARIO_DISK DISPLAY_INSERT_MSG
 
-@ \subsection{Game disk verification (\$6ABF--\$6AE0)}
+@ \subsection{Game disk verification}
 
 [[ENSURE_GAME_DISK]] loops until the game disk is detected.  It calls
 [[VERIFY_GAME_DISK]] and if carry is set (wrong disk), displays the
@@ -15124,7 +15124,7 @@ WAIT_KEYPRESS:
     RTS
 @ %def ENSURE_GAME_DISK PROMPT_INSERT_DISK WAIT_KEYPRESS
 
-@ \subsection{Disk format and signature (\$6AE1--\$6B26)}
+@ \subsection{Disk format and signature}
 
 [[FORMAT_DISK_TRACK]] issues an RWTS format command (command~4) for
 track~\$04 with 12~sectors.
@@ -15211,7 +15211,7 @@ VERIFY_DISK_SIGNATURE:
     RTS
 @ %def FORMAT_DISK_TRACK WRITE_DISK_SIGNATURE VERIFY_DISK_SIGNATURE
 
-@ \subsection{IOB setup and game disk check (\$6B27--\$6B71)}
+@ \subsection{IOB setup and game disk check}
 
 [[SETUP_DATA_IOB]] configures the RWTS IOB for a single-sector
 operation with the data buffer at [[SCENE_TEXT_DATA]] (\$5C00).
@@ -15280,7 +15280,7 @@ VERIFY_GAME_DISK:
     RTS
 @ %def SETUP_DATA_IOB VERIFY_GAME_DISK
 
-@ \subsection{Write game data (\$6B72--\$6B93)}
+@ \subsection{Write game data}
 
 [[WRITE_GAME_DATA]] writes [[SAVE_SECTOR_COUNT]] (26) sectors of game
 state from the \$4000 buffer to disk.  It calls [[SETUP_SLOT_IOB]] to
@@ -15323,7 +15323,7 @@ WRITE_GAME_DATA:
     RTS
 @ %def WRITE_GAME_DATA
 
-@ \subsection{Read game data and IOB helpers (\$6B95--\$6C11)}
+@ \subsection{Read game data and IOB helpers}
 
 [[READ_GAME_DATA]] reads [[SAVE_SECTOR_COUNT]] (26) sectors of save
 data from disk into the \$4000 buffer.  On persistent failure, it
@@ -16074,7 +16074,7 @@ START_COMBAT:
     JMP     RESOLVE_ATTACK          ; perform attack resolution
 @ %def START_COMBAT
 
-@ \subsection{Attack direction handlers (\$14D8--\$14E9)}
+@ \subsection{Attack direction handlers}
 
 The attack direction menu ([[ATTACK_DIR_TABLE]]) has four direction
 handlers that adjust [[CURRENT_COL]] or [[CURRENT_ROW]] by~$\pm$1,
@@ -16107,7 +16107,7 @@ ATTACK_DOWN:
     INC     CURRENT_ROW        ; fall through to FIND_ATTACK_TARGET
 @ %def ATTACK_RIGHT ATTACK_LEFT ATTACK_UP ATTACK_DOWN
 
-@ \subsection{Find attack target (\$14EA--\$1536)}
+@ \subsection{Find attack target}
 
 [[FIND_ATTACK_TARGET]] converts [[CURRENT_COL]]/[[CURRENT_ROW]] to a
 map position via [[COLROW_TO_POS]], then calls [[FIND_ENTITY_AT_POS]]
@@ -16175,7 +16175,7 @@ FIND_ATTACK_TARGET:
     JMP     MENU_ATTACK_TARGET ; present target selection menu
 @ %def FIND_ATTACK_TARGET
 
-@ \subsection{Init attack target display (\$1537--\$155D)}
+@ \subsection{Init attack target display}
 
 [[INIT_ATTACK_DISPLAY]] is the initialization callback for the attack
 target menu ([[ATTACK_TARGET_TABLE]]).  It reads the target's name
@@ -16221,7 +16221,7 @@ INIT_ATTACK_DISPLAY:
     RTS
 @ %def INIT_ATTACK_DISPLAY
 
-@ \subsection{Someone else handler and attack eligibility (\$155E--\$15AA)}
+@ \subsection{Someone else handler and attack eligibility}
 
 [[SELECT_SOMEONE_ELSE]] is the handler for the ``SOMEONE ELSE'' option
 in the attack target menu.  It calls [[NEXT_COLOCATED_MOB]] to advance
@@ -16321,7 +16321,7 @@ NEXT_COLOCATED_MOB:
     RTS
 @ %def SELECT_SOMEONE_ELSE CHECK_ATTACK_ELIGIBLE NEXT_COLOCATED_MOB
 
-@ \subsection{Combat willingness and attack resolution (\$15AB)}
+@ \subsection{Combat willingness and attack resolution}
 
 [[RESOLVE_ATTACK]] determines whether an entity commits to an attack
 or hesitates.  Player characters always attack; AI entities compute a
@@ -16534,7 +16534,7 @@ RESOLVE_ATTACK:
 .mob_attack:
     JMP     MOB_ATTACK
 @ %def RESOLVE_ATTACK
-@ \subsection{Player attack resolution (\$1751)}
+@ \subsection{Player attack resolution}
 
 [[PLAYER_ATTACK]] resolves an attack initiated by the player character.
 The routine computes combat strength, classifies the target, and then
@@ -16697,7 +16697,7 @@ PLAYER_ATTACK:
     LDA     #MSG_HEAVY_ROCK        ; "a heavy piece of rock"
     JMP     DISPLAY_MESSAGE
 @ %def PLAYER_ATTACK
-@ \subsection{Mob attack resolution (\$1860)}
+@ \subsection{Mob attack resolution}
 
 [[MOB_ATTACK]] resolves an attack from a mob against the current
 character.  The overall structure mirrors [[PLAYER_ATTACK]]: compute
@@ -16811,7 +16811,7 @@ MOB_ATTACK:
     LDA     COMBAT_STRENGTH
     JMP     COPY_F4_TO_F6_AND_SET  ; apply partial damage
 @ %def MOB_ATTACK
-@ \subsection{Damage application (\$106F)}
+@ \subsection{Damage application}
 
 [[APPLY_DAMAGE]] is the central damage-resolution routine.  It takes
 a damage amount in~A and the target record pointer in [[EFFECT_REC]].
@@ -17146,7 +17146,7 @@ HANDLE_ENCOUNTER:
     LDA     #$01
     JMP     APPLY_DAMAGE_TO_CURRENT
 @ %def HANDLE_ENCOUNTER
-@ \subsection{Mob movement encounter (\$1E5A)}
+@ \subsection{Mob movement encounter}
 
 [[HANDLE_MOB_ENCOUNTER]] resolves what happens when a character's
 movement brings it into contact with another entity.
@@ -17506,7 +17506,7 @@ returns 1 (attack ready), the caller uses these to load the target.
 <<defines>>=
 TARGET_PTR      EQU     $5A86   ; selected combat target pointer (2 bytes)
 @ %def TARGET_PTR
-@ \subsection{Entity threat evaluation (\$1979)}
+@ \subsection{Entity threat evaluation}
 
 [[GET_ENTITY_THREAT]] evaluates the threat level of the mob at
 [[MOB_PTR]] relative to the current entity at [[ENTITY_PTR]].
@@ -19036,7 +19036,7 @@ ADD_PRICE_COMPONENT:
     RTS
 @ %def ADD_PRICE_COMPONENT
 
-@ \subsection{Shop buy effects (\$720B--\$7248)}
+@ \subsection{Shop buy effects}
 
 When a player buys an item, the buy handler at [[$71AC]] dispatches
 through a function pointer in the shop data.  Five entry points
@@ -19106,7 +19106,7 @@ APPLY_SHOP_EFFECT:
     JMP     BROWSE_HANDLER     ; return to browse handler
 @ %def SHOP_BUY_EFFECT_0 SHOP_BUY_EFFECT_1 SHOP_BUY_EFFECT_2 SHOP_BUY_EFFECT_3 SHOP_BUY_EFFECT_4 APPLY_SHOP_EFFECT
 
-@ \subsection{XP award (\$7249--\$72A6)}
+@ \subsection{XP award}
 
 Five entry points (indexed 0--4) award experience points after combat
 actions.  Each sets X to the action type and falls through to the
@@ -19878,7 +19878,7 @@ SCAN_AND_REORDER:
     JMP     REORDER_CHAR
 @ %def SCAN_AND_REORDER
 
-@ \subsection{Flush pending XP (\$6EE9--\$6F16)}
+@ \subsection{Flush pending XP}
 
 [[FLUSH_PENDING_XP]] extracts the pending XP field from byte~8 of the
 entity record at [[ENTITY_PTR]] and adds it to the level in byte~11.
@@ -19939,7 +19939,7 @@ FLUSH_PENDING_XP:
     JMP     MOVE_LOOP
 @ %def FLUSH_PENDING_XP
 
-@ \subsection{Drop gold system (\$6F17--\$704C)}
+@ \subsection{Drop gold system}
 
 The drop gold system uses a binary search algorithm to let the player
 choose how much gold to drop.  Four variables track the state:
@@ -20165,7 +20165,7 @@ DROP_GOLD_EXEC:
     JMP     MOVE_LOOP
 @ %def DROP_GOLD_EXEC
 
-@ \subsection{Arithmetic helpers (\$7005--\$704C)}
+@ \subsection{Arithmetic helpers}
 
 [[FIND_MSB]] returns in~X the mask of the most significant set bit
 in~A.  It starts with X=\$80 (bit~7) and shifts A left through carry;
@@ -20243,7 +20243,7 @@ HALVE_STEP:
 
 \section{Turn events}
 
-@ \subsection{Scene event trigger (\$1D04)}
+@ \subsection{Scene event trigger}
 
 [[TRIGGER_SCENE_EVENT]] handles events in the \$D2--\$D4 range of the
 encounter dispatch table.  It clears the character's turn state, commits
@@ -20309,7 +20309,7 @@ TRIGGER_SCENE_EVENT:
     ADC     #$01                    ; 1-3
     JMP     APPLY_DAMAGE_TO_CURRENT ; apply damage to char
 @ %def TRIGGER_SCENE_EVENT
-@ \subsection{Treasure pickup (\$646B)}
+@ \subsection{Treasure pickup}
 
 [[PICKUP_TREASURE]] handles the interaction when a character steps onto a
 treasure event.  It clears the character's turn state, copies the event
@@ -20500,7 +20500,7 @@ PICKUP_TREASURE:
     JSR     SCENE_LOOP             ; show bonus scene $0C
     JMP     .mark_used             ; mark event used
 @ %def PICKUP_TREASURE
-@ \subsection{5-bit field counter increment (\$657B)}
+@ \subsection{5-bit field counter increment}
 
 [[INC_FIELD5_COUNTER]] and [[INC_FIELD_COUNTER]] increment a 5-bit counter
 packed into the low bits of a character record field.
@@ -20547,7 +20547,7 @@ INC_FIELD_COUNTER:
     STA     (ENTITY_PTR),Y
     RTS
 @ %def INC_FIELD5_COUNTER INC_FIELD_COUNTER
-@ \subsection{Clear treasure digit fields (\$6593)}
+@ \subsection{Clear treasure digit fields}
 
 [[CLEAR_TREASURE_DIGITS]] clears the two 5-byte digit fields in the
 treasure pickup message strings: the quantity area in [[S_REVEAL_GOLD]]
@@ -20581,7 +20581,7 @@ CLEAR_TREASURE_DIGITS:
     BPL     .loop
     RTS
 @ %def CLEAR_TREASURE_DIGITS
-@ \subsection{Clear and display message (\$65A1)}
+@ \subsection{Clear and display message}
 
 [[CLEAR_AND_DISPLAY]] zeroes the message line counter at~\$5A57 and
 tail-calls [[DISPLAY_MESSAGE_LOOP]].  Clearing the counter ensures the
@@ -20604,7 +20604,7 @@ CLEAR_AND_DISPLAY:
     STOB    #$00,MSG_LINE_COUNT    ; reset line counter
     JMP     DISPLAY_MESSAGE_LOOP   ; display message
 @ %def CLEAR_AND_DISPLAY
-@ \subsection{Event list update (\$1260)}
+@ \subsection{Event list update}
 
 [[UPDATE_EVENT_LIST]] inserts or updates a 3-byte event entry in the
 character's event list.  It takes a map position in~A and a value in
@@ -20713,7 +20713,7 @@ UPDATE_EVENT_LIST:
 .no_carry:
     JMP     .scan
 @ %def UPDATE_EVENT_LIST
-@ \subsection{Leave-area check (\$1231)}
+@ \subsection{Leave-area check}
 
 [[CHECK_CAN_LEAVE]] uses the PRNG to determine whether a character can
 leave an area.
@@ -21197,7 +21197,7 @@ The following routines reside in the relocated block (\$9600--\$A8FF,
 originally staged at \$2000--\$32FF).  They provide keyboard input,
 scene data loading, disk checkpointing, and integrity checking.
 
-\subsection{Tune stubs and keyboard dispatch (\$A440--\$A44B)}
+\subsection{Tune stubs and keyboard dispatch}
 
 [[TUNE_STUB_BIT]] is a short entry point that tests bit~\$A2 (a ZP
 flag), loads A=\$0A, and jumps to the tune player at [[$A4BE]].
@@ -21221,7 +21221,7 @@ DISK_RTS:
     RTS
 @ %def TUNE_END_MARKER LOAD_SCENE_DISK_ENTRY DISK_READ_JUMP DISK_RTS
 
-@ \subsection{Read keyboard (\$A44C--\$A477)}
+@ \subsection{Read keyboard}
 
 [[READ_KEYBOARD]] clears the keyboard strobe, calls [[COLROW_TO_POS]]
 (\$0D30) to update the map position, then enters a polling loop.
@@ -21271,7 +21271,7 @@ READ_KEYBOARD:
     RTS
 @ %def READ_KEYBOARD
 
-@ \subsection{Load scene data from disk (\$A478--\$A4BD)}
+@ \subsection{Load scene data from disk}
 
 [[$A478]] loads scene data from the game disk.  It sets up the RWTS
 IOB for a buffer at [[SCENE_TEXT_DATA]] (\$5C00), calculates the
@@ -21340,7 +21340,7 @@ LOAD_SCENE_FROM_DISK:
     RTS
 @ %def LOAD_SCENE_FROM_DISK
 
-@ \subsection{Tune player dispatch (\$A4BE--\$A4E1)}
+@ \subsection{Tune player dispatch}
 
 [[$A4BE]] sets up the RWTS IOB with the given track (X) and sector (A),
 buffer at \$A400, then reads from disk with retries.  On persistent
@@ -21386,7 +21386,7 @@ SETUP_AND_READ_DISK:
     JMP     COLD_RESTART       ; fatal: disk read failure
 @ %def SETUP_AND_READ_DISK
 
-@ \subsection{Integrity verification (\$A4E2--\$A56E)}
+@ \subsection{Integrity verification}
 
 <<zero page defines>>=
 CKSUM_START             EQU     $BA     ; checksum range start pointer (2 bytes, aliased)
@@ -21533,7 +21533,7 @@ COMPUTE_CHECKSUM:
     RTS
 @ %def INTEGRITY_DATA VERIFY_INTEGRITY VERIFY_DISK_IO CKSUM_ACC COMPUTE_CHECKSUM
 
-@ \subsection{Cold restart error handler (\$A56F--\$A58F)}
+@ \subsection{Cold restart error handler}
 
 <<zero page defines>>=
 CLEAR_PTR               EQU     $BE     ; memory-clear pointer (2 bytes, aliased)
@@ -21583,7 +21583,7 @@ COLD_RESTART:
     JMP     DISK_BOOT_ROM      ; reboot from Disk II
 @ %def COLD_RESTART
 
-@ \subsection{Pointer advance helpers (\$A590--\$A5BB)}
+@ \subsection{Pointer advance helpers}
 
 These are small utility routines for advancing pointers and comparing
 against end-of-range boundaries.  They duplicate logic from
@@ -21897,7 +21897,7 @@ The soft-switch reads at [[$C050]]--[[$C057]] configure the Apple II display:
 [[GR]], full-screen (no split text), page 1, hi-res. This puts the display
 into HGR mode showing the framebuffer at [[$2000]]--[[$3FFF]].
 
-\subsection{Sound and settings routines (\$0984--\$09F3)}
+\subsection{Sound and settings routines}
 
 <<defines>>=
 S_SOUND_CHAR1       EQU     $7B0F   ; 'N'/'F' position in "SOUND IS ON/OFF" label
@@ -23523,7 +23523,7 @@ during boot, and remains at these addresses throughout the game.
 
 \input{mob_font_data}
 
-\section{Mob data records (\$4C80--\$547F)}
+\section{Mob data records}
 
 Each record is 16~bytes.  [[GET_MOB_DATA]] indexes into the table
 via the base pointer at [[$4000/$4001]].
@@ -25866,7 +25866,7 @@ MOB_DATA_TABLE:
 @ %def MOB_DATA_TABLE
 
 
-@ \section{Mob name strings (\$5480--\$59C8)}
+@ \section{Mob name strings}
 
 128 length-prefixed high-ASCII name strings, one per mob record.
 The name pointer in bytes 0--1 of each mob record points into
@@ -26132,7 +26132,7 @@ s_BULL:
     APSTR "BULL"
 @ %def s_ALI_BABA s_SCHEHERAZADE s_HAROUD_EL_LARGE s_BAIRAM_MEDIO s_ABOU_HASSAN s_LUTHIEN s_HUAN s_CELEGORM s_CURUFIN s_ELDO s_MERRYWATER s_STILBO s_CINDER s_JATTE s_THORA s_OG s_ULVA s_COGIA_HOUSSAIN s_OMAR s_MAHMUD s_ABUL_FATH s_IBRAHIM s_JALAL_UD_DIN s_SALAMAN s_ABSAL s_JAMI s_NIZAM_UL_MULK s_ALP_ARSLAN s_MALIK s_TOGHRUL_BEG s_MOWAFFAK s_ABD_US_SAMAD s_HAKIM s_HASAN_BEN_SABBAH s_ALI s_KHORASSAN s_KHWAJAH_NIZAMI s_HAFIZ s_JELALUDDIN s_KWADRACH s_ATTAR s_PEHLEVI s_JAMSHYD s_IRAM s_KAIKOBAD s_KAIKHOSRU s_RUSTUM s_HATIM_TAI s_BAHRAM s_DINARZADE s_SHAHZENAN s_DOUBAN s_FEROZE s_AHMED s_PERIE_BANOU s_HAROUN_AL_RASCHID s_CODADAD s_MORGIANA s_ABDALLA s_ENCHANTED_STATUE s_TAN_RAT s_GRAY_RAT s_SULTAN_SHAHRIAR s_PRINCESS_BUDDIR s_SULTANS_RIGHT_GUARD s_SULTANS_LEFT_GUARD s_TIGER s_WITLESS_ZOMBIE s_SMALL_ZOMBIE s_BIG_ZOMBIE s_CALICO_RAT s_HOOT_OWL s_MOUNTAIN_SCORPION s_UNICORN sm_LEO sm_SCORPIUS s_STATUE_OF_TAURUS s_ARIES_THE_RAM s_CANCER_THE_CRAB s_WEREJACKAL s_CAVEBEAR s_CAVE_RAT s_BROWN_RAT s_BLACK_RAT s_GEMINI_I s_GEMINI_II s_SWORD_OF_DAMOCLES s_TWO_EDGED_SWORD s_WERERAT s_SEWER_RAT s_JUNGLE_RAT s_GIANT_SCORPION s_WEREWOLF s_GRIZZLY_BEAR s_GREEN_DRAGON s_MECHANICAL_SWORD s_VERY_YOUNG_DRAGON s_ENCHANTED_SWORD s_THE_BLOB s_SUN_WANDERER s_EARTH_WANDERER s_SKY_WANDERER s_LOST_BARN_OWL s_SLIME s_SUCCUBUS s_STATUE_OF_MINOTAUR s_OOZING_STENCHBEAST s_SON_OF_MINOTAUR s_MINOTAUR s_BARN_OWL s_BABY_OWL s_GANADRINIL s_LISSOM s_DOCTOR_WHO s_BANE_OF_THIEVES s_ALADDIN s_RING_EYED_OWL s_BLACK_BEAR s_BROWN_BEAR s_WAUKA s_TROG s_NELL s_EQUUS s_WHITE_OWL s_WHITE_DRAGON s_SONNY_BOY_MINOTAUR s_DAUNTLESS_MINNIE s_BULL
 
-@ \section{Residual diagnostic text (\$59C9--\$5AFF)}
+@ \section{Residual diagnostic text}
 
 Debug/diagnostic text from development, unused at runtime.
 
@@ -26170,7 +26170,7 @@ residual strings, and unused data left from earlier builds.  They are
 kept in the assembly output to preserve byte-for-byte binary fidelity,
 but serve no runtime purpose.
 
-\section{Residual development string (\$06F2)}
+\section{Residual development string}
 
 The 14~bytes at [[$06F2--$06FF]] between [[CONTEXT_SWAP]] and
 [[RESIDENT_DECODE_DISPATCH]] are unreferenced and decode as the
@@ -26184,7 +26184,7 @@ RESIDUAL_DONT_BREAK:
     HEX     c4cfcea7d4a0c2d2c5c1cba0d4c8
 @ %def RESIDUAL_DONT_BREAK
 
-@ \section{Residual page tail (\$07E2)}
+@ \section{Residual page tail}
 
 The 30~bytes at [[$07E2--$07FF]] are unreferenced residual data from
 the EALDR copy ([[$A300--$A5FF]]~$\to$~[[$0500--$07FF]]).  Decoded as
@@ -26200,7 +26200,7 @@ RESIDUAL_PAGE_TAIL:
     HEX     006520636865636b6572  ; "e checker" (low ASCII)
 @ %def RESIDUAL_PAGE_TAIL
 
-@ \section{Compressed cursor routine (\$776E)}
+@ \section{Compressed cursor routine}
 
 [[SET_CURSOR_COMPRESSED]] packs column (bits~5--0) and row offset
 (bits~7--6, added to~20) into a single byte.  No callers exist in the
@@ -26232,7 +26232,7 @@ SET_CURSOR_COMPRESSED:
     RTS
 @ %def SET_CURSOR_COMPRESSED
 
-@ \section{Orphaned encounter handler (\$1F19)}
+@ \section{Orphaned encounter handler}
 
 The 231~bytes from [[$1F19]] to [[$1FFF]] contain an orphaned earlier
 version of [[HANDLE_MOB_ENCOUNTER]].  No external JSR, JMP, branch,
