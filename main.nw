@@ -8049,7 +8049,7 @@ HRCG_ORIGINAL_ENTRY:
 RESIDUAL_AND_STRING:
     HEX     5D 41 4E C4 00         ; "]AND\0" (unused)
 @ %def RESIDUAL_AND_STRING
-<<entity item tables cont>>=
+<<entity item tables>>=
     ORG     $A725
     HEX     BD 43 50 D8 00 0E DC 43 50 D9 00 0E BC 44 45 C3
     HEX     00 AA BE 44 45 D8 10 00 CA 44 45 D9 10 00 88 45
@@ -27003,7 +27003,6 @@ The following root chunks produce the assembly files when tangled.
 <<display and dos data>>
 <<residual and string>>
 <<entity item tables>>
-<<entity item tables cont>>
 <<extended entity data>>
 <<pre-init data>>
 <<runtime data area>>
