@@ -4604,6 +4604,14 @@ table at [[BORDER_HANDLER_TABLE]].
 [[TICK_BORDER_ANIM]] at [[$5BE8]] advances the animation index through
 the border positions, wrapping from \$15 back to \$05.
 
+@ Current game speed / animation index, used by [[BORDER_ANIMATION]].
+
+<<anim index>>=
+    ORG     $7ABD
+ANIM_INDEX:
+    DC.B    $02                     ; current game speed / animation index
+@ %def ANIM_INDEX
+
 <<border animation>>=
     ORG     $5B2A
 GAME_ACTION_HANDLER:
@@ -7033,18 +7041,7 @@ STATS_DEXT_OUT      EQU     STATS_DEXT-3     ; $7DF0: dexterity output
 STATS_DAGGR_OUT     EQU     STATS_DAGGR-3    ; $7DFC: dagger output
 @ %def STATS_LIFE_OUT STATS_STR_OUT STATS_DUCATS_OUT STATS_SPEED_OUT STATS_SWORD_OUT STATS_WEAP_OUT STATS_DEXT_OUT STATS_DAGGR_OUT
 
-@ \subsection{Game configuration and menu strings}
-
-The region \$7AAC--\$7D82 contains game configuration variables and
-the complete set of menu option display strings.
-
-\paragraph{Configuration variables (\$7AAC--\$7ADB).}
-Includes blink delay ([[BLINK_DELAY]]), animation frame tables
-([[ANIM_WAIT_TABLE]], [[ANIM_FRAME_TABLE]]), map tile defaults
-([[TILE_DEFAULT_TAB]], [[TILE_FILL_TAB]], [[TILE_BLINK_TAB]]),
-save/load parameters ([[SLOT_NUMBER]], [[GAME_DISK_SLOTS]],
-[[SAVE_TRACK_BASE]], [[DISK_SIGNATURE]]), and other runtime state
---- all documented via EQU labels elsewhere.
+@ \subsection{Menu strings}
 
 \paragraph{Menu strings (\$7ADC--\$7D82).}
 Length-prefixed high-ASCII strings for all menu options: action menus
@@ -7060,13 +7057,7 @@ at [[ATTACK_NAME_BUF]] and drop amount display at
 [[DROP_DISPLAY_BUF]].
 
 <<game config and menu strings>>=
-    ORG     $7AAC
-GAME_CONFIG_DATA:
-    ; Configuration variables ($7AAC-$7ADB) — see EQU labels
-    HEX     2D 50 C8 03 00 32 23 17 0C 05 00 02 02 04 09 13
-    HEX     05 02 20 04 01 25 2C 00 00 01 11 13 01 1A 11 00
-    HEX     C1 CC C9 64 2C 2C 2C 2C 25 2A 20 29 00 00 00 00
-
+    ORG     $7ADC
 MENU_OPTION_STRINGS:
     ; Menu option strings ($7ADC-$7D82) — length-prefixed high ASCII
     APSTR   "DROP ARMOR"
@@ -7124,7 +7115,7 @@ S_PAY_FOR:
     APSTR   "MOVE"
     APSTR   "GAME SPEED : 0"
     APSTR   "SAVE GAME IN SLOT NUMBER 00"
-@ %def GAME_CONFIG_DATA MENU_OPTION_STRINGS
+@ %def MENU_OPTION_STRINGS S_CHEST_OPENS S_REVEAL_GOLD S_NOW_HAVE_GOLD S_MISSES S_PAY_FOR
 
 \section{Character stats display}
 
@@ -7775,8 +7766,12 @@ if pressed, returns 0 (fire).  Otherwise reads both paddles via the ROM
 and maps the two zones to a direction index (1=up, 2=down, 3=left, 4=right).
 If both axes are centered, re-checks the paddle button.
 
-<<defines>>=
-JOY_SETTLE_DELAY    EQU     $7AAE   ; paddle settle delay parameter (in config data)
+@ Paddle settle delay, used by [[CHECK_INPUT]].
+
+<<joy settle delay>>=
+    ORG     $7AAE
+JOY_SETTLE_DELAY:
+    DC.B    $C8                     ; paddle settle delay (200)
 @ %def JOY_SETTLE_DELAY
 
 <<check input>>=
@@ -8523,11 +8518,13 @@ GET_MOB_DATA:
 the status window animation running.  It loads an iteration count from
 [[DELAY_COUNT]] and calls [[ANIM_TICK_AND_WAIT]] that many times.
 
-<<defines>>=
-DELAY_COUNT             EQU     $7ABF   ; number of delay iterations
-@ %def DELAY_COUNT
+@ Delay iteration count, used by [[DELAY_WITH_ANIMATION]].
 
-@ The routine below implements the delay loop.
+<<delay count>>=
+    ORG     $7ABF
+DELAY_COUNT:
+    DC.B    $04                     ; delay iterations
+@ %def DELAY_COUNT
 
 <<delay with animation>>=
     ORG     $0D10
@@ -8556,13 +8553,18 @@ wait loop count from [[ANIM_WAIT_TABLE]] (indexed by [[ANIM_INDEX]]) into
 [[WAIT_LOOP_COUNT]].
 
 <<defines>>=
-ANIM_FRAME_CTR          EQU     $7AAF   ; animation frame countdown
-ANIM_INDEX              EQU     $7ABD   ; current animation table index
-ANIM_WAIT_TABLE         EQU     $7AB0   ; per-frame wait counts (indexed)
 WAIT_LOOP_COUNT         EQU     $5A8C   ; inner wait loop counter
-@ %def ANIM_FRAME_CTR ANIM_INDEX ANIM_WAIT_TABLE WAIT_LOOP_COUNT
+@ %def WAIT_LOOP_COUNT
 
-@ The routine below implements the animation tick.
+@ Animation frame countdown and per-frame wait counts, used by [[TICK_ANIM_COUNTER]].
+
+<<anim frame ctr>>=
+    ORG     $7AAF
+ANIM_FRAME_CTR:
+    DC.B    $03                     ; animation frame countdown
+ANIM_WAIT_TABLE:
+    HEX     00 32 23 17 0C 05      ; per-frame wait counts (6 entries)
+@ %def ANIM_FRAME_CTR ANIM_WAIT_TABLE
 
 <<tick anim counter>>=
     ORG     $0D1E
@@ -8590,8 +8592,12 @@ the frame counter has reached zero, it calls [[DRAW_BLINK_NORMAL]] to
 restore the display and reloads [[ANIM_FRAME_CTR]] from the frame
 duration table [[ANIM_FRAME_TABLE]] (indexed by [[ANIM_INDEX]]).
 
-<<defines>>=
-ANIM_FRAME_TABLE        EQU     $7AB6   ; per-frame frame counts (indexed)
+@ Per-frame frame counts, used by [[ANIM_TICK_AND_WAIT]].
+
+<<anim frame table>>=
+    ORG     $7AB6
+ANIM_FRAME_TABLE:
+    HEX     00 02 02 04 09 13      ; per-frame frame counts (6 entries)
 @ %def ANIM_FRAME_TABLE
 
 <<anim tick and wait>>=
@@ -8649,8 +8655,15 @@ which delays for approximately $A \times 2.5 + 13.5$ microseconds.
 
 <<defines>>=
 ROM_WAIT                EQU     $FCA8   ; Apple II ROM WAIT routine
-WAIT_DURATION           EQU     $7AAD   ; ROM WAIT duration parameter
-@ %def ROM_WAIT WAIT_DURATION
+@ %def ROM_WAIT
+
+@ ROM WAIT duration parameter, used by [[CALL_ROM_WAIT]].
+
+<<wait duration>>=
+    ORG     $7AAD
+WAIT_DURATION:
+    DC.B    $50                     ; ROM WAIT duration parameter
+@ %def WAIT_DURATION
 
 <<call rom wait>>=
     ORG     $0D58
@@ -10069,17 +10082,32 @@ parallel tables: [[TILE_BLINK_TAB]], [[TILE_FILL_TAB]], and
 [[MAP_FILL_CHAR]], and [[DEFAULT_CHAR]].
 
 <<defines>>=
-TILE_DEFAULT_TAB        EQU     $7AD0   ; 4-byte table: default char per style
-TILE_FILL_TAB           EQU     $7AD4   ; 4-byte table: fill char per style
-TILE_BLINK_TAB          EQU     $7AD8   ; 4-byte table: blink alt char per style
 STYLE_INDEX_MASK        EQU     $03     ; mask for 2-bit style index
-@ %def TILE_DEFAULT_TAB TILE_FILL_TAB TILE_BLINK_TAB STYLE_INDEX_MASK
+@ %def STYLE_INDEX_MASK
 
-<<defines>>=
-BLINK_ALT_CHAR          EQU     $7AC3   ; alternate blink character
-DEFAULT_CHAR            EQU     $7AC2   ; default entity character ($2C)
-MAP_FILL_CHAR           EQU     $7AC1   ; character used to fill the map grid
-@ %def BLINK_ALT_CHAR DEFAULT_CHAR MAP_FILL_CHAR
+@ Default character codes for map display, used by [[LOAD_MAP_TILES]].
+
+<<map char defaults>>=
+    ORG     $7AC1
+MAP_FILL_CHAR:
+    DC.B    $25                     ; map grid fill character
+DEFAULT_CHAR:
+    DC.B    $2C                     ; default entity character
+BLINK_ALT_CHAR:
+    DC.B    $00                     ; alternate blink character
+@ %def MAP_FILL_CHAR DEFAULT_CHAR BLINK_ALT_CHAR
+
+@ Tile style lookup tables (4 entries each), used by [[LOAD_MAP_TILES]].
+
+<<tile style tables>>=
+    ORG     $7AD0
+TILE_DEFAULT_TAB:
+    HEX     2C 2C 2C 2C            ; default char per style
+TILE_FILL_TAB:
+    HEX     25 2A 20 29            ; fill char per style
+TILE_BLINK_TAB:
+    HEX     00 00 00 00            ; blink alt char per style
+@ %def TILE_DEFAULT_TAB TILE_FILL_TAB TILE_BLINK_TAB
 
 <<load map tiles>>=
     ORG     $746C
@@ -10378,14 +10406,21 @@ If the low nibble of [[MFIELD_LEVEL_ENC]] is zero, the mob gets only a
 static render; otherwise the full blink sequence plays.
 
 <<defines>>=
-MAP_REDRAW_FLAG         EQU     $7AC4   ; non-zero = full map redraw needed
 CFIELD_DRAWN_FLAG       EQU     $80     ; bit 7 of CFIELD_STYLE: entities drawn
 STYLE_SCROLL_MASK       EQU     $60     ; bits 6-5 of LOCATION_STYLE: scroll trigger
-@ %def MAP_REDRAW_FLAG CFIELD_DRAWN_FLAG STYLE_SCROLL_MASK
+@ %def CFIELD_DRAWN_FLAG STYLE_SCROLL_MASK
 
 <<zero page defines>>=
 ENTITY_REC              EQU     $BE     ; entity lookup result from FIND_ENTITY_AT_POS (2 bytes)
 @ %def ENTITY_REC
+
+@ Map redraw flag, used by [[DRAW_MAP_ENTITIES]].
+
+<<map redraw flag>>=
+    ORG     $7AC4
+MAP_REDRAW_FLAG:
+    DC.B    $00                     ; non-zero = full map redraw needed
+@ %def MAP_REDRAW_FLAG
 
 <<draw map entities>>=
     ORG     $733B
@@ -10493,9 +10528,16 @@ normal frame, and disables the blink cursor.
 
 <<defines>>=
 BLINK_CHAR      EQU     $5AA4   ; font character number
-BLINK_DELAY             EQU     $7AAC   ; delay value loaded into WAIT_LOOP_COUNT by DRAW_MAP_ICON_B
 BLINK_ROW       EQU     $5AA3   ; font row
-@ %def BLINK_CHAR BLINK_DELAY BLINK_ROW
+@ %def BLINK_CHAR BLINK_ROW
+
+@ Blink delay parameter, used by [[DRAW_MAP_ICON_B]].
+
+<<blink delay>>=
+    ORG     $7AAC
+BLINK_DELAY:
+    DC.B    $2D                     ; blink delay (loaded into WAIT_LOOP_COUNT)
+@ %def BLINK_DELAY
 
 <<draw map icon b>>=
     ORG     $740B
@@ -14396,7 +14438,7 @@ adjustment (records~1--3 with arrow keys), sound toggle, danger level
 is an indirect jump through [[$A963]], a resident vector.  [[$61F6]] is
 the direct entry that loads the settings table and enters [[INPUT_LOOP]].
 [[$61FD]] initializes the settings display: it calls the splash routine
-at [[SETTINGS_DISPLAY_INIT]] ([[$09AC]]), then formats the current game speed (\$7ABD) as a digit
+at [[SETTINGS_DISPLAY_INIT]] ([[$09AC]]), then formats the current game speed ([[ANIM_INDEX]]) as a digit
 into the ``GAME SPEED'' label string at [[$7D66]].
 
 <<game settings table>>=
@@ -14444,15 +14486,23 @@ MENU_GAME_SETTINGS_ENTER:
 
 MENU_SETTINGS_INIT:
     JSR     $09AC              ; splash screen setup
-    LDA     $7ABD              ; game speed value
+    LDA     ANIM_INDEX         ; game speed value
     ORA     #$B0               ; convert to ASCII digit
     STA     $7D66              ; patch into "GAME SPEED : X" string
     RTS
 @ %def MENU_GAME_SETTINGS MENU_SETTINGS_INIT
 
 @ The settings adjustment handlers increment or decrement the game speed
-([[$7ABD]]) and danger threshold, then re-enter the settings menu.
-[[$7ABC]] is the maximum game speed.
+([[ANIM_INDEX]]) and danger threshold, then re-enter the settings menu.
+[[MAX_GAME_SPEED]] is the maximum game speed.
+
+@ Maximum game speed index, used by [[SETTINGS_HANDLERS]].
+
+<<max game speed>>=
+    ORG     $7ABC
+MAX_GAME_SPEED:
+    DC.B    $05                     ; maximum game speed index
+@ %def MAX_GAME_SPEED
 
 <<settings handlers>>=
     ORG     $6209
@@ -14461,28 +14511,28 @@ SETTINGS_SPEED_UP:
     ; Increase game speed by one step (clamped to max).
     ;
     ; Behavior:
-    ;   Increments $7ABD (game speed), clamps to the maximum at $7ABC,
+    ;   Increments ANIM_INDEX (game speed), clamps to MAX_GAME_SPEED,
     ;   then re-enters the settings menu. SETTINGS_SPEED_DOWN decrements
     ;   (clamped to 1).
     ;
-    ; Modifies: $7ABD
+    ; Modifies: ANIM_INDEX
     ; Clobbers: A, X
 
     JSR     STORE_SELECTION_TO_RECORD
-    INC     $7ABD              ; speed++
-    LDA     $7ABD
-    CMP     $7ABC              ; at max?
+    INC     ANIM_INDEX         ; speed++
+    LDA     ANIM_INDEX
+    CMP     MAX_GAME_SPEED     ; at max?
     BCC     .done
-    LDA     $7ABC              ; clamp to max
-    STA     $7ABD
+    LDA     MAX_GAME_SPEED     ; clamp to max
+    STA     ANIM_INDEX
 .done:
     JMP     MENU_GAME_SETTINGS_ENTER ; re-enter settings menu
 
 SETTINGS_SPEED_DOWN:
     JSR     STORE_SELECTION_TO_RECORD
-    DEC     $7ABD              ; speed--
+    DEC     ANIM_INDEX         ; speed--
     BNE     .done              ; nonzero -> ok
-    INC     $7ABD              ; clamp to 1
+    INC     ANIM_INDEX         ; clamp to 1
     BNE     .done              ; (always taken)
 
 SETTINGS_DANGER_UP:
@@ -14609,13 +14659,19 @@ SAVE_LOAD_TABLE:
 current slot number, then returns.
 
 <<defines>>=
-SLOT_NUMBER         EQU     $7AC0   ; current save/load slot number
-MAX_SLOT_NUMBER     EQU     $7AC6   ; maximum slot number
 S_CONTINUE_TENS     EQU     $7BF1   ; tens digit in "CONTINUE GAME NUMBER NN"
 S_CONTINUE_ONES     EQU     $7BF2   ; ones digit in "CONTINUE GAME NUMBER NN"
 S_SAVE_SLOT_TENS    EQU     $7D81   ; tens digit in "SAVE GAME IN SLOT NUMBER 00"
 S_SAVE_SLOT_ONES    EQU     $7D82   ; ones digit in "SAVE GAME IN SLOT NUMBER 00"
-@ %def SLOT_NUMBER MAX_SLOT_NUMBER S_CONTINUE_TENS S_CONTINUE_ONES S_SAVE_SLOT_TENS S_SAVE_SLOT_ONES
+@ %def S_CONTINUE_TENS S_CONTINUE_ONES S_SAVE_SLOT_TENS S_SAVE_SLOT_ONES
+
+@ Current save/load slot number, used by [[SAVE_LOAD_INIT]].
+
+<<slot number>>=
+    ORG     $7AC0
+SLOT_NUMBER:
+    DC.B    $01                     ; current save/load slot number
+@ %def SLOT_NUMBER
 
 <<save load init>>=
     ORG     $62EC
@@ -14642,6 +14698,14 @@ and re-enter [[INIT_WORLD]] (which presents the save/load menu).
 high-ASCII decimal digits and writes them into both the ``CONTINUE GAME
 NUMBER'' and ``SAVE GAME IN SLOT NUMBER'' display strings.  Values below
 10 get a leading space; values 10--19 get a ``1'' tens digit.
+
+@ Maximum slot number, used by [[SLOT_NUMBER_ROUTINES]].
+
+<<max slot number>>=
+    ORG     $7AC6
+MAX_SLOT_NUMBER:
+    DC.B    $11                     ; maximum slot number (17)
+@ %def MAX_SLOT_NUMBER
 
 <<slot number routines>>=
     ORG     $62F0
@@ -14993,16 +15057,6 @@ signature lives (track~\$11, sector~\$00).  [[DISK_SIGNATURE]] is the
 valid scenario disks.  [[SHUFFLE_COUNT]] controls how many iterations
 the entity-shuffle routine performs (100).
 
-<<defines>>=
-GAME_DISK_SLOTS     EQU     $7AC5   ; save slots on game disk (1)
-SAVE_TRACK_BASE     EQU     $7AC7   ; base track table: [0]=game disk, [1]=scenario disk
-SAVE_SECTOR_COUNT   EQU     $7AC9   ; sectors per save game (26)
-GAME_SIG_TRACK      EQU     $7ACA   ; game disk signature track ($11)
-GAME_SIG_SECTOR     EQU     $7ACB   ; game disk signature sector ($00)
-DISK_SIGNATURE      EQU     $7ACC   ; 3-byte "ALI" signature (high ASCII)
-SHUFFLE_COUNT       EQU     $7ACF   ; entity shuffle iterations (100)
-@ %def GAME_DISK_SLOTS SAVE_TRACK_BASE SAVE_SECTOR_COUNT GAME_SIG_TRACK GAME_SIG_SECTOR DISK_SIGNATURE SHUFFLE_COUNT
-
 @ \subsection{Continue game handler}
 
 [[CONTINUE_GAME]] is the handler for the ``CONTINUE'' option in the
@@ -15018,6 +15072,22 @@ save/load menu ([[SAVE_LOAD_TABLE]]).
   [[ENSURE_GAME_DISK]].  If invalid, it displays message~\$16 (error)
   and returns to [[INIT_WORLD]].
 \end{itemize}
+
+@ Number of save slots on the game disk, used by [[CONTINUE_GAME]].
+
+<<game disk slots>>=
+    ORG     $7AC5
+GAME_DISK_SLOTS:
+    DC.B    $01                     ; save slots on game disk
+@ %def GAME_DISK_SLOTS
+
+@ Disk signature bytes (high-ASCII "ALI"), used by [[CONTINUE_GAME]].
+
+<<disk signature>>=
+    ORG     $7ACC
+DISK_SIGNATURE:
+    HEX     C1 CC C9                ; "ALI" (high ASCII)
+@ %def DISK_SIGNATURE
 
 <<continue game>>=
     ORG     $69C8
@@ -15072,6 +15142,14 @@ algorithm.  Each iteration:
 \end{itemize}
 This effectively shuffles entity ordering so that saved games do not
 preserve a deterministic entity sequence.
+
+@ Entity shuffle iteration count, used by [[SHUFFLE_ENTITIES]].
+
+<<shuffle count>>=
+    ORG     $7ACF
+SHUFFLE_COUNT:
+    DC.B    $64                     ; entity shuffle iterations (100)
+@ %def SHUFFLE_COUNT
 
 <<shuffle entities>>=
     ORG     $69FD
@@ -15407,6 +15485,16 @@ It clears the track/sector fields and sets the buffer pointer.
 [[GAME_SIG_SECTOR]] and checks for the magic signature bytes
 \$03,\$0F,\$10.  Returns carry clear if the game disk is present.
 
+@ Game disk signature track and sector, used by [[SETUP_DATA_IOB]].
+
+<<game sig params>>=
+    ORG     $7ACA
+GAME_SIG_TRACK:
+    DC.B    $11                     ; game disk signature track
+GAME_SIG_SECTOR:
+    DC.B    $00                     ; game disk signature sector
+@ %def GAME_SIG_TRACK GAME_SIG_SECTOR
+
 <<setup data iob>>=
     ORG     $6B27
 SETUP_DATA_IOB:
@@ -15474,6 +15562,14 @@ calculate the starting track/sector from [[SLOT_NUMBER]], then writes
 each sector via [[DISK_WRITE]], calling [[ADVANCE_SECTOR]] to step
 through consecutive sectors.  Returns A=0 on success, A=1 on failure.
 
+@ Sectors per save game, used by [[WRITE_GAME_DATA]].
+
+<<save sector count>>=
+    ORG     $7AC9
+SAVE_SECTOR_COUNT:
+    DC.B    $1A                     ; sectors per save game (26)
+@ %def SAVE_SECTOR_COUNT
+
 <<write game data>>=
     ORG     $6B72
 WRITE_GAME_DATA:
@@ -15528,6 +15624,14 @@ Sets the IOB buffer to \$4000 and clears the byte-count field.
 [[ADVANCE_SECTOR]] increments the buffer page (IOB+9) and sector
 (IOB+5).  When the sector reaches~13 (\$0D), it wraps to~0 and
 increments the track (IOB+4), starting the next track.
+
+@ Base track numbers for save data, used by [[READ_GAME_DATA]].
+
+<<save track base>>=
+    ORG     $7AC7
+SAVE_TRACK_BASE:
+    HEX     13 01                   ; base track: [0]=game ($13), [1]=scenario ($01)
+@ %def SAVE_TRACK_BASE
 
 <<read game data>>=
     ORG     $6B95
@@ -17219,6 +17323,14 @@ type from byte 1 and the destination from byte 2 through this pointer.
 EVENT_PTR               EQU     $BE     ; event list entry pointer (2 bytes)
 @ %def EVENT_PTR
 
+@ Initial wait loop count, used by [[HANDLE_ENCOUNTER]].
+
+<<wait loop init>>=
+    ORG     $7ABE
+WAIT_LOOP_INIT:
+    DC.B    $20                     ; initial wait loop count
+@ %def WAIT_LOOP_INIT
+
 <<handle encounter>>=
     ORG     $1C01
 HANDLE_ENCOUNTER:
@@ -17290,7 +17402,7 @@ HANDLE_ENCOUNTER:
     LDA     (EVENT_PTR),Y              ; event byte 2 = destination pos
     STA     EVENT_DEST_POS
     JSR     COMMIT_MOVE                ; commit move
-    MOVB    $7ABE,WAIT_LOOP_COUNT
+    MOVB    WAIT_LOOP_INIT,WAIT_LOOP_COUNT
     JSR     REORDER_CURRENT_CHAR
     JSR     TIMED_WAIT
     LDY     #MFIELD_POSITION
@@ -27141,6 +27253,26 @@ The following root chunks produce the assembly files when tangled.
 <<tune helpers>>
 <<play tone>>
 <<play low tone>>
+<<blink delay>>
+<<wait duration>>
+<<joy settle delay>>
+<<anim frame ctr>>
+<<anim frame table>>
+<<max game speed>>
+<<anim index>>
+<<wait loop init>>
+<<delay count>>
+<<slot number>>
+<<map char defaults>>
+<<map redraw flag>>
+<<game disk slots>>
+<<max slot number>>
+<<save track base>>
+<<save sector count>>
+<<game sig params>>
+<<disk signature>>
+<<shuffle count>>
+<<tile style tables>>
 <<game config and menu strings>>
 <<stats template data>>
 <<status border data>>
