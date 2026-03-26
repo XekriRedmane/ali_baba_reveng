@@ -26322,37 +26322,6 @@ s_BULL:
     APSTR "BULL"
 @ %def s_ALI_BABA s_SCHEHERAZADE s_HAROUD_EL_LARGE s_BAIRAM_MEDIO s_ABOU_HASSAN s_LUTHIEN s_HUAN s_CELEGORM s_CURUFIN s_ELDO s_MERRYWATER s_STILBO s_CINDER s_JATTE s_THORA s_OG s_ULVA s_COGIA_HOUSSAIN s_OMAR s_MAHMUD s_ABUL_FATH s_IBRAHIM s_JALAL_UD_DIN s_SALAMAN s_ABSAL s_JAMI s_NIZAM_UL_MULK s_ALP_ARSLAN s_MALIK s_TOGHRUL_BEG s_MOWAFFAK s_ABD_US_SAMAD s_HAKIM s_HASAN_BEN_SABBAH s_ALI s_KHORASSAN s_KHWAJAH_NIZAMI s_HAFIZ s_JELALUDDIN s_KWADRACH s_ATTAR s_PEHLEVI s_JAMSHYD s_IRAM s_KAIKOBAD s_KAIKHOSRU s_RUSTUM s_HATIM_TAI s_BAHRAM s_DINARZADE s_SHAHZENAN s_DOUBAN s_FEROZE s_AHMED s_PERIE_BANOU s_HAROUN_AL_RASCHID s_CODADAD s_MORGIANA s_ABDALLA s_ENCHANTED_STATUE s_TAN_RAT s_GRAY_RAT s_SULTAN_SHAHRIAR s_PRINCESS_BUDDIR s_SULTANS_RIGHT_GUARD s_SULTANS_LEFT_GUARD s_TIGER s_WITLESS_ZOMBIE s_SMALL_ZOMBIE s_BIG_ZOMBIE s_CALICO_RAT s_HOOT_OWL s_MOUNTAIN_SCORPION s_UNICORN sm_LEO sm_SCORPIUS s_STATUE_OF_TAURUS s_ARIES_THE_RAM s_CANCER_THE_CRAB s_WEREJACKAL s_CAVEBEAR s_CAVE_RAT s_BROWN_RAT s_BLACK_RAT s_GEMINI_I s_GEMINI_II s_SWORD_OF_DAMOCLES s_TWO_EDGED_SWORD s_WERERAT s_SEWER_RAT s_JUNGLE_RAT s_GIANT_SCORPION s_WEREWOLF s_GRIZZLY_BEAR s_GREEN_DRAGON s_MECHANICAL_SWORD s_VERY_YOUNG_DRAGON s_ENCHANTED_SWORD s_THE_BLOB s_SUN_WANDERER s_EARTH_WANDERER s_SKY_WANDERER s_LOST_BARN_OWL s_SLIME s_SUCCUBUS s_STATUE_OF_MINOTAUR s_OOZING_STENCHBEAST s_SON_OF_MINOTAUR s_MINOTAUR s_BARN_OWL s_BABY_OWL s_GANADRINIL s_LISSOM s_DOCTOR_WHO s_BANE_OF_THIEVES s_ALADDIN s_RING_EYED_OWL s_BLACK_BEAR s_BROWN_BEAR s_WAUKA s_TROG s_NELL s_EQUUS s_WHITE_OWL s_WHITE_DRAGON s_SONNY_BOY_MINOTAUR s_DAUNTLESS_MINNIE s_BULL
 
-@ \section{Residual diagnostic text}
-
-Debug/diagnostic text from development, unused at runtime.
-
-<<mob residual data>>=
-    ORG     $59C9
-RESIDUAL_DEBUG_TEXT:
-; --- Residual diagnostic text ---
-    HEX     D3 D4 C1 A0 C1 D2 C7 8D A0 CC C4 C1 A0 A3 BE D3
-    HEX     CC C6 D3 D0 C4 8D A0 D3 D4 C1 A0 D4 C5 CD D0 8D
-    HEX     A0 CC C4 C1 A0 A3 BC D3 CC C6 D3 D0 C4 8D A0 D3
-    HEX     D4 C1 A0 D4 C5 CD D0 AB B1 8D A0 CA D3 D2 A0 D3
-    HEX     C8 CF D7 CE CD 8D A0 CC C4 D9 A0 A3 B1 B1 8D A0
-    HEX     CC C4 C1 A0 A8 C1 C3 D4 CF D2 A9 AC D9 8D A0 C1
-    HEX     CE C4 A0 A3 A4 B1 C6 8D A0 D3 D4 C1 A0 C1 D2 C7
-    HEX     8D A0 CC C4 C1 A0 A3 BE D3 CC C6 C4 D8 8D A0 D3
-    HEX     D4 C1 A0 D4 C5 CD D0 8D A0 CC C4 C1 A0 A3 BC D3
-    HEX     CC C6 C4 D8 8D A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1
-    HEX     8D A0 CA D3 D2 A0 D3 C8 CF D7 CE CD 8D A0 CC C4
-    HEX     D9 A0 A3 B1 B3 8D A0 CC C4 C1 A0 A8 C1 C3 D4 CF
-    HEX     D2 A9 AC D9 8D A0 D3 D4 C1 A0 C1 D2 C7 8D A0 C9
-    HEX     CE D9 8D A0 CC C4 C1 A0 A8 C1 C3 D4 CF D2 A9 AC
-    HEX     D9 8D A0 D3 D4 C1 A0 C1 D2 C7 AB B1 8D A0 CC C4
-    HEX     C1 A0 A3 BE D3 CC C6 C4 D5 C3 8D A0 D3 D4 C1 A0
-    HEX     D4 C5 CD D0 8D A0 CC C4 C1 A0 A3 BC D3 CC C6 C4
-    HEX     D5 C3 8D A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1 8D A0
-    HEX     CA D3 D2 A0 D3 C8 CF D7 CE CD 8D A0 CC C4 C1 A0
-    HEX     D3 CC C6 C4 D5 C3 AB
-@ %def RESIDUAL_DEBUG_TEXT
-
-
 @ \chapter{Dead Code}
 
 The following chunks contain confirmed dead code: unreachable routines,
@@ -26421,6 +26390,138 @@ SET_CURSOR_COMPRESSED:
     STA     TEXT_ROW
     RTS
 @ %def SET_CURSOR_COMPRESSED
+
+@ \section{Residual assembler source text}
+
+The 327~bytes at [[$59C9--$5B0F]] are high-ASCII text containing
+a fragment of 6502 assembly source code from the game's development.
+The text is part of a diagnostic routine that reads mob record fields
+via an [[(ACTOR),Y]] pointer and calls [[SHOWNM]] to display each
+value.  The fragment begins mid-routine (the accumulator already holds
+a value) and is truncated at the end ([[LDA SLFDUC+]]).
+
+This is assembler source left in memory from the development process,
+overwritten into the game data area but never cleared.
+
+The label names reveal the original developer's naming conventions:
+
+\begin{tabular}{lll}
+\textbf{Developer label} & \textbf{Our label} & \textbf{Notes} \\
+\hline
+[[ACTOR]]   & [[MOB_PTR]] / [[ENTITY_PTR]] & entity record pointer \\
+[[ARG]]     & (unknown)   & routine argument, likely zero page \\
+[[TEMP]]    & (unknown)   & temporary 16-bit pointer \\
+[[SHOWNM]]  & (unknown)   & ``show name/number'' display routine \\
+[[SLFSPD]]  & ---         & ``self speed'': mob byte~5 bits 4--0 \\
+            &             & \quad (we call this ``strength'') \\
+[[SLFDX]]   & ---         & ``self DX'': mob byte~11 bits 4--0 \\
+            &             & \quad (we call this ``level'') \\
+[[SLFDUC]]  & ---         & ``self ducats'': mob bytes~13--14 (16-bit) \\
+            &             & \quad (entity's gold) \\
+\end{tabular}
+
+\medskip
+
+The ``SLF'' prefix is short for ``self,'' referring to the entity's
+own record fields.  ``SPD'' for what we call strength and ``DX''
+(dexterity) for what we call level suggest the developer thought of
+these attributes differently than their final in-game labeling.
+``DUC'' is short for ``ducats'' --- the entity's gold, stored as
+a 16-bit value across mob data bytes~13--14.
+
+<<mob residual data>>=
+    ORG     $59C9
+RESIDUAL_DEBUG_TEXT:
+; Residual 6502 assembly source (high-ASCII text, $8D = newline)
+; Decoded text:
+;   STA ARG
+;   LDA #>SLFSPD
+;   STA TEMP
+;   LDA #<SLFSPD
+;   STA TEMP+1
+;   JSR SHOWNM
+;   LDY #11
+;   LDA (ACTOR),Y
+;   AND #$1F
+;   STA ARG
+;   LDA #>SLFDX
+;   STA TEMP
+;   LDA #<SLFDX
+;   STA TEMP+1
+;   JSR SHOWNM
+;   LDY #13
+;   LDA (ACTOR),Y
+;   STA ARG
+;   INY
+;   LDA (ACTOR),Y
+;   STA ARG+1
+;   LDA #>SLFDUC
+;   STA TEMP
+;   LDA #<SLFDUC
+;   STA TEMP+1
+;   JSR SHOWNM
+;   LDA SLFDUC+
+    HEX     D3 D4 C1 A0 C1 D2 C7   ; "STA ARG"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 C1 A0 A3 BE   ; " LDA #>SLFS"
+    HEX     D3 CC C6 D3 D0 C4      ; "LFSPD"
+    HEX     8D                      ; CR
+    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 ; " STA TEMP"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 C1 A0 A3 BC   ; " LDA #<SLFS"
+    HEX     D3 CC C6 D3 D0 C4      ; "LFSPD"
+    HEX     8D                      ; CR
+    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1 ; " STA TEMP+1"
+    HEX     8D                      ; CR
+    HEX     A0 CA D3 D2 A0 D3 C8 CF D7 CE CD ; " JSR SHOWNM"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 D9 A0 A3 B1 B1 ; " LDY #11"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 C1 A0 A8 C1 C3 D4 CF D2 A9 AC D9 ; " LDA (ACTOR),Y"
+    HEX     8D                      ; CR
+    HEX     A0 C1 CE C4 A0 A3 A4 B1 C6 ; " AND #$1F"
+    HEX     8D                      ; CR
+    HEX     A0 D3 D4 C1 A0 C1 D2 C7 ; " STA ARG"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 C1 A0 A3 BE   ; " LDA #>SLFD"
+    HEX     D3 CC C6 C4 D8          ; "LFDX"
+    HEX     8D                      ; CR
+    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 ; " STA TEMP"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 C1 A0 A3 BC   ; " LDA #<SLFD"
+    HEX     D3 CC C6 C4 D8          ; "LFDX"
+    HEX     8D                      ; CR
+    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1 ; " STA TEMP+1"
+    HEX     8D                      ; CR
+    HEX     A0 CA D3 D2 A0 D3 C8 CF D7 CE CD ; " JSR SHOWNM"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 D9 A0 A3 B1 B3 ; " LDY #13"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 C1 A0 A8 C1 C3 D4 CF D2 A9 AC D9 ; " LDA (ACTOR),Y"
+    HEX     8D                      ; CR
+    HEX     A0 D3 D4 C1 A0 C1 D2 C7 ; " STA ARG"
+    HEX     8D                      ; CR
+    HEX     A0 C9 CE D9             ; " INY"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 C1 A0 A8 C1 C3 D4 CF D2 A9 AC D9 ; " LDA (ACTOR),Y"
+    HEX     8D                      ; CR
+    HEX     A0 D3 D4 C1 A0 C1 D2 C7 AB B1 ; " STA ARG+1"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 C1 A0 A3 BE   ; " LDA #>SLFD"
+    HEX     D3 CC C6 C4 D5 C3      ; "LFDUC"
+    HEX     8D                      ; CR
+    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 ; " STA TEMP"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 C1 A0 A3 BC   ; " LDA #<SLFD"
+    HEX     D3 CC C6 C4 D5 C3      ; "LFDUC"
+    HEX     8D                      ; CR
+    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1 ; " STA TEMP+1"
+    HEX     8D                      ; CR
+    HEX     A0 CA D3 D2 A0 D3 C8 CF D7 CE CD ; " JSR SHOWNM"
+    HEX     8D                      ; CR
+    HEX     A0 CC C4 C1 A0          ; " LDA "
+    HEX     D3 CC C6 C4 D5 C3 AB   ; "SLFDUC+"  (truncated)
+@ %def RESIDUAL_DEBUG_TEXT
 
 @ \section{Orphaned encounter handler}
 
