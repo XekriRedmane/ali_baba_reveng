@@ -22094,8 +22094,8 @@ RES_ERROR_COUNT:
     DC.B    $00                     ; error status (read via RES_ERROR_COUNT+1)
     DC.B    $00                     ; padding ($07E4)
 RES_ZP_SHADOW:
-    HEX     0e968c41964120         ; shadow for ZP $50-$56 (7 bytes)
-    HEX     d3d3d3d3d3d3d3d3d3     ; shadow for ZP $57-$5F (9 bytes)
+    HEX     0e968c41964120d3        ; shadow for ZP $50-$57 (8 bytes)
+    HEX     d3d3d3d3d3d3d3d3        ; shadow for ZP $58-$5F (8 bytes)
     DC.B    $D3                     ; padding ($07F5)
 RES_ABORT_NIBBLE:
     DC.B    $00                     ; last nibble on keyboard abort ($07F6)
@@ -22105,76 +22105,115 @@ RES_ABORT_NIBBLE:
     ORG     $0503
 READ_DATA_FIELD:
     SUBROUTINE READ_DATA_FIELD
-
-    ; --- Search for D5 AA AD prologue ---
-    LDY     #$20              ; retry counter
+    ;
+    ; Copy-protection signature check.  Searches for the D5 AA AD
+    ; data field prologue, verifies all 342 nibble bytes equal $AF,
+    ; then checks the DE AA epilogue.  No data is stored in memory.
+    ;
+    ; A standard Apple II 6&2-encoded data field contains 342 nibble
+    ; bytes: 86 (auxiliary buffer) + 256 (main data).  A legitimate
+    ; copy-protected sector is written with all $AF nibbles; this
+    ; routine detects tampered or missing sectors.
+    ;
+    ; Entry points:
+    ;   READ_DATA_FIELD     — search for D5 AA AD, then verify
+    ;   READ_DATA_FIELD_AD  — assume D5 AA already found, check AD
+    ;
+    ; Output:  C clear = success, C set = error or abort
+    ; Side effect: on keyboard abort, stores the last nibble at
+    ;              RES_ABORT_NIBBLE ($07F6)
+    ; Clobbers: A, Y
+    ;
+    ; The bytes at .error ($0560: SEC) and .abort+3 ($0567: SEC) are
+    ; integrity-checked by the VM bytecodes via VMLD + VMSUBI $38.
+    ;
+    ; --- Search for D5 AA AD data field prologue ---
+    ;
+    ; Reads nibbles from DISK_DATA_REG until D5 AA AD appears, or
+    ; Y retries are exhausted.  The EOR #$D5 / BNE pattern handles
+    ; the common case where a non-D5 byte is read; if the byte after
+    ; D5 is not AA, .recheck re-tests it as a potential D5 start.
+    ;
+    LDY     #$20              ; 32 retries (outer loop)
 .search_d5:
     DEY
-    BEQ     .error            ; timeout -> error
-    LDA     DISK_DATA_REG     ; \ wait for disk byte
-    BPL     *-3               ; /
+    BEQ     .error            ; all retries exhausted -> error
+    LDA     DISK_DATA_REG     ; \ read nibble from drive
+    BPL     *-3               ; / (wait for data ready: bit 7 set)
 .recheck:
-    EOR     #$D5              ; D5?
-    BNE     .search_d5        ; no -> restart search
-    LDA     DISK_DATA_REG     ; \ wait for next byte
+    EOR     #$D5              ; is it D5?
+    BNE     .search_d5        ; no -> decrement retry, read next
+    ;                         ; yes -> found D5, check for AA
+    LDA     DISK_DATA_REG     ; \ read next nibble
     BPL     *-3               ; /
     CMP     #$AA              ; AA?
-    BNE     .recheck          ; no -> re-check as D5
+    BNE     .recheck          ; no -> re-test this byte as new D5
+    ;
+    ; --- Alternate entry: D5 AA already matched, check AD ---
+    ;
 READ_DATA_FIELD_AD:
-    LDA     DISK_DATA_REG     ; \ wait for next byte
+    LDA     DISK_DATA_REG     ; \ read next nibble
     BPL     *-3               ; /
-    CMP     #$AD              ; AD?
-    BNE     .recheck          ; no -> re-check as D5
-
-    ; --- Verify 86 nibble bytes = $AF ---
-    PHA                       ; timing padding
-    PLA
-    LDY     #$56              ; 86 bytes (6&2 auxiliary buffer)
+    CMP     #$AD              ; AD? (data field marker)
+    BNE     .recheck          ; no -> re-test as potential D5
+    ;
+    ; --- Prologue matched.  Verify 342 data nibbles = $AF ---
+    ;
+    ; Phase 1: 86 bytes (6&2 auxiliary buffer portion)
+    ;
+    PHA                       ; \ timing padding (2+4 cycles) to
+    PLA                       ; / stay synchronized with disk rotation
+    LDY     #$56              ; 86 ($56) bytes
 .read_86:
-    LDA     DISK_DATA_REG     ; \ wait for disk byte
+    LDA     DISK_DATA_REG     ; \ read nibble
     BPL     *-3               ; /
-    BIT     $C000             ; check keyboard (abort on keypress)
-    CMP     #$AF              ; signature byte?
-    BNE     .abort            ; mismatch -> abort
+    BIT     $C000             ; keyboard pressed? (bit 7 -> N flag)
+    CMP     #$AF              ; is it the $AF signature byte?
+    BNE     .abort            ; mismatch -> abort (stores nibble)
     DEY
     BNE     .read_86
-
-    ; --- Verify 256 nibble bytes = $AF ---
-    LDY     #$00              ; 256 bytes (6&2 main data)
+    ;
+    ; Phase 2: 256 bytes (6&2 main data portion)
+    ;
+    LDY     #$00              ; 256 ($00 wraps) bytes
 .read_256:
-    LDA     DISK_DATA_REG     ; \ wait for disk byte
+    LDA     DISK_DATA_REG     ; \ read nibble
     BPL     *-3               ; /
-    BIT     $C000             ; check keyboard (abort on keypress)
+    BIT     $C000             ; keyboard pressed?
     CMP     #$AF              ; signature byte?
     BNE     .abort            ; mismatch -> abort
     DEY
     BNE     .read_256
-
+    ;
     ; --- Verify DE AA epilogue ---
-    LDY     DISK_DATA_REG     ; \ wait for epilogue byte 1
-    BPL     *-3               ; / (value discarded)
-    PHA                       ; timing padding
-    PLA
-    LDA     DISK_DATA_REG     ; \ wait for epilogue byte 2
+    ;
+    LDY     DISK_DATA_REG     ; \ read epilogue byte 1 (discarded;
+    BPL     *-3               ; / LDY used for timing vs LDA)
+    PHA                       ; \ timing padding
+    PLA                       ; /
+    LDA     DISK_DATA_REG     ; \ read epilogue byte 2
     BPL     *-3               ; /
     CMP     #$DE              ; DE?
     BNE     .error            ; no -> error
-    LDA     DISK_DATA_REG     ; \ wait for epilogue byte 3
+    LDA     DISK_DATA_REG     ; \ read epilogue byte 3
     BPL     *-3               ; /
     CMP     #$AA              ; AA?
     BEQ     .ok               ; yes -> success
-
-RDF_VERIFY_SEC1:              ; $0560 — integrity-checked by copy-protection verifier
+    ;                         ; no -> fall through to .error
+    ;
+    ; --- Exit paths ---
+    ;
+RDF_VERIFY_SEC1:              ; $0560 — integrity-checked by VM (expect $38=SEC)
 .error:
-    SEC                       ; carry set = error
+    SEC                       ; C=1: error
     RTS
 .ok:
-    CLC                       ; carry clear = success
+    CLC                       ; C=0: success
     RTS
 .abort:
-    STA     RES_ABORT_NIBBLE  ; save nibble that caused abort
-RDF_VERIFY_SEC2:              ; $0567 — integrity-checked by copy-protection verifier
-    SEC                       ; carry set = error
+    STA     RES_ABORT_NIBBLE  ; save the mismatched nibble
+RDF_VERIFY_SEC2:              ; $0567 — integrity-checked by VM (expect $38=SEC)
+    SEC                       ; C=1: aborted
     RTS
 @ %def READ_DATA_FIELD READ_DATA_FIELD_AD RDF_VERIFY_SEC1 RDF_VERIFY_SEC2
 
