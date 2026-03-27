@@ -24683,16 +24683,16 @@ startup.  It is 106~bytes long (offsets \$00--\$69), terminated by
 \$7F.
 
 \begin{verbatim}
-  COPYRIGHT 1981
+  COPYRIGHT 1981          col 2
 
-      STUART SMITH
+   STUART SMITH           col 3
 
-       MARKETED BY
+    MARKETED BY           col 4
 
-   QUALITY SOFTWARE
-  6660 RESEDA BLVD
-  RESEDA, CA 91335
-    (213) 344-6599
+  QUALITY SOFTWARE        col 2 (wraps at margin 18)
+  6660 RESEDA BLVD        col 2 (auto-wrap)
+  RESEDA, CA 91335        col 2 (auto-wrap)
+  (213) 344-6599          col 2 (auto-wrap)
 \end{verbatim}
 
 Raw byte stream:
