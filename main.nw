@@ -22179,8 +22179,9 @@ VM [[CALL0]] opcodes:
 \item \textbf{DELAY\_LOOP} (\$0681--\$068B): nested countdown delay
       for motor spin-up timing.
 \item \textbf{READ\_AND\_VERIFY} (\$064B--\$0667): calls
-      [[SEARCH_ADDR_FIELD]], then reads and checksums a data area
-      while toggling drive phases for half-track seeks.
+      [[SEARCH_ADDR_FIELD_RES]], then [[READ_DATA_FIELD]] to verify
+      the all-\$AF signature, accumulating errors.  Resets all stepper
+      phases after each read.
 \end{itemize}
 
 Three short native utility routines at the end (\$06A6--\$06B2)
@@ -22236,6 +22237,10 @@ RESIDENT_BYTECODES:
     VMCALL0 VM_EXIT_OK        ; exit via VM_EXIT_OK
 
     ; --- VM subroutine: read tracks with half-track seeks ---
+    ; The Disk II stepper motor has 4 phases; each phase activation
+    ; moves the head one half-track.  .vm_read_one toggles phases
+    ; (PH3->PH0->PH3->PH2) to read at 4 different half-track
+    ; positions, verifying the $AF signature at each.
 .vm_read_tracks:
     VMLD    IWM_MOTORON       ; motor on
     VMLDI   $FF               ; \ delay for motor spin-up
