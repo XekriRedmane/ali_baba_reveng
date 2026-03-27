@@ -10136,7 +10136,7 @@ $\$7F$=end).
 
 <<defines>>=
 SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene number)
-SCENE_TEXT_DATA     EQU     $5C00   ; base address of scene text data
+SCENE_TEXT_DATA     EQU     $5C00   ; scene text buffer (overwrites border code at $5C00-$5CFF)
 PRNG_SCENE_SKIP_MASK EQU    $0A     ; bits 1+3: skip disk load ~75% of iterations
 TUNE_ATTRACT        EQU     $06     ; tune player index for attract/opening music
 @ %def SCENE_TRANSITION SCENE_TEXT_DATA PRNG_SCENE_SKIP_MASK TUNE_ATTRACT
@@ -22024,6 +22024,16 @@ READ_KEYBOARD:
 
 [[LOAD_SCENE_FROM_DISK]] reads one 256-byte sector of scene text
 data from the game disk into [[SCENE_TEXT_DATA]] (\$5C00).
+
+\textbf{Warning: dual-use memory.}  The region \$5C00--\$5CFF is
+normally occupied by border animation and display code
+([[TICK_BORDER_ANIM]] tail, [[ANIM_BORDER_ICONS_A]]/B,
+[[INIT_GAME_DISPLAY]], [[DRAW_BORDER_CHAR]],
+[[DRAW_BORDER_LABELS]]).  Loading scene data \emph{overwrites} all
+of this code.  After the scene ends, [[ENTER_LOCATION]] redraws the
+map, but the border routines at \$5C00+ have been destroyed.  This
+implies either the border code is expendable once the initial display
+is drawn, or some mechanism (not yet identified) restores it.
 
 \paragraph{Disk layout.}  Scene sectors begin at track~\$11,
 sector~0 ([[GAME_SIG_TRACK]]/[[GAME_SIG_SECTOR]]).  Scene~$N$ maps
