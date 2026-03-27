@@ -8994,12 +8994,11 @@ INIT_CHAR_SELECT:
 .found:
     JMP     ENTER_CHAR_SELECT          ; -> character selection menu
 @ %def INIT_CHAR_SELECT
-The scene loop calls [[$A478]] (a game support routine in the relocated
-block at [[$9600]]--[[$A8FF]]) each iteration to check for user input.
-If carry is set (key pressed), the loop exits.  Otherwise, it displays
-the status bar, renders the scene text from [[$5C00]], runs tune~\#3
-(the attract animation at [[$A300]]), and checks [[$5CFF]] for a scene
-transition.
+The scene loop calls [[LOAD_SCENE_FROM_DISK]] (\$A478) each iteration
+to load the current scene's text sector from disk.  If carry is set
+(read failed), the loop exits.  Otherwise, it displays the status bar,
+renders the scene text from [[SCENE_TEXT_DATA]], plays the attract tune,
+and checks [[SCENE_TRANSITION]] for a scene change.
 
 The [[$5C00]] region is populated dynamically by [[LOAD_SCENE_DATA]]
 from disk.  Its contents change with each scene.
@@ -9678,10 +9677,10 @@ The attract screen call flow:
   \item [[ATTRACT_SCREEN]] ([[$09F4]]): sets scene index 1, calls
         [[GET_MOB_DATA]], tail-calls [[SCENE_LOOP]] with scene \$26.
   \item [[SCENE_LOOP]] ([[$6C37]]): saves ZP pointers, steps PRNG,
-        conditionally loads scene data from disk.  In a loop: checks
-        keyboard/timer via [[$A478]], displays status bar, renders scene
-        text via [[TEXT_RENDERER]], runs [[TUNE_PLAYER]] with tune~\#3.
-        Exits when user presses a key or scene sequence ends.
+        conditionally loads scene data from disk.  In a loop: calls
+        [[LOAD_SCENE_FROM_DISK]] (\$A478), displays status bar, renders
+        scene text via [[TEXT_RENDERER]], runs [[TUNE_PLAYER]] with
+        tune~\#6.  Exits on disk error or when scene sequence ends.
 \end{itemize}
 
 Key subsystems:
@@ -9872,8 +9871,8 @@ transitions complete.
   \item Disables the blink cursor and saves zero-page pointers.
   \item Tests [[PRNG_OUTPUT]] bits~1 and~3; if any set ($\sim$75\%),
         skips [[LOAD_SCENE_DATA]].
-  \item Calls the relocated keyboard/timing check at \$A478; carry set
-        means the user pressed a key.
+  \item Calls [[LOAD_SCENE_FROM_DISK]] (\$A478) to load scene text from
+        disk; carry set means the disk read failed.
   \item Renders the status bar and scene text via [[TEXT_RENDERER]].
   \item Plays the attract tune ([[TUNE_ATTRACT]], index~6).
   \item If [[SCENE_TRANSITION]] is nonzero, uses it as a new scene number
