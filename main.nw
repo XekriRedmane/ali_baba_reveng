@@ -27480,32 +27480,32 @@ APPLE_ASM_RESIDUAL:
 ;
 ; --- Assembler directives ---
 ; $81 = directive with expression operand, $80 = directive (no expression)
-; Data bytes after mode = handler address (lo, hi) in assembler code
-    HEX     45 51 D5 81 15 55       ; EQU   $81 handler=$5515
-    HEX     4F 52 C7 81 15 92       ; ORG   $81 handler=$9215
-    HEX     4F 42 CA 81 16 79       ; OBJ   $81 handler=$7916
-    HEX     4C 53 D4 80 17 07       ; LST   $80 handler=$0717
-    HEX     44 46 C2 80 17 14       ; DFB   $80 handler=$1417
-    HEX     50 41 47 C5 80 17 DD    ; PAGE  $80 handler=$DD17
-    HEX     41 53 C3 80 18 2B       ; ASC   $80 handler=$2B18
-    HEX     44 43 C9 80 18 86       ; DCI   $80 handler=$8618
-    HEX     44 57 A0 80 18 B4       ; DW    $80 handler=$B418
-    HEX     4D 53 C2 80 18 A0       ; MSB   $80 handler=$A018
-    HEX     44 44 C2 80 18 DD       ; DDB   $80 handler=$DD18
-    HEX     44 53 A0 81 16 B3       ; DS    $81 handler=$B316
-    HEX     52 45 D0 80 19 08       ; REP   $80 handler=$0819
-    HEX     43 48 D2 80 19 2B       ; CHR   $80 handler=$2B19
-    HEX     53 4B D0 80 19 36       ; SKP   $80 handler=$3619
-    HEX     44 53 45 43 D4 80 19 5C ; DSECT $80 handler=$5C19
-    HEX     44 45 4E C4 80 19 80    ; DEND  $80 handler=$8019
-    HEX     44 4F A0 81 19 AB       ; DO    $81 handler=$AB19
-    HEX     45 4C 53 C5 80 19 BD    ; ELSE  $80 handler=$BD19
-    HEX     46 49 CE 80 19 C9       ; FIN   $80 handler=$C919
-    HEX     43 48 CE 80 19 D0       ; CHN   $80 handler=$D019
-    HEX     52 45 CC 80 1A B4       ; REL   $80 handler=$B41A
-    HEX     45 58 54 52 CE 81 1A F6 ; EXTRN $81 handler=$F61A
-    HEX     45 4E 54 52 D9 81 1A BF ; ENTRY $81 handler=$BF1A
-    HEX     53 42 54 CC 80 17 F2    ; SBTL  $80 handler=$F217
+; Data bytes after mode = handler address (hi, lo) in assembler code
+    HEX     45 51 D5 81 15 55       ; EQU   $81 handler=$1555
+    HEX     4F 52 C7 81 15 92       ; ORG   $81 handler=$1592
+    HEX     4F 42 CA 81 16 79       ; OBJ   $81 handler=$1679
+    HEX     4C 53 D4 80 17 07       ; LST   $80 handler=$1707
+    HEX     44 46 C2 80 17 14       ; DFB   $80 handler=$1714
+    HEX     50 41 47 C5 80 17 DD    ; PAGE  $80 handler=$17DD
+    HEX     41 53 C3 80 18 2B       ; ASC   $80 handler=$182B
+    HEX     44 43 C9 80 18 86       ; DCI   $80 handler=$1886
+    HEX     44 57 A0 80 18 B4       ; DW    $80 handler=$18B4
+    HEX     4D 53 C2 80 18 A0       ; MSB   $80 handler=$18A0
+    HEX     44 44 C2 80 18 DD       ; DDB   $80 handler=$18DD
+    HEX     44 53 A0 81 16 B3       ; DS    $81 handler=$16B3
+    HEX     52 45 D0 80 19 08       ; REP   $80 handler=$1908
+    HEX     43 48 D2 80 19 2B       ; CHR   $80 handler=$192B
+    HEX     53 4B D0 80 19 36       ; SKP   $80 handler=$1936
+    HEX     44 53 45 43 D4 80 19 5C ; DSECT $80 handler=$195C
+    HEX     44 45 4E C4 80 19 80    ; DEND  $80 handler=$1980
+    HEX     44 4F A0 81 19 AB       ; DO    $81 handler=$19AB
+    HEX     45 4C 53 C5 80 19 BD    ; ELSE  $80 handler=$19BD
+    HEX     46 49 CE 80 19 C9       ; FIN   $80 handler=$19C9
+    HEX     43 48 CE 80 19 D0       ; CHN   $80 handler=$19D0
+    HEX     52 45 CC 80 1A B4       ; REL   $80 handler=$1AB4
+    HEX     45 58 54 52 CE 81 1A F6 ; EXTRN $81 handler=$1AF6
+    HEX     45 4E 54 52 D9 81 1A BF ; ENTRY $81 handler=$1ABF
+    HEX     53 42 54 CC 80 17 F2    ; SBTL  $80 handler=$17F2
 ;
 ; --- End of table + addressing mode data ---
     HEX     00 00 00 00 00          ; end-of-table marker
