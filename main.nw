@@ -3876,10 +3876,6 @@ the three variables cleared to zero during step~13/17 (described above).
 currently being processed.
 
 <<defines>>=
-BLINK_COL       EQU     $5AA2   ; font column  (0-19; $14 = disabled)
-LOCATION_POS        EQU     $5A55   ; current location position (triggers redraw when changed)
-LOCATION_STYLE      EQU     $5A56   ; current map style (from record field 5, bits 0-6)
-CURRENT_PLAYER      EQU     $5A02   ; current player index (1-based)
 ENTITY_PTR          EQU     $F8     ; entity record pointer (2 bytes, $F8/$F9)
 
     ; --- Character index record field offsets (9-byte, via CHAR_PTR) ---
@@ -3908,7 +3904,7 @@ MFIELD_CHAR         EQU     $00     ; byte 0: display character
 MFIELD_NAME         EQU     $00     ; bytes 0-1: name pointer (16-bit, lo/hi)
 MFIELD_FLAGS        EQU     $0F     ; byte 15: status flags (bit 2 = combat engaged)
 HP_FLAGS_MASK       EQU     $C0     ; byte 6: mask for flags bits 7-6 (above HP)
-@ %def BLINK_COL LOCATION_POS LOCATION_STYLE CURRENT_PLAYER ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP CFIELD_FACTION_MASK MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_HP MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL MFIELD_NAME MFIELD_GOLD MFIELD_HP HP_FLAGS_MASK
+@ %def ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP CFIELD_FACTION_MASK MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_HP MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL MFIELD_NAME MFIELD_GOLD MFIELD_HP HP_FLAGS_MASK
 
 <<game init>>=
     ORG     $78C7
@@ -4159,10 +4155,15 @@ INIT_GAME_STATE:
     LDX     #$06                  ; tune 3: attract/opening
     JSR     TUNE_PLAYER
     STOW    $4F4C,$7A49 ; patch $7A49 to JMP $7A4F
-    STOB    #$7A,$7A4B
+INPUT_SCAN_OFFSET:                     ; $5B24: also scan position index (runtime storage)
+    LDA     #$7A                   ; (also UNDER_LEVEL at $5B25)
+SAFE_TO_REST:                          ; $5B26: also 1 if no adjacent threats (runtime storage)
+    STA     $7A4B                  ; (also TURN_ACTIVE at $5B27)
     RTS
 
-@ %def INIT_GAME_STATE
+UNDER_LEVEL     EQU INPUT_SCAN_OFFSET+1 ; $5B25: 1 if char level < steps taken (runtime storage)
+TURN_ACTIVE     EQU SAFE_TO_REST+1      ; $5B27: 1 while turn is in progress (runtime storage)
+@ %def INIT_GAME_STATE INPUT_SCAN_OFFSET UNDER_LEVEL SAFE_TO_REST TURN_ACTIVE
 
 @ [[INIT_GAME_DISPLAY]] draws the game's main screen layout.  It renders
 the background from the text stream at [[UI_TEXT_STREAM]], draws
@@ -4328,11 +4329,6 @@ character number is passed in~A.  It stores the character number into
 [[FONT_CHARNUM]] and the charset into [[FONT_CHARSET]], then calls
 [[PRINT_FONTCHAR_AT_TEXT_POS]] to render it.
 
-<<defines>>=
-FONT_CHARNUM        EQU     $5A0E   ; font character number to render
-FONT_CHARSET        EQU     $5A0F   ; font charset index (1-5)
-@ %def FONT_CHARNUM FONT_CHARSET
-
 <<draw border char>>=
     ORG     $5CEC
 DRAW_BORDER_CHAR:
@@ -4359,10 +4355,8 @@ PRINT_STRING_ADDR       EQU     $BC     ; print string source pointer (2 bytes)
 @ %def PRINT_STRING_ADDR
 
 <<defines>>=
-BORDER_STR_VERT_L      EQU     $5EC1   ; vertical border pattern string (left)
-BORDER_STR_VERT_R      EQU     $5EC4   ; vertical border pattern string (right)
 BORDER_LOOP_CTR        EQU     $5DC3   ; loop counter for border label drawing
-@ %def BORDER_STR_VERT_L BORDER_STR_VERT_R BORDER_LOOP_CTR
+@ %def BORDER_LOOP_CTR
 
 @ Border label position tables, used by [[DRAW_BORDER_LABELS]] to
 place text labels around the game map border.
@@ -4391,8 +4385,12 @@ BORDER_STR_HORIZ:
     DC.B    $11               ; length = 17
     HEX     F0 F1 F0 F1 F0 F1 F0 F1
     HEX     F0 F1 F0 F1 F0 F1 F0 F1
-    DC.B    $F0,$02,$F0,$F1,$02,$F1,$F0
-@ %def BORDER_STR_HORIZ
+    DC.B    $F0               ; last byte of horiz pattern
+BORDER_STR_VERT_L:
+    DC.B    $02,$F0,$F1       ; vertical border pattern (left): len=2
+BORDER_STR_VERT_R:
+    DC.B    $02,$F1,$F0       ; vertical border pattern (right): len=2
+@ %def BORDER_STR_HORIZ BORDER_STR_VERT_L BORDER_STR_VERT_R
 
 <<draw border labels>>=
     ORG     $5CFD
@@ -4812,9 +4810,6 @@ initialization data table ([[WORLD_INIT_DATA]] at [[$62B9]]) to the game
 setup routine [[INPUT_LOOP]].  Called once from [[GAME_INIT]] to
 initialize locations and scene state.
 
-<<defines>>=
-WORLD_INIT_DATA         EQU     $62B9   ; world initialization data table
-@ %def WORLD_INIT_DATA
 
 <<init world>>=
     ORG     $62E5
@@ -4847,10 +4842,6 @@ INIT_STUB2:
 fields through indirect-indexed addressing (e.g.\ [[LDA ($08),Y]]
 with~Y selecting the field).
 
-<<defines>>=
-RWTS_IOB                EQU     $B7E8   ; RWTS Input/Output Block (14 bytes)
-@ %def RWTS_IOB
-
 <<zero page defines>>=
 RWTS_IOB_PTR            EQU     $08     ; ZP pointer to RWTS IOB ($B7E8)
 @ %def RWTS_IOB_PTR
@@ -4873,11 +4864,8 @@ INIT_DISK_IOB:
     STY     RWTS_IOB_PTR   ; /
     RTS
 @ %def INIT_DISK_IOB
-<<defines>>=
-INPUT_MODE          EQU     $5A00   ; 0 = keyboard, 1 = joystick
-@ %def INPUT_MODE
 
-Prompts the player to choose keyboard or joystick input.  Displays
+@ Prompts the player to choose keyboard or joystick input.  Displays
 message~\$38 (the prompt), then polls the keyboard and paddle button~1
 in a tight loop.  If the player presses the space bar, [[INPUT_MODE]]
 is set to~0 (keyboard).  If the paddle button state changes (pressed or
@@ -4942,10 +4930,6 @@ sum is simply the total mob count.
 <<zero page defines>>=
 CHAR_PTR                EQU     $FA     ; character record pointer (2 bytes, $FA/$FB)
 @ %def CHAR_PTR
-
-<<defines>>=
-TOTAL_MOB_COUNT     EQU     $5A01   ; total mobs across all groups (excl. group 0)
-@ %def TOTAL_MOB_COUNT
 
 <<init mob count>>=
     ORG     $0C51
@@ -6465,6 +6449,7 @@ SET_CURSOR_ROW21:
     LDA     #$15     ; WNDBTM = 21
     BNE     .shared  ; always taken (stretchy branch)
 
+SET_TEXT_WINDOW:
 SET_TEXT_WINDOW_BOTTOM:
     LDA     #$14     ; WNDBTM = 20
 
@@ -6474,7 +6459,7 @@ SET_TEXT_WINDOW_BOTTOM:
     JSR     PRINT_CTRL_AB
     LDA     #$86     ; Ctrl-F with high bit
     JMP     ROM_COUT1
-@ %def SET_CURSOR_ROW21 SET_TEXT_WINDOW_BOTTOM
+@ %def SET_CURSOR_ROW21 SET_TEXT_WINDOW SET_TEXT_WINDOW_BOTTOM
 The [[PRINT_BOTTOM_CENTERED]] centers text on row 23, which is the bottom of
 the screen.
 
@@ -6551,12 +6536,6 @@ each digit in [[NUM_DIGIT]] and writing it to the output buffer.
 [[NUM_LEADING]] suppresses leading zeros: it starts at~0 (suppress) and
 flips to~1 after the first nonzero digit.  [[NUM_DIVISOR]] ([[$5A1C/$5A1D]])
 holds the current power-of-ten divisor.
-
-<<defines>>=
-NUM_LEADING         EQU     $5A1E   ; leading-zero suppress flag (0=suppress, 1=print)
-NUM_DIVISOR         EQU     $5A1C   ; 16-bit divisor for decimal conversion (2 bytes)
-NUM_DIGIT           EQU     $5A1B   ; current digit accumulator (ASCII $B0-$B9)
-@ %def NUM_LEADING NUM_DIVISOR NUM_DIGIT
 
 <<zero page defines>>=
 DECIMAL_OUT_PTR         EQU     $BA     ; num-to-decimal output buffer pointer (2 bytes)
@@ -6692,11 +6671,6 @@ two lines were printed, a final scroll is performed on exit.
 table by skipping length-prefixed entries until the desired index is
 reached.  [[MSG_LINE_COUNT]] tracks how many lines have been printed so
 far, which controls whether the routine scrolls before or after printing.
-
-<<defines>>=
-MSG_TABLE_PTR           EQU     $4005   ; message table base (2 bytes)
-MSG_LINE_COUNT          EQU     $5A57   ; lines printed so far
-@ %def MSG_TABLE_PTR MSG_LINE_COUNT
 
 @ The routine below implements the message display.
 
@@ -7056,7 +7030,7 @@ placeholders in ``CONTINUE GAME NUMBER NN'' ([[S_CONTINUE_TENS]]/
 at [[ATTACK_NAME_BUF]] and drop amount display at
 [[DROP_DISPLAY_BUF]].
 
-<<game config and menu strings>>=
+<<menu strings>>=
     ORG     $7ADC
 MENU_OPTION_STRINGS:
     ; Menu option strings ($7ADC-$7D82) — length-prefixed high ASCII
@@ -7640,15 +7614,20 @@ pointer (\$4C80), bytes 2--8 are the first 9-byte record (group 0 header).
 <<char record header>>=
     ORG     $4000
 CHAR_RECORD_HEADER:
-    DC.W    MOB_DATA_TABLE         ; $4000: mob data base pointer ($4C80)
-    DC.B    $05                    ; $4002: CURRENT_PLAYER init (5)
+MOB_BASE_LO:
+    DC.B    <MOB_DATA_TABLE        ; $4000: mob data base pointer low
+MOB_BASE_HI:
+    DC.B    >MOB_DATA_TABLE        ; $4001: mob data base pointer high
+CHAR_LIST_HEAD:
+    DC.B    $05                    ; $4002: head of character linked list (mob index)
     DC.B    $9F                    ; $4003: position
     DC.B    $A0                    ; $4004: appearance
-    DC.B    $A6                    ; $4005: strength
+MSG_TABLE_PTR:
+    DC.B    $A6                    ; $4005: message table base (2 bytes, $4005/$4006)
     DC.B    $9A                    ; $4006: HP
     DC.B    $C9                    ; $4007: attack
     DC.B    $B0                    ; $4008: XP/group
-@ %def CHAR_RECORD_HEADER
+@ %def CHAR_RECORD_HEADER MOB_BASE_LO MOB_BASE_HI CHAR_LIST_HEAD MSG_TABLE_PTR
 @ Input callback jump vector, used by [[JMP (INPUT_JMP_VEC)]] at [[$5F5B]].
 
 <<input jump vector>>=
@@ -8011,7 +7990,8 @@ S_STEEL_DAGGER:
     APSTR   "A STEEL DAGGER"
 S_SHIV:
     APSTR   "A SHIV"
-    ; SHOP_EFFECT_TABLE (5 bytes): base effect values by item type
+SHOP_EFFECT_TABLE:
+    ; Base effect values by item type (5 bytes)
     HEX     07 88 84 83 06
 S_PLATE_ARMOR:
     APSTR   "PLATE ARMOR"
@@ -8023,9 +8003,10 @@ S_RITHMIL_CHAIN:
     APSTR   "RITHMIL CHAIN MAIL"
 S_LEATHER_ARMOR:
     APSTR   "LEATHER ARMOR"
-    ; XP_AWARD_TABLE (5 bytes): XP by action type
+XP_AWARD_TABLE:
+    ; XP by action type (5 bytes)
     HEX     75 35 53 23 21
-@ %def S_IRON_SWORD S_STEEL_SWORD S_OAK_CLUB S_STEEL_DAGGER S_SHIV S_PLATE_ARMOR S_RITHMIL_PLATE S_CHAIN_MAIL S_RITHMIL_CHAIN S_LEATHER_ARMOR
+@ %def S_IRON_SWORD S_STEEL_SWORD S_OAK_CLUB S_STEEL_DAGGER S_SHIV SHOP_EFFECT_TABLE S_PLATE_ARMOR S_RITHMIL_PLATE S_CHAIN_MAIL S_RITHMIL_CHAIN S_LEATHER_ARMOR XP_AWARD_TABLE
 
 <<map object names>>=
     ORG     $7FC3
@@ -8197,12 +8178,6 @@ full LCG state, [[PRNG_TEMP]] is a scratch byte used during the $69\times$
 multiplication, and [[PRNG_OUTPUT]] receives the state shifted right by one
 bit---this is the value most callers test for random decisions.
 
-<<defines>>=
-PRNG_STATE          EQU     $5A19   ; PRNG full state: val = 69*val + $53 (mod 256)
-PRNG_TEMP           EQU     $5A1A   ; PRNG temporary for multiplication
-PRNG_OUTPUT         EQU     $5A18   ; PRNG output (state >> 1), used for random tests
-@ %def PRNG_STATE PRNG_TEMP PRNG_OUTPUT
-
 <<step prng>>=
     ORG     $78A8
 ; ---------------------------------------------------------------
@@ -8272,11 +8247,6 @@ Output: A~=~random value in [[0..limit$-$1]].
 bitmask in [[RNG_MASK]] that covers the range.  It then loops, calling
 [[STEP_PRNG]] and masking [[PRNG_OUTPUT]] with [[RNG_MASK]], rejecting
 values that exceed the limit.
-
-<<defines>>=
-RNG_LIMIT           EQU     $5A11   ; random_in_range temporary (limit/shift count)
-RNG_MASK            EQU     $5A12   ; random_in_range bit mask
-@ %def RNG_LIMIT RNG_MASK
 
 @ The implementation below uses bit-mask tables for each power-of-two range
 bracket to minimize the number of PRNG calls.
@@ -8463,12 +8433,9 @@ character table header record at [[$4000]].  [[CHAR_LIST_HEAD]] at
 [[$4002]] is the head of the character linked list.
 
 <<defines>>=
-MOB_BASE_LO         EQU     $4000   ; mob data base address low byte
-MOB_BASE_HI         EQU     $4001   ; mob data base address high byte
-CHAR_LIST_HEAD      EQU     $4002   ; head of character linked list (mob index, 0=none)
 HIGH_NIBBLE_MASK    EQU     $F0     ; bits 7-4: generic high nibble extraction
 NAME_BUF_LEN        EQU     $14     ; character name display buffer length (20 bytes)
-@ %def MOB_BASE_LO MOB_BASE_HI CHAR_LIST_HEAD HIGH_NIBBLE_MASK NAME_BUF_LEN
+@ %def HIGH_NIBBLE_MASK NAME_BUF_LEN
 
 <<get mob data>>=
     ORG     $0C32
@@ -8551,10 +8518,6 @@ DELAY_WITH_ANIMATION:
 zero, it calls [[$74CB]] to advance the animation frame, then reloads the
 wait loop count from [[ANIM_WAIT_TABLE]] (indexed by [[ANIM_INDEX]]) into
 [[WAIT_LOOP_COUNT]].
-
-<<defines>>=
-WAIT_LOOP_COUNT         EQU     $5A8C   ; inner wait loop counter
-@ %def WAIT_LOOP_COUNT
 
 @ Animation frame countdown and per-frame wait counts, used by [[TICK_ANIM_COUNTER]].
 
@@ -8791,9 +8754,8 @@ inside the menu option strings area where the selected character's name
 is displayed.
 
 <<defines>>=
-BROWSE_CHAR_INDEX   EQU     $5A07   ; mob index of browsed character
 CHAR_SELECT_NAME    EQU     $7B4B   ; 20-byte name display buffer in menu
-@ %def BROWSE_CHAR_INDEX CHAR_SELECT_NAME
+@ %def CHAR_SELECT_NAME
 
 @ [[FIND_FIRST_PC]] scans the mob linked list from the head pointer at
 [[CHAR_LIST_HEAD]], following byte-2 links.  For each mob whose byte~4 (appearance)
@@ -9049,13 +9011,6 @@ zero-page pointer pairs to/from shadow locations in the [[$5A]] page:
 These pointers are heavily aliased---the same zero-page bytes serve
 different roles in different routines---so saving and restoring them is
 necessary when entering nested operations like scene loading or disk~I/O.
-
-<<defines>>=
-SAVED_TARGET_REC    EQU     $5A9A   ; saved TARGET_REC ($BC/$BD, 2 bytes)
-SAVED_ENTITY_PTR    EQU     $5A9C   ; saved ENTITY_PTR ($F8/$F9, 2 bytes)
-SAVED_DATA_PTR      EQU     $5A9E   ; saved DATA_PTR ($BE/$BF, 2 bytes)
-SAVED_MOB_PTR       EQU     $5AA0   ; saved MOB_PTR ($F4/$F5, 2 bytes)
-@ %def SAVED_TARGET_REC SAVED_ENTITY_PTR SAVED_DATA_PTR SAVED_MOB_PTR
 
 <<zero page defines>>=
 DATA_PTR                EQU     $BE     ; general data pointer / return value (2 bytes)
@@ -9714,35 +9669,6 @@ ev_astrologers_maze:                    ; 61: ASTROLOGER'S MAZE
     HEX AF C0 0A BD B4 2F BE B3 32
     HEX 1F D5 C6 FF FF FF
 @ %def LOCATION_EVENTS
-\label{sec:a478}
-
-The scene loop calls [[JSR $A478]] every iteration to check for user
-input.  This address is in the EALDR region ([[$A000]]--[[$BFFF]]),
-which remains in memory after the main program starts.
-
-The bytes at [[$A478]] include the undocumented NMOS 6502 opcode [[$04]]
-(a 2-byte NOP).  This could mean the code legitimately uses undocumented
-instructions, or that the region is modified at runtime before being called.
-
-Partial decode:
-
-\begin{verbatim}
-    A478: 04 E5         ; NOP $E5 (DOP: 2-byte NOP, reads zp $E5)
-    A47A: 19 03 64      ; ORA $6403,Y
-    ...
-    A483: CA            ; DEX
-    A484: D0 FD         ; BNE $A483   (inner delay loop)
-    A486: 38            ; SEC
-    A487: E9 01         ; SBC #$01
-    A489: D0 F6         ; BNE $A481   (outer delay loop)
-    A48B: 60            ; RTS
-\end{verbatim}
-
-The inner loop at [[$A483]]--[[$A484]] ([[DEX; BNE]]) is a standard
-delay loop.  The outer loop decrements A and repeats, making this a
-nested delay.  The carry flag state on exit likely indicates whether a
-key was pressed (C=1) or the timer expired (C=0).  Further analysis
-requires an emulator that supports undocumented 6502 opcodes.
 
 The attract screen call flow:
 
@@ -9823,14 +9749,6 @@ embedded in the string switch charset (ctrl-A), enter block mode (ctrl-B),
 move to the lower half (ctrl-C), and finish the block (ctrl-D), so that a
 single [[PRINT_STRING]] call renders an entire $2\times2$ font character.
 
-<<defines>>=
-CHAR_LOWER_LEFT     EQU     $80AB
-CHAR_LOWER_RIGHT    EQU     $80AC
-CHAR_UPPER_RIGHT    EQU     $80A9
-CHAR_CHARSET        EQU     $80A6
-CHAR_UPPER_LEFT     EQU     $80A8
-@ %def CHAR_LOWER_LEFT CHAR_LOWER_RIGHT CHAR_UPPER_RIGHT CHAR_CHARSET CHAR_UPPER_LEFT
-
 @ \subsection{Plot character}
 
 [[PLOT_CHAR]] renders a single custom font glyph at a given text
@@ -9877,19 +9795,9 @@ for bytes~3 and~4.  For character records these same offsets hold position
 and appearance; for location records they hold the bounding box corners.
 
 <<defines>>=
-SOURCE_CHAR         EQU     $5A28   ; source character for reorder
-BOUNDS_MAX_COL      EQU     $5A52   ; scene setup: right column boundary
-BOUNDS_MAX_ROW      EQU     $5A54   ; scene setup: bottom row boundary
-BOUNDS_MIN_COL      EQU     $5A51   ; scene setup: left column boundary
-BOUNDS_MIN_ROW      EQU     $5A53   ; scene setup: top row boundary
-FONT_COL            EQU     $5A0C   ; font cursor column coordinate
 LFIELD_MIN_POS      EQU     $03     ; location record byte 3: top-left bounding position
 LFIELD_MAX_POS      EQU     $04     ; location record byte 4: bottom-right bounding position
-@ %def SOURCE_CHAR BOUNDS_MAX_COL BOUNDS_MAX_ROW BOUNDS_MIN_COL BOUNDS_MIN_ROW FONT_COL LFIELD_MIN_POS LFIELD_MAX_POS
-
-<<defines>>=
-ACTIVE_CHAR         EQU     $5A29   ; character index being processed
-@ %def ACTIVE_CHAR
+@ %def LFIELD_MIN_POS LFIELD_MAX_POS
 
 <<scene setup>>=
     ORG     $0A17
@@ -9977,10 +9885,9 @@ transitions complete.
 <<defines>>=
 SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene number)
 SCENE_TEXT_DATA     EQU     $5C00   ; base address of scene text data
-SCENE_NUMBER        EQU     $5A99   ; current scene number
 PRNG_SCENE_SKIP_MASK EQU    $0A     ; bits 1+3: skip disk load ~75% of iterations
 TUNE_ATTRACT        EQU     $06     ; tune player index for attract/opening music
-@ %def SCENE_TRANSITION SCENE_TEXT_DATA SCENE_NUMBER PRNG_SCENE_SKIP_MASK TUNE_ATTRACT
+@ %def SCENE_TRANSITION SCENE_TEXT_DATA PRNG_SCENE_SKIP_MASK TUNE_ATTRACT
 
 <<scene loop>>=
     ORG     $6C37
@@ -10142,11 +10049,6 @@ After drawing the character sprite and loading its name pointer, shifts
 [[AI_WAIT_FLAG]] left by one (ROL) into [[WAIT_LOOP_COUNT]] and
 tail-calls [[TIMED_WAIT]].
 
-<<defines>>=
-CHAR_AI_MODE    EQU     $5A05   ; 0 = player, 2-5 = AI behavior modes
-AI_WAIT_FLAG    EQU     $5A06   ; wait delay for AI moves (0 or $0A)
-@ %def CHAR_AI_MODE AI_WAIT_FLAG
-
 <<setup scene display>>=
     ORG     $0901
 SETUP_SCENE_DISPLAY:
@@ -10194,18 +10096,8 @@ location is unchanged and the routine returns immediately.  Otherwise:
 \end{enumerate}
 
 <<defines>>=
-EVENT_POS           EQU     $5A5E   ; event position (from FIND_NEAREST_EVENT)
-VIEW_MIN_ROW        EQU     $5A0B   ; viewport min row
-VIEW_MIN_COL        EQU     $5A0A   ; viewport min column
-VIEW_MAX_ROW        EQU     $5A09   ; viewport max row
-VIEW_MAX_COL        EQU     $5A08   ; viewport max column
 STYLE_ID_MASK       EQU     $7F     ; strip visited flag (bit 7) from CFIELD_STYLE
-@ %def EVENT_POS VIEW_MIN_ROW VIEW_MIN_COL VIEW_MAX_ROW VIEW_MAX_COL STYLE_ID_MASK
-
-<<defines>>=
-FONT_ROW        EQU     $5A0D
-SET_TEXT_WINDOW EQU     $76C2   ; set text window parameters
-@ %def FONT_ROW SET_TEXT_WINDOW
+@ %def STYLE_ID_MASK
 
 <<enter location>>=
     ORG     $72A7
@@ -10272,10 +10164,6 @@ ENTER_LOCATION:
 [[CHECK_AT_BOUNDARY]] tests whether [[LOCATION_ID]] lies on any viewport
 edge.  Converts the position to column/row, compares against all four
 edges, and stores \$0001 in [[DATA_PTR]] if at edge, \$0000 if interior.
-
-<<defines>>=
-LOCATION_ID     EQU     $5A17   ; current location/position index
-@ %def LOCATION_ID
 
 <<check at boundary>>=
     ORG     $0BFA
@@ -10526,11 +10414,6 @@ DRAW_MAP_ENTITIES:
 blink alternate frame, waits for [[BLINK_DELAY]] ticks, restores the
 normal frame, and disables the blink cursor.
 
-<<defines>>=
-BLINK_CHAR      EQU     $5AA4   ; font character number
-BLINK_ROW       EQU     $5AA3   ; font row
-@ %def BLINK_CHAR BLINK_ROW
-
 @ Blink delay parameter, used by [[DRAW_MAP_ICON_B]].
 
 <<blink delay>>=
@@ -10573,10 +10456,6 @@ command code (IOB+\$0C: 1=read, 2=write) and fall through to
 [[RWTS_DISPATCH]] stores the command at IOB+\$0C, clears the volume
 field at IOB+\$03, then calls [[RWTS_ENTRY]] with the IOB pointer
 from~\$08/\$09.  Carry reflects the RWTS result (clear=success).
-
-<<defines>>=
-RWTS_ENTRY              EQU     $B7B5   ; RWTS entry: PHP/SEI, JSR RWTS_CORE, CLC/SEC
-@ %def RWTS_ENTRY
 
 <<disk read write>>=
     ORG     $6C12
@@ -10883,15 +10762,20 @@ position conversion, for callers that have already set [[TEXT_COL]] and
 s_PRINT_FONT_CHAR:
     HEX     09              ; string length: 9 bytes follow
     HEX     81              ; ctrl-A: select charset (next byte = selector)
-    HEX     B1              ; CHAR_CHARSET (self-modified: HRCG charset selector)
+CHAR_CHARSET:
+    HEX     B1              ; $80A6: self-modified HRCG charset selector
     HEX     82              ; ctrl-B: enter block-display mode
-    HEX     A0              ; CHAR_UPPER_LEFT (self-modified: upper-left glyph)
-    HEX     A0              ; CHAR_UPPER_RIGHT (self-modified: upper-right glyph)
+CHAR_UPPER_LEFT:
+    HEX     A0              ; $80A8: self-modified upper-left glyph
+CHAR_UPPER_RIGHT:
+    HEX     A0              ; $80A9: self-modified upper-right glyph
     HEX     83              ; ctrl-C: advance to lower-left of block
-    HEX     A0              ; CHAR_LOWER_LEFT (self-modified: lower-left glyph)
-    HEX     A0              ; CHAR_LOWER_RIGHT (self-modified: lower-right glyph)
+CHAR_LOWER_LEFT:
+    HEX     A0              ; $80AB: self-modified lower-left glyph
+CHAR_LOWER_RIGHT:
+    HEX     A0              ; $80AC: self-modified lower-right glyph
     HEX     84              ; ctrl-D: complete block and emit it
-@ %def s_PRINT_FONT_CHAR
+@ %def s_PRINT_FONT_CHAR CHAR_CHARSET CHAR_UPPER_LEFT CHAR_UPPER_RIGHT CHAR_LOWER_LEFT CHAR_LOWER_RIGHT
 
 <<render font char>>=
     ORG     $7489
@@ -11016,9 +10900,8 @@ during [[FIND_ENTITY_AT_POS]].
 distinguish mob records (bit~7 set) from character records (bit~7 clear).
 
 <<defines>>=
-ENTITY_SEARCH_POS   EQU     $5A17   ; scratch: target position for FIND_ENTITY_AT_POS
 MOB_PTR_FLAG        EQU     $80     ; bit 7 flag in ENTITY_REC+1: set = mob
-@ %def ENTITY_SEARCH_POS MOB_PTR_FLAG
+@ %def MOB_PTR_FLAG
 
 <<find entity at pos>>=
     ORG     $0B62
@@ -11225,15 +11108,6 @@ from the current combatant so the blink cursor tracks the active entity.
     [[ENTITY_REC]] so [[GET_ENTITY_FONTCHAR]] can look up the player sprite.
 \end{itemize}
 
-<<defines>>=
-IS_PLAYER_TURN  EQU     $5A74   ; 0 = mob's turn, 1 = player's turn
-@ %def IS_PLAYER_TURN
-
-<<defines>>=
-CURRENT_COL     EQU     $5A63   ; current column during turn
-CURRENT_ROW     EQU     $5A64   ; current row during turn
-@ %def CURRENT_ROW CURRENT_COL
-
 <<set blink target>>=
     ORG     $16A3
 SET_BLINK_TARGET:
@@ -11311,12 +11185,6 @@ compared during the insertion phase.  [[REORDER_LINK]] saves the removed
 node's next-link so it can be spliced back in.  [[CURRENT_ROOM]] records
 which room is being processed.  [[REORDER_CHAR]] uses all three during
 the two-phase unlink-and-reinsert operation.
-
-<<defines>>=
-REORDER_SORT_KEY    EQU     $5A2B   ; temp: byte 11 of node for sorted insert
-CURRENT_ROOM        EQU     $5A03   ; current room/location being processed
-REORDER_LINK        EQU     $5A2A   ; temp: saved next-link during reorder
-@ %def REORDER_SORT_KEY CURRENT_ROOM REORDER_LINK
 
 <<reorder char>>=
     ORG     $0F84
@@ -11452,10 +11320,6 @@ Called exclusively from [[REORDER_CHAR]] (\$0F84).
 @ [[GROUP_COUNT_DELTA]] holds +1 or $-$1, set by the two entry points
 [[INCR_GROUP_COUNT]] and [[DECR_GROUP_COUNT]] respectively.  The shared
 body adds this delta to the low nibble of byte 8 of the group head record.
-
-<<defines>>=
-GROUP_COUNT_DELTA   EQU     $5A2C   ; +1 or -1 delta for group count adjustment
-@ %def GROUP_COUNT_DELTA
 
 <<adjust char byte8>>=
     ORG     $102F
@@ -11679,10 +11543,6 @@ character's sprite index from [[CHAR_SPRITE]], sets [[FONT_CHARSET]] to~1
 (custom font), and tail-calls [[RENDER_FONT_CHAR]] to draw the sprite at the
 entity's position.  This is the standard way to draw or redraw a character's
 map icon.
-
-<<defines>>=
-CHAR_SPRITE         EQU     $5A04   ; character's font char number for display
-@ %def CHAR_SPRITE
 
 <<setup char sprite>>=
     ORG     $0933
@@ -11937,12 +11797,6 @@ stream across [[RENDER_FONT_CHAR]] calls, since rendering may clobber~Y.
 [[TEXT_RENDERER]] initializes the margins (2 and 18) and row, then loops
 through bytes, advancing the column and wrapping to the next row when it
 passes the right margin.
-
-<<defines>>=
-TEXT_RIGHT_MARGIN        EQU     $5A96   ; right margin column for text wrap
-TEXT_LEFT_MARGIN         EQU     $5A97   ; left margin column for text wrap
-TEXT_STREAM_IDX          EQU     $5A98   ; saved Y index into byte stream
-@ %def TEXT_RIGHT_MARGIN TEXT_LEFT_MARGIN TEXT_STREAM_IDX
 
 @ The routine below processes the byte stream.
 
@@ -12634,8 +12488,20 @@ LOCATION_DATA:
     DC.B $00
 
     DC.W $FFFF               ; end sentinel
-    HEX 12 01 00 00 00 00 A0 ; unused padding to $4240
-@ %def LOCATION_DATA
+EVENT_THRESHOLD:
+    DC.B    $12                ; $4239: random event probability threshold (~7%)
+SCENE_COMBAT_FLAG:
+    DC.B    $01                ; $423A: nonzero = combat pending
+SCENE_P3_DONE:
+    DC.B    $00                ; $423B: nonzero = player 3 scene processed
+SCENE_P1_DONE:
+    DC.B    $00                ; $423C: nonzero = player 1 scene processed
+SCENE_HOSTILE_DONE:
+    DC.B    $00                ; $423D: nonzero = hostile encounter processed
+SCENE_EVENT_RESULT:
+    DC.B    $00                ; $423E: nonzero = event fully handled
+    DC.B    $A0                ; $423F: padding
+@ %def LOCATION_DATA EVENT_THRESHOLD SCENE_COMBAT_FLAG SCENE_P3_DONE SCENE_P1_DONE SCENE_HOSTILE_DONE SCENE_EVENT_RESULT
 
 <<main entry>>=
     ORG     $0800
@@ -12908,11 +12774,6 @@ If neither is found, the mob has nothing to react to, so
 [[CLEAR_RESTRICTED]] is called and the turn is skipped.  This keeps the game
 moving briskly---mobs in empty corridors don't waste time.
 
-<<defines>>=
-ADJACENT_THREAT         EQU     $5A26   ; accumulated adjacent threat level
-ENCOUNTER_RESULT        EQU     $5A1F   ; 0/1/2 from CHECK_ENCOUNTER
-@ %def ADJACENT_THREAT ENCOUNTER_RESULT
-
 <<check mob needs turn>>=
     ORG     $0958
 CHECK_MOB_NEEDS_TURN:
@@ -13122,15 +12983,6 @@ steps consumed so far.  [[INPUT_DIR]] holds the direction or command
 code (1--9) from the player or AI.  [[TURN_ACTIVE]] is set to 1 while
 the turn loop is running.  All six variables are initialized by
 [[GAME_TURN_LOOP]] at the start of each character's turn.
-
-<<defines>>=
-TURN_START_COL  EQU     $5A61   ; column at start of turn
-TURN_START_ROW  EQU     $5A62   ; row at start of turn
-MOVE_POINTS     EQU     $5A65   ; movement points remaining
-STEPS_TAKEN     EQU     $5A66   ; steps taken this turn
-INPUT_DIR       EQU     $5A67   ; direction/command from input (1-9)
-TURN_ACTIVE     EQU     $5B27   ; 1 while turn is in progress
-@ %def TURN_START_COL TURN_START_ROW MOVE_POINTS STEPS_TAKEN INPUT_DIR TURN_ACTIVE
 
 <<game turn loop>>=
     ORG     $19AD
@@ -13407,10 +13259,6 @@ If [[TURN_TUNE_GUARD]] is exactly~\$16---meaning this is the
 first call since [[COMMIT_MOVE]] set it---the guard is decremented and the
 [[TUNE_PLAYER]] is invoked to play the movement sound effect.
 
-<<defines>>=
-TURN_TUNE_GUARD   EQU     $5AA9   ; turn reset: guards one-shot script execution
-@ %def TURN_TUNE_GUARD
-
 <<commit move>>=
     ORG     $1B52
 COMMIT_MOVE:
@@ -13675,10 +13523,6 @@ in-place action.
 [[INPUT_LOOP]] writes the exit handler address from the selected record
 into [[INPUT_JMP_VEC]] and executes it via [[JMP (INPUT_JMP_VEC)]].
 
-<<defines>>=
-CURRENT_SELECTION EQU   $5AAB   ; current menu selection index
-@ %def CURRENT_SELECTION
-
 @ [[READ_KEYBOARD]] at [[$A44C]] is the keyboard input routine in the
 relocated block (\$9600--\$A8FF).  [[INPUT_LOOP]] calls it to wait for
 a keypress; a zero return indicates the player pressed return (select),
@@ -13765,10 +13609,6 @@ SETUP_INPUT:
 option, it calls [[CALC_RECORD_PTR]] to locate the option's data record, checks
 whether byte~0 of the record is non-zero (enabled), and if so copies the
 record's display data into the input buffer with [[COPY_RECORD_DATA]].
-
-<<defines>>=
-INPUT_OPTION_COUNT EQU  $5AAA   ; number of input options to draw
-@ %def INPUT_OPTION_COUNT
 
 <<draw input options>>=
     ORG     $5F70
@@ -13946,9 +13786,6 @@ returning so the caller's record context is preserved.
 input record.  It saves the starting offset for the scan so
 [[READ_INPUT_CHAR]] can return the key code one position beyond it.
 
-<<defines>>=
-INPUT_SCAN_OFFSET   EQU     $5B24   ; scan position index for VALIDATE_INPUT/READ_INPUT_CHAR
-@ %def INPUT_SCAN_OFFSET
 
 <<validate input>>=
     ORG     $5FDD
@@ -14044,10 +13881,6 @@ CALL_INPUT_INIT:
 @ [[CLEAR_INPUT_BUFFER]] fills the 120-byte input display buffer
 ([[INPUT_BUFFER]] through [[INPUT_BUFFER]]+\$77) with high-bit spaces (\$A0).
 This provides a clean slate before menu options are drawn into the buffer.
-
-<<defines>>=
-INPUT_BUFFER    EQU     $5AAC   ; 120-byte input text display buffer
-@ %def INPUT_BUFFER
 
 <<clear input buffer>>=
     ORG     $6024
@@ -14156,11 +13989,6 @@ followed by seven 10-byte option records.  Each record contains an enable flag
 a key code (byte~2), a display string pointer (bytes~6--7), and an exit
 handler address (bytes~8--9).  The seven options correspond to movement,
 two combat choices, flee, and three additional actions (one of which is rest).
-
-<<defines>>=
-SAFE_TO_REST    EQU     $5B26   ; 1 if no adjacent threats or encounters
-UNDER_LEVEL     EQU     $5B25   ; 1 if char level < steps taken
-@ %def SAFE_TO_REST UNDER_LEVEL
 
 <<game input table>>=
     ORG     $607D
@@ -14630,6 +14458,7 @@ MENU_DROP_DEC:
 
 <<save load table>>=
     ORG     $62B9
+WORLD_INIT_DATA:
 SAVE_LOAD_TABLE:
     ; 4 options, max_range=1, init=SAVE_LOAD_INIT
     DC.B    $04,$01
@@ -14650,7 +14479,7 @@ SAVE_LOAD_TABLE:
     HEX     01 71 01 01 03 02
     DC.W    $7B62              ; "@"
     DC.W    SLOT_DEC_ENTER
-@ %def SAVE_LOAD_TABLE
+@ %def WORLD_INIT_DATA SAVE_LOAD_TABLE
 
 @ \subsection{Save/load slot routines}
 
@@ -15223,10 +15052,6 @@ option in the save game slot menu.
   flag.  Subsequent calls jump directly to [[ENTER_SCENARIO_DISK]].
 \end{itemize}
 
-<<defines>>=
-SCENARIO_INIT_FLAG  EQU     $6A58   ; self-modifying: 0=first scenario save, 1=initialized
-@ %def SCENARIO_INIT_FLAG
-
 <<save game>>=
     ORG     $6A47
 SAVE_GAME:
@@ -15250,7 +15075,8 @@ SAVE_GAME:
     JSR     WRITE_GAME_DATA
     JMP     MOVE_LOOP
 
-    DC.B    $00                ; SCENARIO_INIT_FLAG ($6A58)
+SCENARIO_INIT_FLAG:
+    DC.B    $00                ; $6A58: self-modifying flag (0=first, 1=initialized)
 
 .scenario:
     LDA     SCENARIO_INIT_FLAG
@@ -15262,7 +15088,7 @@ SAVE_GAME:
     STA     SCENARIO_INIT_FLAG ; set flag (self-modifying)
 .already_init:
     JMP     ENTER_SCENARIO_DISK
-@ %def SAVE_GAME
+@ %def SAVE_GAME SCENARIO_INIT_FLAG
 
 @ \subsection{Scenario disk handlers}
 
@@ -15891,12 +15717,6 @@ comparison target.  [[COLOCATE_LINK]] saves the starting mob's next-link
 is set to 2 initially (found ahead in chain) and changed to 1 if the search
 wraps past the end.  [[FIND_MOB_AT_SAME_POS]] returns this value on success.
 
-<<defines>>=
-COLOCATE_POS            EQU     $5A21   ; saved position for co-location search
-COLOCATE_LINK           EQU     $5A20   ; saved next-link (stop condition)
-COLOCATE_WRAPPED        EQU     $5A22   ; 1 if wrapped, 2 if ahead
-@ %def COLOCATE_POS COLOCATE_LINK COLOCATE_WRAPPED
-
 @ The routine below implements the co-location search.
 
 <<find mob at same pos>>=
@@ -15959,12 +15779,6 @@ their font-char remainders differ (different hostile sub-factions).
 [[HOSTILE_A]] and [[HOSTILE_Y]] save the return values (remainder and
 faction flag) from the first [[GET_HOSTILITY]] call, allowing the routine
 to compare both factions after the second call completes.
-
-<<defines>>=
-HOSTILE_APP             EQU     $5A23   ; saved appearance for hostility check
-HOSTILE_A               EQU     $5A24   ; saved A from first GET_HOSTILITY
-HOSTILE_Y               EQU     $5A25   ; saved Y from first GET_HOSTILITY
-@ %def HOSTILE_APP HOSTILE_A HOSTILE_Y
 
 @ The routine below implements the hostility comparison.
 
@@ -16043,10 +15857,6 @@ position~199 no right, positions~0--19 no up, positions~180--199 no down.
 [[CHECK_ADJACENT_THREATS]].  The routine adds and subtracts offsets (1 for
 left/right, 20 for up/down) from this saved position to compute the four
 cardinal neighbors, passing each to [[SUM_HOSTILE_AT_POS]].
-
-<<defines>>=
-ADJACENT_POS            EQU     $5A27   ; saved position for adjacency check
-@ %def ADJACENT_POS
 
 @ The routine below implements the four-direction threat scan.
 
@@ -16195,10 +16005,6 @@ depending on the high bit of the chosen field, a random roll against either
 \$0D or \$50 determines whether a special event triggers.  On a roll of zero,
 the field is marked~\$81, scene~1 is displayed, and a bonus of 0--9 is added
 to the combat strength (capped at~\$1F).
-
-<<defines>>=
-COMBAT_STRENGTH EQU     $5A78   ; result of CALC_COMBAT_STRENGTH
-@ %def COMBAT_STRENGTH
 
 <<calc combat strength>>=
     ORG     $16E0
@@ -16532,10 +16338,6 @@ changed.  If the position is unchanged, it returns A=0 (no new mob).
 If byte~4 (appearance) is~$\ge$\$15, the mob is a valid attackable
 target and it returns A=1.  Otherwise it retries up to the loop limit.
 
-<<defines>>=
-SAVED_MOB_LINK      EQU     $5A75   ; temp: saved byte 2 of mob record
-@ %def SAVED_MOB_LINK
-
 <<attack eligibility>>=
     ORG     $155E
 SELECT_SOMEONE_ELSE:
@@ -16653,7 +16455,6 @@ bonus and then clears bit~4 of byte~11, consuming the rage for
 future turns.
 
 <<defines>>=
-COMBAT_WILLINGNESS EQU  $5A76   ; accumulated willingness-to-fight score
     ; --- Byte 11 (MFIELD_LEVEL) flag bit masks ---
 LEVEL_BIT5_MASK     EQU     $20     ; byte 11 bit 5: rage/berserk flag
 LEVEL_CLEAR_BIT4    EQU     $EF     ; byte 11: clear bit 4 (consume rage)
@@ -16665,8 +16466,7 @@ FLAGS_STATE_MASK    EQU     $03     ; byte 15 bits 1-0: combat state (0-3)
     ; --- Byte 5 defense mask ---
 DEFENSE_HALF_MASK   EQU     $0F     ; byte 5: defense (bits 4-1 shifted down via ROR)
     ; --- Scratch ---
-TARGET_DEFENSE      EQU     $5A77   ; scratch: target's defense value
-@ %def COMBAT_WILLINGNESS LEVEL_BIT5_MASK LEVEL_CLEAR_BIT4 TARGET_BIT6_MASK TARGET_BIT7_MASK FLAGS_ENGAGED_BIT FLAGS_STATE_MASK DEFENSE_HALF_MASK TARGET_DEFENSE
+@ %def LEVEL_BIT5_MASK LEVEL_CLEAR_BIT4 TARGET_BIT6_MASK TARGET_BIT7_MASK FLAGS_ENGAGED_BIT FLAGS_STATE_MASK DEFENSE_HALF_MASK
 
 <<resolve attack>>=
     ORG     $15AB
@@ -17013,11 +16813,6 @@ For player characters (appearance below [[NPC_APPEARANCE_MIN]]),
 [[SCENE_COMBAT_FLAG]] is cleared to signal that the player is under
 attack.
 
-<<defines>>=
-SCENE_COMBAT_FLAG       EQU     $423A   ; nonzero = combat pending
-MOB_DEFENSE     EQU     $5A79   ; mob defense value (low 4 bits of mob byte 8)
-@ %def SCENE_COMBAT_FLAG MOB_DEFENSE
-
 <<mob attack>>=
     ORG     $1860
 MOB_ATTACK:
@@ -17138,10 +16933,6 @@ remaining HP:
 \item Below~8: ``wounded.''
 \item 8~or above: ``scratched.''
 \end{itemize}
-
-<<defines>>=
-DAMAGE_AMOUNT       EQU     $5A10   ; damage to apply / new HP after subtraction
-@ %def DAMAGE_AMOUNT
 
 <<apply damage>>=
     ORG     $106F
@@ -17310,10 +17101,6 @@ PRNG.
 during specific encounters (type [[$40]] and above).  [[HANDLE_ENCOUNTER]]
 writes the character's updated position from this variable after committing
 the move and reordering the character.
-
-<<defines>>=
-EVENT_DEST_POS      EQU     $5A5F   ; event handler: destination position
-@ %def EVENT_DEST_POS
 
 @ [[EVENT_PTR]] is a 2-byte zero-page pointer at [[$BE/$BF]] that points
 to the current event list entry.  [[HANDLE_ENCOUNTER]] reads the event
@@ -17589,11 +17376,6 @@ and either clear the event slot or decrement a counter for multi-use
 containers.  [[EVENT_PRNG_CHECK]] itself rolls the PRNG and, if the result is
 below~\$14, applies 1--2 points of trap damage with the restricted flag set.
 
-<<defines>>=
-EVENT_SUB_VALUE EQU     $5A5A   ; lower 5 bits of event slot byte 2
-EVENT_SLOT_BYTE EQU     $5A59   ; saved byte 2 of event slot (type+value)
-@ %def EVENT_SUB_VALUE EVENT_SLOT_BYTE
-
 <<handle event slot>>=
     ORG     $1D4D
 HANDLE_EVENT_SLOT:
@@ -17793,17 +17575,10 @@ high paths, execution falls through to the low path for a final check.
 @ [[BEST_THREAT]] accumulates the highest threat or strength score seen
 so far while [[SELECT_COMBAT_TARGET]] iterates through group members.
 
-<<defines>>=
-BEST_THREAT     EQU     $5A88   ; best threat level during target selection
-@ %def BEST_THREAT
-
 @ [[TARGET_PTR]] and [[TARGET_PTR+1]] record the pointer to the
 mob with the best score.  When [[SELECT_COMBAT_TARGET]] finishes and
 returns 1 (attack ready), the caller uses these to load the target.
 
-<<defines>>=
-TARGET_PTR      EQU     $5A86   ; selected combat target pointer (2 bytes)
-@ %def TARGET_PTR
 @ \subsection{Entity threat evaluation}
 
 [[GET_ENTITY_THREAT]] evaluates the threat level of the mob at
@@ -18186,10 +17961,6 @@ additional point becoming less likely.  For player characters (field~4 below
 the [[HEAL_NOTIFIED]] flag to avoid repeating the notification on subsequent
 HP increments.
 
-<<defines>>=
-HEAL_NOTIFIED       EQU     $5A16   ; auto heal: nonzero = already printed heal message
-@ %def HEAL_NOTIFIED
-
 <<auto heal>>=
     ORG     $143F
 AUTO_HEAL:
@@ -18284,11 +18055,6 @@ which encodes a derived level/XP value.  The recomputation uses field~5
 (shifted left 3~bits) as a scaling factor and iterates through a level
 progression, comparing accumulated thresholds against the character's gold
 (fields~13--14) to determine the appropriate level encoding.
-
-<<defines>>=
-STAT_SCALE          EQU     $5A7E   ; strength-derived level threshold step
-STAT_LEVEL_BITS     EQU     $5A7F   ; level bits during stat modification
-@ %def STAT_SCALE STAT_LEVEL_BITS
 
 <<zero page defines>>=
 LEVEL_THRESHOLD     EQU     $BA     ; 16-bit level threshold accumulator (2 bytes)
@@ -18439,12 +18205,6 @@ position into column and row via [[POS_TO_COLROW]].
 selects as the destination, and [[AI_TARGET_COL]] holds the column
 component after unpacking.
 
-<<defines>>=
-AI_PREV_DIR         EQU     $5A5D   ; NPC AI: previous move direction (bias avoidance)
-AI_TARGET_COL   EQU     $5A72   ; AI target column / min distance temp
-AI_TARGET_POS   EQU     $5A71   ; AI target position (set by AI_CHOOSE_TARGET)
-@ %def AI_PREV_DIR AI_TARGET_COL AI_TARGET_POS
-
 @ [[AI_BEST_POS]] and [[AI_BEST_STR]] are zero-page temporaries at
 [[$BE]] and [[$BF]] that [[AI_CHOOSE_TARGET]] uses in mode 5 to track
 the strongest hostile mob found during the group iteration.
@@ -18454,10 +18214,6 @@ AI_SCRATCH              EQU     $BA     ; scratch byte in AI_CHOOSE_TARGET
 AI_BEST_POS             EQU     $BE     ; best hostile position in ai_choose_target
 AI_BEST_STR             EQU     $BF     ; best hostile strength in ai_choose_target
 @ %def AI_SCRATCH AI_BEST_POS AI_BEST_STR
-
-<<defines>>=
-AI_TARGET_ROW       EQU     $5A73   ; AI target row (from POS_TO_COLROW)
-@ %def AI_TARGET_ROW
 
 <<ai choose target>>=
     ORG     $68AB
@@ -18636,12 +18392,6 @@ position for that direction.  [[NPC_MOVE_AI]] fills the array, randomizes
 the scores, and picks the direction with the lowest value.
 
 <<defines>>=
-AI_TEST_POS     EQU     $5A70   ; position being tested for direction evaluation
-AI_DIRECTION    EQU     $5A6F   ; current direction being evaluated / random range
-DIR_SCORES      EQU     $5A6A   ; array of 5 direction scores (indexed 0-4)
-@ %def AI_TEST_POS AI_DIRECTION DIR_SCORES
-
-<<defines>>=
 MAP_WIDTH           EQU     $14     ; map grid width (20 columns)
 AI_RANDOM_NORMAL    EQU     $06     ; randomization range for normal AI
 AI_RANDOM_PHASE4    EQU     $0F     ; randomization range for phase 4 AI
@@ -18791,11 +18541,6 @@ mobs of various strength ranges, and locked/safe events each contribute
 different penalty amounts via [[INC_MOB_COUNTERS]].  The entity's position
 is restored before returning.
 
-<<defines>>=
-AI_BEST_DIST        EQU     $5A68   ; current best distance to AI target
-AI_SAVED_POS        EQU     $5A69   ; saved entity position during direction eval
-@ %def AI_BEST_DIST AI_SAVED_POS
-
 <<evaluate direction>>=
     ORG     $6815
 EVALUATE_DIRECTION:
@@ -18933,9 +18678,6 @@ found.  The winning position is returned in~A and stored at~\$5A13 for the AI
 to use as a movement target.
 
 <<defines>>=
-NEAREST_DIST        EQU     $5A14   ; current minimum distance during event search
-NEAREST_POS         EQU     $5A13   ; position of nearest event found
-CANDIDATE_POS       EQU     $5A15   ; position of event being evaluated
     ; --- Event record field offsets (3-byte entries) ---
 EVFIELD_POSITION    EQU     $00     ; byte 0: packed map position
 EVFIELD_TYPE        EQU     $01     ; byte 1: event type (>= $C0 = activated)
@@ -18946,7 +18688,7 @@ EVENT_ACCUM_MAX     EQU     $D1     ; event types < this are accumulable ($C0-$D
 EVENT_VALUE_HI_MASK EQU     $07     ; mask for value high bits stored in type byte
 EVENT_EMPTY         EQU     $FE     ; event list: empty slot marker
 EVENT_END           EQU     $FF     ; event list: end-of-list marker
-@ %def NEAREST_DIST NEAREST_POS CANDIDATE_POS EVFIELD_POSITION EVFIELD_TYPE EVFIELD_VALUE EVENT_RECORD_SIZE EVENT_ACTIVATED EVENT_ACCUM_MAX EVENT_VALUE_HI_MASK EVENT_EMPTY EVENT_END
+@ %def EVFIELD_POSITION EVFIELD_TYPE EVFIELD_VALUE EVENT_RECORD_SIZE EVENT_ACTIVATED EVENT_ACCUM_MAX EVENT_VALUE_HI_MASK EVENT_EMPTY EVENT_END
 
 <<find nearest event>>=
     ORG     $138D
@@ -19074,12 +18816,6 @@ the item name string into the display buffer, and enters the game's
 alternative input loop via [[START_GAME_INPUT]] so the player can choose to
 buy.  The item mask is rotated right to advance through items, wrapping around
 when all bits have been checked.
-
-<<defines>>=
-SHOP_PRICE          EQU     $5A81   ; shop: accumulated price (2 bytes)
-SHOP_ITEM_MASK      EQU     $5A80   ; shop: bitmask for current item ($80 rotating right)
-SHOP_ITEM_OFFSET EQU    $5A85   ; offset into shop record (5 per item slot)
-@ %def SHOP_PRICE SHOP_ITEM_MASK SHOP_ITEM_OFFSET
 
 <<zero page defines>>=
 SHOP_DATA_PTR           EQU     $E6     ; ZP pointer to current shop item record (2 bytes)
@@ -19285,10 +19021,9 @@ SHOP_RECORD_SIZE        EQU     $29     ; size of one shop record (41 bytes)
 SHOP_SCENE_OFFSET       EQU     $28     ; offset of scene number within shop record
 SHOP_TYPE_FIELD         EQU     $01     ; entity record byte 1: shop type ($D5=weapons, $D6=armor)
 SHOP_AVAIL_FIELD        EQU     $02     ; entity record byte 2: item validity bitmask
-SHOP_VALID_MASK         EQU     $5A83   ; copy of item validity bitmask during shop display
 SHOP_PRICE_DIGITS       EQU     S_PAY_FOR+5  ; 6-byte price field in "PAY 000000 FOR" string
 SHOP_ITEM_NAME          EQU     S_PAY_FOR+16 ; 20-byte item name field after "FOR " in pay string
-@ %def SHOP_RECORD_SIZE SHOP_SCENE_OFFSET SHOP_TYPE_FIELD SHOP_AVAIL_FIELD SHOP_VALID_MASK SHOP_PRICE_DIGITS SHOP_ITEM_NAME
+@ %def SHOP_RECORD_SIZE SHOP_SCENE_OFFSET SHOP_TYPE_FIELD SHOP_AVAIL_FIELD SHOP_PRICE_DIGITS SHOP_ITEM_NAME
 
 <<advance shop ptr>>=
     ORG     $71F0
@@ -19348,11 +19083,6 @@ the result at byte~Y of the entity record.  It then extracts bits~2--1
 of byte~5 (defense field) and adds that bonus to the same field.
 Finally it jumps to [[$7194]] (the browse handler, to continue
 shopping).
-
-<<defines>>=
-LOCATION_STYLE_BITS EQU     $5A84   ; location style (0-3), used as modifier
-SHOP_EFFECT_TABLE   EQU     $7F6D   ; 5-byte table of base effect values
-@ %def LOCATION_STYLE_BITS SHOP_EFFECT_TABLE
 
 <<shop buy effects>>=
     ORG     $720B
@@ -19424,10 +19154,6 @@ The common handler:
   merges it with the saved upper bits back into byte~11.
 \item Jumps to [[$7194]] (browse handler).
 \end{itemize}
-
-<<defines>>=
-XP_AWARD_TABLE      EQU     $7FBE   ; 5-byte XP award values by action type
-@ %def XP_AWARD_TABLE
 
 <<defines>>=
     ; (ENTITY_LEVEL_FIELD and ENTITY_XP_FIELD removed; use MFIELD_LEVEL and MFIELD_XP)
@@ -19569,9 +19295,6 @@ game world feels unpredictably alive.
 events.  [[RANDOM_EVENTS]] compares each PRNG roll against this value; a
 roll below the threshold triggers the corresponding event handler.
 
-<<defines>>=
-EVENT_THRESHOLD         EQU     $4239   ; random event probability threshold (~7%)
-@ %def EVENT_THRESHOLD
 
 <<random events>>=
     ORG     $65A9
@@ -19968,16 +19691,6 @@ for the scan.  [[SCENE_P1_DONE]], [[SCENE_P3_DONE]],
 the [[$4230]] region that [[CHECK_SCENE_EVENTS]] tests and sets to prevent
 the same phase from firing twice in one round.
 
-<<defines>>=
-SCENE_FOUND_FLAG        EQU     $5A89   ; scan result: 1 = matching group found
-SCENE_HOSTILE_FLAG      EQU     $5A8A   ; scan result: nonzero = hostile encountered
-SCENE_GROUP_IDX         EQU     $5A8B   ; current group index for scanning
-SCENE_P3_DONE           EQU     $423B   ; nonzero = player 3 scene processed
-SCENE_P1_DONE           EQU     $423C   ; nonzero = player 1 scene processed
-SCENE_HOSTILE_DONE      EQU     $423D   ; nonzero = hostile encounter processed
-SCENE_EVENT_RESULT      EQU     $423E   ; nonzero = event fully handled
-@ %def SCENE_FOUND_FLAG SCENE_HOSTILE_FLAG SCENE_GROUP_IDX SCENE_P3_DONE SCENE_P1_DONE SCENE_HOSTILE_DONE SCENE_EVENT_RESULT
-
 <<check scene events>>=
     ORG     $6DFA
 SCENE_LOADER_END:
@@ -20254,10 +19967,8 @@ If the entity has no gold, it displays message~\$2E and returns to
 the other options menu.
 
 <<defines>>=
-DROP_AMOUNT         EQU     $5A7A   ; drop gold amount (2 bytes)
-DROP_STEP           EQU     $5A7C   ; binary search step (2 bytes)
 DROP_DISPLAY_BUF    EQU     $7CEB   ; 5-byte decimal display buffer
-@ %def DROP_AMOUNT DROP_STEP DROP_DISPLAY_BUF
+@ %def DROP_DISPLAY_BUF
 
 <<init drop gold>>=
     ORG     $6F17
@@ -20651,10 +20362,6 @@ field~5 and field~11 (via [[INC_STRENGTH]] and
 [[INC_LEVEL]]), and then rolls a 1-in-3 chance for a bonus
 scene~\$0C (a lucky find).  On the bonus path, the event slot is marked
 empty.
-
-<<defines>>=
-TRAP_TYPE           EQU     $5A58   ; treasure trap: random trap type (0-3)
-@ %def TRAP_TYPE
 
 <<pickup treasure>>=
     ORG     $646B
@@ -21076,9 +20783,6 @@ tune index 6 (the attract/demo mode) and cleared to 0 for all other
 indices.  Downstream code checks this flag to alter behavior during the
 title screen sequence.
 
-<<defines>>=
-ATTRACT_FLAG        EQU     $5AA7   ; 1 = attract/demo mode, 0 = normal
-@ %def ATTRACT_FLAG
 @ The script base addresses are stored in the table below.
 The X~register passed to [[TUNE_PLAYER]] is a byte offset into
 this table (X~=~0 for script~0, X~=~2 for script~1, etc.).
@@ -21955,12 +21659,7 @@ interpreter ANDs the PRNG output with this mask before dispatching.
 Both are initialized to 0 and 1 respectively at the start of each
 script invocation.
 
-<<defines>>=
-TUNE_LOOP_CTR     EQU     $5A8D   ; tune loop iteration counter
-TUNE_PRNG_MASK    EQU     $5A92   ; PRNG mask for action randomization
-@ %def TUNE_LOOP_CTR TUNE_PRNG_MASK
-
-After setup, the interpreter initializes its loop counter and PRNG mask:
+@ After setup, the interpreter initializes its loop counter and PRNG mask:
 
 <<tune player>>=
     ORG     $798A
@@ -22008,10 +21707,6 @@ address'' command (\$1F).  When the loop counter has not yet reached the
 target byte value, the interpreter copies [[TUNE_LOOP_ADDR]] back into
 [[TUNE_PC]] to restart the loop body.
 
-<<defines>>=
-TUNE_LOOP_ADDR    EQU     $5A8E   ; tune loop address (2 bytes)
-@ %def TUNE_LOOP_ADDR
-
 <<tune player>>=
     ORG     $799F
 
@@ -22050,11 +21745,6 @@ and execution jumps back to the saved loop address.
 command (\$21): after the subroutine finishes, [[TUNE_PC]] is restored
 from this 2-byte value.  [[TUNE_ACTION_VEC]] is a 2-byte vector set by
 commands \$22 and \$23 to select between the low and high tone handlers.
-
-<<defines>>=
-TUNE_GOSUB_ADDR   EQU     $5A90   ; tune gosub return address (2 bytes)
-TUNE_ACTION_VEC   EQU     $5A93   ; action handler vector (2 bytes)
-@ %def TUNE_GOSUB_ADDR TUNE_ACTION_VEC
 
 <<tune player>>=
     ORG     $79D6
@@ -22358,10 +22048,6 @@ STUB_ENTRY:
     JMP     ATTRACT_LOOP
 @ %def STUB_ENTRY
 
-<<defines>>=
-RES_ABORT_NIBBLE        EQU     $07F6   ; last nibble stored on keyboard abort
-@ %def RES_ABORT_NIBBLE
-
 @ [[READ_DATA_FIELD]] reads a disk data field from the drive.  It
 searches for the D5~AA~AD prologue, reads 342~(\$156) bytes of
 encoded data (checking each against \$AF), then reads 256~(\$100)
@@ -22371,6 +22057,34 @@ clear on success, carry set on error.  The entry at [[READ_DATA_FIELD_AD]]
 
 During reading, [[BIT \$C000]] polls the keyboard---if a key is
 pressed, the read is aborted and the nibble is stored at [[RES_ABORT_NIBBLE]].
+
+I think this is just a check. It seems nothing is
+done with the data read, except checking that each of the 86+256 disk bytes is
+equal to \$AF. The above explanation is incorrect (except for the keyboard).
+
+@ The 30~bytes at [[$07E2--$07FF]] are runtime storage locations used by
+the resident copy-protection verifier and disk~I/O routines:
+\begin{itemize}
+\item [[RES_ERROR_COUNT]] (\$07E2, 2~bytes): error accumulator for the
+  copy-protection verifier.
+\item [[RES_ZP_SHADOW]] (\$07E5, 17~bytes): shadow area for ZP~\$50--\$5F,
+  used by [[CONTEXT_SWAP]] to save/restore VM state.
+\item [[RES_ABORT_NIBBLE]] (\$07F6, 1~byte): last nibble stored when a
+  disk read is aborted by a keypress.
+\end{itemize}
+The remaining bytes are residual data from the EALDR copy.
+
+<<resident page tail>>=
+    ORG     $07E2
+RES_ERROR_COUNT:
+    HEX     000000                 ; $07E2: error accumulator (2 bytes) + pad
+RES_ZP_SHADOW:
+    HEX     0e968c41964120         ; $07E5: ZP shadow area (17 bytes)
+    HEX     d3d3d3d3d3d3d3d3d3d3
+RES_ABORT_NIBBLE:
+    HEX     00                     ; $07F6: last nibble on keyboard abort
+    HEX     6520636865636b6572     ; $07F7: residual "e checker" (low ASCII)
+@ %def RES_ERROR_COUNT RES_ZP_SHADOW RES_ABORT_NIBBLE
 
 <<read data field>>=
     ORG     $0503
@@ -22397,18 +22111,18 @@ READ_DATA_FIELD_AD:
     CMP     #$AD              ; AD?
     BNE     .recheck          ; no -> re-check as D5
 
-    ; --- Read 342 bytes of encoded data ---
+    ; --- Read 86 bytes of data ---
     PHA                       ; timing padding
     PLA
-    LDY     #$56              ; 342 bytes ($156 wraps via DEY from $56)
-.read_342:
+    LDY     #$56              ; 86 bytes
+.read_86:
     LDA     DISK_DATA_REG     ; \ wait for disk byte
     BPL     *-3               ; /
     BIT     $C000             ; check keyboard
-    CMP     #$AF              ; valid nibble? (must be >= $AF)
+    CMP     #$AF              ; valid nibble? (must be = $AF)
     BNE     .abort            ; invalid -> abort
     DEY
-    BNE     .read_342         ; loop for $56 bytes (86 dec)
+    BNE     .read_86          ; loop for $56 bytes (86 dec)
 
     ; --- Read 256 bytes of data ---
     LDY     #$00              ; 256 bytes
@@ -22416,7 +22130,7 @@ READ_DATA_FIELD_AD:
     LDA     DISK_DATA_REG     ; \ wait for disk byte
     BPL     *-3               ; /
     BIT     $C000             ; check keyboard
-    CMP     #$AF              ; valid nibble?
+    CMP     #$AF              ; valid nibble? (must be = $AF)
     BNE     .abort            ; invalid -> abort
     DEY
     BNE     .read_256         ; loop for 256 bytes
@@ -22482,11 +22196,6 @@ VM_IP                   EQU     $52     ; bytecode instruction pointer (2 bytes,
 VM_OPERAND              EQU     $54     ; decoded address/operand (2 bytes, lo/hi)
 VM_ACC                  EQU     $56     ; VM accumulator
 @ %def VM_SCRATCH VM_IP VM_OPERAND VM_ACC
-
-<<defines>>=
-RES_ZP_SHADOW           EQU     $07E5   ; saved ZP $50-$5F for resident VM context swap (16 bytes)
-RES_ERROR_COUNT         EQU     $07E2   ; error accumulator (resident copy-protection verifier)
-@ %def RES_ZP_SHADOW RES_ERROR_COUNT
 
 <<resident data and bytecodes>>=
     ORG     $0572
@@ -22561,6 +22270,8 @@ RESIDENT_BYTECODES:
     VMRET
 
     ; --- Native: search for D5 AA 96 address field ---
+    ; After the address field, decodes two 4&4 encoded
+    ; bytes, storing the second one in VM_SCRATCH.
 SEARCH_ADDR_FIELD_RES:
     LDY     #$FF              ; outer retry counter
 .search_d5:
@@ -22617,7 +22328,7 @@ RES_RETRY_COUNT:
     ; --- Native: read and verify one sector ---
 READ_AND_VERIFY_RES:
     JSR     SEARCH_ADDR_FIELD_RES
-    BCS     .read_done
+    BCS     .read_done        ; error
     JSR     READ_DATA_FIELD   ; read data field
 .read_done:
     LDA     #$00
@@ -22702,14 +22413,13 @@ CONTEXT_SWAP:
 The 14 bytes between [[CONTEXT_SWAP]] and [[RESIDENT_DECODE_DISPATCH]]
 ([[$06F2--$06FF]]) are dead code --- see the Dead Code chapter.
 
-The 18-byte table maps opcode indices to handler addresses in page [[$07]]:
+The 13-byte table maps opcode indices to handler addresses in page [[$07]]:
 
 <<resident dispatch table>>=
     ORG     $06D3
 RESIDENT_DISPATCH_TABLE:
     HEX     00 27 55 5F 6D 8A AD B9
     HEX     4F A2 CE 26 79
-; last 5 bytes overlap with CONTEXT_SWAP code at $06E0
 @ %def RESIDENT_DISPATCH_TABLE
 Dispatches one bytecode instruction using a stack trick.  X and Y hold
 the bytecode pointer from the previous iteration.  They are pushed onto
@@ -22723,7 +22433,7 @@ RESIDENT_DISPATCH:
 
     TXA                              ; \
     PHA                              ;  | save X, Y on stack
-    TYA                              ;  | (these ARE the bytecode pointer)
+    TYA                              ;  | (these are the bytecode pointer)
     PHA                              ; /
     JSR     PULL_TWO_RET_ADDRS       ; rearrange stack, jump to .resume
 
@@ -22779,16 +22489,9 @@ RES_VM_SET_IP:
 \$0A & \$CE & \$07CE \\
 \$0B & \$26 & \$0726 \\
 \$0C & \$79 & \$0779 \\
-\$0D & \$A2 & \$07A2 \\
-\$0E & \$0F & \$070F \\
-\$0F & \$B5 & \$07B5 \\
-\$10 & \$50 & \$0750 \\
-\$11 & \$48 & \$0748 \\
 \bottomrule
 \end{tabular}
 \end{center}
-
-Opcodes \$09 and \$0D share the same handler (\$07A2).
 
 Decodes a 2-byte encrypted address from the bytecode stream.
 Uses the same XOR scheme as the EALDR VM (low byte XOR [[RES_XOR_LO]],
@@ -23048,16 +22751,13 @@ data is included verbatim from [[dos.asm]].
 DOS 3.3 RWTS.  [[RWTS_ENTRY]] calls it after saving the processor status
 and disabling interrupts.
 
-<<defines>>=
-RWTS_CORE               EQU     $BD00   ; RWTS core dispatcher
-@ %def RWTS_CORE
 @ The chunk below includes the standard RWTS binary verbatim, accessed through [[RWTS_ENTRY]] and [[RWTS_CORE]].
 
 <<dos33 rwts>>=
     ORG     $B600
 DOS33_RWTS:
     INCLUDE "dos.asm"
-@ %def DOS33_RWTS
+@ %def DOS33_RWTS RWTS_ENTRY RWTS_IOB RWTS_CORE
 [[DISK_READ_FIELD]] is the entry point called by [[LOAD_SCENE_DATA]]
 to read sector data from disk.  It is a trampoline into the disk~VM
 interpreter loop at~[[$B36A]], which uses an embedded bytecode program
@@ -23085,8 +22785,7 @@ prologue and verifying the data field contents.
 
 <<defines>>=
 DISK_DATA_REG           EQU     $C0EC   ; disk controller data register (active slot)
-DISK_BAD_NIBBLE         EQU     $B5F6   ; stores mismatched nibble from VERIFY_DATA_FIELD
-@ %def DISK_DATA_REG DISK_BAD_NIBBLE
+@ %def DISK_DATA_REG
 
 <<verify data field>>=
     ORG     $B304
@@ -23501,8 +23200,8 @@ DISK_VM_DISPATCH:
     TYA
     PHA                           ; save Y
     JSR     DISK_VM_PULL_IP       ; pull IP from stack -> $52/$53
-    PULB    $52 ; restore as VM instruction pointer
-    PULB    $53 ;  (values set by DISK_VM_PULL_IP
+    PULB    $52 ; \ restore as VM instruction pointer
+    PULB    $53 ; / values set by DISK_VM_PULL_IP
     LDY     #$04
 DISK_VM_RESUME:
     LDA     ($52),Y               ; read opcode from VM program
@@ -23618,8 +23317,6 @@ Exits the VM by executing [[RTS]], which returns to the caller of
 [[DISK_VM_DISPATCH]].  This handler is just the [[RTS]] at the end
 of [[DISK_VM_READ_ADDR]]---the dispatch table points to~[[$B526]]
 which is that instruction.
-
-(No separate chunk needed; [[DISK_VM_READ_ADDR]] provides the [[RTS]].)
 
 Calls a native 6502 subroutine.  Passes the VM accumulator in~[[A]]
 and captures the subroutine's return value from~[[A]] back into the
@@ -23810,11 +23507,12 @@ DISK_VM_SAVED_STATE:
 ;           saved ZP $50-$5F; bytes 9-11 ($59-$5B) = $4A,$4C,$4E
 DISK_VM_SCRATCH:
     HEX     00          ; $B5F5
-    HEX     00          ; $B5F6: bad nibble storage
+DISK_BAD_NIBBLE:
+    HEX     00          ; $B5F6: stores mismatched nibble from VERIFY_DATA_FIELD
     HEX     00 00 00    ; $B5F7-$B5F9
     HEX     a0 a0       ; $B5FA-$B5FB
     HEX     00 00 00 01 ; $B5FC-$B5FF
-@ %def DISK_VM_SAVED_STATE DISK_VM_SCRATCH
+@ %def DISK_VM_SAVED_STATE DISK_VM_SCRATCH DISK_BAD_NIBBLE
 @ \chapter{Mob Data}
 \label{ch:mob-data}
 
@@ -26455,22 +26153,6 @@ RESIDUAL_DONT_BREAK:
     HEX     c4cfcea7d4a0c2d2c5c1cba0d4c8
 @ %def RESIDUAL_DONT_BREAK
 
-@ \section{Residual page tail}
-
-The 30~bytes at [[$07E2--$07FF]] are unreferenced residual data from
-the EALDR copy ([[$A300--$A5FF]]~$\to$~[[$0500--$07FF]]).  Decoded as
-Apple~II text: ``\texttt{SSSSSSSSSS}'' (ten high-bit~S) followed by
-the low-ASCII fragment ``\texttt{e checker}''.
-
-<<resident page tail>>=
-    ORG     $07E2
-RESIDUAL_PAGE_TAIL:
-; Unused residual data at end of resident handler page
-    HEX     0000000e968c41964120
-    HEX     d3d3d3d3d3d3d3d3d3d3
-    HEX     006520636865636b6572  ; "e checker" (low ASCII)
-@ %def RESIDUAL_PAGE_TAIL
-
 @ \section{Compressed cursor routine}
 
 [[SET_CURSOR_COMPRESSED]] packs column (bits~5--0) and row offset
@@ -26583,57 +26265,632 @@ RESIDUAL_DEBUG_TEXT:
     HEX     A0 CC C4 C1 A0 A3 BC   ; " LDA #<SLFS"
     HEX     D3 CC C6 D3 D0 C4      ; "LFSPD"
     HEX     8D                      ; CR
-    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1 ; " STA TEMP+1"
-    HEX     8D                      ; CR
-    HEX     A0 CA D3 D2 A0 D3 C8 CF D7 CE CD ; " JSR SHOWNM"
-    HEX     8D                      ; CR
-    HEX     A0 CC C4 D9 A0 A3 B1 B1 ; " LDY #11"
-    HEX     8D                      ; CR
-    HEX     A0 CC C4 C1 A0 A8 C1 C3 D4 CF D2 A9 AC D9 ; " LDA (ACTOR),Y"
-    HEX     8D                      ; CR
-    HEX     A0 C1 CE C4 A0 A3 A4 B1 C6 ; " AND #$1F"
-    HEX     8D                      ; CR
-    HEX     A0 D3 D4 C1 A0 C1 D2 C7 ; " STA ARG"
-    HEX     8D                      ; CR
-    HEX     A0 CC C4 C1 A0 A3 BE   ; " LDA #>SLFD"
-    HEX     D3 CC C6 C4 D8          ; "LFDX"
-    HEX     8D                      ; CR
-    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 ; " STA TEMP"
-    HEX     8D                      ; CR
-    HEX     A0 CC C4 C1 A0 A3 BC   ; " LDA #<SLFD"
-    HEX     D3 CC C6 C4 D8          ; "LFDX"
-    HEX     8D                      ; CR
-    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1 ; " STA TEMP+1"
-    HEX     8D                      ; CR
-    HEX     A0 CA D3 D2 A0 D3 C8 CF D7 CE CD ; " JSR SHOWNM"
-    HEX     8D                      ; CR
-    HEX     A0 CC C4 D9 A0 A3 B1 B3 ; " LDY #13"
-    HEX     8D                      ; CR
-    HEX     A0 CC C4 C1 A0 A8 C1 C3 D4 CF D2 A9 AC D9 ; " LDA (ACTOR),Y"
-    HEX     8D                      ; CR
-    HEX     A0 D3 D4 C1 A0 C1 D2 C7 ; " STA ARG"
-    HEX     8D                      ; CR
-    HEX     A0 C9 CE D9             ; " INY"
-    HEX     8D                      ; CR
-    HEX     A0 CC C4 C1 A0 A8 C1 C3 D4 CF D2 A9 AC D9 ; " LDA (ACTOR),Y"
-    HEX     8D                      ; CR
-    HEX     A0 D3 D4 C1 A0 C1 D2 C7 AB B1 ; " STA ARG+1"
-    HEX     8D                      ; CR
-    HEX     A0 CC C4 C1 A0 A3 BE   ; " LDA #>SLFD"
-    HEX     D3 CC C6 C4 D5 C3      ; "LFDUC"
-    HEX     8D                      ; CR
-    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 ; " STA TEMP"
-    HEX     8D                      ; CR
-    HEX     A0 CC C4 C1 A0 A3 BC   ; " LDA #<SLFD"
-    HEX     D3 CC C6 C4 D5 C3      ; "LFDUC"
-    HEX     8D                      ; CR
-    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1 ; " STA TEMP+1"
-    HEX     8D                      ; CR
-    HEX     A0 CA D3 D2 A0 D3 C8 CF D7 CE CD ; " JSR SHOWNM"
-    HEX     8D                      ; CR
-    HEX     A0 CC C4 C1 A0          ; " LDA "
-    HEX     D3 CC C6 C4 D5 C3 AB   ; "SLFDUC+"  (truncated)
+    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 ; " STA TEMP" (truncated at $59FF)
 @ %def RESIDUAL_DEBUG_TEXT
+
+@ \section{Runtime variables (\$5A page)}
+
+The 256~bytes from [[$5A00]] to [[$5AFF]] are runtime scratch
+variables.  On disk they hold residual assembler source text
+(a continuation of [[RESIDUAL_DEBUG_TEXT]]); at runtime every byte
+is overwritten by game logic.  Each variable is defined at its
+disk-image address with the initial (residual) byte value.
+
+<<5a input mode>>=
+    ORG     $5A00
+INPUT_MODE:
+    DC.B    $AB                     ; initial value (runtime: 0 = keyboard, 1 = joystick)
+
+<<5a total mob count>>=
+    ORG     $5A01
+TOTAL_MOB_COUNT:
+    DC.B    $B1                     ; initial value (runtime: total mobs across all groups (excl. group 0))
+
+<<5a current player>>=
+    ORG     $5A02
+CURRENT_PLAYER:
+    DC.B    $8D                     ; initial value (runtime: current player index (1-based))
+
+<<5a current room>>=
+    ORG     $5A03
+CURRENT_ROOM:
+    DC.B    $A0                     ; initial value (runtime: current room/location being processed)
+
+<<5a char sprite>>=
+    ORG     $5A04
+CHAR_SPRITE:
+    DC.B    $CA                     ; initial value (runtime: character's font char number for display)
+
+<<5a char ai mode>>=
+    ORG     $5A05
+CHAR_AI_MODE:
+    DC.B    $D3                     ; initial value (runtime: 0 = player, 2-5 = AI behavior modes)
+
+<<5a ai wait flag>>=
+    ORG     $5A06
+AI_WAIT_FLAG:
+    DC.B    $D2                     ; initial value (runtime: wait delay for AI moves (0 or $0A))
+
+<<5a browse char index>>=
+    ORG     $5A07
+BROWSE_CHAR_INDEX:
+    DC.B    $A0                     ; initial value (runtime: mob index of browsed character)
+
+<<5a view max col>>=
+    ORG     $5A08
+VIEW_MAX_COL:
+    DC.B    $D3                     ; initial value (runtime: viewport max column)
+
+<<5a view max row>>=
+    ORG     $5A09
+VIEW_MAX_ROW:
+    DC.B    $C8                     ; initial value (runtime: viewport max row)
+
+<<5a view min col>>=
+    ORG     $5A0A
+VIEW_MIN_COL:
+    DC.B    $CF                     ; initial value (runtime: viewport min column)
+
+<<5a view min row>>=
+    ORG     $5A0B
+VIEW_MIN_ROW:
+    DC.B    $D7                     ; initial value (runtime: viewport min row)
+
+<<5a font col>>=
+    ORG     $5A0C
+FONT_COL:
+    DC.B    $CE                     ; initial value (runtime: font cursor column coordinate)
+
+<<5a font row>>=
+    ORG     $5A0D
+FONT_ROW:
+    DC.B    $CD                     ; initial value (runtime: font cursor row coordinate)
+
+<<5a font charnum>>=
+    ORG     $5A0E
+FONT_CHARNUM:
+    DC.B    $8D                     ; initial value (runtime: font character number to render)
+
+<<5a font charset>>=
+    ORG     $5A0F
+FONT_CHARSET:
+    DC.B    $A0                     ; initial value (runtime: font charset index (1-5))
+
+<<5a damage amount>>=
+    ORG     $5A10
+DAMAGE_AMOUNT:
+    DC.B    $CC                     ; initial value (runtime: damage to apply / new HP after subtraction)
+
+<<5a rng limit>>=
+    ORG     $5A11
+RNG_LIMIT:
+    DC.B    $C4                     ; initial value (runtime: random_in_range temporary (limit/shift count))
+
+<<5a rng mask>>=
+    ORG     $5A12
+RNG_MASK:
+    DC.B    $D9                     ; initial value (runtime: random_in_range bit mask)
+
+<<5a nearest pos>>=
+    ORG     $5A13
+NEAREST_POS:
+    DC.B    $A0                     ; initial value (runtime: position of nearest event found)
+
+<<5a nearest dist>>=
+    ORG     $5A14
+NEAREST_DIST:
+    DC.B    $A3                     ; initial value (runtime: current minimum distance during event search)
+
+<<5a candidate pos>>=
+    ORG     $5A15
+CANDIDATE_POS:
+    DC.B    $B1                     ; initial value (runtime: position of event being evaluated)
+
+<<5a heal notified>>=
+    ORG     $5A16
+HEAL_NOTIFIED:
+    DC.B    $B1                     ; initial value (runtime: auto heal: nonzero = already printed heal message)
+
+<<5a location id>>=
+    ORG     $5A17
+LOCATION_ID:
+ENTITY_SEARCH_POS:
+    DC.B    $8D                     ; initial value (runtime: current location/position index)
+
+<<5a prng output>>=
+    ORG     $5A18
+PRNG_OUTPUT:
+    DC.B    $A0                     ; initial value (runtime: PRNG output (state >> 1), used for random tests)
+
+<<5a prng state>>=
+    ORG     $5A19
+PRNG_STATE:
+    DC.B    $CC                     ; initial value (runtime: PRNG full state: val = 69*val + $53 (mod 256))
+
+<<5a prng temp>>=
+    ORG     $5A1A
+PRNG_TEMP:
+    DC.B    $C4                     ; initial value (runtime: PRNG temporary for multiplication)
+
+<<5a num digit>>=
+    ORG     $5A1B
+NUM_DIGIT:
+    DC.B    $C1                     ; initial value (runtime: current digit accumulator (ASCII $B0-$B9))
+
+<<5a num divisor>>=
+    ORG     $5A1C
+NUM_DIVISOR:
+    DC.B    $A0,$A8                 ; initial value (runtime: 16-bit divisor for decimal conversion)
+
+<<5a num leading>>=
+    ORG     $5A1E
+NUM_LEADING:
+    DC.B    $C1                     ; initial value (runtime: leading-zero suppress flag (0=suppress, 1=print))
+
+<<5a encounter result>>=
+    ORG     $5A1F
+ENCOUNTER_RESULT:
+    DC.B    $C3                     ; initial value (runtime: 0/1/2 from CHECK_ENCOUNTER)
+
+<<5a colocate link>>=
+    ORG     $5A20
+COLOCATE_LINK:
+    DC.B    $D4                     ; initial value (runtime: saved next-link (stop condition))
+
+<<5a colocate pos>>=
+    ORG     $5A21
+COLOCATE_POS:
+    DC.B    $CF                     ; initial value (runtime: saved position for co-location search)
+
+<<5a colocate wrapped>>=
+    ORG     $5A22
+COLOCATE_WRAPPED:
+    DC.B    $D2                     ; initial value (runtime: 1 if wrapped, 2 if ahead)
+
+<<5a hostile app>>=
+    ORG     $5A23
+HOSTILE_APP:
+    DC.B    $A9                     ; initial value (runtime: saved appearance for hostility check)
+
+<<5a hostile a>>=
+    ORG     $5A24
+HOSTILE_A:
+    DC.B    $AC                     ; initial value (runtime: saved A from first GET_HOSTILITY)
+
+<<5a hostile y>>=
+    ORG     $5A25
+HOSTILE_Y:
+    DC.B    $D9                     ; initial value (runtime: saved Y from first GET_HOSTILITY)
+
+<<5a adjacent threat>>=
+    ORG     $5A26
+ADJACENT_THREAT:
+    DC.B    $8D                     ; initial value (runtime: accumulated adjacent threat level)
+
+<<5a adjacent pos>>=
+    ORG     $5A27
+ADJACENT_POS:
+    DC.B    $A0                     ; initial value (runtime: saved position for adjacency check)
+
+<<5a source char>>=
+    ORG     $5A28
+SOURCE_CHAR:
+    DC.B    $C1                     ; initial value (runtime: source character for reorder)
+
+<<5a active char>>=
+    ORG     $5A29
+ACTIVE_CHAR:
+    DC.B    $CE                     ; initial value (runtime: character index being processed)
+
+<<5a reorder link>>=
+    ORG     $5A2A
+REORDER_LINK:
+    DC.B    $C4                     ; initial value (runtime: temp: saved next-link during reorder)
+
+<<5a reorder sort key>>=
+    ORG     $5A2B
+REORDER_SORT_KEY:
+    DC.B    $A0                     ; initial value (runtime: temp: byte 11 of node for sorted insert)
+
+<<5a group count delta>>=
+    ORG     $5A2C
+GROUP_COUNT_DELTA:
+    DC.B    $A3                     ; initial value (runtime: +1 or -1 delta for group count adjustment)
+
+<<5a page gap 5a2d-5a50>>=
+    ORG     $5A2D
+RESIDUAL_5A_5A2D:
+    HEX     A4 B1 C6 8D A0 D3 D4 C1 A0 C1 D2 C7 8D A0 CC C4
+    HEX     C1 A0 A3 BE D3 CC C6 C4 D8 8D A0 D3 D4 C1 A0 D4
+    HEX     C5 CD D0 8D
+@ %def RESIDUAL_5A_5A2D
+
+<<5a bounds min col>>=
+    ORG     $5A51
+BOUNDS_MIN_COL:
+    DC.B    $A0                     ; initial value (runtime: scene setup: left column boundary)
+
+<<5a bounds max col>>=
+    ORG     $5A52
+BOUNDS_MAX_COL:
+    DC.B    $CC                     ; initial value (runtime: scene setup: right column boundary)
+
+<<5a bounds min row>>=
+    ORG     $5A53
+BOUNDS_MIN_ROW:
+    DC.B    $C4                     ; initial value (runtime: scene setup: top row boundary)
+
+<<5a bounds max row>>=
+    ORG     $5A54
+BOUNDS_MAX_ROW:
+    DC.B    $C1                     ; initial value (runtime: scene setup: bottom row boundary)
+
+<<5a location pos>>=
+    ORG     $5A55
+LOCATION_POS:
+    DC.B    $A0                     ; initial value (runtime: current location position (triggers redraw when changed))
+
+<<5a location style>>=
+    ORG     $5A56
+LOCATION_STYLE:
+    DC.B    $A3                     ; initial value (runtime: current map style (from record field 5, bits 0-6))
+
+<<5a msg line count>>=
+    ORG     $5A57
+MSG_LINE_COUNT:
+    DC.B    $BC                     ; initial value (runtime: lines printed so far)
+
+<<5a trap type>>=
+    ORG     $5A58
+TRAP_TYPE:
+    DC.B    $D3                     ; initial value (runtime: treasure trap: random trap type (0-3))
+
+<<5a event slot byte>>=
+    ORG     $5A59
+EVENT_SLOT_BYTE:
+    DC.B    $CC                     ; initial value (runtime: saved byte 2 of event slot (type+value))
+
+<<5a event sub value>>=
+    ORG     $5A5A
+EVENT_SUB_VALUE:
+    DC.B    $C6                     ; initial value (runtime: lower 5 bits of event slot byte 2)
+
+<<5a page gap 5a5b-5a5c>>=
+    ORG     $5A5B
+RESIDUAL_5A_5A5B:
+    HEX     C4 D8
+@ %def RESIDUAL_5A_5A5B
+
+<<5a ai prev dir>>=
+    ORG     $5A5D
+AI_PREV_DIR:
+    DC.B    $8D                     ; initial value (runtime: NPC AI: previous move direction (bias avoidance))
+
+<<5a event pos>>=
+    ORG     $5A5E
+EVENT_POS:
+    DC.B    $A0                     ; initial value (runtime: event position (from FIND_NEAREST_EVENT))
+
+<<5a event dest pos>>=
+    ORG     $5A5F
+EVENT_DEST_POS:
+    DC.B    $D3                     ; initial value (runtime: event handler: destination position)
+
+<<5a page gap 5a60-5a60>>=
+    ORG     $5A60
+RESIDUAL_5A_5A60:
+    HEX     D4
+@ %def RESIDUAL_5A_5A60
+
+<<5a turn start col>>=
+    ORG     $5A61
+TURN_START_COL:
+    DC.B    $C1                     ; initial value (runtime: column at start of turn)
+
+<<5a turn start row>>=
+    ORG     $5A62
+TURN_START_ROW:
+    DC.B    $A0                     ; initial value (runtime: row at start of turn)
+
+<<5a current col>>=
+    ORG     $5A63
+CURRENT_COL:
+    DC.B    $D4                     ; initial value (runtime: current column during turn)
+
+<<5a current row>>=
+    ORG     $5A64
+CURRENT_ROW:
+    DC.B    $C5                     ; initial value (runtime: current row during turn)
+
+<<5a move points>>=
+    ORG     $5A65
+MOVE_POINTS:
+    DC.B    $CD                     ; initial value (runtime: movement points remaining)
+
+<<5a steps taken>>=
+    ORG     $5A66
+STEPS_TAKEN:
+    DC.B    $D0                     ; initial value (runtime: steps taken this turn)
+
+<<5a input dir>>=
+    ORG     $5A67
+INPUT_DIR:
+    DC.B    $AB                     ; initial value (runtime: direction/command from input (1-9))
+
+<<5a ai best dist>>=
+    ORG     $5A68
+AI_BEST_DIST:
+    DC.B    $B1                     ; initial value (runtime: current best distance to AI target)
+
+<<5a ai saved pos>>=
+    ORG     $5A69
+AI_SAVED_POS:
+    DC.B    $8D                     ; initial value (runtime: saved entity position during direction eval)
+
+<<5a dir scores>>=
+    ORG     $5A6A
+DIR_SCORES:
+    HEX     A0 CA D3 D2 A0
+    ; initial values (runtime: array of 5 direction scores (indexed 0-4))
+
+<<5a ai direction>>=
+    ORG     $5A6F
+AI_DIRECTION:
+    DC.B    $D3                     ; initial value (runtime: current direction being evaluated / random range)
+
+<<5a ai test pos>>=
+    ORG     $5A70
+AI_TEST_POS:
+    DC.B    $C8                     ; initial value (runtime: position being tested for direction evaluation)
+
+<<5a ai target pos>>=
+    ORG     $5A71
+AI_TARGET_POS:
+    DC.B    $CF                     ; initial value (runtime: AI target position (set by AI_CHOOSE_TARGET))
+
+<<5a ai target col>>=
+    ORG     $5A72
+AI_TARGET_COL:
+    DC.B    $D7                     ; initial value (runtime: AI target column / min distance temp)
+
+<<5a ai target row>>=
+    ORG     $5A73
+AI_TARGET_ROW:
+    DC.B    $CE                     ; initial value (runtime: AI target row (from POS_TO_COLROW))
+
+<<5a is player turn>>=
+    ORG     $5A74
+IS_PLAYER_TURN:
+    DC.B    $CD                     ; initial value (runtime: 0 = mob's turn, 1 = player's turn)
+
+<<5a saved mob link>>=
+    ORG     $5A75
+SAVED_MOB_LINK:
+    DC.B    $8D                     ; initial value (runtime: temp: saved byte 2 of mob record)
+
+<<5a combat willingness>>=
+    ORG     $5A76
+COMBAT_WILLINGNESS:
+    DC.B    $A0                     ; initial value (runtime: accumulated willingness-to-fight score)
+
+<<5a target defense>>=
+    ORG     $5A77
+TARGET_DEFENSE:
+    DC.B    $CC                     ; initial value (runtime: scratch: target's defense value)
+
+<<5a combat strength>>=
+    ORG     $5A78
+COMBAT_STRENGTH:
+    DC.B    $C4                     ; initial value (runtime: result of CALC_COMBAT_STRENGTH)
+
+<<5a mob defense>>=
+    ORG     $5A79
+MOB_DEFENSE:
+    DC.B    $D9                     ; initial value (runtime: mob defense value (low 4 bits of mob byte 8))
+
+<<5a drop amount>>=
+    ORG     $5A7A
+DROP_AMOUNT:
+    DC.B    $A0,$A3                 ; initial value (runtime: drop gold amount (2 bytes))
+
+<<5a drop step>>=
+    ORG     $5A7C
+DROP_STEP:
+    DC.B    $B1,$B3                 ; initial value (runtime: binary search step (2 bytes))
+
+<<5a stat scale>>=
+    ORG     $5A7E
+STAT_SCALE:
+    DC.B    $8D                     ; initial value (runtime: strength-derived level threshold step)
+
+<<5a stat level bits>>=
+    ORG     $5A7F
+STAT_LEVEL_BITS:
+    DC.B    $A0                     ; initial value (runtime: level bits during stat modification)
+
+<<5a shop item mask>>=
+    ORG     $5A80
+SHOP_ITEM_MASK:
+    DC.B    $CC                     ; initial value (runtime: shop: bitmask for current item ($80 rotating right))
+
+<<5a shop price>>=
+    ORG     $5A81
+SHOP_PRICE:
+    DC.B    $C4,$C1                 ; initial value (runtime: shop: accumulated price (2 bytes))
+
+<<5a shop valid mask>>=
+    ORG     $5A83
+SHOP_VALID_MASK:
+    DC.B    $A0                     ; initial value (runtime: copy of item validity bitmask during shop display)
+
+<<5a location style bits>>=
+    ORG     $5A84
+LOCATION_STYLE_BITS:
+    DC.B    $A8                     ; initial value (runtime: location style (0-3), used as modifier)
+
+<<5a shop item offset>>=
+    ORG     $5A85
+SHOP_ITEM_OFFSET:
+    DC.B    $C1                     ; initial value (runtime: offset into shop record (5 per item slot))
+
+<<5a target ptr>>=
+    ORG     $5A86
+TARGET_PTR:
+    DC.B    $C3,$D4                 ; initial value (runtime: selected combat target pointer (2 bytes))
+
+<<5a best threat>>=
+    ORG     $5A88
+BEST_THREAT:
+    DC.B    $CF                     ; initial value (runtime: best threat level during target selection)
+
+<<5a scene found flag>>=
+    ORG     $5A89
+SCENE_FOUND_FLAG:
+    DC.B    $D2                     ; initial value (runtime: scan result: 1 = matching group found)
+
+<<5a scene hostile flag>>=
+    ORG     $5A8A
+SCENE_HOSTILE_FLAG:
+    DC.B    $A9                     ; initial value (runtime: scan result: nonzero = hostile encountered)
+
+<<5a scene group idx>>=
+    ORG     $5A8B
+SCENE_GROUP_IDX:
+    DC.B    $AC                     ; initial value (runtime: current group index for scanning)
+
+<<5a wait loop count>>=
+    ORG     $5A8C
+WAIT_LOOP_COUNT:
+    DC.B    $D9                     ; initial value (runtime: inner wait loop counter)
+
+<<5a tune loop ctr>>=
+    ORG     $5A8D
+TUNE_LOOP_CTR:
+    DC.B    $8D                     ; initial value (runtime: tune loop iteration counter)
+
+<<5a tune loop addr>>=
+    ORG     $5A8E
+TUNE_LOOP_ADDR:
+    DC.B    $A0,$D3                 ; initial value (runtime: tune loop address (2 bytes))
+
+<<5a tune gosub addr>>=
+    ORG     $5A90
+TUNE_GOSUB_ADDR:
+    DC.B    $D4,$C1                 ; initial value (runtime: tune gosub return address (2 bytes))
+
+<<5a tune prng mask>>=
+    ORG     $5A92
+TUNE_PRNG_MASK:
+    DC.B    $A0                     ; initial value (runtime: PRNG mask for action randomization)
+
+<<5a tune action vec>>=
+    ORG     $5A93
+TUNE_ACTION_VEC:
+    DC.B    $C1,$D2                 ; initial value (runtime: action handler vector (2 bytes))
+
+<<5a page gap 5a95-5a95>>=
+    ORG     $5A95
+RESIDUAL_5A_5A95:
+    HEX     C7
+@ %def RESIDUAL_5A_5A95
+
+<<5a text right margin>>=
+    ORG     $5A96
+TEXT_RIGHT_MARGIN:
+    DC.B    $8D                     ; initial value (runtime: right margin column for text wrap)
+
+<<5a text left margin>>=
+    ORG     $5A97
+TEXT_LEFT_MARGIN:
+    DC.B    $A0                     ; initial value (runtime: left margin column for text wrap)
+
+<<5a text stream idx>>=
+    ORG     $5A98
+TEXT_STREAM_IDX:
+    DC.B    $C9                     ; initial value (runtime: saved Y index into byte stream)
+
+<<5a scene number>>=
+    ORG     $5A99
+SCENE_NUMBER:
+    DC.B    $CE                     ; initial value (runtime: current scene number)
+
+<<5a saved target rec>>=
+    ORG     $5A9A
+SAVED_TARGET_REC:
+    DC.B    $D9,$8D                 ; initial value (runtime: saved TARGET_REC ($BC/$BD, 2 bytes))
+
+<<5a saved entity ptr>>=
+    ORG     $5A9C
+SAVED_ENTITY_PTR:
+    DC.B    $A0,$CC                 ; initial value (runtime: saved ENTITY_PTR ($F8/$F9, 2 bytes))
+
+<<5a saved data ptr>>=
+    ORG     $5A9E
+SAVED_DATA_PTR:
+    DC.B    $C4,$C1                 ; initial value (runtime: saved DATA_PTR ($BE/$BF, 2 bytes))
+
+<<5a saved mob ptr>>=
+    ORG     $5AA0
+SAVED_MOB_PTR:
+    DC.B    $A0,$A8                 ; initial value (runtime: saved MOB_PTR ($F4/$F5, 2 bytes))
+
+<<5a blink col>>=
+    ORG     $5AA2
+BLINK_COL:
+    DC.B    $C1                     ; initial value (runtime: font column (0-19; $14 = disabled))
+
+<<5a blink row>>=
+    ORG     $5AA3
+BLINK_ROW:
+    DC.B    $C3                     ; initial value (runtime: font row)
+
+<<5a blink char>>=
+    ORG     $5AA4
+BLINK_CHAR:
+    DC.B    $D4                     ; initial value (runtime: font character number)
+
+<<5a page gap 5aa5-5aa6>>=
+    ORG     $5AA5
+RESIDUAL_5A_5AA5:
+    HEX     CF D2
+@ %def RESIDUAL_5A_5AA5
+
+<<5a attract flag>>=
+    ORG     $5AA7
+ATTRACT_FLAG:
+    DC.B    $A9                     ; initial value (runtime: 1 = attract/demo mode, 0 = normal)
+
+<<5a page gap 5aa8-5aa8>>=
+    ORG     $5AA8
+RESIDUAL_5A_5AA8:
+    HEX     AC
+@ %def RESIDUAL_5A_5AA8
+
+<<5a turn tune guard>>=
+    ORG     $5AA9
+TURN_TUNE_GUARD:
+    DC.B    $D9                     ; initial value (runtime: turn reset: guards one-shot script execution)
+
+<<5a input option count>>=
+    ORG     $5AAA
+INPUT_OPTION_COUNT:
+    DC.B    $8D                     ; initial value (runtime: number of input options to draw)
+
+<<5a current selection>>=
+    ORG     $5AAB
+CURRENT_SELECTION:
+    DC.B    $A0                     ; initial value (runtime: current menu selection index)
+
+<<5a input buffer>>=
+    ORG     $5AAC
+INPUT_BUFFER:
+    HEX     D3 D4 C1 A0 C1 D2 C7 AB B1 8D A0 CC C4 C1 A0 A3
+    HEX     BE D3 CC C6 C4 D5 C3 8D A0 D3 D4 C1 A0 D4 C5 CD
+    HEX     D0 8D A0 CC C4 C1 A0 A3 BC D3 CC C6 C4 D5 C3 8D
+    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1 8D A0 CA D3 D2
+    HEX     A0 D3 C8 CF D7 CE CD 8D A0 CC C4 C1 A0 D3 CC C6
+    HEX     C4 D5 C3 AB
+    ; runtime: 84-byte input text display buffer
 
 @ \section{Orphaned encounter handler}
 
@@ -26990,9 +27247,8 @@ The following root chunks produce the assembly files when tangled.
 <<EALDR VM macros>>
 <<zero page defines>>
 <<defines>>
-<<Macros>>
-<<zero page defines>>
-<<defines>>
+
+; Stub code
 <<stub entry>>
 <<read data field>>
 <<attract loop>>
@@ -27006,6 +27262,8 @@ The following root chunks produce the assembly files when tangled.
 <<resident vm handlers>>
 <<decode dispatch relay>>
 <<resident page tail>>
+
+; Game code
 <<main entry>>
 <<select input mode>>
 <<process mob groups>>
@@ -27105,6 +27363,126 @@ The following root chunks produce the assembly files when tangled.
 <<mob data records>>
 <<mob name strings>>
 <<mob residual data>>
+<<5a input mode>>
+<<5a total mob count>>
+<<5a current player>>
+<<5a current room>>
+<<5a char sprite>>
+<<5a char ai mode>>
+<<5a ai wait flag>>
+<<5a browse char index>>
+<<5a view max col>>
+<<5a view max row>>
+<<5a view min col>>
+<<5a view min row>>
+<<5a font col>>
+<<5a font row>>
+<<5a font charnum>>
+<<5a font charset>>
+<<5a damage amount>>
+<<5a rng limit>>
+<<5a rng mask>>
+<<5a nearest pos>>
+<<5a nearest dist>>
+<<5a candidate pos>>
+<<5a heal notified>>
+<<5a location id>>
+<<5a prng output>>
+<<5a prng state>>
+<<5a prng temp>>
+<<5a num digit>>
+<<5a num divisor>>
+<<5a num leading>>
+<<5a encounter result>>
+<<5a colocate link>>
+<<5a colocate pos>>
+<<5a colocate wrapped>>
+<<5a hostile app>>
+<<5a hostile a>>
+<<5a hostile y>>
+<<5a adjacent threat>>
+<<5a adjacent pos>>
+<<5a source char>>
+<<5a active char>>
+<<5a reorder link>>
+<<5a reorder sort key>>
+<<5a group count delta>>
+<<5a page gap 5a2d-5a50>>
+<<5a bounds min col>>
+<<5a bounds max col>>
+<<5a bounds min row>>
+<<5a bounds max row>>
+<<5a location pos>>
+<<5a location style>>
+<<5a msg line count>>
+<<5a trap type>>
+<<5a event slot byte>>
+<<5a event sub value>>
+<<5a page gap 5a5b-5a5c>>
+<<5a ai prev dir>>
+<<5a event pos>>
+<<5a event dest pos>>
+<<5a page gap 5a60-5a60>>
+<<5a turn start col>>
+<<5a turn start row>>
+<<5a current col>>
+<<5a current row>>
+<<5a move points>>
+<<5a steps taken>>
+<<5a input dir>>
+<<5a ai best dist>>
+<<5a ai saved pos>>
+<<5a dir scores>>
+<<5a ai direction>>
+<<5a ai test pos>>
+<<5a ai target pos>>
+<<5a ai target col>>
+<<5a ai target row>>
+<<5a is player turn>>
+<<5a saved mob link>>
+<<5a combat willingness>>
+<<5a target defense>>
+<<5a combat strength>>
+<<5a mob defense>>
+<<5a drop amount>>
+<<5a drop step>>
+<<5a stat scale>>
+<<5a stat level bits>>
+<<5a shop item mask>>
+<<5a shop price>>
+<<5a shop valid mask>>
+<<5a location style bits>>
+<<5a shop item offset>>
+<<5a target ptr>>
+<<5a best threat>>
+<<5a scene found flag>>
+<<5a scene hostile flag>>
+<<5a scene group idx>>
+<<5a wait loop count>>
+<<5a tune loop ctr>>
+<<5a tune loop addr>>
+<<5a tune gosub addr>>
+<<5a tune prng mask>>
+<<5a tune action vec>>
+<<5a page gap 5a95-5a95>>
+<<5a text right margin>>
+<<5a text left margin>>
+<<5a text stream idx>>
+<<5a scene number>>
+<<5a saved target rec>>
+<<5a saved entity ptr>>
+<<5a saved data ptr>>
+<<5a saved mob ptr>>
+<<5a blink col>>
+<<5a blink row>>
+<<5a blink char>>
+<<5a page gap 5aa5-5aa6>>
+<<5a attract flag>>
+<<5a page gap 5aa8-5aa8>>
+<<5a turn tune guard>>
+<<5a input option count>>
+<<5a current selection>>
+<<5a input buffer>>
 <<init game state>>
 <<border animation>>
 <<init game display>>
@@ -27242,11 +27620,15 @@ The following root chunks produce the assembly files when tangled.
 <<set cursor compressed>>
 <<display char stats>>
 <<step prng>>
+
+; Initialization
 <<game init>>
 <<init stub>>
 <<init hrcg>>
 <<set text window upper left>>
 <<clear strength flags>>
+
+; Audio
 <<tune player>>
 <<tune action indirect>>
 <<tune advance>>
@@ -27273,7 +27655,7 @@ The following root chunks produce the assembly files when tangled.
 <<disk signature>>
 <<shuffle count>>
 <<tile style tables>>
-<<game config and menu strings>>
+<<menu strings>>
 <<stats template data>>
 <<status border data>>
 <<press space string>>
@@ -27294,6 +27676,8 @@ The following root chunks produce the assembly files when tangled.
 <<tune bytecodes copy>>
 <<border bitmap data>>
 <<font data>>
+
+; High Resolution Character Generator
 <<hrcg original entry>>
 <<hrcg init>>
 <<hrcg version string>>
@@ -27325,6 +27709,8 @@ The following root chunks produce the assembly files when tangled.
 <<hrcg home clr>>
 <<hrcg calc addr>>
 <<std font data>>
+
+; Game messages
 <<game message strings>>
 <<hrcg library tail>>
 <<resident tune bytecode>>

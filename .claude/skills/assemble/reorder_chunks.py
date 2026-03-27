@@ -9,6 +9,9 @@ TARGET is one of: main (default), boot1, ealdr, all
 Reads main.nw, finds the <<TARGET.asm>>= chunk, resolves each chunk
 reference's first ORG address, and reorders them in ascending order.
 
+Comments and blank lines are attached to the chunk reference that
+follows them and move together during reordering.
+
 Use -v for verbose output showing all chunks with their addresses.
 """
 
@@ -72,49 +75,75 @@ def reorder_target(target: str, lines: list[str]) -> list[str]:
     if end < 0:
         end = len(lines)
 
-    # Extract refs and non-ref lines before first ref
-    refs: list[str] = []
-    pre_lines: list[str] = []
-    found_first = False
-    for i in range(start + 1, end):
-        m = chunk_ref_pattern.match(lines[i].strip())
-        if m:
-            found_first = True
-            refs.append(m.group(1))
-        elif not found_first:
-            pre_lines.append(lines[i])
+    # Parse the chunk body into groups.
+    # Each group is: (chunk_name | None, [lines])
+    # A group with chunk_name is a chunk reference preceded by its
+    # associated comment/blank lines.  A group with chunk_name=None
+    # is a preamble (PROCESSOR, macros, defines, etc.) before the
+    # first ORG-bearing chunk.
+    groups: list[tuple[str | None, list[str]]] = []
+    pending_lines: list[str] = []
 
-    # Resolve ORGs
+    for i in range(start + 1, end):
+        line = lines[i]
+        m = chunk_ref_pattern.match(line.strip())
+        if m:
+            name = m.group(1)
+            # Check if this chunk has an ORG (is reorderable)
+            org = find_chunk_org(name, lines)
+            if org is not None:
+                # This is a reorderable chunk ref; pending lines are its prefix
+                groups.append((name, pending_lines + [line]))
+                pending_lines = []
+            else:
+                # Non-ORG chunk (macros, defines, etc.) — keep in preamble
+                pending_lines.append(line)
+        else:
+            # Comment, blank line, or directive — accumulate
+            pending_lines.append(line)
+
+    # Any trailing pending lines (comments/blanks after last ref)
+    trailing: list[str] = pending_lines
+
+    # Separate preamble (groups before first ORG ref) from reorderable groups
+    preamble: list[str] = []
+    reorderable: list[tuple[str, list[str]]] = []
+
+    for name, group_lines in groups:
+        if name is not None:
+            reorderable.append((name, group_lines))
+        else:
+            preamble.extend(group_lines)
+
+    # Resolve ORGs for sorting
     chunk_orgs: dict[str, int] = {}
-    unresolved: list[str] = []
-    for name in refs:
+    for name, _ in reorderable:
         org = find_chunk_org(name, lines)
         if org is not None:
             chunk_orgs[name] = org
-        else:
-            unresolved.append(name)
 
-    # Sort
-    resolved = [n for n in refs if n in chunk_orgs]
-    resolved.sort(key=lambda n: chunk_orgs[n])
-    new_refs = unresolved + resolved  # non-ORG chunks first (macros, defines)
+    # Sort reorderable groups by ORG address
+    old_order = [name for name, _ in reorderable]
+    reorderable.sort(key=lambda x: chunk_orgs.get(x[0], 0))
+    new_order = [name for name, _ in reorderable]
 
-    # Count changes
-    changes = sum(1 for a, b in zip(refs, new_refs) if a != b)
+    changes = sum(1 for a, b in zip(old_order, new_order) if a != b)
 
     # Rebuild
     new_chunk = [lines[start]]
-    new_chunk.extend(pre_lines)
-    for name in new_refs:
-        new_chunk.append(f'<<{name}>>\n')
+    new_chunk.extend(preamble)
+    for name, group_lines in reorderable:
+        new_chunk.extend(group_lines)
+    new_chunk.extend(trailing)
 
     result = lines[:start] + new_chunk + lines[end:]
 
-    print(f'  {target}: {len(refs)} chunks, {changes} reordered'
-          + (f', {len(unresolved)} without ORG' if unresolved else ''))
+    n_no_org = len([name for name, _ in groups if name is None])
+    print(f'  {target}: {len(reorderable)} chunks, {changes} reordered'
+          + (f', {n_no_org} without ORG' if n_no_org else ''))
 
     if '-v' in sys.argv or '--verbose' in sys.argv:
-        for name in new_refs:
+        for name, _ in reorderable:
             org = chunk_orgs.get(name)
             addr = f'${org:04X}' if org is not None else '????'
             print(f'    {addr}  <<{name}>>')
