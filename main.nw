@@ -27507,13 +27507,17 @@ APPLE_ASM_RESIDUAL:
     HEX     45 4E 54 52 D9 81 1A BF ; ENTRY $81 handler=$1ABF
     HEX     53 42 54 CC 80 17 F2    ; SBTL  $80 handler=$17F2
 ;
-; --- End of table + addressing mode data ---
-    HEX     00 00 00 00 00          ; end-of-table marker
-    HEX     04 08 0C 10 14 18 1C 20 ; mode offset table (8 entries)
-    HEX     30 18 0C 00 00 00 00    ; assembler internal data
-    HEX     35 21 54 01 69 00       ; assembler internal data
-    HEX     01 03 00 13 3C 00       ; assembler internal data
-    HEX     14 19 5D                ; assembler internal data
+; --- End of table + trailing data ---
+    HEX     00 00 00 00 00          ; end-of-table marker (5 null bytes)
+; The remaining 27 bytes are assembler internal data whose exact
+; purpose is unknown.  The first 8 bytes ($04..$20 = $04*1..$04*8)
+; resemble addressing mode offsets added to base opcodes, but this
+; is unconfirmed.
+    HEX     04 08 0C 10 14 18 1C 20
+    HEX     30 18 0C 00 00 00 00
+    HEX     35 21 54 01 69 00
+    HEX     01 03 00 13 3C 00
+    HEX     14 19 5D
 @ %def APPLE_ASM_RESIDUAL
 
 \chapter{Assembly output}
