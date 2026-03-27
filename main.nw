@@ -12593,31 +12593,38 @@ ATTRACT_SCREEN:
     JMP     SCENE_LOOP                 ; tail-call
 @ %def ATTRACT_SCREEN
 
-@ [[ATTRACT_LOOP]] is the main loop of the resident bytecode interpreter.
-Each iteration swaps zero-page context and dispatches one bytecode
-instruction.  It runs until the VM exits via [[VM_EXIT_OK]] or
-[[VM_EXIT_ERR]].
+@ [[RES_VM_LOOP]] is the entry point and main loop for the resident
+bytecode interpreter (the copy-protection verifier).  Despite its
+former name ``ATTRACT\_LOOP,'' it has nothing to do with the attract
+screen ([[ATTRACT_SCREEN]]).
 
-<<attract loop>>=
+[[CONTEXT_SWAP]] swaps zero-page \$50--\$5F with the shadow area at
+[[RES_ZP_SHADOW]], giving the VM its own private workspace (including
+[[VM_IP]], [[VM_OPERAND]], [[VM_ACC]]).  [[RESIDENT_DISPATCH]] then
+runs the \emph{entire} bytecode program from [[RESIDENT_BYTECODES]]
+(\$0572) to completion.  When the VM exits via [[VM_EXIT_OK]] (which
+calls [[CONTEXT_SWAP]] again to restore the main ZP state), the loop
+restarts.
+
+<<res vm loop>>=
     ORG     $0569
-ATTRACT_LOOP:
-    SUBROUTINE ATTRACT_LOOP
-    ; Main loop for the resident bytecode interpreter.
+RES_VM_LOOP:
+    SUBROUTINE RES_VM_LOOP
+    ; Entry point for the resident bytecode interpreter.
     ;
     ; Behavior:
-    ;   Each iteration swaps zero-page context ($50-$5F) with the
-    ;   saved VM state, then runs the ENTIRE bytecode program from
-    ;   $0572 (RESIDENT_BYTECODES) to completion.  The VM handlers
-    ;   chain via JMP RESIDENT_DISPATCH_FETCH and never return here
-    ;   between opcodes.  The loop restarts after the VM exits via
-    ;   VM_EXIT_OK or VM_EXIT_ERR.
+    ;   Swaps ZP context ($50-$5F) to restore VM state, then runs the
+    ;   ENTIRE bytecode program from $0572 (RESIDENT_BYTECODES) to
+    ;   completion.  Handlers chain via JMP RESIDENT_DISPATCH_FETCH
+    ;   and never return here between opcodes.  VM_EXIT_OK swaps the
+    ;   ZP context back and returns; then the loop restarts.
     ;
     ; Clobbers: A, X, Y
 
-    JSR     CONTEXT_SWAP
-    JSR     RESIDENT_DISPATCH
-    JMP     ATTRACT_LOOP
-@ %def ATTRACT_LOOP
+    JSR     CONTEXT_SWAP              ; swap main ZP <-> VM ZP
+    JSR     RESIDENT_DISPATCH         ; run bytecode program to completion
+    JMP     RES_VM_LOOP               ; restart
+@ %def RES_VM_LOOP
 
 @ [[PROCESS_MOB_GROUPS]] walks the mob linked list for the current character,
 processing each group according to its type.
@@ -22042,12 +22049,12 @@ copy at [[$0500]]--[[$07FF]] survives.  The tune pointer table
 addresses, which is safe because tunes~3--7 run only during attract
 mode, before [[GAME_INIT]].
 
-The reset vector points here.  Simply jumps to [[ATTRACT_LOOP]].
+The reset vector points here.  Simply jumps to [[RES_VM_LOOP]].
 
 <<stub entry>>=
     ORG     $0500
 STUB_ENTRY:
-    JMP     ATTRACT_LOOP
+    JMP     RES_VM_LOOP
 @ %def STUB_ENTRY
 
 @ [[READ_DATA_FIELD]] is a copy-protection signature check, not a
@@ -22167,7 +22174,7 @@ RDF_VERIFY_SEC2:              ; $0567 — integrity-checked by copy-protection v
     RTS
 @ %def READ_DATA_FIELD READ_DATA_FIELD_AD RDF_VERIFY_SEC1 RDF_VERIFY_SEC2
 
-This 321-byte region between [[ATTRACT_LOOP]] and [[CONTEXT_SWAP]]
+This 321-byte region between [[RES_VM_LOOP]] and [[CONTEXT_SWAP]]
 contains EALDR VM bytecodes interleaved with native 6502 routines.
 The bytecodes drive the attract-screen display and the
 copy-protection verifier that runs before the game starts.
@@ -27353,7 +27360,7 @@ The following root chunks produce the assembly files when tangled.
 ; Stub code
 <<stub entry>>
 <<read data field>>
-<<attract loop>>
+<<res vm loop>>
 <<resident data and bytecodes>>
 <<resident dispatch>>
 <<resident dispatch table>>
