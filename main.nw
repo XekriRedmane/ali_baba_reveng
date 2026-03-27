@@ -22430,10 +22430,31 @@ RESIDENT_DISPATCH_TABLE:
     HEX     00 27 55 5F 6D 8A AD B9
     HEX     4F A2 CE 26 79
 @ %def RESIDENT_DISPATCH_TABLE
-Dispatches one bytecode instruction using a stack trick.  X and Y hold
-the bytecode pointer from the previous iteration.  They are pushed onto
-the stack at entry, then [[PULL_TWO_RET_ADDRS]] rearranges the stack
-so the saved X/Y values end up in [[VM_IP]]/[[VM_IP]]+1 as the new bytecode pointer.
+Dispatches one bytecode instruction using a stack trick.
+On the \emph{first} call (from [[ATTRACT_LOOP]]), the X/Y values pushed
+at entry are discarded by [[PULL_TWO_RET_ADDRS]].  The routine works
+as follows:
+\begin{enumerate}
+\item Push X (high) and Y (low) onto the stack.
+\item [[JSR PULL_TWO_RET_ADDRS]] --- this pulls its own return address
+      into [[VM_OPERAND]] and the X/Y values into [[VM_IP]], then
+      jumps back to [[\texttt{.resume}]] via [[JMP (VM_OPERAND)]].
+\item At [[\texttt{.resume}]]: pull the \emph{caller's} return address
+      (from the outer [[JSR RESIDENT_DISPATCH]]) into [[VM_IP]].
+\item [[LDY \#\$04]] skips 4~bytes past the return address.
+\end{enumerate}
+
+Since [[JSR RESIDENT_DISPATCH]] is at \$056C, the return address on the
+stack is \$056E.  Adding~4 gives \$0572 = [[RESIDENT_BYTECODES]]---the
+first VM instruction.  The ``JMP ATTRACT\_LOOP'' at \$056F and the
+bytecodes' ORG at \$0572 are placed so that the IP lands exactly at the
+start of the bytecode program.
+
+On subsequent iterations, [[ATTRACT_LOOP]] calls [[JSR CONTEXT_SWAP]]
+then [[JSR RESIDENT_DISPATCH]] again.  The same stack trick re-derives
+the IP from the return address each time, but by this point the VM
+handlers have already updated X/Y to track the current bytecode position
+(passed through the stack round-trip).
 
 <<resident dispatch>>=
     ORG     $06B3
@@ -22562,10 +22583,20 @@ RES_VM_CALL1:
     JMP     RESIDENT_DISPATCH_FETCH ; dispatch next
 @ %def RES_VM_CALL1
 
-[[PULL_TWO_RET_ADDRS]] pulls both return addresses from the stack
-(its own and the caller's), increments each by 1 (since RTS pushes
-addr\textminus{}1), and jumps through [[VM_OPERAND]]/[[VM_OPERAND]]+1 back to the code
-after the [[JSR]] in [[RESIDENT_DISPATCH]].
+[[PULL_TWO_RET_ADDRS]] (\$0738) is a stack-manipulation utility used by
+[[RESIDENT_DISPATCH]].  It pulls four bytes from the stack:
+\begin{enumerate}
+\item Its own return address $\to$ [[VM_OPERAND]] (incremented by~1 to
+      correct the RTS addr\textminus{}1 convention).
+\item The X/Y values pushed by [[RESIDENT_DISPATCH]] $\to$ [[VM_IP]]
+      (incremented; these become the bytecode pointer on subsequent
+      iterations).
+\end{enumerate}
+It then jumps through [[VM_OPERAND]], which points to
+[[\texttt{.resume}]] in [[RESIDENT_DISPATCH]].  This effectively
+``returns'' from [[PULL_TWO_RET_ADDRS]] while leaving the caller's
+return address (from [[JSR RESIDENT_DISPATCH]]) on the stack for
+[[\texttt{.resume}]] to pull into [[VM_IP]].
 
 <<pull two ret addrs>>=
     ORG     $0738
