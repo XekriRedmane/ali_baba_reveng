@@ -4660,6 +4660,12 @@ GAME_ACTION_HANDLER:
     SUBROUTINE GAME_ACTION_HANDLER
     ; Border animation handler invoked via DISPATCH_VEC during idle loop.
     ;
+    ; NOTE: Code from $5C00 onward (TICK_BORDER_ANIM tail through
+    ; DRAW_BORDER_LABELS) is overwritten when LOAD_SCENE_FROM_DISK
+    ; loads scene text into SCENE_TEXT_DATA ($5C00).  This permanently
+    ; disables the idle border animation after the first scene load.
+    ; See the LOAD_SCENE_FROM_DISK documentation for the full analysis.
+    ;
     ; Behavior:
     ;   1. Runs a 3-pass loop: each pass dispatches three border handlers
     ;      (A, B, C) that swap/draw 2x2 icons along the border.
@@ -22036,15 +22042,51 @@ READ_KEYBOARD:
 [[LOAD_SCENE_FROM_DISK]] reads one 256-byte sector of scene text
 data from the game disk into [[SCENE_TEXT_DATA]] (\$5C00).
 
-\textbf{Warning: dual-use memory.}  The region \$5C00--\$5CFF is
-normally occupied by border animation and display code
-([[TICK_BORDER_ANIM]] tail, [[ANIM_BORDER_ICONS_A]]/B,
-[[INIT_GAME_DISPLAY]], [[DRAW_BORDER_CHAR]],
-[[DRAW_BORDER_LABELS]]).  Loading scene data \emph{overwrites} all
-of this code.  After the scene ends, [[ENTER_LOCATION]] redraws the
-map, but the border routines at \$5C00+ have been destroyed.  This
-implies either the border code is expendable once the initial display
-is drawn, or some mechanism (not yet identified) restores it.
+\paragraph{Dual-use memory at \$5C00--\$5CFF.}
+The 256-byte buffer at [[SCENE_TEXT_DATA]] (\$5C00) overlaps with
+active code.  Loading a scene \emph{overwrites} the following
+routines:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\thead{Address} & \thead{Routine} & \thead{Called from} \\
+\midrule
+\$5C00--\$5C0D & [[TICK_BORDER_ANIM]] tail & [[GAME_ACTION_HANDLER]] \\
+\$5C0E & [[ANIM_BORDER_ICONS_A]] & [[GAME_ACTION_HANDLER]] \\
+\$5C1A & [[ANIM_BORDER_ICONS_B]] & [[GAME_ACTION_HANDLER]] \\
+\$5C6D & [[INIT_GAME_DISPLAY]] & [[INIT_GAME_STATE]] \\
+\$5CEC & [[DRAW_BORDER_CHAR]] & [[INIT_GAME_DISPLAY]] \\
+\$5CFD & [[DRAW_BORDER_LABELS]] & [[INIT_GAME_DISPLAY]] \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Call-chain analysis shows that this is \textbf{intentional}:
+\begin{itemize}
+\item \textbf{Startup-only routines} ([[INIT_GAME_DISPLAY]],
+  [[DRAW_BORDER_CHAR]], [[DRAW_BORDER_LABELS]]): called exactly
+  once during [[GAME_INIT]] $\to$ [[INIT_GAME_STATE]].  After
+  the initial border frame is drawn, they are never called again
+  and can be safely overwritten.
+\item \textbf{Idle animation} ([[GAME_ACTION_HANDLER]], which
+  contains [[TICK_BORDER_ANIM]] and [[ANIM_BORDER_ICONS_A]]/B):
+  called during the input-poll idle loop via [[DISPATCH_VEC]] $\to$
+  [[TUNE_ADVANCE]] $\to$ [[JMP (DISPATCH_VEC)]].  The first scene
+  load \emph{permanently destroys} the idle border animation.
+  After that, the animated icon cycling along the border ceases,
+  but gameplay is unaffected.
+\item \textbf{Post-scene code} ([[ENTER_LOCATION]], called after
+  [[SCENE_LOOP]] returns): does \emph{not} call any \$5C00+
+  routines.  It redraws the map via [[DRAW_MAP_COL]] and
+  [[DRAW_MAP_ENTITIES]], neither of which depends on the border
+  animation code.
+\end{itemize}
+
+In summary, the border code is expendable after the initial display
+is set up.  The game deliberately reuses \$5C00--\$5CFF as a scene
+text buffer, accepting that the idle border animation is a one-time
+effect that stops after the first scene is shown.
 
 \paragraph{Disk layout.}  Scene sectors begin at track~\$11,
 sector~0 ([[GAME_SIG_TRACK]]/[[GAME_SIG_SECTOR]]).  Scene~$N$ maps
