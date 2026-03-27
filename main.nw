@@ -17283,7 +17283,7 @@ The routine reads byte~8 of the target (via [[MOB_PTR]]) and uses
 its low 4~bits as a defense value:
 \begin{itemize}
 \item Defense $= 0$: full combat strength applied via
-      [[COPY_F4_TO_F6_AND_SET]].
+      [[APPLY_DAMAGE_TO_MOB]].
 \item Defense $> 0$: subtracted from strength.  A zero or negative
       result means the attack is absorbed, with message \$19/\$1A
       (``blocked'') or~\$34 for critical blocks when HP $<$ 3.
@@ -17344,7 +17344,7 @@ MOB_ATTACK:
     AND     #DEFENSE_HALF_MASK     ; low 4 bits = defense
     BANE    #$00,.has_defense
     LDA     COMBAT_STRENGTH        ; defense=0: full damage
-    JMP     COPY_F4_TO_F6_AND_SET
+    JMP     APPLY_DAMAGE_TO_MOB
 
     ; --- compare strength vs defense ---
 .has_defense:
@@ -17383,7 +17383,7 @@ MOB_ATTACK:
     TXA
     JSR     DISPLAY_MESSAGE        ; "hit" message
     LDA     COMBAT_STRENGTH
-    JMP     COPY_F4_TO_F6_AND_SET  ; apply partial damage
+    JMP     APPLY_DAMAGE_TO_MOB  ; apply partial damage
 @ %def MOB_ATTACK
 @ \subsection{Damage application}
 
@@ -18297,16 +18297,16 @@ PROCESS_ENTITY_SCRIPT:
     LDA     SAVED_CHAR             ; restore saved character
     JMP     DRAW_CHAR_AT_POS       ; redraw at entity position
 @ %def PROCESS_ENTITY_SCRIPT
-@ [[COPY_F4_TO_F6_AND_SET]] copies [[MOB_PTR]] into [[EFFECT_REC]] and
+@ [[APPLY_DAMAGE_TO_MOB]] copies [[MOB_PTR]] into [[EFFECT_REC]] and
 tail-calls [[APPLY_DAMAGE]] with the damage amount in~A.  This is the
 counterpart to [[APPLY_DAMAGE_TO_CURRENT]]: where that routine applies
 damage to the entity at [[ENTITY_PTR]], this one applies damage to the
 mob at [[MOB_PTR]]---used during mob-on-player combat.
 
-<<copy f4 to f6 and set>>=
+<<apply damage to mob>>=
     ORG     $1432
-COPY_F4_TO_F6_AND_SET:
-    SUBROUTINE COPY_F4_TO_F6_AND_SET
+APPLY_DAMAGE_TO_MOB:
+    SUBROUTINE APPLY_DAMAGE_TO_MOB
     ; Apply damage to the mob at MOB_PTR.
     ;
     ; Input:  A = damage amount, MOB_PTR = target mob
@@ -18317,7 +18317,7 @@ COPY_F4_TO_F6_AND_SET:
     MOVW    MOB_PTR,EFFECT_REC     ; copy target pointer
     TXA                            ; restore damage value
     JMP     APPLY_DAMAGE
-@ %def COPY_F4_TO_F6_AND_SET
+@ %def APPLY_DAMAGE_TO_MOB
 @ [[ADD_WILLINGNESS]] is a tiny helper that adds~A (signed) to the
 [[COMBAT_WILLINGNESS]] accumulator.  It exists as a separate routine because
 [[RESOLVE_ATTACK]] calls it from many points during the willingness
@@ -27763,10 +27763,12 @@ The following root chunks produce the assembly files when tangled.
 <<print member name>>
 <<reorder current char>>
 <<apply damage to current>>
-<<copy f4 to f6 and set>>
+<<apply damage to mob>>
 <<auto heal>>
 <<increment hp>>
 <<turn dispatch>>
+
+; Combat
 <<enter combat state>>
 <<start combat>>
 <<attack direction handlers>>
@@ -27783,6 +27785,8 @@ The following root chunks produce the assembly files when tangled.
 <<select combat target>>
 <<get entity threat>>
 <<load target ptr>>
+
+; Game loop
 <<game turn loop>>
 <<commit move>>
 <<end turn>>
@@ -27799,7 +27803,11 @@ The following root chunks produce the assembly files when tangled.
 <<set target restricted>>
 <<dispatch on mode>>
 <<orphaned encounter handler>>
+
+; Graphics page
 <<zeroed hires page>>
+
+; Data tables
 <<char record header>>
 <<Location data>>
 <<Location names>>
