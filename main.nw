@@ -3822,8 +3822,6 @@ if __name__ == "__main__":
 
 \chapter{Initialization}
 
-@ %def INIT_WORLD
-
 @ [[GAME_INIT]] sets up the Apple II for the game.  It runs once at startup,
 before the main loop or attract screen.  The steps, in order:
 
@@ -4109,9 +4107,9 @@ INIT_HRCG:
 
     STOB    #$60,$94B6 ; RTS opcode
     STOB    #$EA,$92D5 ; NOP opcode
-    STA     $92D6     ;  | (skip DOS reconnect)
+    STA     $92D6     ;  | (NOP out DOS reconnect)
     STA     $92D7     ; /
-    JMP     HRCG_INIT ; enter HRCG initialization
+    JMP     HRCG_INIT ; tail call: enter HRCG initialization
 @ %def INIT_HRCG
 A single [[RTS]]---a no-op stub called from [[GAME_INIT]].  Likely a
 hook point or a disabled feature from development.
@@ -10084,6 +10082,57 @@ transitions complete.
   \item On exit, clears [[LOCATION_POS]]/[[LOCATION_STYLE]], calls
         [[ENTER_LOCATION]], and restores zero-page pointers.
 \end{enumerate}
+
+Scene numbers are indices into on-disk text sectors loaded by
+[[LOAD_SCENE_FROM_DISK]].  The following table lists all known
+scene numbers and their contexts:
+
+\begin{center}
+\begin{tabular}{rll}
+\toprule
+\thead{Scene} & \thead{Hex} & \thead{Text / Context} \\
+\midrule
+ 0 & \$00 & ``COPYRIGHT 1981 STUART SMITH \ldots'' \\
+ 1 & \$01 & (empty) \\
+ 2 & \$02 & ``TAKING A DRINK OF COOL CLEAR WATER \ldots'' \\
+ 3 & \$03 & ``THE OAK DOOR VIBRATES WITH A HOLLOW BOOM \ldots'' \\
+ 4 & \$04 & ``AND TO THINK THAT YOU HAVE DONE IT ALL ALONE \ldots'' \\
+ 5 & \$05 & ``THE SULTAN RUSHES OVER TO YOUR SIDE \ldots'' \\
+ 6 & \$06 & ``YOU BASH THE STATUE INTO SMITHEREENS \ldots'' \\
+ 7 & \$07 & ``YOUR WEAPON IS IMPALED IN YOUR VICTIM \ldots'' \\
+ 8 & \$08 & (empty) \\
+ 9 & \$09 & ``THE MAGIC POOL OF HEALING SPIRITS DRIES UP'' \\
+10 & \$0A & ``AHA! AN ILLUSION! \ldots DISSOLVES INTO MIST'' \\
+11 & \$0B & ``YOU HAVE NEVER HARMED A LIVING THING \ldots'' \\
+12 & \$0C & ``PRAISE BE TO ALLAH! YOU HAVE RESCUED \ldots'' \\
+16 & \$10 & ``HE ALSO AWARDS YOU WITH GREAT WEALTH \ldots'' \\
+18 & \$12 & ``THE SULTAN SCURRIES BACK TO HIS THRONE'' \\
+25 & \$19 & ``THE STATUE TOPPLES OVER AND \ldots'' \\
+29 & \$1D & ``THANK YOU FOR FIGHTING TO MAKE THIS \ldots'' \\
+35 & \$23 & ``I GRIEVE OVER YOUR UNTIMELY DEMISE \ldots'' (retirement) \\
+41 & \$29 & ``A RETIRED ADVENTURER IS SELLING \ldots'' \\
+43 & \$2B & ``THE ASTROLOGER OF SHAHRIAR \ldots'' (hint text) \\
+48 & \$30 & ``A BLACKSMITH OFFERS YOU SOME FINE \ldots'' \\
+50 & \$32 & ``ERROR 47 FORTY-SEVEN'' (weapon shop) \\
+56 & \$38 & ``STRONG FIGHTERS SUCH AS DWARVES \ldots'' (hint) \\
+57 & \$39 & ``ABSORBED IN THE TREASURE CHEST \ldots'' (trap: theft) \\
+58 & \$3A & ``A DARK GREEN VAPOR RISES FROM THE \ldots'' (trap: gas) \\
+63 & \$3F & ``DWARVES ARE STRONG, SLOW AND CLUMSY \ldots'' (hint) \\
+64 & \$40 & ``DWARVES AND HUMANS GENERALLY DO MORE \ldots'' (hint) \\
+67 & \$43 & ``PICKING UP A BEAUTIFUL RUBY RING \ldots'' \\
+68 & \$44 & ``A LANDSLIDE BEHIND YOU OBLITERATES \ldots'' \\
+69 & \$45 & ``AN ORACULAR RUNE REVEALS \ldots'' (hint) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Scenes~1, 8, 13--15, 19, 24, 26, 33--34, 36--38, and others are empty
+(all zeros) and serve as placeholders or are loaded conditionally.
+Scene data is stored on disk starting at track~\$11, sector~0; scene~$N$
+maps to track~$\$11 + N/13$, sector~$N \bmod 13$.  The byte encoding
+uses $\$00$=space, $\$01$--$\$1A$=A--Z, $\$1B$--$\$24$=0--9, with
+control codes for positioning ($\$80$+) and flow ($\$7E$=pause,
+$\$7F$=end).
 
 <<defines>>=
 SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene number)
@@ -27680,7 +27729,7 @@ The following root chunks produce the assembly files when tangled.
 <<zero page defines>>
 <<defines>>
 
-; The EA "checker" -- copy protection and verification
+; The EA "checker" -- initial copy protection and verification
 <<reset vector>>
 <<read data field>>
 <<res vm loop>>
@@ -27707,7 +27756,7 @@ The following root chunks produce the assembly files when tangled.
 <<resident page tail>>
 <<resident page residual>>
 
-; Game code
+; Game code main
 <<main entry>>
 <<select input mode>>
 <<process mob groups>>
@@ -27982,6 +28031,8 @@ The following root chunks produce the assembly files when tangled.
 <<settings handlers>>
 <<attack target table>>
 <<drop gold table>>
+
+; Save and load
 <<save load table>>
 <<init world>>
 <<save load init>>
@@ -27994,6 +28045,8 @@ The following root chunks produce the assembly files when tangled.
 <<char select handlers>>
 <<alt input table>>
 <<start game input>>
+
+; More game code
 <<check threats here>>
 <<pickup treasure>>
 <<inc strength>>
@@ -28015,6 +28068,8 @@ The following root chunks produce the assembly files when tangled.
 <<ai choose target>>
 <<continue game>>
 <<shuffle entities>>
+
+; Game save
 <<save game>>
 <<scenario disk handlers>>
 <<ensure game disk>>
@@ -28025,6 +28080,8 @@ The following root chunks produce the assembly files when tangled.
 <<read game data>>
 <<disk read write>>
 <<init disk iob>>
+
+; More game code
 <<scene loop>>
 <<text renderer>>
 <<display status bar>>
@@ -28183,12 +28240,14 @@ The following root chunks produce the assembly files when tangled.
 <<integrity verification>>
 <<cold restart>>
 <<pointer helpers>>
+
+; Unused padding
 <<apple asm residual>>
 
 ; Uninitialized data
 <<runtime data area>>
 
-; Disk I/O
+; Another EA checker
 <<disk read field>>
 <<verify data field>>
 <<disk vm loop>>
@@ -28221,6 +28280,8 @@ The following root chunks produce the assembly files when tangled.
 <<disk vm trampoline>>
 <<disk vm error accum>>
 <<disk vm saved state>>
+
+; Disk I/O
 <<dos33 rwts>>
 @
 
