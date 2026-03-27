@@ -23017,75 +23017,72 @@ Decoded program flow:
 <<disk vm bytecode>>=
     ORG     $B373
 DISK_VM_BYTECODE:
+    SUBROUTINE DISK_VM_BYTECODE
 ; --- Integrity checks ---
-; LDA_ABS $B361; SUB_IMM #$38; BNZ $B48D  (verify SEC at .error)
-    HEX     04 fd 1e 07 42 02 11 19
-; LDA_ABS $B362; SUB_IMM #$60; BNZ $B48D  (verify RTS at .error+1)
-    HEX     04 fe 1e 07 1a 02 11 19
-; LDA_ABS $B368; SUB_IMM #$38; BNZ $B48D  (verify SEC at .bad_nibble+3)
-    HEX     04 f4 1e 07 42 02 11 19
+; Verify that key bytes in VERIFY_DATA_FIELD have not been patched.
+; $B361 = SEC ($38), $B362 = RTS ($60), $B368 = SEC ($38).
+    DVMLD   $B361                  ; load byte at .error
+    DVMSUBI $38                    ; compare with SEC opcode
+    DVMBNE  DISK_VM_SUB_EXIT_ERR  ; patched -> error exit
+    DVMLD   $B362                  ; load byte at .error+1
+    DVMSUBI $60                    ; compare with RTS opcode
+    DVMBNE  DISK_VM_SUB_EXIT_ERR  ; patched -> error exit
+    DVMLD   $B368                  ; load byte at .bad_nibble+3
+    DVMSUBI $38                    ; compare with SEC opcode
+    DVMBNE  DISK_VM_SUB_EXIT_ERR  ; patched -> error exit
 ; --- First attempt ---
-; CALL $B3A8 (disk read sub); BNZ $B394 (retry on error)
-    HEX     05 34 1e
-; GOTO $B3A5 (exit OK path, skipping retry)
-    HEX     02 08 1e ;BNZ $B394 (if error -> retry)
-    HEX     0c 39 1e ;GOTO $B3A5 (success -> exit)
-; --- Retry (second attempt, at $B394) ---
-; CALL $B3A8; BNZ $B39D (error handler)
-    HEX     05 34 1e
-    HEX     02 01 1e ;BNZ $B39D (if error -> handler)
-; GOTO $B3A5 (exit OK)
-    HEX     0c 39 1e
-; --- Error handler at $B39D ---
-; SUB_IMM #$02; BNZ $B48D (fatal if >2 errors); GOTO $B373 (restart)
-    HEX     07 78 02 11 19 0c ef 1e
-; --- Success exit at $B3A5 ---
-; CALL0 $B492 (DISK_VM_EXIT_OK)
-    HEX     09 0e 19
-; --- Disk read subroutine at $B3A8 ---
-; LDA_ABS $C0E9 (motor on)
-    HEX     04 75 6d
-; LDA_IMM #$FF; CALL1 $FCA8 (ROM WAIT)  x2  (motor spin-up delay)
-    HEX     03 85 01 34 51
-    HEX     03 85 01 34 51
-; LDA_ABS $C0EE (Q7L = read mode)
-    HEX     04 72 6d
-; LDA_IMM #$00; STA_ABS $B5E2 (clear error accumulator)
-    HEX     03 7a 06 7e 18
-; CALL $B3D0 x4 (half-track verification passes)
-    HEX     05 4c 1e
-    HEX     05 4c 1e
-    HEX     05 4c 1e
-    HEX     05 4c 1e
-; LDA_ABS $C0E8 (motor off)
-    HEX     04 74 6d
-; LDA_ABS $B5E2 (load error count); RET
-    HEX     04 7e 18 08
-; --- Half-track verifier subroutine at $B3D0 ---
-; LDA_IMM #$03; STA_ABS $B44D (set retry counter)
-    HEX     03 79 06 d1 19
-; CALL1 $B44E (READ_AND_VERIFY)
-    HEX     01 d2 19
-; LDA_ABS $C0E7 (phase 3 on -- half-track step)
-    HEX     04 7b 6d
-; CALL1 $B44E x2
-    HEX     01 d2 19 01 d2 19
-; LDA_ABS $C0E1 (phase 0 on -- half-track step)
-    HEX     04 7d 6d
-; CALL $B46B (PARK_STEPPER sub)
-    HEX     05 f7 19
-; LDA_IMM #$03; STA_ABS $B44D (reset retry counter)
-    HEX     03 79 06 d1 19
-; CALL1 $B44E (READ_AND_VERIFY)
-    HEX     01 d2 19
-; LDA_ABS $C0E7 (phase 3 on)
-    HEX     04 7b 6d
-; CALL1 $B44E x2
-    HEX     01 d2 19 01 d2 19
-; LDA_ABS $C0E5 (phase 2 on -- half-track step)
-    HEX     04 79 6d
-; CALL $B46B (PARK_STEPPER); RET
-    HEX     05 f7 19 08
+    DVMCALL .disk_read_sub         ; call disk read subroutine
+    DVMBNE  .retry                 ; error -> retry
+    DVMGOTO .exit_ok               ; success -> exit
+; --- Retry (second attempt) ---
+.retry:
+    DVMCALL .disk_read_sub         ; retry disk read
+    DVMBNE  .error_handler         ; error -> handler
+    DVMGOTO .exit_ok               ; success -> exit
+; --- Error handler ---
+.error_handler:
+    DVMSUBI $02                    ; subtract 2 from error count
+    DVMBNE  DISK_VM_SUB_EXIT_ERR  ; >2 errors -> fatal exit
+    DVMGOTO DISK_VM_BYTECODE       ; restart from beginning
+; --- Success exit ---
+.exit_ok:
+    DVMCALL0 DISK_VM_EXIT_OK       ; swap context, return carry clear
+; --- Disk read subroutine (called via DVMCALL) ---
+.disk_read_sub:
+    DVMLD   IWM_MOTORON            ; turn on drive motor
+    DVMLDI  $FF                    ; \ motor spin-up delay
+    DVMCALL1 ROM_WAIT              ; /  WAIT($FF)
+    DVMLDI  $FF                    ; \ second spin-up delay
+    DVMCALL1 ROM_WAIT              ; /  WAIT($FF)
+    DVMLD   IWM_READMODE           ; set read mode (Q7L)
+    DVMLDI  $00                    ; \ clear error accumulator
+    DVMST   DISK_VM_ERROR_ACCUM    ; /
+    DVMCALL .half_track_verify     ; \ four half-track
+    DVMCALL .half_track_verify     ;  | verification
+    DVMCALL .half_track_verify     ;  | passes
+    DVMCALL .half_track_verify     ; /
+    DVMLD   IWM_MOTOROFF           ; turn off motor
+    DVMLD   DISK_VM_ERROR_ACCUM    ; load error count
+    DVMRET                         ; return to caller
+; --- Half-track verifier subroutine ---
+.half_track_verify:
+    DVMLDI  $03                    ; \ set retry counter
+    DVMST   DISK_RETRY_COUNT       ; /  to 3
+    DVMCALL1 READ_AND_VERIFY       ; read and verify sector
+    DVMLD   IWM_PH3_ON             ; phase 3 on (half-track step)
+    DVMCALL1 READ_AND_VERIFY       ; \ verify two more
+    DVMCALL1 READ_AND_VERIFY       ; /  sectors
+    DVMLD   IWM_PH0_ON             ; phase 0 on (half-track step)
+    DVMCALL DISK_VM_SUB_PARK_STEPPER ; park stepper motor
+    DVMLDI  $03                    ; \ reset retry counter
+    DVMST   DISK_RETRY_COUNT       ; /  to 3
+    DVMCALL1 READ_AND_VERIFY       ; read and verify sector
+    DVMLD   IWM_PH3_ON             ; phase 3 on
+    DVMCALL1 READ_AND_VERIFY       ; \ verify two more
+    DVMCALL1 READ_AND_VERIFY       ; /  sectors
+    DVMLD   IWM_PH2_ON             ; phase 2 on (half-track step)
+    DVMCALL DISK_VM_SUB_PARK_STEPPER ; park stepper
+    DVMRET                         ; return to caller
 ; $B3FF: next byte ($A0) is the LDY opcode of SEARCH_ADDR_FIELD
 @ %def DISK_VM_BYTECODE
 Searches for the D5~AA~96 address field prologue on disk.  The entry
@@ -23199,20 +23196,15 @@ movements.
 <<disk vm sub park stepper>>=
     ORG     $B46B
 DISK_VM_SUB_PARK_STEPPER:
-; LDA_IMM #$70; CALL1 $B482 (DELAY_LOOP)  -- long delay
-    HEX     03 0a 01 1e 19
-; LDA_ABS $C0E0 (phase 0 off)
-    HEX     04 7c 6d
-; LDA_ABS $C0E2 (phase 1 off)
-    HEX     04 7e 6d
-; LDA_ABS $C0E4 (phase 2 off)
-    HEX     04 78 6d
-; LDA_ABS $C0E6 (phase 3 off)
-    HEX     04 7a 6d
-; LDA_IMM #$28; CALL1 $B482 (DELAY_LOOP)  -- short delay
-    HEX     03 52 01 1e 19
-; RET
-    HEX     08
+    DVMLDI  $70                    ; \ long delay
+    DVMCALL1 DELAY_LOOP            ; /  for stepper settle
+    DVMLD   IWM_PH0_OFF            ; phase 0 off
+    DVMLD   IWM_PH1_OFF            ; phase 1 off
+    DVMLD   IWM_PH2_OFF            ; phase 2 off
+    DVMLD   IWM_PH3_OFF            ; phase 3 off
+    DVMLDI  $28                    ; \ short delay
+    DVMCALL1 DELAY_LOOP            ; /  for settle
+    DVMRET                         ; return to caller
 @ %def DISK_VM_SUB_PARK_STEPPER
 Native delay routine.  Takes the delay count in~[[A]] (passed from
 VM accumulator via CALL1).  Inner loop: [[DEX]] from [[$20]] to~0
@@ -23240,8 +23232,8 @@ error-handler [[BNZ]] branches in the main bytecode program.
 <<disk vm sub exit err>>=
     ORG     $B48D
 DISK_VM_SUB_EXIT_ERR:
-; LDA_IMM #$20; CALL0 $B497 (DISK_VM_EXIT_ERR)
-    HEX     03 5a 09 0b 19
+    DVMLDI  $20                    ; load error code
+    DVMCALL0 DISK_VM_EXIT_ERR      ; exit VM with carry set
 @ %def DISK_VM_SUB_EXIT_ERR
 These native routines exit the disk~VM\@.  Each calls
 [[DISK_VM_SWAP]] to restore the caller's zero-page state, then
@@ -23340,7 +23332,19 @@ DISK_VM_RESUME:
 ; Each byte is the low address of a handler in page $B5.
 ; Opcode index -> handler address ($B5xx).
 DISK_VM_HANDLER_TBL:
-    HEX     79 27 55 5f 6d 8a ad b9 a2 4f ce 26 00
+    DC.B    #<DISK_VM_OP_LDA_IDX   ; $00: DVMLDX
+    DC.B    #<DISK_VM_OP_CALL1     ; $01: DVMCALL1
+    DC.B    #<DISK_VM_OP_BNZ       ; $02: DVMBNE
+    DC.B    #<DISK_VM_OP_LDA_IMM   ; $03: DVMLDI
+    DC.B    #<DISK_VM_OP_LDA_ABS   ; $04: DVMLD
+    DC.B    #<DISK_VM_OP_CALL      ; $05: DVMCALL
+    DC.B    #<DISK_VM_OP_STA_ABS   ; $06: DVMST
+    DC.B    #<DISK_VM_OP_SUB_IMM   ; $07: DVMSUBI
+    DC.B    #<DISK_VM_OP_RET       ; $08: DVMRET
+    DC.B    #<DISK_VM_OP_CALL0     ; $09: DVMCALL0
+    DC.B    #<DISK_VM_OP_INC_LOAD  ; $0A: DVMINC
+    DC.B    #<DISK_VM_HALT         ; $0B: DVMHALT (RTS)
+    DC.B    #<DISK_VM_OP_GOTO      ; $0C: DVMGOTO
 @ %def DISK_VM_DISPATCH DISK_VM_RESUME DISK_VM_HANDLER_TBL
 @ [[DISK_VM_PULL_IP]] is an RTS-trick bootstrap used during VM startup.  It
 pulls two return addresses from the 6502 stack: the inner one (from the JSR
@@ -23350,6 +23354,10 @@ that called it) and the outer one (from the JSR that entered
 convention of pushing address$-$1 during JSR.  Execution then resumes at the
 inner return address via an indirect jump, allowing the dispatcher to
 ``capture'' its caller's position as the starting bytecode address.
+
+This is the same stack trick used by [[PULL_TWO_RET_ADDRS]] ([[$0738]]) in
+the resident~VM dispatcher.  Both routines pull two nested return addresses to
+bootstrap the VM instruction pointer from the call site.
 
 <<disk vm pull ip>>=
     ORG     $B538
@@ -23393,8 +23401,9 @@ DISK_VM_READ_ADDR:
 .no_page2:
     EOR     #$AD    ; decrypt
     STA     $55     ; operand high
+DISK_VM_HALT:                   ; opcode $0B handler: HALT (just RTS)
     RTS
-@ %def DISK_VM_READ_ADDR
+@ %def DISK_VM_READ_ADDR DISK_VM_HALT
 The disk~VM has 13~opcodes (indices 0--12).  Each handler's low
 address is stored in the table at~[[$B4BF]]; dispatch jumps to
 [[$B5xx]].  Handlers return to the dispatch loop by jumping to
@@ -23422,6 +23431,58 @@ dispatches again.
 \bottomrule
 \end{tabular}
 \end{center}
+
+The following macros emit encrypted Disk~VM bytecodes, analogous to the
+EALDR~VM macros (Table~\ref{table:ealoadervm}).  The Disk~VM uses
+different XOR keys: address low~byte XOR~[[$9C]], address high~byte
+XOR~[[$AD]], immediate XOR~[[$7A]].  The opcode numbering also differs
+from the EALDR~VM; notably, opcode~[[$0B]] is [[HALT]] (exit VM) in the
+disk~VM, whereas in the EALDR~VM it was [[VMASL]] (shift left).
+
+<<Disk VM macros>>=
+    ; --- Disk VM bytecode macros ---
+    ; Each macro emits the opcode byte followed by XOR-encrypted arguments.
+    ; Address args: low ^ $9C, high ^ $AD.  Immediate args: ^ $7A.
+    MACRO DVMLDX   ;  $00 addr -- ACC <- *(addr + ACC)
+        DC.B $00, <[{1}] ^ $9C, >[{1}] ^ $AD
+    ENDM
+    MACRO DVMCALL1 ;  $01 addr -- call native, result -> ACC
+        DC.B $01, <[{1}] ^ $9C, >[{1}] ^ $AD
+    ENDM
+    MACRO DVMBNE   ;  $02 addr -- branch if ACC != 0
+        DC.B $02, <[{1}] ^ $9C, >[{1}] ^ $AD
+    ENDM
+    MACRO DVMLDI   ;  $03 imm  -- ACC <- immediate
+        DC.B $03, [{1}] ^ $7A
+    ENDM
+    MACRO DVMLD    ;  $04 addr -- ACC <- *(addr)
+        DC.B $04, <[{1}] ^ $9C, >[{1}] ^ $AD
+    ENDM
+    MACRO DVMCALL  ;  $05 addr -- VM subroutine call
+        DC.B $05, <[{1}] ^ $9C, >[{1}] ^ $AD
+    ENDM
+    MACRO DVMST    ;  $06 addr -- *(addr) <- ACC
+        DC.B $06, <[{1}] ^ $9C, >[{1}] ^ $AD
+    ENDM
+    MACRO DVMSUBI  ;  $07 imm  -- ACC <- ACC - immediate
+        DC.B $07, [{1}] ^ $7A
+    ENDM
+    MACRO DVMRET   ;  $08      -- VM subroutine return
+        DC.B $08
+    ENDM
+    MACRO DVMCALL0 ;  $09 addr -- jump to native (no return)
+        DC.B $09, <[{1}] ^ $9C, >[{1}] ^ $AD
+    ENDM
+    MACRO DVMINC   ;  $0A addr -- *(addr)++, result -> ACC
+        DC.B $0A, <[{1}] ^ $9C, >[{1}] ^ $AD
+    ENDM
+    MACRO DVMHALT  ;  $0B      -- exit VM (RTS)
+        DC.B $0B
+    ENDM
+    MACRO DVMGOTO  ;  $0C addr -- unconditional branch
+        DC.B $0C, <[{1}] ^ $9C, >[{1}] ^ $AD
+    ENDM
+@
 
 Unconditional branch.  Reads a 2-byte encrypted address operand and
 sets the VM instruction pointer to that address.
@@ -27367,6 +27428,7 @@ The following root chunks produce the assembly files when tangled.
     PROCESSOR 6502
 <<Macros>>
 <<EALDR VM macros>>
+<<Disk VM macros>>
 <<zero page defines>>
 <<defines>>
 
