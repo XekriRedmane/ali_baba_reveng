@@ -22454,7 +22454,7 @@ The 13-byte table maps opcode indices to handler addresses in page [[$07]]:
 <<resident dispatch table>>=
     ORG     $06D3
 RESIDENT_DISPATCH_TABLE:
-    DC.B    #<RESIDENT_DECODE_DISPATCH ; $00: VMGOTO
+    DC.B    #<RES_VM_DISPATCH ; $00: VMGOTO
     DC.B    #<RES_VM_CALL1            ; $01: VMCALL1
     DC.B    #<RES_VM_VMBEQ            ; $02: VMBEQ
     DC.B    #<RES_VM_VMLDI            ; $03: VMLDI
@@ -22557,8 +22557,8 @@ Decodes an address and redirects execution there.
 
 <<resident decode dispatch>>=
     ORG     $0700
-RESIDENT_DECODE_DISPATCH:
-    SUBROUTINE RESIDENT_DECODE_DISPATCH
+RES_VM_DISPATCH:
+    SUBROUTINE RES_VM_DISPATCH
     ;
     ; Opcode $00 (VMGOTO): unconditional branch.
     ; Reads a 2-byte encrypted address from the bytecode stream,
@@ -22572,7 +22572,7 @@ RES_VM_SET_IP:
     MOVW    VM_OPERAND,VM_IP         ; VM_IP = decoded target address
     LDY     #$00                     ; reset Y (new page, offset 0)
     JMP     RESIDENT_DISPATCH_FETCH  ; fetch next opcode from new IP
-@ %def RESIDENT_DECODE_DISPATCH RES_VM_SET_IP
+@ %def RES_VM_DISPATCH RES_VM_SET_IP
 @
 
 \begin{center}
@@ -22580,7 +22580,7 @@ RES_VM_SET_IP:
 \toprule
 \thead{Opcode} & \thead{Mnemonic} & \thead{Address} & \thead{Handler label} \\
 \midrule
-\$00 & VMGOTO   & \$0700 & [[RESIDENT_DECODE_DISPATCH]] \\
+\$00 & VMGOTO   & \$0700 & [[RES_VM_DISPATCH]] \\
 \$01 & VMCALL1  & \$0727 & [[RES_VM_CALL1]] \\
 \$02 & VMBEQ    & \$0755 & [[RES_VM_VMBEQ]] \\
 \$03 & VMLDI    & \$075F & [[RES_VM_VMLDI]] \\
@@ -22868,12 +22868,12 @@ RES_VM_VMINC:
     JMP     RESIDENT_DISPATCH_FETCH
 @ %def RES_VM_VMINC
 A 3-byte relay in the handler page.  Jumps to
-[[RESIDENT_DECODE_DISPATCH]] at [[$0700]].
+[[RES_VM_DISPATCH]] at [[$0700]].
 
 <<decode dispatch relay>>=
     ORG     $07DF
 DECODE_DISPATCH_RELAY:
-    JMP     RESIDENT_DECODE_DISPATCH
+    JMP     RES_VM_DISPATCH
 @ %def DECODE_DISPATCH_RELAY
 The remaining 30 bytes of the handler page ([[$07E2--$07FF]]) are
 \chapter{Disk I/O}
@@ -26399,7 +26399,7 @@ but serve no runtime purpose.
 \section{Residual development string}
 
 The 14~bytes at [[$06F2--$06FF]] between [[CONTEXT_SWAP]] and
-[[RESIDENT_DECODE_DISPATCH]] are unreferenced and decode as the
+[[RES_VM_DISPATCH]] are unreferenced and decode as the
 high-bit ASCII fragment ``\texttt{DON'T BREAK TH}''---likely a
 truncated development message.
 
