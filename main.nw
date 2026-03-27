@@ -22405,29 +22405,34 @@ DECRYPT_HIGH_BYTE:
     EOR     #$D9                         ; decrypt high byte of address
     RTS
 @ %def RESIDENT_BYTECODES VM_EXIT_OK VM_EXIT_ERR DECRYPT_HIGH_BYTE
-Swaps 16 bytes between zero page [[VM_SCRATCH]]--[[VM_SCRATCH]]+\$0F and
-[[RES_ZP_SHADOW]]--[[RES_ZP_SHADOW]]+\$0F.
-  This gives the resident interpreter its own private set of zero-page
-temporaries that don't interfere with the main program.
+[[CONTEXT_SWAP]] saves and restores zero-page \$50--\$5F so the VM can
+use those addresses for its own registers without clobbering the
+caller's data.  Before the VM runs, [[CONTEXT_SWAP]] saves the caller's
+\$50--\$5F into [[RES_ZP_SHADOW]] and loads the VM's saved state into
+ZP.  When the VM exits, [[VM_EXIT_OK]]/[[VM_EXIT_ERR]] calls
+[[CONTEXT_SWAP]] again, saving the VM state back to the shadow area and
+restoring the caller's original values.
 
 <<context swap>>=
     ORG     $06E0
 CONTEXT_SWAP:
     SUBROUTINE CONTEXT_SWAP
     ;
-    ; Exchanges 16 bytes between ZP $50-$5F and the shadow area at
-    ; RES_ZP_SHADOW ($07E5-$07F4).  This gives the VM its own private
-    ; copy of the zero-page registers:
+    ; Saves the caller's ZP $50-$5F into the shadow area at
+    ; RES_ZP_SHADOW ($07E5-$07F4) and loads the VM's saved state
+    ; from the shadow into ZP.  This lets the VM use $50-$5F for
+    ; its registers without clobbering the caller's data:
     ;
-    ;   $50 (VM_SCRATCH)  — decoded nibble / general scratch
-    ;   $52/$53 (VM_IP)   — bytecode instruction pointer
+    ;   $50 (VM_SCRATCH)     — decoded nibble / general scratch
+    ;   $51                  — additional VM scratch
+    ;   $52/$53 (VM_IP)      — bytecode instruction pointer
     ;   $54/$55 (VM_OPERAND) — decoded address operand
-    ;   $56 (VM_ACC)      — VM accumulator
-    ;   $57-$5F           — additional VM scratch
+    ;   $56 (VM_ACC)         — VM accumulator
+    ;   $57-$5F              — additional VM scratch
     ;
     ; Called twice per VM execution:
-    ;   1. Before RESIDENT_DISPATCH — restores VM state from shadow
-    ;   2. Inside VM_EXIT_OK/ERR  — saves VM state back to shadow
+    ;   1. Before RESIDENT_DISPATCH — saves caller's ZP, loads VM state
+    ;   2. Inside VM_EXIT_OK/ERR   — saves VM state, restores caller's ZP
     ;
     ; On exit: X = $FF (loop underflows past 0), Y unchanged.
     ;
@@ -22443,8 +22448,6 @@ CONTEXT_SWAP:
     BPL     .loop                   ; loop while X >= 0
     RTS
 @ %def CONTEXT_SWAP
-The 14 bytes between [[CONTEXT_SWAP]] and [[RESIDENT_DECODE_DISPATCH]]
-([[$06F2--$06FF]]) are dead code --- see the Dead Code chapter.
 
 The 13-byte table maps opcode indices to handler addresses in page [[$07]]:
 
