@@ -22048,19 +22048,21 @@ STUB_ENTRY:
     JMP     ATTRACT_LOOP
 @ %def STUB_ENTRY
 
-@ [[READ_DATA_FIELD]] reads a disk data field from the drive.  It
-searches for the D5~AA~AD prologue, reads 342~(\$156) bytes of
-encoded data (checking each against \$AF), then reads 256~(\$100)
-bytes, and finally verifies the DE~AA epilogue.  Returns with carry
-clear on success, carry set on error.  The entry at [[READ_DATA_FIELD_AD]]
-(\$051E) skips the D5~AA search and checks only for the AD~byte.
+@ [[READ_DATA_FIELD]] is a copy-protection signature check, not a
+normal sector read.  It searches for a D5~AA~AD data field prologue,
+then reads all 342 nibble bytes (86~+~256, matching the standard
+6\&2-encoded data field size) and verifies that \emph{every} byte
+equals~\$AF.  No data is stored in memory---the bytes are compared and
+discarded.  After the data field, the DE~AA epilogue is verified.
+Returns with carry clear on success, carry set on error.
+
+The entry at [[READ_DATA_FIELD_AD]] (\$051E) skips the D5~AA search
+and checks only for the AD~byte, used when the address field has
+already been located.
 
 During reading, [[BIT \$C000]] polls the keyboard---if a key is
-pressed, the read is aborted and the nibble is stored at [[RES_ABORT_NIBBLE]].
-
-I think this is just a check. It seems nothing is
-done with the data read, except checking that each of the 86+256 disk bytes is
-equal to \$AF. The above explanation is incorrect (except for the keyboard).
+pressed, the read is aborted and the last nibble is stored at
+[[RES_ABORT_NIBBLE]].
 
 @ The 30~bytes at [[$07E2--$07FF]] are runtime storage locations used by
 the resident copy-protection verifier and disk~I/O routines:
@@ -22111,29 +22113,29 @@ READ_DATA_FIELD_AD:
     CMP     #$AD              ; AD?
     BNE     .recheck          ; no -> re-check as D5
 
-    ; --- Read 86 bytes of data ---
+    ; --- Verify 86 nibble bytes = $AF ---
     PHA                       ; timing padding
     PLA
-    LDY     #$56              ; 86 bytes
+    LDY     #$56              ; 86 bytes (6&2 auxiliary buffer)
 .read_86:
     LDA     DISK_DATA_REG     ; \ wait for disk byte
     BPL     *-3               ; /
-    BIT     $C000             ; check keyboard
-    CMP     #$AF              ; valid nibble? (must be = $AF)
-    BNE     .abort            ; invalid -> abort
+    BIT     $C000             ; check keyboard (abort on keypress)
+    CMP     #$AF              ; signature byte?
+    BNE     .abort            ; mismatch -> abort
     DEY
-    BNE     .read_86          ; loop for $56 bytes (86 dec)
+    BNE     .read_86
 
-    ; --- Read 256 bytes of data ---
-    LDY     #$00              ; 256 bytes
+    ; --- Verify 256 nibble bytes = $AF ---
+    LDY     #$00              ; 256 bytes (6&2 main data)
 .read_256:
     LDA     DISK_DATA_REG     ; \ wait for disk byte
     BPL     *-3               ; /
-    BIT     $C000             ; check keyboard
-    CMP     #$AF              ; valid nibble? (must be = $AF)
-    BNE     .abort            ; invalid -> abort
+    BIT     $C000             ; check keyboard (abort on keypress)
+    CMP     #$AF              ; signature byte?
+    BNE     .abort            ; mismatch -> abort
     DEY
-    BNE     .read_256         ; loop for 256 bytes
+    BNE     .read_256
 
     ; --- Verify DE AA epilogue ---
     LDY     DISK_DATA_REG     ; \ wait for epilogue byte 1
