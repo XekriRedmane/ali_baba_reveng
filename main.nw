@@ -3906,6 +3906,26 @@ MFIELD_FLAGS        EQU     $0F     ; byte 15: status flags (bit 2 = combat enga
 HP_FLAGS_MASK       EQU     $C0     ; byte 6: mask for flags bits 7-6 (above HP)
 @ %def ENTITY_PTR CFIELD_NEXT CFIELD_POSITION CFIELD_APPEARANCE CFIELD_STYLE CFIELD_EVENTS CFIELD_XP CFIELD_FACTION_MASK MFIELD_NEXT MFIELD_POSITION MFIELD_APPEARANCE MFIELD_STRENGTH MFIELD_HP MFIELD_ATTACK MFIELD_XP MFIELD_DEFENSE MFIELD_LEVEL MFIELD_NAME MFIELD_GOLD MFIELD_HP HP_FLAGS_MASK
 
+<<var current player>>=
+    ORG     $5A02
+CURRENT_PLAYER:
+    DC.B    $8D                     ; initial value (runtime: current player index (1-based))
+
+<<var location pos>>=
+    ORG     $5A55
+LOCATION_POS:
+    DC.B    $A0                     ; initial value (runtime: current location position (triggers redraw when changed))
+
+<<var location style>>=
+    ORG     $5A56
+LOCATION_STYLE:
+    DC.B    $A3                     ; initial value (runtime: current map style (from record field 5, bits 0-6))
+
+<<var blink col>>=
+    ORG     $5AA2
+BLINK_COL:
+    DC.B    $C1                     ; initial value (runtime: font column (0-19; $14 = disabled))
+
 <<game init>>=
     ORG     $78C7
 GAME_INIT:
@@ -4328,6 +4348,16 @@ INIT_GAME_DISPLAY:
 character number is passed in~A.  It stores the character number into
 [[FONT_CHARNUM]] and the charset into [[FONT_CHARSET]], then calls
 [[PRINT_FONTCHAR_AT_TEXT_POS]] to render it.
+
+<<var font charnum>>=
+    ORG     $5A0E
+FONT_CHARNUM:
+    DC.B    $8D                     ; initial value (runtime: font character number to render)
+
+<<var font charset>>=
+    ORG     $5A0F
+FONT_CHARSET:
+    DC.B    $A0                     ; initial value (runtime: font charset index (1-5))
 
 <<draw border char>>=
     ORG     $5CEC
@@ -4872,6 +4902,11 @@ is set to~0 (keyboard).  If the paddle button state changes (pressed or
 released), [[INPUT_MODE]] is set to~1 (joystick), the cursor is
 repositioned, and message~\$2F (joystick confirmation) is displayed.
 
+<<var input mode>>=
+    ORG     $5A00
+INPUT_MODE:
+    DC.B    $AB                     ; initial value (runtime: 0 = keyboard, 1 = joystick)
+
 <<select input mode>>=
     ORG     $084E
 SELECT_INPUT_MODE:
@@ -4930,6 +4965,11 @@ sum is simply the total mob count.
 <<zero page defines>>=
 CHAR_PTR                EQU     $FA     ; character record pointer (2 bytes, $FA/$FB)
 @ %def CHAR_PTR
+
+<<var total mob count>>=
+    ORG     $5A01
+TOTAL_MOB_COUNT:
+    DC.B    $B1                     ; initial value (runtime: total mobs across all groups (excl. group 0))
 
 <<init mob count>>=
     ORG     $0C51
@@ -6542,6 +6582,21 @@ DECIMAL_OUT_PTR         EQU     $BA     ; num-to-decimal output buffer pointer (
 NUM_VALUE               EQU     $BC     ; 16-bit numeric value for division (2 bytes)
 @ %def DECIMAL_OUT_PTR NUM_VALUE
 
+<<var num digit>>=
+    ORG     $5A1B
+NUM_DIGIT:
+    DC.B    $C1                     ; initial value (runtime: current digit accumulator (ASCII $B0-$B9))
+
+<<var num divisor>>=
+    ORG     $5A1C
+NUM_DIVISOR:
+    DC.B    $A0,$A8                 ; initial value (runtime: 16-bit divisor for decimal conversion)
+
+<<var num leading>>=
+    ORG     $5A1E
+NUM_LEADING:
+    DC.B    $C1                     ; initial value (runtime: leading-zero suppress flag (0=suppress, 1=print))
+
 <<num to decimal>>=
     ORG     $0DA1
 NUM_TO_DECIMAL:
@@ -6671,6 +6726,11 @@ two lines were printed, a final scroll is performed on exit.
 table by skipping length-prefixed entries until the desired index is
 reached.  [[MSG_LINE_COUNT]] tracks how many lines have been printed so
 far, which controls whether the routine scrolls before or after printing.
+
+<<var msg line count>>=
+    ORG     $5A57
+MSG_LINE_COUNT:
+    DC.B    $BC                     ; initial value (runtime: lines printed so far)
 
 @ The routine below implements the message display.
 
@@ -7567,6 +7627,11 @@ reaches zero, it checks the animation frame via [[ANIM_CHECK_FRAME]],
 ticks the counter, and loops.  In joystick mode, it runs a fixed
 12-iteration countdown via [[DEC_WAIT_IF_NONZERO]].
 
+<<var wait loop count>>=
+    ORG     $5A8C
+WAIT_LOOP_COUNT:
+    DC.B    $D9                     ; initial value (runtime: inner wait loop counter)
+
 <<idle anim handler>>=
     ORG     $0D5E
 IDLE_ANIM_HANDLER:
@@ -7644,6 +7709,11 @@ the current selection index back into the table.
 MENU_DESC_PTR           EQU     $C0     ; menu descriptor table pointer (2 bytes, $C0/$C1)
 @ %def MENU_DESC_PTR
 
+<<var current selection>>=
+    ORG     $5AAB
+CURRENT_SELECTION:
+    DC.B    $A0                     ; initial value (runtime: current menu selection index)
+
 <<store selection to record>>=
     ORG     $6071
 STORE_SELECTION_TO_RECORD:
@@ -7674,6 +7744,16 @@ message~\$31 (``can't afford'') and returns to the shop menu.
 Otherwise it copies the price into [[NUM_VALUE]], calls the shop's
 deduct routine, displays message~\$26 (``bought''), then jumps
 through the item's effect handler pointer in the shop record.
+
+<<var shop price>>=
+    ORG     $5A81
+SHOP_PRICE:
+    DC.B    $C4,$C1                 ; initial value (runtime: shop: accumulated price (2 bytes))
+
+<<var shop item offset>>=
+    ORG     $5A85
+SHOP_ITEM_OFFSET:
+    DC.B    $C1                     ; initial value (runtime: offset into shop record (5 per item slot))
 
 <<shop buy handler>>=
     ORG     $71AC
@@ -8178,6 +8258,21 @@ full LCG state, [[PRNG_TEMP]] is a scratch byte used during the $69\times$
 multiplication, and [[PRNG_OUTPUT]] receives the state shifted right by one
 bit---this is the value most callers test for random decisions.
 
+<<var prng output>>=
+    ORG     $5A18
+PRNG_OUTPUT:
+    DC.B    $A0                     ; initial value (runtime: PRNG output (state >> 1), used for random tests)
+
+<<var prng state>>=
+    ORG     $5A19
+PRNG_STATE:
+    DC.B    $CC                     ; initial value (runtime: PRNG full state: val = 69*val + $53 (mod 256))
+
+<<var prng temp>>=
+    ORG     $5A1A
+PRNG_TEMP:
+    DC.B    $C4                     ; initial value (runtime: PRNG temporary for multiplication)
+
 <<step prng>>=
     ORG     $78A8
 ; ---------------------------------------------------------------
@@ -8250,6 +8345,16 @@ values that exceed the limit.
 
 @ The implementation below uses bit-mask tables for each power-of-two range
 bracket to minimize the number of PRNG calls.
+
+<<var rng limit>>=
+    ORG     $5A11
+RNG_LIMIT:
+    DC.B    $C4                     ; initial value (runtime: random_in_range temporary (limit/shift count))
+
+<<var rng mask>>=
+    ORG     $5A12
+RNG_MASK:
+    DC.B    $D9                     ; initial value (runtime: random_in_range bit mask)
 
 <<random in range>>=
     ORG     $1317
@@ -8763,6 +8868,22 @@ is $<$~\$15 and bit~7 clear, it is a player character.  On success, copies
 the name into [[CHAR_SELECT_NAME]] and returns with carry clear.  If the
 list is exhausted (byte-2 link = 0), returns with carry set.
 
+<<var browse char index>>=
+    ORG     $5A07
+BROWSE_CHAR_INDEX:
+    DC.B    $A0                     ; initial value (runtime: mob index of browsed character)
+
+<<var input buffer>>=
+    ORG     $5AAC
+INPUT_BUFFER:
+    HEX     D3 D4 C1 A0 C1 D2 C7 AB B1 8D A0 CC C4 C1 A0 A3
+    HEX     BE D3 CC C6 C4 D5 C3 8D A0 D3 D4 C1 A0 D4 C5 CD
+    HEX     D0 8D A0 CC C4 C1 A0 A3 BC D3 CC C6 C4 D5 C3 8D
+    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1 8D A0 CA D3 D2
+    HEX     A0 D3 C8 CF D7 CE CD 8D A0 CC C4 C1 A0 D3 CC C6
+    HEX     C4 D5 C3 AB
+    ; runtime: 84-byte input text display buffer
+
 <<find first pc>>=
     ORG     $0AAE
 ; -----------------------------------------------
@@ -9018,6 +9139,26 @@ DATA_PTR                EQU     $BE     ; general data pointer / return value (2
 <<zero page defines>>=
 TARGET_REC              EQU     $BC     ; secondary entity record pointer in combat/reorder (2 bytes)
 @ %def TARGET_REC
+
+<<var saved target rec>>=
+    ORG     $5A9A
+SAVED_TARGET_REC:
+    DC.B    $D9,$8D                 ; initial value (runtime: saved TARGET_REC ($BC/$BD, 2 bytes))
+
+<<var saved entity ptr>>=
+    ORG     $5A9C
+SAVED_ENTITY_PTR:
+    DC.B    $A0,$CC                 ; initial value (runtime: saved ENTITY_PTR ($F8/$F9, 2 bytes))
+
+<<var saved data ptr>>=
+    ORG     $5A9E
+SAVED_DATA_PTR:
+    DC.B    $C4,$C1                 ; initial value (runtime: saved DATA_PTR ($BE/$BF, 2 bytes))
+
+<<var saved mob ptr>>=
+    ORG     $5AA0
+SAVED_MOB_PTR:
+    DC.B    $A0,$A8                 ; initial value (runtime: saved MOB_PTR ($F4/$F5, 2 bytes))
 
 <<save zp context>>=
     ORG     $6D53
@@ -9798,6 +9939,41 @@ LFIELD_MIN_POS      EQU     $03     ; location record byte 3: top-left bounding 
 LFIELD_MAX_POS      EQU     $04     ; location record byte 4: bottom-right bounding position
 @ %def LFIELD_MIN_POS LFIELD_MAX_POS
 
+<<var font col>>=
+    ORG     $5A0C
+FONT_COL:
+    DC.B    $CE                     ; initial value (runtime: font cursor column coordinate)
+
+<<var source char>>=
+    ORG     $5A28
+SOURCE_CHAR:
+    DC.B    $C1                     ; initial value (runtime: source character for reorder)
+
+<<var active char>>=
+    ORG     $5A29
+ACTIVE_CHAR:
+    DC.B    $CE                     ; initial value (runtime: character index being processed)
+
+<<var bounds min col>>=
+    ORG     $5A51
+BOUNDS_MIN_COL:
+    DC.B    $A0                     ; initial value (runtime: scene setup: left column boundary)
+
+<<var bounds max col>>=
+    ORG     $5A52
+BOUNDS_MAX_COL:
+    DC.B    $CC                     ; initial value (runtime: scene setup: right column boundary)
+
+<<var bounds min row>>=
+    ORG     $5A53
+BOUNDS_MIN_ROW:
+    DC.B    $C4                     ; initial value (runtime: scene setup: top row boundary)
+
+<<var bounds max row>>=
+    ORG     $5A54
+BOUNDS_MAX_ROW:
+    DC.B    $C1                     ; initial value (runtime: scene setup: bottom row boundary)
+
 <<scene setup>>=
     ORG     $0A17
 SCENE_SETUP:
@@ -9887,6 +10063,11 @@ SCENE_TEXT_DATA     EQU     $5C00   ; base address of scene text data
 PRNG_SCENE_SKIP_MASK EQU    $0A     ; bits 1+3: skip disk load ~75% of iterations
 TUNE_ATTRACT        EQU     $06     ; tune player index for attract/opening music
 @ %def SCENE_TRANSITION SCENE_TEXT_DATA PRNG_SCENE_SKIP_MASK TUNE_ATTRACT
+
+<<var scene number>>=
+    ORG     $5A99
+SCENE_NUMBER:
+    DC.B    $CE                     ; initial value (runtime: current scene number)
 
 <<scene loop>>=
     ORG     $6C37
@@ -10048,6 +10229,21 @@ After drawing the character sprite and loading its name pointer, shifts
 [[AI_WAIT_FLAG]] left by one (ROL) into [[WAIT_LOOP_COUNT]] and
 tail-calls [[TIMED_WAIT]].
 
+<<var char ai mode>>=
+    ORG     $5A05
+CHAR_AI_MODE:
+    DC.B    $D3                     ; initial value (runtime: 0 = player, 2-5 = AI behavior modes)
+
+<<var ai wait flag>>=
+    ORG     $5A06
+AI_WAIT_FLAG:
+    DC.B    $D2                     ; initial value (runtime: wait delay for AI moves (0 or $0A))
+
+<<var event pos>>=
+    ORG     $5A5E
+EVENT_POS:
+    DC.B    $A0                     ; initial value (runtime: event position (from FIND_NEAREST_EVENT))
+
 <<setup scene display>>=
     ORG     $0901
 SETUP_SCENE_DISPLAY:
@@ -10097,6 +10293,36 @@ location is unchanged and the routine returns immediately.  Otherwise:
 <<defines>>=
 STYLE_ID_MASK       EQU     $7F     ; strip visited flag (bit 7) from CFIELD_STYLE
 @ %def STYLE_ID_MASK
+
+<<var view max col>>=
+    ORG     $5A08
+VIEW_MAX_COL:
+    DC.B    $D3                     ; initial value (runtime: viewport max column)
+
+<<var view max row>>=
+    ORG     $5A09
+VIEW_MAX_ROW:
+    DC.B    $C8                     ; initial value (runtime: viewport max row)
+
+<<var view min col>>=
+    ORG     $5A0A
+VIEW_MIN_COL:
+    DC.B    $CF                     ; initial value (runtime: viewport min column)
+
+<<var view min row>>=
+    ORG     $5A0B
+VIEW_MIN_ROW:
+    DC.B    $D7                     ; initial value (runtime: viewport min row)
+
+<<var font row>>=
+    ORG     $5A0D
+FONT_ROW:
+    DC.B    $CD                     ; initial value (runtime: font cursor row coordinate)
+
+<<var candidate pos>>=
+    ORG     $5A15
+CANDIDATE_POS:
+    DC.B    $B1                     ; initial value (runtime: position of event being evaluated)
 
 <<enter location>>=
     ORG     $72A7
@@ -10163,6 +10389,12 @@ ENTER_LOCATION:
 [[CHECK_AT_BOUNDARY]] tests whether [[LOCATION_ID]] lies on any viewport
 edge.  Converts the position to column/row, compares against all four
 edges, and stores \$0001 in [[DATA_PTR]] if at edge, \$0000 if interior.
+
+<<var location id>>=
+    ORG     $5A17
+LOCATION_ID:
+ENTITY_SEARCH_POS:
+    DC.B    $8D                     ; initial value (runtime: current location/position index)
 
 <<check at boundary>>=
     ORG     $0BFA
@@ -10420,6 +10652,16 @@ normal frame, and disables the blink cursor.
 BLINK_DELAY:
     DC.B    $2D                     ; blink delay (loaded into WAIT_LOOP_COUNT)
 @ %def BLINK_DELAY
+
+<<var blink row>>=
+    ORG     $5AA3
+BLINK_ROW:
+    DC.B    $C3                     ; initial value (runtime: font row)
+
+<<var blink char>>=
+    ORG     $5AA4
+BLINK_CHAR:
+    DC.B    $D4                     ; initial value (runtime: font character number)
 
 <<draw map icon b>>=
     ORG     $740B
@@ -11059,6 +11301,16 @@ If [[BLINK_COL]] $\ge$ [[MAP_WIDTH]] (20), blinking is disabled and the
 routine returns immediately.  Saves and restores [[PRINT_STRING_ADDR]]
 across the call since [[RENDER_FONT_CHAR]] overwrites it.
 
+<<var current col>>=
+    ORG     $5A63
+CURRENT_COL:
+    DC.B    $D4                     ; initial value (runtime: current column during turn)
+
+<<var current row>>=
+    ORG     $5A64
+CURRENT_ROW:
+    DC.B    $C5                     ; initial value (runtime: current row during turn)
+
 <<draw blink char>>=
     ORG     $74DD
 DRAW_BLINK_NORMAL:
@@ -11106,6 +11358,11 @@ from the current combatant so the blink cursor tracks the active entity.
     come from [[CURRENT_COL]]/[[CURRENT_ROW]]; [[MOB_PTR]] is copied to
     [[ENTITY_REC]] so [[GET_ENTITY_FONTCHAR]] can look up the player sprite.
 \end{itemize}
+
+<<var is player turn>>=
+    ORG     $5A74
+IS_PLAYER_TURN:
+    DC.B    $CD                     ; initial value (runtime: 0 = mob's turn, 1 = player's turn)
 
 <<set blink target>>=
     ORG     $16A3
@@ -11184,6 +11441,21 @@ compared during the insertion phase.  [[REORDER_LINK]] saves the removed
 node's next-link so it can be spliced back in.  [[CURRENT_ROOM]] records
 which room is being processed.  [[REORDER_CHAR]] uses all three during
 the two-phase unlink-and-reinsert operation.
+
+<<var current room>>=
+    ORG     $5A03
+CURRENT_ROOM:
+    DC.B    $A0                     ; initial value (runtime: current room/location being processed)
+
+<<var reorder link>>=
+    ORG     $5A2A
+REORDER_LINK:
+    DC.B    $C4                     ; initial value (runtime: temp: saved next-link during reorder)
+
+<<var reorder sort key>>=
+    ORG     $5A2B
+REORDER_SORT_KEY:
+    DC.B    $A0                     ; initial value (runtime: temp: byte 11 of node for sorted insert)
 
 <<reorder char>>=
     ORG     $0F84
@@ -11319,6 +11591,11 @@ Called exclusively from [[REORDER_CHAR]] (\$0F84).
 @ [[GROUP_COUNT_DELTA]] holds +1 or $-$1, set by the two entry points
 [[INCR_GROUP_COUNT]] and [[DECR_GROUP_COUNT]] respectively.  The shared
 body adds this delta to the low nibble of byte 8 of the group head record.
+
+<<var group count delta>>=
+    ORG     $5A2C
+GROUP_COUNT_DELTA:
+    DC.B    $A3                     ; initial value (runtime: +1 or -1 delta for group count adjustment)
 
 <<adjust char byte8>>=
     ORG     $102F
@@ -11542,6 +11819,11 @@ character's sprite index from [[CHAR_SPRITE]], sets [[FONT_CHARSET]] to~1
 (custom font), and tail-calls [[RENDER_FONT_CHAR]] to draw the sprite at the
 entity's position.  This is the standard way to draw or redraw a character's
 map icon.
+
+<<var char sprite>>=
+    ORG     $5A04
+CHAR_SPRITE:
+    DC.B    $CA                     ; initial value (runtime: character's font char number for display)
 
 <<setup char sprite>>=
     ORG     $0933
@@ -11796,6 +12078,21 @@ stream across [[RENDER_FONT_CHAR]] calls, since rendering may clobber~Y.
 [[TEXT_RENDERER]] initializes the margins (2 and 18) and row, then loops
 through bytes, advancing the column and wrapping to the next row when it
 passes the right margin.
+
+<<var text right margin>>=
+    ORG     $5A96
+TEXT_RIGHT_MARGIN:
+    DC.B    $8D                     ; initial value (runtime: right margin column for text wrap)
+
+<<var text left margin>>=
+    ORG     $5A97
+TEXT_LEFT_MARGIN:
+    DC.B    $A0                     ; initial value (runtime: left margin column for text wrap)
+
+<<var text stream idx>>=
+    ORG     $5A98
+TEXT_STREAM_IDX:
+    DC.B    $C9                     ; initial value (runtime: saved Y index into byte stream)
 
 @ The routine below processes the byte stream.
 
@@ -12782,6 +13079,16 @@ If neither is found, the mob has nothing to react to, so
 [[CLEAR_RESTRICTED]] is called and the turn is skipped.  This keeps the game
 moving briskly---mobs in empty corridors don't waste time.
 
+<<var encounter result>>=
+    ORG     $5A1F
+ENCOUNTER_RESULT:
+    DC.B    $C3                     ; initial value (runtime: 0/1/2 from CHECK_ENCOUNTER)
+
+<<var adjacent threat>>=
+    ORG     $5A26
+ADJACENT_THREAT:
+    DC.B    $8D                     ; initial value (runtime: accumulated adjacent threat level)
+
 <<check mob needs turn>>=
     ORG     $0958
 CHECK_MOB_NEEDS_TURN:
@@ -12991,6 +13298,31 @@ steps consumed so far.  [[INPUT_DIR]] holds the direction or command
 code (1--9) from the player or AI.  [[TURN_ACTIVE]] is set to 1 while
 the turn loop is running.  All six variables are initialized by
 [[GAME_TURN_LOOP]] at the start of each character's turn.
+
+<<var turn start col>>=
+    ORG     $5A61
+TURN_START_COL:
+    DC.B    $C1                     ; initial value (runtime: column at start of turn)
+
+<<var turn start row>>=
+    ORG     $5A62
+TURN_START_ROW:
+    DC.B    $A0                     ; initial value (runtime: row at start of turn)
+
+<<var move points>>=
+    ORG     $5A65
+MOVE_POINTS:
+    DC.B    $CD                     ; initial value (runtime: movement points remaining)
+
+<<var steps taken>>=
+    ORG     $5A66
+STEPS_TAKEN:
+    DC.B    $D0                     ; initial value (runtime: steps taken this turn)
+
+<<var input dir>>=
+    ORG     $5A67
+INPUT_DIR:
+    DC.B    $AB                     ; initial value (runtime: direction/command from input (1-9))
 
 <<game turn loop>>=
     ORG     $19AD
@@ -13266,6 +13598,11 @@ Execution falls through into [[RESET_TURN_POS]], which:
 If [[TURN_TUNE_GUARD]] is exactly~\$16---meaning this is the
 first call since [[COMMIT_MOVE]] set it---the guard is decremented and the
 [[TUNE_PLAYER]] is invoked to play the movement sound effect.
+
+<<var turn tune guard>>=
+    ORG     $5AA9
+TURN_TUNE_GUARD:
+    DC.B    $D9                     ; initial value (runtime: turn reset: guards one-shot script execution)
 
 <<commit move>>=
     ORG     $1B52
@@ -13617,6 +13954,11 @@ SETUP_INPUT:
 option, it calls [[CALC_RECORD_PTR]] to locate the option's data record, checks
 whether byte~0 of the record is non-zero (enabled), and if so copies the
 record's display data into the input buffer with [[COPY_RECORD_DATA]].
+
+<<var input option count>>=
+    ORG     $5AAA
+INPUT_OPTION_COUNT:
+    DC.B    $8D                     ; initial value (runtime: number of input options to draw)
 
 <<draw input options>>=
     ORG     $5F70
@@ -15725,6 +16067,21 @@ comparison target.  [[COLOCATE_LINK]] saves the starting mob's next-link
 is set to 2 initially (found ahead in chain) and changed to 1 if the search
 wraps past the end.  [[FIND_MOB_AT_SAME_POS]] returns this value on success.
 
+<<var colocate link>>=
+    ORG     $5A20
+COLOCATE_LINK:
+    DC.B    $D4                     ; initial value (runtime: saved next-link (stop condition))
+
+<<var colocate pos>>=
+    ORG     $5A21
+COLOCATE_POS:
+    DC.B    $CF                     ; initial value (runtime: saved position for co-location search)
+
+<<var colocate wrapped>>=
+    ORG     $5A22
+COLOCATE_WRAPPED:
+    DC.B    $D2                     ; initial value (runtime: 1 if wrapped, 2 if ahead)
+
 @ The routine below implements the co-location search.
 
 <<find mob at same pos>>=
@@ -15787,6 +16144,21 @@ their font-char remainders differ (different hostile sub-factions).
 [[HOSTILE_A]] and [[HOSTILE_Y]] save the return values (remainder and
 faction flag) from the first [[GET_HOSTILITY]] call, allowing the routine
 to compare both factions after the second call completes.
+
+<<var hostile app>>=
+    ORG     $5A23
+HOSTILE_APP:
+    DC.B    $A9                     ; initial value (runtime: saved appearance for hostility check)
+
+<<var hostile a>>=
+    ORG     $5A24
+HOSTILE_A:
+    DC.B    $AC                     ; initial value (runtime: saved A from first GET_HOSTILITY)
+
+<<var hostile y>>=
+    ORG     $5A25
+HOSTILE_Y:
+    DC.B    $D9                     ; initial value (runtime: saved Y from first GET_HOSTILITY)
 
 @ The routine below implements the hostility comparison.
 
@@ -15865,6 +16237,11 @@ position~199 no right, positions~0--19 no up, positions~180--199 no down.
 [[CHECK_ADJACENT_THREATS]].  The routine adds and subtracts offsets (1 for
 left/right, 20 for up/down) from this saved position to compute the four
 cardinal neighbors, passing each to [[SUM_HOSTILE_AT_POS]].
+
+<<var adjacent pos>>=
+    ORG     $5A27
+ADJACENT_POS:
+    DC.B    $A0                     ; initial value (runtime: saved position for adjacency check)
 
 @ The routine below implements the four-direction threat scan.
 
@@ -16013,6 +16390,11 @@ depending on the high bit of the chosen field, a random roll against either
 \$0D or \$50 determines whether a special event triggers.  On a roll of zero,
 the field is marked~\$81, scene~1 is displayed, and a bonus of 0--9 is added
 to the combat strength (capped at~\$1F).
+
+<<var combat strength>>=
+    ORG     $5A78
+COMBAT_STRENGTH:
+    DC.B    $C4                     ; initial value (runtime: result of CALC_COMBAT_STRENGTH)
 
 <<calc combat strength>>=
     ORG     $16E0
@@ -16346,6 +16728,11 @@ changed.  If the position is unchanged, it returns A=0 (no new mob).
 If byte~4 (appearance) is~$\ge$\$15, the mob is a valid attackable
 target and it returns A=1.  Otherwise it retries up to the loop limit.
 
+<<var saved mob link>>=
+    ORG     $5A75
+SAVED_MOB_LINK:
+    DC.B    $8D                     ; initial value (runtime: temp: saved byte 2 of mob record)
+
 <<attack eligibility>>=
     ORG     $155E
 SELECT_SOMEONE_ELSE:
@@ -16475,6 +16862,16 @@ FLAGS_STATE_MASK    EQU     $03     ; byte 15 bits 1-0: combat state (0-3)
 DEFENSE_HALF_MASK   EQU     $0F     ; byte 5: defense (bits 4-1 shifted down via ROR)
     ; --- Scratch ---
 @ %def LEVEL_BIT5_MASK LEVEL_CLEAR_BIT4 TARGET_BIT6_MASK TARGET_BIT7_MASK FLAGS_ENGAGED_BIT FLAGS_STATE_MASK DEFENSE_HALF_MASK
+
+<<var combat willingness>>=
+    ORG     $5A76
+COMBAT_WILLINGNESS:
+    DC.B    $A0                     ; initial value (runtime: accumulated willingness-to-fight score)
+
+<<var target defense>>=
+    ORG     $5A77
+TARGET_DEFENSE:
+    DC.B    $CC                     ; initial value (runtime: scratch: target's defense value)
 
 <<resolve attack>>=
     ORG     $15AB
@@ -16821,6 +17218,11 @@ For player characters (appearance below [[NPC_APPEARANCE_MIN]]),
 [[SCENE_COMBAT_FLAG]] is cleared to signal that the player is under
 attack.
 
+<<var mob defense>>=
+    ORG     $5A79
+MOB_DEFENSE:
+    DC.B    $D9                     ; initial value (runtime: mob defense value (low 4 bits of mob byte 8))
+
 <<mob attack>>=
     ORG     $1860
 MOB_ATTACK:
@@ -16941,6 +17343,11 @@ remaining HP:
 \item Below~8: ``wounded.''
 \item 8~or above: ``scratched.''
 \end{itemize}
+
+<<var damage amount>>=
+    ORG     $5A10
+DAMAGE_AMOUNT:
+    DC.B    $CC                     ; initial value (runtime: damage to apply / new HP after subtraction)
 
 <<apply damage>>=
     ORG     $106F
@@ -17125,6 +17532,11 @@ EVENT_PTR               EQU     $BE     ; event list entry pointer (2 bytes)
 WAIT_LOOP_INIT:
     DC.B    $20                     ; initial wait loop count
 @ %def WAIT_LOOP_INIT
+
+<<var event dest pos>>=
+    ORG     $5A5F
+EVENT_DEST_POS:
+    DC.B    $D3                     ; initial value (runtime: event handler: destination position)
 
 <<handle encounter>>=
     ORG     $1C01
@@ -17384,6 +17796,16 @@ and either clear the event slot or decrement a counter for multi-use
 containers.  [[EVENT_PRNG_CHECK]] itself rolls the PRNG and, if the result is
 below~\$14, applies 1--2 points of trap damage with the restricted flag set.
 
+<<var event slot byte>>=
+    ORG     $5A59
+EVENT_SLOT_BYTE:
+    DC.B    $CC                     ; initial value (runtime: saved byte 2 of event slot (type+value))
+
+<<var event sub value>>=
+    ORG     $5A5A
+EVENT_SUB_VALUE:
+    DC.B    $C6                     ; initial value (runtime: lower 5 bits of event slot byte 2)
+
 <<handle event slot>>=
     ORG     $1D4D
 HANDLE_EVENT_SLOT:
@@ -17641,6 +18063,16 @@ GET_ENTITY_THREAT:
     LDA     #$00                   ; return 0 (too far)
     RTS
 @ %def GET_ENTITY_THREAT
+
+<<var target ptr>>=
+    ORG     $5A86
+TARGET_PTR:
+    DC.B    $C3,$D4                 ; initial value (runtime: selected combat target pointer (2 bytes))
+
+<<var best threat>>=
+    ORG     $5A88
+BEST_THREAT:
+    DC.B    $CF                     ; initial value (runtime: best threat level during target selection)
 
 <<select combat target>>=
     ORG     $18E4
@@ -17969,6 +18401,11 @@ additional point becoming less likely.  For player characters (field~4 below
 the [[HEAL_NOTIFIED]] flag to avoid repeating the notification on subsequent
 HP increments.
 
+<<var heal notified>>=
+    ORG     $5A16
+HEAL_NOTIFIED:
+    DC.B    $B1                     ; initial value (runtime: auto heal: nonzero = already printed heal message)
+
 <<auto heal>>=
     ORG     $143F
 AUTO_HEAL:
@@ -18067,6 +18504,16 @@ progression, comparing accumulated thresholds against the character's gold
 <<zero page defines>>=
 LEVEL_THRESHOLD     EQU     $BA     ; 16-bit level threshold accumulator (2 bytes)
 @ %def LEVEL_THRESHOLD
+
+<<var stat scale>>=
+    ORG     $5A7E
+STAT_SCALE:
+    DC.B    $8D                     ; initial value (runtime: strength-derived level threshold step)
+
+<<var stat level bits>>=
+    ORG     $5A7F
+STAT_LEVEL_BITS:
+    DC.B    $A0                     ; initial value (runtime: level bits during stat modification)
 
 <<modify char stats>>=
     ORG     $704D
@@ -18222,6 +18669,26 @@ AI_SCRATCH              EQU     $BA     ; scratch byte in AI_CHOOSE_TARGET
 AI_BEST_POS             EQU     $BE     ; best hostile position in ai_choose_target
 AI_BEST_STR             EQU     $BF     ; best hostile strength in ai_choose_target
 @ %def AI_SCRATCH AI_BEST_POS AI_BEST_STR
+
+<<var ai prev dir>>=
+    ORG     $5A5D
+AI_PREV_DIR:
+    DC.B    $8D                     ; initial value (runtime: NPC AI: previous move direction (bias avoidance))
+
+<<var ai target pos>>=
+    ORG     $5A71
+AI_TARGET_POS:
+    DC.B    $CF                     ; initial value (runtime: AI target position (set by AI_CHOOSE_TARGET))
+
+<<var ai target col>>=
+    ORG     $5A72
+AI_TARGET_COL:
+    DC.B    $D7                     ; initial value (runtime: AI target column / min distance temp)
+
+<<var ai target row>>=
+    ORG     $5A73
+AI_TARGET_ROW:
+    DC.B    $CE                     ; initial value (runtime: AI target row (from POS_TO_COLROW))
 
 <<ai choose target>>=
     ORG     $68AB
@@ -18410,6 +18877,27 @@ AI_MIN_SCORE        EQU     $BA     ; best (lowest) score during direction selec
 AI_BEST_DIR         EQU     $BB     ; direction index with best score
 @ %def AI_MIN_SCORE AI_BEST_DIR
 
+<<var ai best dist>>=
+    ORG     $5A68
+AI_BEST_DIST:
+    DC.B    $B1                     ; initial value (runtime: current best distance to AI target)
+
+<<var dir scores>>=
+    ORG     $5A6A
+DIR_SCORES:
+    HEX     A0 CA D3 D2 A0
+    ; initial values (runtime: array of 5 direction scores (indexed 0-4))
+
+<<var ai direction>>=
+    ORG     $5A6F
+AI_DIRECTION:
+    DC.B    $D3                     ; initial value (runtime: current direction being evaluated / random range)
+
+<<var ai test pos>>=
+    ORG     $5A70
+AI_TEST_POS:
+    DC.B    $C8                     ; initial value (runtime: position being tested for direction evaluation)
+
 <<npc move ai>>=
     ORG     $6742
 NPC_MOVE_AI:
@@ -18548,6 +19036,11 @@ and entities are scored based on their type byte---friendly mobs, hostile
 mobs of various strength ranges, and locked/safe events each contribute
 different penalty amounts via [[INC_MOB_COUNTERS]].  The entity's position
 is restored before returning.
+
+<<var ai saved pos>>=
+    ORG     $5A69
+AI_SAVED_POS:
+    DC.B    $8D                     ; initial value (runtime: saved entity position during direction eval)
 
 <<evaluate direction>>=
     ORG     $6815
@@ -18697,6 +19190,16 @@ EVENT_VALUE_HI_MASK EQU     $07     ; mask for value high bits stored in type by
 EVENT_EMPTY         EQU     $FE     ; event list: empty slot marker
 EVENT_END           EQU     $FF     ; event list: end-of-list marker
 @ %def EVFIELD_POSITION EVFIELD_TYPE EVFIELD_VALUE EVENT_RECORD_SIZE EVENT_ACTIVATED EVENT_ACCUM_MAX EVENT_VALUE_HI_MASK EVENT_EMPTY EVENT_END
+
+<<var nearest pos>>=
+    ORG     $5A13
+NEAREST_POS:
+    DC.B    $A0                     ; initial value (runtime: position of nearest event found)
+
+<<var nearest dist>>=
+    ORG     $5A14
+NEAREST_DIST:
+    DC.B    $A3                     ; initial value (runtime: current minimum distance during event search)
 
 <<find nearest event>>=
     ORG     $138D
@@ -18888,6 +19391,21 @@ SHOP_TABLE:
     ; [+$28]: scene number
     DC.B    $33                ; scene $33 (armor shop)
 @ %def SHOP_TABLE
+
+<<var shop item mask>>=
+    ORG     $5A80
+SHOP_ITEM_MASK:
+    DC.B    $CC                     ; initial value (runtime: shop: bitmask for current item ($80 rotating right))
+
+<<var shop valid mask>>=
+    ORG     $5A83
+SHOP_VALID_MASK:
+    DC.B    $A0                     ; initial value (runtime: copy of item validity bitmask during shop display)
+
+<<var location style bits>>=
+    ORG     $5A84
+LOCATION_STYLE_BITS:
+    DC.B    $A8                     ; initial value (runtime: location style (0-3), used as modifier)
 
 <<display shop>>=
     ORG     $70DF
@@ -19699,6 +20217,21 @@ for the scan.  [[SCENE_P1_DONE]], [[SCENE_P3_DONE]],
 the [[$4230]] region that [[CHECK_SCENE_EVENTS]] tests and sets to prevent
 the same phase from firing twice in one round.
 
+<<var scene found flag>>=
+    ORG     $5A89
+SCENE_FOUND_FLAG:
+    DC.B    $D2                     ; initial value (runtime: scan result: 1 = matching group found)
+
+<<var scene hostile flag>>=
+    ORG     $5A8A
+SCENE_HOSTILE_FLAG:
+    DC.B    $A9                     ; initial value (runtime: scan result: nonzero = hostile encountered)
+
+<<var scene group idx>>=
+    ORG     $5A8B
+SCENE_GROUP_IDX:
+    DC.B    $AC                     ; initial value (runtime: current group index for scanning)
+
 <<check scene events>>=
     ORG     $6DFA
 SCENE_LOADER_END:
@@ -19977,6 +20510,16 @@ the other options menu.
 <<defines>>=
 DROP_DISPLAY_BUF    EQU     $7CEB   ; 5-byte decimal display buffer
 @ %def DROP_DISPLAY_BUF
+
+<<var drop amount>>=
+    ORG     $5A7A
+DROP_AMOUNT:
+    DC.B    $A0,$A3                 ; initial value (runtime: drop gold amount (2 bytes))
+
+<<var drop step>>=
+    ORG     $5A7C
+DROP_STEP:
+    DC.B    $B1,$B3                 ; initial value (runtime: binary search step (2 bytes))
 
 <<init drop gold>>=
     ORG     $6F17
@@ -20370,6 +20913,11 @@ field~5 and field~11 (via [[INC_STRENGTH]] and
 [[INC_LEVEL]]), and then rolls a 1-in-3 chance for a bonus
 scene~\$0C (a lucky find).  On the bonus path, the event slot is marked
 empty.
+
+<<var trap type>>=
+    ORG     $5A58
+TRAP_TYPE:
+    DC.B    $D3                     ; initial value (runtime: treasure trap: random trap type (0-3))
 
 <<pickup treasure>>=
     ORG     $646B
@@ -20836,6 +21384,36 @@ TUNE_TABLE:
     DC.W    $A3FC ; script 10 (X=$14): encounter effect
     DC.W    $A43C ; script 11 (X=$16): movement effect
 @ %def TUNE_TABLE
+
+<<var tune loop ctr>>=
+    ORG     $5A8D
+TUNE_LOOP_CTR:
+    DC.B    $8D                     ; initial value (runtime: tune loop iteration counter)
+
+<<var tune loop addr>>=
+    ORG     $5A8E
+TUNE_LOOP_ADDR:
+    DC.B    $A0,$D3                 ; initial value (runtime: tune loop address (2 bytes))
+
+<<var tune gosub addr>>=
+    ORG     $5A90
+TUNE_GOSUB_ADDR:
+    DC.B    $D4,$C1                 ; initial value (runtime: tune gosub return address (2 bytes))
+
+<<var tune prng mask>>=
+    ORG     $5A92
+TUNE_PRNG_MASK:
+    DC.B    $A0                     ; initial value (runtime: PRNG mask for action randomization)
+
+<<var tune action vec>>=
+    ORG     $5A93
+TUNE_ACTION_VEC:
+    DC.B    $C1,$D2                 ; initial value (runtime: action handler vector (2 bytes))
+
+<<var attract flag>>=
+    ORG     $5AA7
+ATTRACT_FLAG:
+    DC.B    $A9                     ; initial value (runtime: 1 = attract/demo mode, 0 = normal)
 
 <<tune player>>=
     ORG     $795B
@@ -22050,11 +22628,11 @@ mode, before [[GAME_INIT]].
 
 The reset vector points here.  Simply jumps to [[RES_VM_LOOP]].
 
-<<stub entry>>=
+<<reset vector>>=
     ORG     $0500
-STUB_ENTRY:
+RESET_VECTOR:
     JMP     RES_VM_LOOP
-@ %def STUB_ENTRY
+@ %def RESET_VECTOR
 
 @ [[READ_DATA_FIELD]] is a copy-protection signature check, not a
 normal sector read.  It searches for a D5~AA~AD data field prologue,
@@ -26505,8 +27083,10 @@ SET_CURSOR_COMPRESSED:
 
 @ \section{Residual assembler source text}
 
-The 327~bytes at [[$59C9--$5B0F]] are high-ASCII text containing
+The bytes at [[$59C9--$5B0F]] are high-ASCII text containing
 a fragment of 6502 assembly source code from the game's development.
+Since the data starting at [[$5A00]] is uninitialized runtime memory,
+the text bleeds over into that area.
 The text is part of a diagnostic routine that reads mob record fields
 via an [[(ACTOR),Y]] pointer and calls [[SHOWNM]] to display each
 value.  The fragment begins mid-routine (the accumulator already holds
@@ -26585,237 +27165,9 @@ RESIDUAL_DEBUG_TEXT:
     HEX     8D                      ; CR
     HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 ; " STA TEMP" (truncated at $59FF)
 @ %def RESIDUAL_DEBUG_TEXT
+@ Residual data gaps in the \$5A variable page.
 
-@ \section{Runtime variables (\$5A page)}
-
-The 256~bytes from [[$5A00]] to [[$5AFF]] are runtime scratch
-variables.  On disk they hold residual assembler source text
-(a continuation of [[RESIDUAL_DEBUG_TEXT]]); at runtime every byte
-is overwritten by game logic.  Each variable is defined at its
-disk-image address with the initial (residual) byte value.
-
-<<5a input mode>>=
-    ORG     $5A00
-INPUT_MODE:
-    DC.B    $AB                     ; initial value (runtime: 0 = keyboard, 1 = joystick)
-
-<<5a total mob count>>=
-    ORG     $5A01
-TOTAL_MOB_COUNT:
-    DC.B    $B1                     ; initial value (runtime: total mobs across all groups (excl. group 0))
-
-<<5a current player>>=
-    ORG     $5A02
-CURRENT_PLAYER:
-    DC.B    $8D                     ; initial value (runtime: current player index (1-based))
-
-<<5a current room>>=
-    ORG     $5A03
-CURRENT_ROOM:
-    DC.B    $A0                     ; initial value (runtime: current room/location being processed)
-
-<<5a char sprite>>=
-    ORG     $5A04
-CHAR_SPRITE:
-    DC.B    $CA                     ; initial value (runtime: character's font char number for display)
-
-<<5a char ai mode>>=
-    ORG     $5A05
-CHAR_AI_MODE:
-    DC.B    $D3                     ; initial value (runtime: 0 = player, 2-5 = AI behavior modes)
-
-<<5a ai wait flag>>=
-    ORG     $5A06
-AI_WAIT_FLAG:
-    DC.B    $D2                     ; initial value (runtime: wait delay for AI moves (0 or $0A))
-
-<<5a browse char index>>=
-    ORG     $5A07
-BROWSE_CHAR_INDEX:
-    DC.B    $A0                     ; initial value (runtime: mob index of browsed character)
-
-<<5a view max col>>=
-    ORG     $5A08
-VIEW_MAX_COL:
-    DC.B    $D3                     ; initial value (runtime: viewport max column)
-
-<<5a view max row>>=
-    ORG     $5A09
-VIEW_MAX_ROW:
-    DC.B    $C8                     ; initial value (runtime: viewport max row)
-
-<<5a view min col>>=
-    ORG     $5A0A
-VIEW_MIN_COL:
-    DC.B    $CF                     ; initial value (runtime: viewport min column)
-
-<<5a view min row>>=
-    ORG     $5A0B
-VIEW_MIN_ROW:
-    DC.B    $D7                     ; initial value (runtime: viewport min row)
-
-<<5a font col>>=
-    ORG     $5A0C
-FONT_COL:
-    DC.B    $CE                     ; initial value (runtime: font cursor column coordinate)
-
-<<5a font row>>=
-    ORG     $5A0D
-FONT_ROW:
-    DC.B    $CD                     ; initial value (runtime: font cursor row coordinate)
-
-<<5a font charnum>>=
-    ORG     $5A0E
-FONT_CHARNUM:
-    DC.B    $8D                     ; initial value (runtime: font character number to render)
-
-<<5a font charset>>=
-    ORG     $5A0F
-FONT_CHARSET:
-    DC.B    $A0                     ; initial value (runtime: font charset index (1-5))
-
-<<5a damage amount>>=
-    ORG     $5A10
-DAMAGE_AMOUNT:
-    DC.B    $CC                     ; initial value (runtime: damage to apply / new HP after subtraction)
-
-<<5a rng limit>>=
-    ORG     $5A11
-RNG_LIMIT:
-    DC.B    $C4                     ; initial value (runtime: random_in_range temporary (limit/shift count))
-
-<<5a rng mask>>=
-    ORG     $5A12
-RNG_MASK:
-    DC.B    $D9                     ; initial value (runtime: random_in_range bit mask)
-
-<<5a nearest pos>>=
-    ORG     $5A13
-NEAREST_POS:
-    DC.B    $A0                     ; initial value (runtime: position of nearest event found)
-
-<<5a nearest dist>>=
-    ORG     $5A14
-NEAREST_DIST:
-    DC.B    $A3                     ; initial value (runtime: current minimum distance during event search)
-
-<<5a candidate pos>>=
-    ORG     $5A15
-CANDIDATE_POS:
-    DC.B    $B1                     ; initial value (runtime: position of event being evaluated)
-
-<<5a heal notified>>=
-    ORG     $5A16
-HEAL_NOTIFIED:
-    DC.B    $B1                     ; initial value (runtime: auto heal: nonzero = already printed heal message)
-
-<<5a location id>>=
-    ORG     $5A17
-LOCATION_ID:
-ENTITY_SEARCH_POS:
-    DC.B    $8D                     ; initial value (runtime: current location/position index)
-
-<<5a prng output>>=
-    ORG     $5A18
-PRNG_OUTPUT:
-    DC.B    $A0                     ; initial value (runtime: PRNG output (state >> 1), used for random tests)
-
-<<5a prng state>>=
-    ORG     $5A19
-PRNG_STATE:
-    DC.B    $CC                     ; initial value (runtime: PRNG full state: val = 69*val + $53 (mod 256))
-
-<<5a prng temp>>=
-    ORG     $5A1A
-PRNG_TEMP:
-    DC.B    $C4                     ; initial value (runtime: PRNG temporary for multiplication)
-
-<<5a num digit>>=
-    ORG     $5A1B
-NUM_DIGIT:
-    DC.B    $C1                     ; initial value (runtime: current digit accumulator (ASCII $B0-$B9))
-
-<<5a num divisor>>=
-    ORG     $5A1C
-NUM_DIVISOR:
-    DC.B    $A0,$A8                 ; initial value (runtime: 16-bit divisor for decimal conversion)
-
-<<5a num leading>>=
-    ORG     $5A1E
-NUM_LEADING:
-    DC.B    $C1                     ; initial value (runtime: leading-zero suppress flag (0=suppress, 1=print))
-
-<<5a encounter result>>=
-    ORG     $5A1F
-ENCOUNTER_RESULT:
-    DC.B    $C3                     ; initial value (runtime: 0/1/2 from CHECK_ENCOUNTER)
-
-<<5a colocate link>>=
-    ORG     $5A20
-COLOCATE_LINK:
-    DC.B    $D4                     ; initial value (runtime: saved next-link (stop condition))
-
-<<5a colocate pos>>=
-    ORG     $5A21
-COLOCATE_POS:
-    DC.B    $CF                     ; initial value (runtime: saved position for co-location search)
-
-<<5a colocate wrapped>>=
-    ORG     $5A22
-COLOCATE_WRAPPED:
-    DC.B    $D2                     ; initial value (runtime: 1 if wrapped, 2 if ahead)
-
-<<5a hostile app>>=
-    ORG     $5A23
-HOSTILE_APP:
-    DC.B    $A9                     ; initial value (runtime: saved appearance for hostility check)
-
-<<5a hostile a>>=
-    ORG     $5A24
-HOSTILE_A:
-    DC.B    $AC                     ; initial value (runtime: saved A from first GET_HOSTILITY)
-
-<<5a hostile y>>=
-    ORG     $5A25
-HOSTILE_Y:
-    DC.B    $D9                     ; initial value (runtime: saved Y from first GET_HOSTILITY)
-
-<<5a adjacent threat>>=
-    ORG     $5A26
-ADJACENT_THREAT:
-    DC.B    $8D                     ; initial value (runtime: accumulated adjacent threat level)
-
-<<5a adjacent pos>>=
-    ORG     $5A27
-ADJACENT_POS:
-    DC.B    $A0                     ; initial value (runtime: saved position for adjacency check)
-
-<<5a source char>>=
-    ORG     $5A28
-SOURCE_CHAR:
-    DC.B    $C1                     ; initial value (runtime: source character for reorder)
-
-<<5a active char>>=
-    ORG     $5A29
-ACTIVE_CHAR:
-    DC.B    $CE                     ; initial value (runtime: character index being processed)
-
-<<5a reorder link>>=
-    ORG     $5A2A
-REORDER_LINK:
-    DC.B    $C4                     ; initial value (runtime: temp: saved next-link during reorder)
-
-<<5a reorder sort key>>=
-    ORG     $5A2B
-REORDER_SORT_KEY:
-    DC.B    $A0                     ; initial value (runtime: temp: byte 11 of node for sorted insert)
-
-<<5a group count delta>>=
-    ORG     $5A2C
-GROUP_COUNT_DELTA:
-    DC.B    $A3                     ; initial value (runtime: +1 or -1 delta for group count adjustment)
-
-<<5a page gap 5a2d-5a50>>=
+<<var page gap 5a2d-5a50>>=
     ORG     $5A2D
 RESIDUAL_5A_5A2D:
     HEX     A4 B1 C6 8D A0 D3 D4 C1 A0 C1 D2 C7 8D A0 CC C4
@@ -26823,392 +27175,35 @@ RESIDUAL_5A_5A2D:
     HEX     C5 CD D0 8D
 @ %def RESIDUAL_5A_5A2D
 
-<<5a bounds min col>>=
-    ORG     $5A51
-BOUNDS_MIN_COL:
-    DC.B    $A0                     ; initial value (runtime: scene setup: left column boundary)
-
-<<5a bounds max col>>=
-    ORG     $5A52
-BOUNDS_MAX_COL:
-    DC.B    $CC                     ; initial value (runtime: scene setup: right column boundary)
-
-<<5a bounds min row>>=
-    ORG     $5A53
-BOUNDS_MIN_ROW:
-    DC.B    $C4                     ; initial value (runtime: scene setup: top row boundary)
-
-<<5a bounds max row>>=
-    ORG     $5A54
-BOUNDS_MAX_ROW:
-    DC.B    $C1                     ; initial value (runtime: scene setup: bottom row boundary)
-
-<<5a location pos>>=
-    ORG     $5A55
-LOCATION_POS:
-    DC.B    $A0                     ; initial value (runtime: current location position (triggers redraw when changed))
-
-<<5a location style>>=
-    ORG     $5A56
-LOCATION_STYLE:
-    DC.B    $A3                     ; initial value (runtime: current map style (from record field 5, bits 0-6))
-
-<<5a msg line count>>=
-    ORG     $5A57
-MSG_LINE_COUNT:
-    DC.B    $BC                     ; initial value (runtime: lines printed so far)
-
-<<5a trap type>>=
-    ORG     $5A58
-TRAP_TYPE:
-    DC.B    $D3                     ; initial value (runtime: treasure trap: random trap type (0-3))
-
-<<5a event slot byte>>=
-    ORG     $5A59
-EVENT_SLOT_BYTE:
-    DC.B    $CC                     ; initial value (runtime: saved byte 2 of event slot (type+value))
-
-<<5a event sub value>>=
-    ORG     $5A5A
-EVENT_SUB_VALUE:
-    DC.B    $C6                     ; initial value (runtime: lower 5 bits of event slot byte 2)
-
-<<5a page gap 5a5b-5a5c>>=
+<<var page gap 5a5b-5a5c>>=
     ORG     $5A5B
 RESIDUAL_5A_5A5B:
     HEX     C4 D8
 @ %def RESIDUAL_5A_5A5B
 
-<<5a ai prev dir>>=
-    ORG     $5A5D
-AI_PREV_DIR:
-    DC.B    $8D                     ; initial value (runtime: NPC AI: previous move direction (bias avoidance))
-
-<<5a event pos>>=
-    ORG     $5A5E
-EVENT_POS:
-    DC.B    $A0                     ; initial value (runtime: event position (from FIND_NEAREST_EVENT))
-
-<<5a event dest pos>>=
-    ORG     $5A5F
-EVENT_DEST_POS:
-    DC.B    $D3                     ; initial value (runtime: event handler: destination position)
-
-<<5a page gap 5a60-5a60>>=
+<<var page gap 5a60-5a60>>=
     ORG     $5A60
 RESIDUAL_5A_5A60:
     HEX     D4
 @ %def RESIDUAL_5A_5A60
 
-<<5a turn start col>>=
-    ORG     $5A61
-TURN_START_COL:
-    DC.B    $C1                     ; initial value (runtime: column at start of turn)
-
-<<5a turn start row>>=
-    ORG     $5A62
-TURN_START_ROW:
-    DC.B    $A0                     ; initial value (runtime: row at start of turn)
-
-<<5a current col>>=
-    ORG     $5A63
-CURRENT_COL:
-    DC.B    $D4                     ; initial value (runtime: current column during turn)
-
-<<5a current row>>=
-    ORG     $5A64
-CURRENT_ROW:
-    DC.B    $C5                     ; initial value (runtime: current row during turn)
-
-<<5a move points>>=
-    ORG     $5A65
-MOVE_POINTS:
-    DC.B    $CD                     ; initial value (runtime: movement points remaining)
-
-<<5a steps taken>>=
-    ORG     $5A66
-STEPS_TAKEN:
-    DC.B    $D0                     ; initial value (runtime: steps taken this turn)
-
-<<5a input dir>>=
-    ORG     $5A67
-INPUT_DIR:
-    DC.B    $AB                     ; initial value (runtime: direction/command from input (1-9))
-
-<<5a ai best dist>>=
-    ORG     $5A68
-AI_BEST_DIST:
-    DC.B    $B1                     ; initial value (runtime: current best distance to AI target)
-
-<<5a ai saved pos>>=
-    ORG     $5A69
-AI_SAVED_POS:
-    DC.B    $8D                     ; initial value (runtime: saved entity position during direction eval)
-
-<<5a dir scores>>=
-    ORG     $5A6A
-DIR_SCORES:
-    HEX     A0 CA D3 D2 A0
-    ; initial values (runtime: array of 5 direction scores (indexed 0-4))
-
-<<5a ai direction>>=
-    ORG     $5A6F
-AI_DIRECTION:
-    DC.B    $D3                     ; initial value (runtime: current direction being evaluated / random range)
-
-<<5a ai test pos>>=
-    ORG     $5A70
-AI_TEST_POS:
-    DC.B    $C8                     ; initial value (runtime: position being tested for direction evaluation)
-
-<<5a ai target pos>>=
-    ORG     $5A71
-AI_TARGET_POS:
-    DC.B    $CF                     ; initial value (runtime: AI target position (set by AI_CHOOSE_TARGET))
-
-<<5a ai target col>>=
-    ORG     $5A72
-AI_TARGET_COL:
-    DC.B    $D7                     ; initial value (runtime: AI target column / min distance temp)
-
-<<5a ai target row>>=
-    ORG     $5A73
-AI_TARGET_ROW:
-    DC.B    $CE                     ; initial value (runtime: AI target row (from POS_TO_COLROW))
-
-<<5a is player turn>>=
-    ORG     $5A74
-IS_PLAYER_TURN:
-    DC.B    $CD                     ; initial value (runtime: 0 = mob's turn, 1 = player's turn)
-
-<<5a saved mob link>>=
-    ORG     $5A75
-SAVED_MOB_LINK:
-    DC.B    $8D                     ; initial value (runtime: temp: saved byte 2 of mob record)
-
-<<5a combat willingness>>=
-    ORG     $5A76
-COMBAT_WILLINGNESS:
-    DC.B    $A0                     ; initial value (runtime: accumulated willingness-to-fight score)
-
-<<5a target defense>>=
-    ORG     $5A77
-TARGET_DEFENSE:
-    DC.B    $CC                     ; initial value (runtime: scratch: target's defense value)
-
-<<5a combat strength>>=
-    ORG     $5A78
-COMBAT_STRENGTH:
-    DC.B    $C4                     ; initial value (runtime: result of CALC_COMBAT_STRENGTH)
-
-<<5a mob defense>>=
-    ORG     $5A79
-MOB_DEFENSE:
-    DC.B    $D9                     ; initial value (runtime: mob defense value (low 4 bits of mob byte 8))
-
-<<5a drop amount>>=
-    ORG     $5A7A
-DROP_AMOUNT:
-    DC.B    $A0,$A3                 ; initial value (runtime: drop gold amount (2 bytes))
-
-<<5a drop step>>=
-    ORG     $5A7C
-DROP_STEP:
-    DC.B    $B1,$B3                 ; initial value (runtime: binary search step (2 bytes))
-
-<<5a stat scale>>=
-    ORG     $5A7E
-STAT_SCALE:
-    DC.B    $8D                     ; initial value (runtime: strength-derived level threshold step)
-
-<<5a stat level bits>>=
-    ORG     $5A7F
-STAT_LEVEL_BITS:
-    DC.B    $A0                     ; initial value (runtime: level bits during stat modification)
-
-<<5a shop item mask>>=
-    ORG     $5A80
-SHOP_ITEM_MASK:
-    DC.B    $CC                     ; initial value (runtime: shop: bitmask for current item ($80 rotating right))
-
-<<5a shop price>>=
-    ORG     $5A81
-SHOP_PRICE:
-    DC.B    $C4,$C1                 ; initial value (runtime: shop: accumulated price (2 bytes))
-
-<<5a shop valid mask>>=
-    ORG     $5A83
-SHOP_VALID_MASK:
-    DC.B    $A0                     ; initial value (runtime: copy of item validity bitmask during shop display)
-
-<<5a location style bits>>=
-    ORG     $5A84
-LOCATION_STYLE_BITS:
-    DC.B    $A8                     ; initial value (runtime: location style (0-3), used as modifier)
-
-<<5a shop item offset>>=
-    ORG     $5A85
-SHOP_ITEM_OFFSET:
-    DC.B    $C1                     ; initial value (runtime: offset into shop record (5 per item slot))
-
-<<5a target ptr>>=
-    ORG     $5A86
-TARGET_PTR:
-    DC.B    $C3,$D4                 ; initial value (runtime: selected combat target pointer (2 bytes))
-
-<<5a best threat>>=
-    ORG     $5A88
-BEST_THREAT:
-    DC.B    $CF                     ; initial value (runtime: best threat level during target selection)
-
-<<5a scene found flag>>=
-    ORG     $5A89
-SCENE_FOUND_FLAG:
-    DC.B    $D2                     ; initial value (runtime: scan result: 1 = matching group found)
-
-<<5a scene hostile flag>>=
-    ORG     $5A8A
-SCENE_HOSTILE_FLAG:
-    DC.B    $A9                     ; initial value (runtime: scan result: nonzero = hostile encountered)
-
-<<5a scene group idx>>=
-    ORG     $5A8B
-SCENE_GROUP_IDX:
-    DC.B    $AC                     ; initial value (runtime: current group index for scanning)
-
-<<5a wait loop count>>=
-    ORG     $5A8C
-WAIT_LOOP_COUNT:
-    DC.B    $D9                     ; initial value (runtime: inner wait loop counter)
-
-<<5a tune loop ctr>>=
-    ORG     $5A8D
-TUNE_LOOP_CTR:
-    DC.B    $8D                     ; initial value (runtime: tune loop iteration counter)
-
-<<5a tune loop addr>>=
-    ORG     $5A8E
-TUNE_LOOP_ADDR:
-    DC.B    $A0,$D3                 ; initial value (runtime: tune loop address (2 bytes))
-
-<<5a tune gosub addr>>=
-    ORG     $5A90
-TUNE_GOSUB_ADDR:
-    DC.B    $D4,$C1                 ; initial value (runtime: tune gosub return address (2 bytes))
-
-<<5a tune prng mask>>=
-    ORG     $5A92
-TUNE_PRNG_MASK:
-    DC.B    $A0                     ; initial value (runtime: PRNG mask for action randomization)
-
-<<5a tune action vec>>=
-    ORG     $5A93
-TUNE_ACTION_VEC:
-    DC.B    $C1,$D2                 ; initial value (runtime: action handler vector (2 bytes))
-
-<<5a page gap 5a95-5a95>>=
+<<var page gap 5a95-5a95>>=
     ORG     $5A95
 RESIDUAL_5A_5A95:
     HEX     C7
 @ %def RESIDUAL_5A_5A95
 
-<<5a text right margin>>=
-    ORG     $5A96
-TEXT_RIGHT_MARGIN:
-    DC.B    $8D                     ; initial value (runtime: right margin column for text wrap)
-
-<<5a text left margin>>=
-    ORG     $5A97
-TEXT_LEFT_MARGIN:
-    DC.B    $A0                     ; initial value (runtime: left margin column for text wrap)
-
-<<5a text stream idx>>=
-    ORG     $5A98
-TEXT_STREAM_IDX:
-    DC.B    $C9                     ; initial value (runtime: saved Y index into byte stream)
-
-<<5a scene number>>=
-    ORG     $5A99
-SCENE_NUMBER:
-    DC.B    $CE                     ; initial value (runtime: current scene number)
-
-<<5a saved target rec>>=
-    ORG     $5A9A
-SAVED_TARGET_REC:
-    DC.B    $D9,$8D                 ; initial value (runtime: saved TARGET_REC ($BC/$BD, 2 bytes))
-
-<<5a saved entity ptr>>=
-    ORG     $5A9C
-SAVED_ENTITY_PTR:
-    DC.B    $A0,$CC                 ; initial value (runtime: saved ENTITY_PTR ($F8/$F9, 2 bytes))
-
-<<5a saved data ptr>>=
-    ORG     $5A9E
-SAVED_DATA_PTR:
-    DC.B    $C4,$C1                 ; initial value (runtime: saved DATA_PTR ($BE/$BF, 2 bytes))
-
-<<5a saved mob ptr>>=
-    ORG     $5AA0
-SAVED_MOB_PTR:
-    DC.B    $A0,$A8                 ; initial value (runtime: saved MOB_PTR ($F4/$F5, 2 bytes))
-
-<<5a blink col>>=
-    ORG     $5AA2
-BLINK_COL:
-    DC.B    $C1                     ; initial value (runtime: font column (0-19; $14 = disabled))
-
-<<5a blink row>>=
-    ORG     $5AA3
-BLINK_ROW:
-    DC.B    $C3                     ; initial value (runtime: font row)
-
-<<5a blink char>>=
-    ORG     $5AA4
-BLINK_CHAR:
-    DC.B    $D4                     ; initial value (runtime: font character number)
-
-<<5a page gap 5aa5-5aa6>>=
+<<var page gap 5aa5-5aa6>>=
     ORG     $5AA5
 RESIDUAL_5A_5AA5:
     HEX     CF D2
 @ %def RESIDUAL_5A_5AA5
 
-<<5a attract flag>>=
-    ORG     $5AA7
-ATTRACT_FLAG:
-    DC.B    $A9                     ; initial value (runtime: 1 = attract/demo mode, 0 = normal)
-
-<<5a page gap 5aa8-5aa8>>=
+<<var page gap 5aa8-5aa8>>=
     ORG     $5AA8
 RESIDUAL_5A_5AA8:
     HEX     AC
 @ %def RESIDUAL_5A_5AA8
-
-<<5a turn tune guard>>=
-    ORG     $5AA9
-TURN_TUNE_GUARD:
-    DC.B    $D9                     ; initial value (runtime: turn reset: guards one-shot script execution)
-
-<<5a input option count>>=
-    ORG     $5AAA
-INPUT_OPTION_COUNT:
-    DC.B    $8D                     ; initial value (runtime: number of input options to draw)
-
-<<5a current selection>>=
-    ORG     $5AAB
-CURRENT_SELECTION:
-    DC.B    $A0                     ; initial value (runtime: current menu selection index)
-
-<<5a input buffer>>=
-    ORG     $5AAC
-INPUT_BUFFER:
-    HEX     D3 D4 C1 A0 C1 D2 C7 AB B1 8D A0 CC C4 C1 A0 A3
-    HEX     BE D3 CC C6 C4 D5 C3 8D A0 D3 D4 C1 A0 D4 C5 CD
-    HEX     D0 8D A0 CC C4 C1 A0 A3 BC D3 CC C6 C4 D5 C3 8D
-    HEX     A0 D3 D4 C1 A0 D4 C5 CD D0 AB B1 8D A0 CA D3 D2
-    HEX     A0 D3 C8 CF D7 CE CD 8D A0 CC C4 C1 A0 D3 CC C6
-    HEX     C4 D5 C3 AB
-    ; runtime: 84-byte input text display buffer
 
 @ \section{Orphaned encounter handler}
 
@@ -27571,8 +27566,8 @@ The following root chunks produce the assembly files when tangled.
 <<zero page defines>>
 <<defines>>
 
-; Stub code
-<<stub entry>>
+; The EA "checker" -- copy protection and verification
+<<reset vector>>
 <<read data field>>
 <<res vm loop>>
 <<resident data and bytecodes>>
@@ -27698,126 +27693,130 @@ The following root chunks produce the assembly files when tangled.
 <<mob data records>>
 <<mob name strings>>
 <<mob residual data>>
-<<5a input mode>>
-<<5a total mob count>>
-<<5a current player>>
-<<5a current room>>
-<<5a char sprite>>
-<<5a char ai mode>>
-<<5a ai wait flag>>
-<<5a browse char index>>
-<<5a view max col>>
-<<5a view max row>>
-<<5a view min col>>
-<<5a view min row>>
-<<5a font col>>
-<<5a font row>>
-<<5a font charnum>>
-<<5a font charset>>
-<<5a damage amount>>
-<<5a rng limit>>
-<<5a rng mask>>
-<<5a nearest pos>>
-<<5a nearest dist>>
-<<5a candidate pos>>
-<<5a heal notified>>
-<<5a location id>>
-<<5a prng output>>
-<<5a prng state>>
-<<5a prng temp>>
-<<5a num digit>>
-<<5a num divisor>>
-<<5a num leading>>
-<<5a encounter result>>
-<<5a colocate link>>
-<<5a colocate pos>>
-<<5a colocate wrapped>>
-<<5a hostile app>>
-<<5a hostile a>>
-<<5a hostile y>>
-<<5a adjacent threat>>
-<<5a adjacent pos>>
-<<5a source char>>
-<<5a active char>>
-<<5a reorder link>>
-<<5a reorder sort key>>
-<<5a group count delta>>
-<<5a page gap 5a2d-5a50>>
-<<5a bounds min col>>
-<<5a bounds max col>>
-<<5a bounds min row>>
-<<5a bounds max row>>
-<<5a location pos>>
-<<5a location style>>
-<<5a msg line count>>
-<<5a trap type>>
-<<5a event slot byte>>
-<<5a event sub value>>
-<<5a page gap 5a5b-5a5c>>
-<<5a ai prev dir>>
-<<5a event pos>>
-<<5a event dest pos>>
-<<5a page gap 5a60-5a60>>
-<<5a turn start col>>
-<<5a turn start row>>
-<<5a current col>>
-<<5a current row>>
-<<5a move points>>
-<<5a steps taken>>
-<<5a input dir>>
-<<5a ai best dist>>
-<<5a ai saved pos>>
-<<5a dir scores>>
-<<5a ai direction>>
-<<5a ai test pos>>
-<<5a ai target pos>>
-<<5a ai target col>>
-<<5a ai target row>>
-<<5a is player turn>>
-<<5a saved mob link>>
-<<5a combat willingness>>
-<<5a target defense>>
-<<5a combat strength>>
-<<5a mob defense>>
-<<5a drop amount>>
-<<5a drop step>>
-<<5a stat scale>>
-<<5a stat level bits>>
-<<5a shop item mask>>
-<<5a shop price>>
-<<5a shop valid mask>>
-<<5a location style bits>>
-<<5a shop item offset>>
-<<5a target ptr>>
-<<5a best threat>>
-<<5a scene found flag>>
-<<5a scene hostile flag>>
-<<5a scene group idx>>
-<<5a wait loop count>>
-<<5a tune loop ctr>>
-<<5a tune loop addr>>
-<<5a tune gosub addr>>
-<<5a tune prng mask>>
-<<5a tune action vec>>
-<<5a page gap 5a95-5a95>>
-<<5a text right margin>>
-<<5a text left margin>>
-<<5a text stream idx>>
-<<5a scene number>>
-<<5a saved target rec>>
-<<5a saved entity ptr>>
-<<5a saved data ptr>>
-<<5a saved mob ptr>>
-<<5a blink col>>
-<<5a blink row>>
-<<5a blink char>>
-<<5a page gap 5aa5-5aa6>>
-<<5a attract flag>>
-<<5a page gap 5aa8-5aa8>>
-<<5a turn tune guard>>
-<<5a input option count>>
-<<5a current selection>>
-<<5a input buffer>>
+
+; Runtime data
+<<var input mode>>
+<<var total mob count>>
+<<var current player>>
+<<var current room>>
+<<var char sprite>>
+<<var char ai mode>>
+<<var ai wait flag>>
+<<var browse char index>>
+<<var view max col>>
+<<var view max row>>
+<<var view min col>>
+<<var view min row>>
+<<var font col>>
+<<var font row>>
+<<var font charnum>>
+<<var font charset>>
+<<var damage amount>>
+<<var rng limit>>
+<<var rng mask>>
+<<var nearest pos>>
+<<var nearest dist>>
+<<var candidate pos>>
+<<var heal notified>>
+<<var location id>>
+<<var prng output>>
+<<var prng state>>
+<<var prng temp>>
+<<var num digit>>
+<<var num divisor>>
+<<var num leading>>
+<<var encounter result>>
+<<var colocate link>>
+<<var colocate pos>>
+<<var colocate wrapped>>
+<<var hostile app>>
+<<var hostile a>>
+<<var hostile y>>
+<<var adjacent threat>>
+<<var adjacent pos>>
+<<var source char>>
+<<var active char>>
+<<var reorder link>>
+<<var reorder sort key>>
+<<var group count delta>>
+<<var page gap 5a2d-5a50>>
+<<var bounds min col>>
+<<var bounds max col>>
+<<var bounds min row>>
+<<var bounds max row>>
+<<var location pos>>
+<<var location style>>
+<<var msg line count>>
+<<var trap type>>
+<<var event slot byte>>
+<<var event sub value>>
+<<var page gap 5a5b-5a5c>>
+<<var ai prev dir>>
+<<var event pos>>
+<<var event dest pos>>
+<<var page gap 5a60-5a60>>
+<<var turn start col>>
+<<var turn start row>>
+<<var current col>>
+<<var current row>>
+<<var move points>>
+<<var steps taken>>
+<<var input dir>>
+<<var ai best dist>>
+<<var ai saved pos>>
+<<var dir scores>>
+<<var ai direction>>
+<<var ai test pos>>
+<<var ai target pos>>
+<<var ai target col>>
+<<var ai target row>>
+<<var is player turn>>
+<<var saved mob link>>
+<<var combat willingness>>
+<<var target defense>>
+<<var combat strength>>
+<<var mob defense>>
+<<var drop amount>>
+<<var drop step>>
+<<var stat scale>>
+<<var stat level bits>>
+<<var shop item mask>>
+<<var shop price>>
+<<var shop valid mask>>
+<<var location style bits>>
+<<var shop item offset>>
+<<var target ptr>>
+<<var best threat>>
+<<var scene found flag>>
+<<var scene hostile flag>>
+<<var scene group idx>>
+<<var wait loop count>>
+<<var tune loop ctr>>
+<<var tune loop addr>>
+<<var tune gosub addr>>
+<<var tune prng mask>>
+<<var tune action vec>>
+<<var page gap 5a95-5a95>>
+<<var text right margin>>
+<<var text left margin>>
+<<var text stream idx>>
+<<var scene number>>
+<<var saved target rec>>
+<<var saved entity ptr>>
+<<var saved data ptr>>
+<<var saved mob ptr>>
+<<var blink col>>
+<<var blink row>>
+<<var blink char>>
+<<var page gap 5aa5-5aa6>>
+<<var attract flag>>
+<<var page gap 5aa8-5aa8>>
+<<var turn tune guard>>
+<<var input option count>>
+<<var current selection>>
+<<var input buffer>>
+
+; Display
 <<init game state>>
 <<border animation>>
 <<init game display>>
@@ -27831,6 +27830,8 @@ The following root chunks produce the assembly files when tangled.
 <<border frame pattern>>
 <<copyright string>>
 <<boot display strings>>
+
+; Input
 <<input loop>>
 <<input jump vector>>
 <<setup input>>
