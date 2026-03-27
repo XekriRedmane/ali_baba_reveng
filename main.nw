@@ -22022,70 +22022,109 @@ READ_KEYBOARD:
 
 @ \subsection{Load scene data from disk}
 
-[[$A478]] loads scene data from the game disk.  It sets up the RWTS
-IOB for a buffer at [[SCENE_TEXT_DATA]] (\$5C00), calculates the
-track and sector from [[GAME_SIG_TRACK]] and [[SCENE_NUMBER]]
-(sector = (sig\_sector + scene) mod~13, incrementing track on
-overflow), then reads the sector via [[DISK_READ]].  On failure
-after 2~retries it returns carry set; on success carry clear.
+[[LOAD_SCENE_FROM_DISK]] reads one 256-byte sector of scene text
+data from the game disk into [[SCENE_TEXT_DATA]] (\$5C00).
+
+\paragraph{Disk layout.}  Scene sectors begin at track~\$11,
+sector~0 ([[GAME_SIG_TRACK]]/[[GAME_SIG_SECTOR]]).  Scene~$N$ maps
+to:
+\[
+  \text{track} = \$11 + \lfloor N / 13 \rfloor, \qquad
+  \text{sector} = N \bmod 13
+\]
+With 13~sectors per track, the 70~known scenes span tracks
+\$11--\$16.
+
+\paragraph{Scene data format.}  Each 256-byte sector is a byte stream
+interpreted by [[TEXT_RENDERER]]:
+\begin{itemize}
+\item \$00 = space.
+\item \$01--\$1A = letters A--Z.
+\item \$1B--\$24 = digits 0--9.
+\item \$25 = comma, \$26 = colon/period, \$27 = hyphen,
+      \$28 = apostrophe, \$2C = left paren, \$2D = right paren,
+      \$2F = asterisk/divider.
+\item \$7D = reset to full-screen layout.
+\item \$7E = page break (plays tune, refreshes status bar, then
+      re-initializes margins).
+\item \$7F = end of stream.
+\item \$80--\$FE = position command: bits~6--0 = row, next byte = column.
+\end{itemize}
+Characters \$00--\$7C are rendered using the custom 14$\times$16 font
+([[FONT_CHARSET]]=2).  The renderer wraps text between
+[[TEXT_LEFT_MARGIN]] (default~2) and [[TEXT_RIGHT_MARGIN]] (default~18).
+
+\paragraph{RWTS interface.}  The routine sets the RWTS IOB buffer
+address to \$5C00 (IOB bytes~8/9), computes the target track/sector
+from [[GAME_SIG_TRACK]] + scene number, and calls [[DISK_READ_JUMP]]
+with up to 2~retries.
 
 <<load scene from disk>>=
     ORG     $A478
 LOAD_SCENE_FROM_DISK:
     SUBROUTINE LOAD_SCENE_FROM_DISK
-    ; Load a scene's text data sector from disk into SCENE_TEXT_DATA.
     ;
-    ; Inputs:
-    ;   SCENE_NUMBER — scene index to load
+    ; Reads one sector of scene text data from disk.
     ;
-    ; Behavior:
-    ;   Computes target track/sector from base + scene number, sets
-    ;   RWTS IOB buffer to $5C00, and attempts disk read with up
-    ;   to 2 retries on failure.
+    ; Input:   SCENE_NUMBER = scene index (0-69)
+    ; Output:  C clear = success (data at $5C00), C set = failure
+    ; Clobbers: A, X, Y, $BE
     ;
-    ; Outputs:
-    ;   C — clear on success, set on failure
-    ; Clobbers: A, X, Y
-
-    JSR     DISK_RTS           ; no-op (placeholder)
+    ; Disk mapping:
+    ;   track  = GAME_SIG_TRACK + (GAME_SIG_SECTOR + SCENE_NUMBER) / 13
+    ;   sector = (GAME_SIG_SECTOR + SCENE_NUMBER) mod 13
+    ;   With GAME_SIG_TRACK=$11, GAME_SIG_SECTOR=$00:
+    ;     scene 0  -> T$11 S$00
+    ;     scene 12 -> T$11 S$0C
+    ;     scene 13 -> T$12 S$00
+    ;     scene 69 -> T$16 S$04
+    ;
+    ; --- Set RWTS IOB buffer to $5C00 (SCENE_TEXT_DATA) ---
+    ;
+    JSR     DISK_RTS           ; no-op (cracked-out hook)
     LDA     #$00
     LDY     #$08
     STA     (RWTS_IOB_PTR),Y   ; IOB+8 = buffer lo ($00)
     INY
     LDA     #$5C
-    STA     (RWTS_IOB_PTR),Y   ; IOB+9 = buffer hi ($5C -> $5C00)
-    LDA     GAME_SIG_TRACK     ; base track
-    STA     $BE
-    LDA     GAME_SIG_SECTOR    ; base sector
+    STA     (RWTS_IOB_PTR),Y   ; IOB+9 = buffer hi ($5C)
+    ;
+    ; --- Compute track and sector ---
+    ;
+    LDA     GAME_SIG_TRACK     ; track = base track ($11)
+    STA     $BE                ; $BE = working track number
+    LDA     GAME_SIG_SECTOR    ; A = base sector ($00)
     CLC
-    ADC     SCENE_NUMBER       ; + current scene
+    ADC     SCENE_NUMBER       ; A = base_sector + scene_number
 .mod13:
-    CMP     #$0D               ; >= 13 sectors per track?
-    BCC     .set_iob           ; no -> done
-    INC     $BE                ; next track
+    CMP     #$0D               ; A >= 13?
+    BCC     .set_iob           ; no -> A = final sector
+    INC     $BE                ; yes -> track++
     SEC
-    SBC     #$0D               ; subtract 13
-    JMP     .mod13
-
+    SBC     #$0D               ; A -= 13
+    JMP     .mod13             ; repeat until A < 13
+    ;
+    ; --- Store track/sector in RWTS IOB and read ---
+    ;
 .set_iob:
     LDY     #$05
     STA     (RWTS_IOB_PTR),Y   ; IOB+5 = sector
     DEY
     LDA     $BE
     STA     (RWTS_IOB_PTR),Y   ; IOB+4 = track
-    LDA     #$02               ; retry counter
+    LDA     #$02               ; 2 retries on failure
     STA     $BE
 .retry:
-    JSR     DISK_READ_JUMP     ; read from disk
-    BCS     .error
-    JSR     DISK_RTS           ; no-op
-    CLC                        ; success
+    JSR     DISK_READ_JUMP     ; RWTS read
+    BCS     .error             ; C set = read failed
+    JSR     DISK_RTS           ; no-op (cracked-out hook)
+    CLC                        ; C clear = success
     RTS
 .error:
-    DEC     $BE
-    BNE     .retry
-    JSR     DISK_RTS           ; no-op
-    SEC                        ; all retries failed
+    DEC     $BE                ; retries--
+    BNE     .retry             ; try again if retries remain
+    JSR     DISK_RTS           ; no-op (cracked-out hook)
+    SEC                        ; C set = all retries exhausted
     RTS
 @ %def LOAD_SCENE_FROM_DISK
 
