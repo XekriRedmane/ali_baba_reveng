@@ -24651,6 +24651,91 @@ DISK_BAD_NIBBLE:
     HEX     a0 a0       ; $B5FA-$B5FB
     HEX     00 00 00 01 ; $B5FC-$B5FF
 @ %def DISK_VM_SAVED_STATE DISK_VM_SCRATCH DISK_BAD_NIBBLE
+
+\chapter{Scene Data}
+\label{ch:scenes}
+
+Scene text is stored on disk as 256-byte sectors, one per scene.
+[[LOAD_SCENE_FROM_DISK]] reads a scene into [[SCENE_TEXT_DATA]]
+(\$5C00), and [[TEXT_RENDERER]] interprets the byte stream to display
+text on the hi-res screen using the custom 14$\times$16 font.
+
+Each scene is a sequence of character codes and control bytes:
+\begin{itemize}
+\item \$00 = space.
+\item \$01--\$1A = letters A--Z.
+\item \$1B--\$24 = digits 0--9.
+\item \$25 = comma, \$26 = colon, \$27 = hyphen, \$28 = apostrophe,
+      \$2C = left paren, \$2D = right paren, \$2F = divider.
+\item \$7D = reset to full-screen layout.
+\item \$7E = page break (pause, play tune, refresh status bar).
+\item \$7F = end of stream.
+\item \$80--\$FE = position command: bits~6--0 = row, next byte = column.
+\end{itemize}
+
+Scene sectors start at track~\$11, sector~0.  Scene~$N$ maps to
+track~$\$11 + \lfloor N/13 \rfloor$, sector~$N \bmod 13$.
+
+\section{Scene \$00: Copyright notice}
+
+Scene~0 is the copyright and publisher information screen, shown at
+startup.  It is 106~bytes long (offsets \$00--\$69), terminated by
+\$7F.
+
+\begin{verbatim}
+  COPYRIGHT 1981
+
+      STUART SMITH
+
+       MARKETED BY
+
+   QUALITY SOFTWARE
+  6660 RESEDA BLVD
+  RESEDA, CA 91335
+    (213) 344-6599
+\end{verbatim}
+
+Raw byte stream:
+\begin{center}
+\begin{tabular}{rll}
+\toprule
+\thead{Offset} & \thead{Hex} & \thead{Meaning} \\
+\midrule
+\$00 & 03 0F 10 19 12 09 07 08 14 00 1C 24 23 1C
+     & ``COPYRIGHT 1981'' \\
+\$0E & 82 03
+     & Position: row~2, col~3 \\
+\$10 & 13 14 15 01 12 14 00 13 0D 09 14 08
+     & ``STUART SMITH'' \\
+\$1C & 84 04
+     & Position: row~4, col~4 \\
+\$1E & 0D 01 12 0B 05 14 05 04 00 02 19
+     & ``MARKETED BY'' \\
+\$29 & 86 02
+     & Position: row~6, col~2 \\
+\$2B & 11 15 01 0C 09 14 19 00 13 0F 06 14
+     & ``QUALITY SOFT'' \\
+\$37 & 17 01 12 05 21 21 21 1B 00 12 05 13
+     & ``WARE6660 RES'' \\
+\$43 & 05 04 01 00 02 0C 16 04 12 05 13 05
+     & ``EDA BLVDRESE'' \\
+\$4F & 04 01 25 00 03 01 00 24 1C 1E 1E 20
+     & ``DA, CA 91335'' \\
+\$5B & 2C 1D 1C 1E 2D 00 1E 1F 1F 27 21 20
+     & ``(213) 344-65'' \\
+\$67 & 24 24
+     & ``99'' \\
+\$69 & 7F
+     & End of stream \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The text wraps automatically between the default margins (columns~2
+and~18).  The position commands place each section at a specific
+row, centering the text visually.  Note that Quality Software was
+Stuart Smith's publisher, located in Reseda, California.
+
 @ \chapter{Mob Data}
 \label{ch:mob-data}
 
