@@ -4651,7 +4651,8 @@ icon drawing.
 <<defines>>=
 BORDER_ICON_OFFSET      EQU     $5DC2   ; runtime: icon table offset (aliases BORDER_ICON_CHARS)
 BORDER_SWAP_FLAG        EQU     $5DC4   ; runtime: swap flag (aliases BORDER_ICON_CHARS+2)
-@ %def BORDER_ICON_OFFSET BORDER_SWAP_FLAG
+ICON_TABLE_PTR          EQU     $BE     ; pointer to border icon table (aliases DATA_PTR)
+@ %def BORDER_ICON_OFFSET BORDER_SWAP_FLAG ICON_TABLE_PTR
 
 <<border animation>>=
     ORG     $5B2A
@@ -4735,8 +4736,8 @@ BORDER_HANDLER_B:
 DRAW_BORDER_ICON_LIST:
     LDY     #$18              ; default: start at offset $18
 DRAW_BORDER_ICON_ENTRY:
-    STA     $BE               ; \ set pointer
-    STX     $BF               ; /
+    STA     ICON_TABLE_PTR    ; \ set pointer
+    STX     ICON_TABLE_PTR+1  ; /
     STY     BORDER_ICON_OFFSET ; save offset
     LDA     #$00
     STA     BORDER_SWAP_FLAG  ; clear swap flag
@@ -4744,15 +4745,15 @@ DRAW_BORDER_ICON_ENTRY:
     LDY     BORDER_ICON_OFFSET ; current offset
     LDA     BORDER_SWAP_FLAG  ; swap flag
     BNE     .swap_restore     ; nonzero -> restore saved char
-    LDA     ($BE),Y           ; read icon from table
+    LDA     (ICON_TABLE_PTR),Y ; read icon from table
     STA     BORDER_SWAP_FLAG  ; save it
     BEQ     .skip             ; zero -> skip (empty)
     LDA     #$00
-    STA     ($BE),Y           ; clear table entry
+    STA     (ICON_TABLE_PTR),Y ; clear table entry
     JSR     DRAW_BORDER_CHAR_AT ; draw the icon
     JMP     .skip
 .swap_restore:
-    STA     ($BE),Y           ; restore saved icon
+    STA     (ICON_TABLE_PTR),Y ; restore saved icon
     JSR     DRAW_BORDER_CHAR_AT ; draw it
     LDA     #$00
     STA     BORDER_SWAP_FLAG  ; clear swap flag
@@ -4767,10 +4768,10 @@ DRAW_BORDER_ICON_ENTRY:
 DRAW_BORDER_CHAR_AT:
     STA     FONT_CHARNUM      ; set character to draw
     INY
-    LDA     ($BE),Y           ; column
+    LDA     (ICON_TABLE_PTR),Y ; column
     STA     TEXT_ROW          ; -> cursor column
     INY
-    LDA     ($BE),Y           ; row
+    LDA     (ICON_TABLE_PTR),Y ; row
     STA     TEXT_COL          ; -> cursor row
     JMP     RENDER_FONT_CHAR_DIRECT ; render font char
 
@@ -4811,8 +4812,8 @@ ANIM_BORDER_ICONS_B:
     LDY     #$5D
 .anim_shared:
     STX     BORDER_INITIAL_CHAR ; save max index
-    STA     $BE               ; \ set pointer
-    STY     $BF               ; /
+    STA     ICON_TABLE_PTR    ; \ set pointer
+    STY     ICON_TABLE_PTR+1  ; /
     PLA
     JSR     RANDOM_IN_RANGE
     CMP     #$01
@@ -4828,14 +4829,14 @@ ANIM_BORDER_ICONS_B:
     LDX     BORDER_INITIAL_CHAR
     LDA     BORDER_POS_TABLE,X ; read icon from border table
     STA     FONT_CHARNUM
-    STA     ($BE),Y           ; store in target table
+    STA     (ICON_TABLE_PTR),Y ; store in target table
     LDA     #$00
     STA     BORDER_POS_TABLE,X ; clear source entry
     INY
-    LDA     ($BE),Y           ; column
+    LDA     (ICON_TABLE_PTR),Y ; column
     STA     TEXT_ROW
     INY
-    LDA     ($BE),Y           ; row
+    LDA     (ICON_TABLE_PTR),Y ; row
     STA     TEXT_COL
     JSR     RENDER_FONT_CHAR_DIRECT ; render
     LDA     #$00
