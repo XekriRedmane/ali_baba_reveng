@@ -22414,17 +22414,33 @@ temporaries that don't interfere with the main program.
     ORG     $06E0
 CONTEXT_SWAP:
     SUBROUTINE CONTEXT_SWAP
-
-    LDX     #$0F
+    ;
+    ; Exchanges 16 bytes between ZP $50-$5F and the shadow area at
+    ; RES_ZP_SHADOW ($07E5-$07F4).  This gives the VM its own private
+    ; copy of the zero-page registers:
+    ;
+    ;   $50 (VM_SCRATCH)  — decoded nibble / general scratch
+    ;   $52/$53 (VM_IP)   — bytecode instruction pointer
+    ;   $54/$55 (VM_OPERAND) — decoded address operand
+    ;   $56 (VM_ACC)      — VM accumulator
+    ;   $57-$5F           — additional VM scratch
+    ;
+    ; Called twice per VM execution:
+    ;   1. Before RESIDENT_DISPATCH — restores VM state from shadow
+    ;   2. Inside VM_EXIT_OK/ERR  — saves VM state back to shadow
+    ;
+    ; On exit: X = $FF (loop underflows past 0), Y unchanged.
+    ;
+    LDX     #$0F                    ; 16 bytes ($50-$5F)
 .loop:
-    LDA     VM_SCRATCH,X            ; load ZP byte
-    PHA                             ; save on stack
-    LDA     RES_ZP_SHADOW,X         ; load shadow byte
-    STA     VM_SCRATCH,X            ; -> ZP
-    PLA                             ; recover old ZP byte
-    STA     RES_ZP_SHADOW,X         ; -> shadow
-    DEX
-    BPL     .loop
+    LDA     VM_SCRATCH,X            ; A = ZP[$50+X]
+    PHA                             ; save old ZP byte on stack
+    LDA     RES_ZP_SHADOW,X         ; A = shadow[$07E5+X]
+    STA     VM_SCRATCH,X            ; ZP[$50+X] = shadow value
+    PLA                             ; A = old ZP byte
+    STA     RES_ZP_SHADOW,X         ; shadow[$07E5+X] = old ZP value
+    DEX                             ; X-- ($0F -> $00 -> $FF)
+    BPL     .loop                   ; loop while X >= 0
     RTS
 @ %def CONTEXT_SWAP
 The 14 bytes between [[CONTEXT_SWAP]] and [[RESIDENT_DECODE_DISPATCH]]
@@ -22540,12 +22556,19 @@ Decodes an address and redirects execution there.
     ORG     $0700
 RESIDENT_DECODE_DISPATCH:
     SUBROUTINE RESIDENT_DECODE_DISPATCH
-
-    JSR     DECODE_ENCRYPTED_ADDR    ; -> VM_OPERAND/VM_OPERAND+1
+    ;
+    ; Opcode $00 (VMGOTO): unconditional branch.
+    ; Reads a 2-byte encrypted address from the bytecode stream,
+    ; sets VM_IP to the decoded address, and resumes execution there.
+    ;
+    ; Also used as a shared entry point: RES_VM_SET_IP is jumped to
+    ; by VMCALL ($05) after pushing the return IP onto the stack.
+    ;
+    JSR     DECODE_ENCRYPTED_ADDR    ; decrypt 2 bytes -> VM_OPERAND
 RES_VM_SET_IP:
-    MOVW    VM_OPERAND,VM_IP         ; VM_IP = decoded address
-    LDY     #$00
-    JMP     RESIDENT_DISPATCH_FETCH  ; fetch from new location
+    MOVW    VM_OPERAND,VM_IP         ; VM_IP = decoded target address
+    LDY     #$00                     ; reset Y (new page, offset 0)
+    JMP     RESIDENT_DISPATCH_FETCH  ; fetch next opcode from new IP
 @ %def RESIDENT_DECODE_DISPATCH RES_VM_SET_IP
 @
 
@@ -22586,22 +22609,31 @@ RES_XOR_IMM             EQU     $4C     ; bytecode encryption XOR key (immediate
     ORG     $0710
 DECODE_ENCRYPTED_ADDR:
     SUBROUTINE DECODE_ENCRYPTED_ADDR
-
-    LDA     (VM_IP),Y               ; read low byte
-    EOR     #RES_XOR_LO             ; decrypt
-    INY
+    ;
+    ; Reads 2 encrypted bytes from the bytecode stream at (VM_IP),Y
+    ; and decodes them into a 16-bit address in VM_OPERAND.
+    ;
+    ; Encryption: low byte XOR $03, high byte XOR $D9.
+    ; Y is advanced past both bytes (with page-crossing handled).
+    ;
+    ; On entry:  (VM_IP),Y points to the encrypted low byte
+    ; On exit:   VM_OPERAND = decoded address, Y advanced by 2
+    ;
+    LDA     (VM_IP),Y               ; read encrypted low byte
+    EOR     #RES_XOR_LO             ; XOR $03 -> plaintext low
+    INY                              ; advance past low byte
     BNE     .no_carry1
-    INC     VM_IP+1
+    INC     VM_IP+1                  ; handle Y overflow (page cross)
 .no_carry1:
-    STA     VM_OPERAND              ; decoded low
-    LDA     (VM_IP),Y               ; read high byte
-    INY
+    STA     VM_OPERAND              ; store decoded low byte
+    LDA     (VM_IP),Y               ; read encrypted high byte
+    INY                              ; advance past high byte
     BNE     .no_carry2
-    INC     VM_IP+1
+    INC     VM_IP+1                  ; handle Y overflow
 .no_carry2:
-    EOR     #RES_XOR_HI             ; decrypt
-    STA     VM_OPERAND+1            ; decoded high
-RES_VM_VMYIELD:                           ; opcode $0B: VMYIELD — just RTS (unused)
+    EOR     #RES_XOR_HI             ; XOR $D9 -> plaintext high
+    STA     VM_OPERAND+1            ; store decoded high byte
+RES_VM_VMYIELD:                      ; opcode $0B: VMYIELD (unused, just RTS)
     RTS
 @ %def DECODE_ENCRYPTED_ADDR RES_VM_VMYIELD
 
