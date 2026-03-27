@@ -8026,12 +8026,6 @@ HRCG_ORIGINAL_ENTRY:
     JMP     HRCG_PRINT_VERSION     ; dead: original entry before patch
 @ %def HRCG_ORIGINAL_ENTRY
 
-<<pre-init data>>=
-    ORG     $A8CE
-    HEX     00 00 01 00 03 33 33 32 33 13 A5 13 02 15 02 00
-    HEX     A3 1C 32 00 4C 14 00 BD C9 00 C0 04 00 3C 80 00
-    HEX     FF 14 00
-
 @ \subsection{Equipment and combat data}
 
 This region contains interleaved lookup tables and string data used
@@ -27666,6 +27660,12 @@ APPLE_ASM_RESIDUAL:
     HEX     35 21 54 01 69 00
     HEX     01 03 00 13 3C 00
     HEX     14 19 5D
+    HEX     FF                      ; gap byte ($A8CD)
+; --- Pre-initialization data ($A8CE-$A8F0) ---
+; Likely more assembler/editor residual data, not used at runtime.
+    HEX     00 00 01 00 03 33 33 32 33 13 A5 13 02 15 02 00
+    HEX     A3 1C 32 00 4C 14 00 BD C9 00 C0 04 00 3C 80 00
+    HEX     FF 14 00
 @ %def APPLE_ASM_RESIDUAL
 
 \chapter{Assembly output}
@@ -28052,6 +28052,8 @@ The following root chunks produce the assembly files when tangled.
 <<shop buy effects>>
 <<xp award>>
 <<enter location>>
+
+; Map display
 <<draw map col>>
 <<draw map entities>>
 <<draw map icon b>>
@@ -28101,6 +28103,8 @@ The following root chunks produce the assembly files when tangled.
 <<max game speed>>
 <<anim index>>
 <<wait loop init>>
+
+; Constants
 <<delay count>>
 <<slot number>>
 <<map char defaults>>
@@ -28180,8 +28184,11 @@ The following root chunks produce the assembly files when tangled.
 <<cold restart>>
 <<pointer helpers>>
 <<apple asm residual>>
-<<pre-init data>>
+
+; Uninitialized data
 <<runtime data area>>
+
+; Disk I/O
 <<disk read field>>
 <<verify data field>>
 <<disk vm loop>>
