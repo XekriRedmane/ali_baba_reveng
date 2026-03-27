@@ -22547,9 +22547,8 @@ branching.
 of [[DECODE_ENCRYPTED_ADDR]].  The VMASL handler is simply RTS (a
 no-op that returns without modifying the accumulator).
 
-<<resident vm handlers>>=
+<<res vm call1>>=
     ORG     $0727
-    ; --- $01: VMCALL1 (call native, result -> acc) ---
 RES_VM_CALL1:
     SUBROUTINE RES_VM_CALL1
     JSR     DECODE_ENCRYPTED_ADDR
@@ -22561,12 +22560,17 @@ RES_VM_CALL1:
     PLA                       ; \ restore Y
     TAY                       ; /
     JMP     RESIDENT_DISPATCH_FETCH ; dispatch next
+@ %def RES_VM_CALL1
 
-    ; --- PULL_TWO_RET_ADDRS ($0738) ---
-    ; Rearranges stack for RESIDENT_DISPATCH: pulls own and caller's
-    ; return addresses, increments each (RTS pushes addr-1), and
-    ; jumps through (VM_OPERAND).
+[[PULL_TWO_RET_ADDRS]] pulls both return addresses from the stack
+(its own and the caller's), increments each by 1 (since RTS pushes
+addr\textminus{}1), and jumps through [[VM_OPERAND]]/[[VM_OPERAND]]+1 back to the code
+after the [[JSR]] in [[RESIDENT_DISPATCH]].
+
+<<pull two ret addrs>>=
+    ORG     $0738
 PULL_TWO_RET_ADDRS:
+    SUBROUTINE PULL_TWO_RET_ADDRS
     PULB    VM_OPERAND              ; own return addr (low)
     PULB    VM_OPERAND+1            ; own return addr (high)
     PULB    VM_IP                   ; caller's return addr (low)
@@ -22577,22 +22581,38 @@ PULL_TWO_RET_ADDRS:
     INC     VM_OPERAND+1
 .no_inc:
     JMP     (VM_OPERAND)            ; jump through decoded addr
+@ %def PULL_TWO_RET_ADDRS
 
-    ; --- $08: VMCALL0 (terminal jump to native code) ---
+@ Opcode \$08: VMCALL0 calls native code as a terminal jump.
+[[RES_VM_CALL1_IND]] is shared by [[RES_VM_CALL1]] for indirect calls.
+
+<<res vm call0>>=
+    ORG     $074F
 RES_VM_CALL0:
+    SUBROUTINE RES_VM_CALL0
     JSR     DECODE_ENCRYPTED_ADDR
 RES_VM_CALL1_IND:
     JMP     (VM_OPERAND)            ; indirect jump through VM_OPERAND
+@ %def RES_VM_CALL0 RES_VM_CALL1_IND
 
-    ; --- $02: VMBEQ (branch if acc == 0) ---
+@ Opcode \$02: VMBEQ branches if the VM accumulator is zero.
+The [[BNE +0]] is a Passport crack patch that disables copy-protection branching.
+
+<<res vm beq>>=
+    ORG     $0755
 RES_VM_VMBEQ:
     JSR     DECODE_ENCRYPTED_ADDR
     LDA     VM_ACC                  ; test VM accumulator
     BNE     *+2                     ; PATCHED: BNE +0 = no-op (was branch to GOTO)
     JMP     RESIDENT_DISPATCH_FETCH ; always: dispatch next (branch disabled)
+@ %def RES_VM_VMBEQ
 
-    ; --- $03: VMLDI (load immediate -> acc) ---
+@ Opcode \$03: VMLDI loads an immediate byte (decrypted) into the VM accumulator.
+
+<<res vm ldi>>=
+    ORG     $075F
 RES_VM_VMLDI:
+    SUBROUTINE RES_VM_VMLDI
     LDA     (VM_IP),Y               ; read immediate byte
     INY
     BNE     .no_carry1
@@ -22601,17 +22621,27 @@ RES_VM_VMLDI:
     EOR     #RES_XOR_IMM            ; decrypt
     STA     VM_ACC                  ; -> VM acc
     JMP     RESIDENT_DISPATCH_FETCH
+@ %def RES_VM_VMLDI
 
-    ; --- $04: VMLD (load from memory -> acc) ---
+@ Opcode \$04: VMLD loads a byte from the decoded address into the VM accumulator.
+
+<<res vm ld>>=
+    ORG     $076D
 RES_VM_VMLD:
     JSR     DECODE_ENCRYPTED_ADDR
     LDX     #$00
     LDA     (VM_OPERAND,X)          ; acc = *(addr)
     STA     VM_ACC
     JMP     RESIDENT_DISPATCH_FETCH
+@ %def RES_VM_VMLD
 
-    ; --- $0C: VMADD (acc += *(addr)) ---
+@ Opcode \$0C: VMADD adds the VM accumulator to the decoded address low byte,
+then loads from the resulting pointer. Falls through to [[RES_VM_VMLD]]+3.
+
+<<res vm add>>=
+    ORG     $0779
 RES_VM_VMADD:
+    SUBROUTINE RES_VM_VMADD
     JSR     DECODE_ENCRYPTED_ADDR
     LDA     VM_ACC                  ; acc
     CLC
@@ -22621,9 +22651,15 @@ RES_VM_VMADD:
     INC     VM_OPERAND+1
 .no_carry2:
     JMP     RES_VM_VMLD+3           ; -> LDX #$00 / LDA (VM_OPERAND,X) / ...
+@ %def RES_VM_VMADD
 
-    ; --- $05: VMCALL (VM subroutine call) ---
+@ Opcode \$05: VMCALL performs a VM subroutine call. It pushes the current IP
+(adjusted by Y offset) and sets the IP to the decoded address.
+
+<<res vm call>>=
+    ORG     $078A
 RES_VM_VMCALL:
+    SUBROUTINE RES_VM_VMCALL
     JSR     DECODE_ENCRYPTED_ADDR
     TYA                       ; \ compute return address:
     CLC                       ;  | IP + Y offset
@@ -22638,8 +22674,12 @@ RES_VM_VMCALL:
     PHA                       ; /
     LDY     #$00              ; reset Y
     JMP     RES_VM_SET_IP           ; set IP = VM_OPERAND, dispatch
+@ %def RES_VM_VMCALL
 
-    ; --- $09: VMRET (return from VM subroutine) ---
+@ Opcode \$09: VMRET returns from a VM subroutine by popping the saved IP.
+
+<<res vm ret>>=
+    ORG     $07A2
 RES_VM_VMRET:
     PLA                       ; \ pop return IP
     STA     VM_IP+1                 ;  | (high byte first)
@@ -22647,17 +22687,26 @@ RES_VM_VMRET:
     STA     VM_IP                   ; /
     LDY     #$00
     JMP     RESIDENT_DISPATCH_FETCH ; dispatch next
+@ %def RES_VM_VMRET
 
-    ; --- $06: VMST (store acc to memory) ---
+@ Opcode \$06: VMST stores the VM accumulator to the decoded memory address.
+
+<<res vm st>>=
+    ORG     $07AD
 RES_VM_VMST:
     JSR     DECODE_ENCRYPTED_ADDR
     LDA     VM_ACC                  ; VM acc
     LDX     #$00
     STA     (VM_OPERAND,X)          ; *(addr) = acc
     JMP     RESIDENT_DISPATCH_FETCH
+@ %def RES_VM_VMST
 
-    ; --- $07: VMSUBI (acc -= immediate) ---
+@ Opcode \$07: VMSUBI subtracts a decrypted immediate byte from the VM accumulator.
+
+<<res vm subi>>=
+    ORG     $07B9
 RES_VM_VMSUBI:
+    SUBROUTINE RES_VM_VMSUBI
     LDA     (VM_IP),Y               ; read immediate byte
     INY
     BNE     .no_carry4
@@ -22670,8 +22719,13 @@ RES_VM_VMSUBI:
     SBC     VM_OPERAND              ; acc - immediate
     STA     VM_ACC
     JMP     RESIDENT_DISPATCH_FETCH
+@ %def RES_VM_VMSUBI
 
-    ; --- $0A: VMINC (*(addr)++, result -> acc) ---
+@ Opcode \$0A: VMINC increments the byte at the decoded address and stores the
+result in the VM accumulator.
+
+<<res vm inc>>=
+    ORG     $07CE
 RES_VM_VMINC:
     JSR     DECODE_ENCRYPTED_ADDR
     LDX     #$00
@@ -22681,16 +22735,7 @@ RES_VM_VMINC:
     STA     (VM_OPERAND,X)          ; store back
     STA     VM_ACC                  ; -> VM acc
     JMP     RESIDENT_DISPATCH_FETCH
-@ %def RES_VM_VMASL RES_VM_CALL1 RES_VM_CALL0 RES_VM_CALL1_IND RES_VM_VMBEQ RES_VM_VMLDI RES_VM_VMLD RES_VM_VMADD RES_VM_VMCALL RES_VM_VMRET RES_VM_VMST RES_VM_VMSUBI RES_VM_VMINC
-
-[[PULL_TWO_RET_ADDRS]] pulls both return addresses from the stack
-(its own and the caller's), increments each by 1 (since RTS pushes
-addr\textminus{}1), and jumps through [[VM_OPERAND]]/[[VM_OPERAND]]+1 back to the code
-after the [[JSR]] in [[RESIDENT_DISPATCH]].
-
-@ [[PULL_TWO_RET_ADDRS]] is now part of [[<<resident vm handlers>>]]
-at~\$0738, since it shares the same address range as the VM opcode
-handlers.
+@ %def RES_VM_VMASL RES_VM_VMINC
 A 3-byte relay in the handler page.  Jumps to
 [[RESIDENT_DECODE_DISPATCH]] at [[$0700]].
 
@@ -27279,7 +27324,18 @@ The following root chunks produce the assembly files when tangled.
 <<context swap padding>>
 <<resident decode dispatch>>
 <<decode encrypted addr>>
-<<resident vm handlers>>
+<<res vm call1>>
+<<pull two ret addrs>>
+<<res vm call0>>
+<<res vm beq>>
+<<res vm ldi>>
+<<res vm ld>>
+<<res vm add>>
+<<res vm call>>
+<<res vm ret>>
+<<res vm st>>
+<<res vm subi>>
+<<res vm inc>>
 <<decode dispatch relay>>
 <<resident page tail>>
 
