@@ -12606,8 +12606,10 @@ ATTRACT_LOOP:
     ;
     ; Behavior:
     ;   Each iteration swaps zero-page context ($50-$5F) with the
-    ;   saved VM state, dispatches one bytecode instruction, then
-    ;   loops.  Never returns -- runs until the VM exits via
+    ;   saved VM state, then runs the ENTIRE bytecode program from
+    ;   $0572 (RESIDENT_BYTECODES) to completion.  The VM handlers
+    ;   chain via JMP RESIDENT_DISPATCH_FETCH and never return here
+    ;   between opcodes.  The loop restarts after the VM exits via
     ;   VM_EXIT_OK or VM_EXIT_ERR.
     ;
     ; Clobbers: A, X, Y
@@ -22430,17 +22432,22 @@ RESIDENT_DISPATCH_TABLE:
     HEX     00 27 55 5F 6D 8A AD B9
     HEX     4F A2 CE 26 79
 @ %def RESIDENT_DISPATCH_TABLE
-Dispatches one bytecode instruction using a stack trick.
-On the \emph{first} call (from [[ATTRACT_LOOP]]), the X/Y values pushed
-at entry are discarded by [[PULL_TWO_RET_ADDRS]].  The routine works
-as follows:
+Runs the entire bytecode program starting at [[RESIDENT_BYTECODES]].
+The VM~IP is derived from the caller's return address via a stack trick;
+the opcode handlers chain to each other through [[RESIDENT_DISPATCH_FETCH]]
+and never return here until the program exits.
+
+The stack trick works as follows:
 \begin{enumerate}
-\item Push X (high) and Y (low) onto the stack.
-\item [[JSR PULL_TWO_RET_ADDRS]] --- this pulls its own return address
-      into [[VM_OPERAND]] and the X/Y values into [[VM_IP]], then
-      jumps back to [[\texttt{.resume}]] via [[JMP (VM_OPERAND)]].
-\item At [[\texttt{.resume}]]: pull the \emph{caller's} return address
-      (from the outer [[JSR RESIDENT_DISPATCH]]) into [[VM_IP]].
+\item Push X and Y onto the stack as \textbf{padding}---their values
+      are irrelevant and are immediately discarded.
+\item [[JSR PULL_TWO_RET_ADDRS]]---pulls four stack entries: its own
+      return address $\to$ [[VM_OPERAND]], then the X/Y padding $\to$
+      [[VM_IP]] (discarded).  Jumps to [[\texttt{.resume}]] via
+      [[JMP (VM_OPERAND)]].
+\item At [[\texttt{.resume}]]: pulls the \emph{caller's} return address
+      (from the outer [[JSR RESIDENT_DISPATCH]]) into [[VM_IP]],
+      overwriting the discarded X/Y values.
 \item [[LDY \#\$04]] skips 4~bytes past the return address.
 \end{enumerate}
 
@@ -22450,29 +22457,28 @@ first VM instruction.  The ``JMP ATTRACT\_LOOP'' at \$056F and the
 bytecodes' ORG at \$0572 are placed so that the IP lands exactly at the
 start of the bytecode program.
 
-On subsequent iterations, [[ATTRACT_LOOP]] calls [[JSR CONTEXT_SWAP]]
-then [[JSR RESIDENT_DISPATCH]] again.  The same stack trick re-derives
-the IP from the return address each time, but by this point the VM
-handlers have already updated X/Y to track the current bytecode position
-(passed through the stack round-trip).
+The VM always starts from \$0572.  Each call to [[RESIDENT_DISPATCH]]
+re-derives the IP from the return address; there is no mechanism to
+resume a partially-executed program.
 
 <<resident dispatch>>=
     ORG     $06B3
 RESIDENT_DISPATCH:
     SUBROUTINE RESIDENT_DISPATCH
 
-    TXA                              ; \
-    PHA                              ;  | save X, Y on stack
-    TYA                              ;  | (these are the bytecode pointer)
-    PHA                              ; /
-    JSR     PULL_TWO_RET_ADDRS       ; rearrange stack, jump to .resume
+    TXA                              ; \  push X and Y as stack padding
+    PHA                              ;  | (values are irrelevant;
+    TYA                              ;  |  PULL_TWO_RET_ADDRS needs
+    PHA                              ; /  4 entries to consume)
+    JSR     PULL_TWO_RET_ADDRS       ; consume padding + own ret addr,
+                                     ; jump to .resume via (VM_OPERAND)
 
-    ; Control returns here via JMP (VM_OPERAND):
+    ; Control arrives here via JMP (VM_OPERAND):
 .resume:
-    PULB    VM_IP                    ; recover saved Y -> IP low
-    PULB    VM_IP+1                  ; recover saved X -> IP high
+    PULB    VM_IP                    ; pull caller's ret addr lo -> VM_IP
+    PULB    VM_IP+1                  ; pull caller's ret addr hi -> VM_IP+1
 
-    LDY     #$04                     ; skip 4 bytes
+    LDY     #$04                     ; skip 4 bytes past ret addr -> $0572
 RESIDENT_DISPATCH_FETCH:
 .fetch:
     LDA     (VM_IP),Y                ; read opcode
@@ -22588,30 +22594,30 @@ RES_VM_CALL1:
 \begin{enumerate}
 \item Its own return address $\to$ [[VM_OPERAND]] (incremented by~1 to
       correct the RTS addr\textminus{}1 convention).
-\item The X/Y values pushed by [[RESIDENT_DISPATCH]] $\to$ [[VM_IP]]
-      (incremented; these become the bytecode pointer on subsequent
-      iterations).
+\item The X/Y padding pushed by [[RESIDENT_DISPATCH]] $\to$ [[VM_IP]]
+      (these values are meaningless and are immediately overwritten
+      by [[\texttt{.resume}]]).
 \end{enumerate}
 It then jumps through [[VM_OPERAND]], which points to
-[[\texttt{.resume}]] in [[RESIDENT_DISPATCH]].  This effectively
-``returns'' from [[PULL_TWO_RET_ADDRS]] while leaving the caller's
-return address (from [[JSR RESIDENT_DISPATCH]]) on the stack for
-[[\texttt{.resume}]] to pull into [[VM_IP]].
+[[\texttt{.resume}]] in [[RESIDENT_DISPATCH]].  This leaves the
+\emph{caller's} return address (from [[JSR RESIDENT_DISPATCH]]) as
+the top of the stack, which [[\texttt{.resume}]] pulls into [[VM_IP]]
+to derive the bytecode start address.
 
 <<pull two ret addrs>>=
     ORG     $0738
 PULL_TWO_RET_ADDRS:
     SUBROUTINE PULL_TWO_RET_ADDRS
-    PULB    VM_OPERAND              ; own return addr (low)
-    PULB    VM_OPERAND+1            ; own return addr (high)
-    PULB    VM_IP                   ; caller's return addr (low)
-    PULB    VM_IP+1                 ; caller's return addr (high)
-    INC     VM_IP
-    INC     VM_OPERAND
+    PULB    VM_OPERAND              ; pull own return addr lo
+    PULB    VM_OPERAND+1            ; pull own return addr hi
+    PULB    VM_IP                   ; pull X/Y padding lo (discarded by .resume)
+    PULB    VM_IP+1                 ; pull X/Y padding hi (discarded by .resume)
+    INC     VM_IP                   ; (meaningless — .resume overwrites VM_IP)
+    INC     VM_OPERAND              ; correct addr-1 to actual .resume addr
     BNE     .no_inc
     INC     VM_OPERAND+1
 .no_inc:
-    JMP     (VM_OPERAND)            ; jump through decoded addr
+    JMP     (VM_OPERAND)            ; jump to .resume in RESIDENT_DISPATCH
 @ %def PULL_TWO_RET_ADDRS
 
 @ Opcode \$08: VMCALL0 calls native code as a terminal jump.
