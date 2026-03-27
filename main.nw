@@ -4564,9 +4564,9 @@ BORDER_ANIM_SAVE:
 BORDER_ICON_CHARS:
     DC.B    $C4,$D3,$E9       ; icon character codes (D, S, i)
 BORDER_HANDLER_TABLE:
-    DC.W    $5B6D             ; handler pointer 0
-    DC.W    $5B8F             ; handler pointer 1
-    DC.W    $5B7E             ; handler pointer 2
+    DC.W    BORDER_HANDLER_A  ; handler pointer 0
+    DC.W    BORDER_HANDLER_B  ; handler pointer 1
+    DC.W    BORDER_HANDLER_C  ; handler pointer 2
 
     ; --- Border position table: 46 entries of (icon, col, row) ---
     ; Bottom border (row $13, columns $09-$12)
@@ -4644,6 +4644,15 @@ ANIM_INDEX:
     DC.B    $02                     ; current game speed / animation index
 @ %def ANIM_INDEX
 
+@ Runtime aliases for bytes within [[BORDER_ICON_CHARS]] ([[$5DC2]]):
+the border animation reuses these three bytes as loop variables during
+icon drawing.
+
+<<defines>>=
+BORDER_ICON_OFFSET      EQU     $5DC2   ; runtime: icon table offset (aliases BORDER_ICON_CHARS)
+BORDER_SWAP_FLAG        EQU     $5DC4   ; runtime: swap flag (aliases BORDER_ICON_CHARS+2)
+@ %def BORDER_ICON_OFFSET BORDER_SWAP_FLAG
+
 <<border animation>>=
     ORG     $5B2A
 GAME_ACTION_HANDLER:
@@ -4668,19 +4677,19 @@ GAME_ACTION_HANDLER:
     JSR     TICK_BORDER_ANIM  ; advance one position
 .new_pass:
     LDX     #$04              ; start at handler pair 2
-    STX     $5DC3             ; handler index
+    STX     BORDER_LOOP_CTR   ; handler index
 .handler_loop:
-    LDX     $5DC3
+    LDX     BORDER_LOOP_CTR
     LDA     BORDER_HANDLER_TABLE,X ; \ load handler pointer
-    STA     $F6               ;  | into DISPATCH_VEC
+    STA     DISPATCH_VEC      ;  | into DISPATCH_VEC
     INX                       ;  |
     LDA     BORDER_HANDLER_TABLE,X ;  |
-    STA     $F7               ; /
-    DEC     $5DC3             ; \ next handler pair
-    DEC     $5DC3             ; /
+    STA     DISPATCH_VEC+1    ; /
+    DEC     BORDER_LOOP_CTR   ; \ next handler pair
+    DEC     BORDER_LOOP_CTR   ; /
     JMP     TUNE_ADVANCE      ; play next note, returns via DISPATCH_VEC
 .check_pass:
-    LDA     $5DC3
+    LDA     BORDER_LOOP_CTR
     BPL     .handler_loop     ; more handlers -> continue
     DEC     BORDER_ANIM_SAVE  ; next pass
     BMI     .restart          ; all passes done -> restart from top
@@ -4728,15 +4737,15 @@ DRAW_BORDER_ICON_LIST:
 DRAW_BORDER_ICON_ENTRY:
     STA     $BE               ; \ set pointer
     STX     $BF               ; /
-    STY     $5DC2             ; save offset
+    STY     BORDER_ICON_OFFSET ; save offset
     LDA     #$00
-    STA     $5DC4             ; clear swap flag
+    STA     BORDER_SWAP_FLAG  ; clear swap flag
 .icon_loop:
-    LDY     $5DC2             ; current offset
-    LDA     $5DC4             ; swap flag
+    LDY     BORDER_ICON_OFFSET ; current offset
+    LDA     BORDER_SWAP_FLAG  ; swap flag
     BNE     .swap_restore     ; nonzero -> restore saved char
     LDA     ($BE),Y           ; read icon from table
-    STA     $5DC4             ; save it
+    STA     BORDER_SWAP_FLAG  ; save it
     BEQ     .skip             ; zero -> skip (empty)
     LDA     #$00
     STA     ($BE),Y           ; clear table entry
@@ -4746,11 +4755,11 @@ DRAW_BORDER_ICON_ENTRY:
     STA     ($BE),Y           ; restore saved icon
     JSR     DRAW_BORDER_CHAR_AT ; draw it
     LDA     #$00
-    STA     $5DC4             ; clear swap flag
+    STA     BORDER_SWAP_FLAG  ; clear swap flag
 .skip:
-    DEC     $5DC2             ; \ next entry (3 bytes per record)
-    DEC     $5DC2             ;  |
-    DEC     $5DC2             ; /
+    DEC     BORDER_ICON_OFFSET ; \ next entry (3 bytes per record)
+    DEC     BORDER_ICON_OFFSET ;  |
+    DEC     BORDER_ICON_OFFSET ; /
     BPL     .icon_loop
     RTS
 
@@ -4759,22 +4768,22 @@ DRAW_BORDER_CHAR_AT:
     STA     FONT_CHARNUM      ; set character to draw
     INY
     LDA     ($BE),Y           ; column
-    STA     $25               ; -> WNDWDTH (cursor column)
+    STA     TEXT_ROW          ; -> cursor column
     INY
     LDA     ($BE),Y           ; row
-    STA     $24               ; -> WNDTOP (cursor row)
-    JMP     $749A             ; render font char
+    STA     TEXT_COL          ; -> cursor row
+    JMP     RENDER_FONT_CHAR_DIRECT ; render font char
 
     ; --- Tick border animation: advance index, draw next position ---
 TICK_BORDER_ANIM:
     LDA     BORDER_ANIM_INDEX ; current position index
     STA     BORDER_POS_TABLE+27 ; save to restore later ($5DE6)
     LDY     BORDER_POS_TABLE+28 ; \ get col/row from next position
-    STY     $25               ;  |
+    STY     TEXT_ROW          ;  |
     LDY     BORDER_POS_TABLE+29 ;  |
-    STY     $24               ; /
+    STY     TEXT_COL          ; /
     STA     FONT_CHARNUM      ; draw border char
-    JSR     $749A
+    JSR     RENDER_FONT_CHAR_DIRECT
     INC     BORDER_ANIM_INDEX ; advance index
     LDA     BORDER_ANIM_INDEX
     CMP     #$16              ; past end?
@@ -4805,7 +4814,7 @@ ANIM_BORDER_ICONS_B:
     STA     $BE               ; \ set pointer
     STY     $BF               ; /
     PLA
-    JSR     $1317             ; RANDOM_IN_RANGE
+    JSR     RANDOM_IN_RANGE
     CMP     #$01
     BEQ     .random_ok
     BCC     .random_small
@@ -4824,19 +4833,19 @@ ANIM_BORDER_ICONS_B:
     STA     BORDER_POS_TABLE,X ; clear source entry
     INY
     LDA     ($BE),Y           ; column
-    STA     $25
+    STA     TEXT_ROW
     INY
     LDA     ($BE),Y           ; row
-    STA     $24
-    JSR     $749A             ; render
+    STA     TEXT_COL
+    JSR     RENDER_FONT_CHAR_DIRECT ; render
     LDA     #$00
     STA     FONT_CHARNUM
     LDX     BORDER_INITIAL_CHAR
     LDA     BORDER_POS_TABLE+1,X ; \ restore cursor from
-    STA     $25               ;  | adjacent table entry
+    STA     TEXT_ROW          ;  | adjacent table entry
     LDA     BORDER_POS_TABLE+2,X ;  |
-    STA     $24               ; /
-    JMP     $749A             ; render and return
+    STA     TEXT_COL          ; /
+    JMP     RENDER_FONT_CHAR_DIRECT ; render and return
 @ %def GAME_ACTION_HANDLER BORDER_HANDLER_A BORDER_HANDLER_B BORDER_HANDLER_C DRAW_BORDER_ICON_LIST DRAW_BORDER_ICON_ENTRY DRAW_BORDER_CHAR_AT TICK_BORDER_ANIM ANIM_BORDER_ICONS_A ANIM_BORDER_ICONS_B
 
 @ [[INIT_WORLD]] is a thin wrapper that passes a pointer to the world
@@ -11139,6 +11148,7 @@ PRINT_FONTCHAR_AT_TEXT_POS:
 .charset_ok:
     STX     CHAR_CHARSET                ; patch selector in control string
     ; --- Walk charset pages until charnum fits ---
+RENDER_FONT_CHAR_DIRECT:                ; entry: render from FONT_CHARNUM directly
     LDA     FONT_CHARNUM
 .check_range:
     BALT    #CHARS_PER_FONT_PAGE,.compute_glyphs ; < 24? fits in current page
@@ -11164,7 +11174,7 @@ PRINT_FONTCHAR_AT_TEXT_POS:
     ; --- Render via HRCG ---
     STOW    s_PRINT_FONT_CHAR,PRINT_STRING_ADDR ; aim string ptr at control string
     JMP     PRINT_STRING                ; HRCG renders the 2x2 block
-@ %def RENDER_FONT_CHAR PRINT_FONTCHAR_AT_TEXT_POS
+@ %def RENDER_FONT_CHAR RENDER_FONT_CHAR_DIRECT PRINT_FONTCHAR_AT_TEXT_POS
 @ \subsection{Font position to text position}
 
 [[FONT_POS_TO_TEXT_POS]] converts a logical font position ([[FONT_COL]],
