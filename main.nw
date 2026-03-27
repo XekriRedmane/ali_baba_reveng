@@ -22482,31 +22482,56 @@ resume a partially-executed program.
     ORG     $06B3
 RESIDENT_DISPATCH:
     SUBROUTINE RESIDENT_DISPATCH
-
+    ;
+    ; Called from RES_VM_LOOP via JSR RESIDENT_DISPATCH ($056C).
+    ; On entry, the 6502 stack contains (top shown right):
+    ;
+    ;   ... | $05 $6E |
+    ;          ^^^^^^^
+    ;   return addr from JSR RESIDENT_DISPATCH (= $056F - 1)
+    ;
     TXA                              ; \  push X and Y as stack padding
     PHA                              ;  | (values are irrelevant;
     TYA                              ;  |  PULL_TWO_RET_ADDRS needs
     PHA                              ; /  4 entries to consume)
-    JSR     PULL_TWO_RET_ADDRS       ; consume padding + own ret addr,
-                                     ; jump to .resume via (VM_OPERAND)
-
-    ; Control arrives here via JMP (VM_OPERAND):
+    ;
+    ; Stack: ... | $05 $6E | X | Y |
+    ;
+    JSR     PULL_TWO_RET_ADDRS       ; pushes $06B9 (.resume - 1)
+    ;
+    ; Stack at entry to PULL_TWO_RET_ADDRS:
+    ;   ... | $05 $6E | X | Y | $06 $B9 |
+    ;
+    ; PULL_TWO_RET_ADDRS pulls all 4 data bytes:
+    ;   $06/$B9 -> VM_OPERAND  (incremented to $06BA = .resume)
+    ;   Y/X     -> VM_IP       (discarded — overwritten below)
+    ; then JMP (VM_OPERAND) jumps here:
+    ;
+    ; Stack after PULL_TWO_RET_ADDRS:
+    ;   ... | $05 $6E |
+    ;
 .resume:
-    PULB    VM_IP                    ; pull caller's ret addr lo -> VM_IP
-    PULB    VM_IP+1                  ; pull caller's ret addr hi -> VM_IP+1
-
-    LDY     #$04                     ; skip 4 bytes past ret addr -> $0572
+    PULB    VM_IP                    ; pull $6E -> VM_IP (lo)
+    PULB    VM_IP+1                  ; pull $05 -> VM_IP+1 (hi)
+    ;                                ; VM_IP = $056E
+    ; Stack: ... |  (caller's ret addr consumed)
+    ;
+    LDY     #$04                     ; Y = 4
+    ;                                ; first fetch: (VM_IP),Y = *($056E+4) = *$0572
+    ;                                ; $0572 = RESIDENT_BYTECODES
+    ;
+    ; --- Fetch-decode-dispatch loop (handlers JMP back here) ---
 RESIDENT_DISPATCH_FETCH:
 .fetch:
-    LDA     (VM_IP),Y                ; read opcode
-    INY
+    LDA     (VM_IP),Y                ; read opcode byte
+    INY                              ; advance Y past opcode
     BNE     .no_carry
-    INC     VM_IP+1
+    INC     VM_IP+1                  ; handle page crossing
 .no_carry:
-    TAX                              ; opcode -> X (also saves position)
-    LDA     RESIDENT_DISPATCH_TABLE,X
-    STA     DECODE_DISPATCH_RELAY+1 ; patch JMP target low byte
-    JMP     DECODE_DISPATCH_RELAY   ; dispatch to handler via patched JMP
+    TAX                              ; opcode -> X
+    LDA     RESIDENT_DISPATCH_TABLE,X ; look up handler low byte
+    STA     DECODE_DISPATCH_RELAY+1   ; patch JMP target
+    JMP     DECODE_DISPATCH_RELAY     ; dispatch to handler
 @ %def RESIDENT_DISPATCH
 Opcode \$00 handler---the resident interpreter's GOTO instruction.
 Decodes an address and redirects execution there.
@@ -22628,16 +22653,30 @@ to derive the bytecode start address.
     ORG     $0738
 PULL_TWO_RET_ADDRS:
     SUBROUTINE PULL_TWO_RET_ADDRS
-    PULB    VM_OPERAND              ; pull own return addr lo
-    PULB    VM_OPERAND+1            ; pull own return addr hi
-    PULB    VM_IP                   ; pull X/Y padding lo (discarded by .resume)
-    PULB    VM_IP+1                 ; pull X/Y padding hi (discarded by .resume)
+    ;
+    ; On entry, the 6502 stack is (top shown right):
+    ;   ... | $05 $6E | X | Y | $06 $B9 |
+    ;          -------   ----   ---------
+    ;          caller's  pad    own ret addr
+    ;          ret addr        (= .resume - 1)
+    ;
+    PULB    VM_OPERAND              ; PLA -> $B9 -> VM_OPERAND
+    PULB    VM_OPERAND+1            ; PLA -> $06 -> VM_OPERAND+1
+    ;                               ; VM_OPERAND = $06B9
+    ;
+    ; Stack: ... | $05 $6E | X | Y |
+    ;
+    PULB    VM_IP                   ; PLA -> Y -> VM_IP   (padding; discarded)
+    PULB    VM_IP+1                 ; PLA -> X -> VM_IP+1 (padding; discarded)
+    ;
+    ; Stack: ... | $05 $6E |  (caller's ret addr remains)
+    ;
     INC     VM_IP                   ; (meaningless — .resume overwrites VM_IP)
-    INC     VM_OPERAND              ; correct addr-1 to actual .resume addr
+    INC     VM_OPERAND              ; $06B9 + 1 = $06BA = .resume
     BNE     .no_inc
     INC     VM_OPERAND+1
 .no_inc:
-    JMP     (VM_OPERAND)            ; jump to .resume in RESIDENT_DISPATCH
+    JMP     (VM_OPERAND)            ; JMP .resume ($06BA)
 @ %def PULL_TWO_RET_ADDRS
 
 @ Opcode \$08: VMCALL0 calls native code as a terminal jump.
