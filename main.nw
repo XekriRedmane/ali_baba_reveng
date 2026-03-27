@@ -843,7 +843,7 @@ disk drive motor for slot~6.
 SOFTEV          EQU     $03F2   ; reset vector (2 bytes)
 PWREDUP         EQU     $03F4   ; power-up byte (EOR of SOFTEV bytes)
 IWM_MOTORON     EQU     $C0E9   ; IWM motor on (slot-indexed)
-@ %def SOFTEV PWREDUP IWM_MOTORON
+@ %def SOFTEV PWREDUP
 
 @ [[BOOT1_ERROR_FLAG]] is set by [[BOOT1_LOAD_TRACK]] when a timeout occurs.
 
@@ -22149,6 +22149,7 @@ READ_DATA_FIELD_AD:
     CMP     #$AA              ; AA?
     BEQ     .ok               ; yes -> success
 
+RDF_VERIFY_SEC1:              ; $0560 — integrity-checked by copy-protection verifier
 .error:
     SEC                       ; carry set = error
     RTS
@@ -22157,9 +22158,10 @@ READ_DATA_FIELD_AD:
     RTS
 .abort:
     STA     RES_ABORT_NIBBLE  ; save nibble that caused abort
+RDF_VERIFY_SEC2:              ; $0567 — integrity-checked by copy-protection verifier
     SEC                       ; carry set = error
     RTS
-@ %def READ_DATA_FIELD READ_DATA_FIELD_AD
+@ %def READ_DATA_FIELD READ_DATA_FIELD_AD RDF_VERIFY_SEC1 RDF_VERIFY_SEC2
 
 This 321-byte region between [[ATTRACT_LOOP]] and [[CONTEXT_SWAP]]
 contains EALDR VM bytecodes interleaved with native 6502 routines.
@@ -22206,13 +22208,13 @@ RESIDENT_BYTECODES:
     ; with half-track seeks.  On failure, falls through to error display.
     ;
     ; Phase 1: verify three addresses match expected values
-    VMLD    $0560             ; check addr byte 1
+    VMLD    RDF_VERIFY_SEC1   ; check addr byte 1 (expect $38 = SEC)
     VMSUBI  $38
     VMBEQ   VM_RES_ERROR      ; mismatch -> error
-    VMLD    $0561             ; check addr byte 2
+    VMLD    RDF_VERIFY_SEC1+1 ; check addr byte 2 (expect $60 = RTS)
     VMSUBI  $60
     VMBEQ   VM_RES_ERROR
-    VMLD    $0567             ; check addr byte 3
+    VMLD    RDF_VERIFY_SEC2   ; check addr byte 3 (expect $38 = SEC)
     VMSUBI  $38
     VMBEQ   VM_RES_ERROR
     ;
@@ -22227,25 +22229,25 @@ RESIDENT_BYTECODES:
 .vm_pass2_ok:
     VMSUBI  $02               ; check error count
     VMBEQ   VM_RES_ERROR      ; too many errors -> fail
-    VMGOTO  $0572             ; retry from start
+    VMGOTO  RESIDENT_BYTECODES ; retry from start
 .vm_done:
-    VMCALL0 $06A6             ; exit via VM_EXIT_OK
+    VMCALL0 VM_EXIT_OK        ; exit via VM_EXIT_OK
 
     ; --- VM subroutine: read tracks with half-track seeks ---
 .vm_read_tracks:
-    VMLD    $C0E9             ; motor on
+    VMLD    IWM_MOTORON       ; motor on
     VMLDI   $FF               ; \ delay for motor spin-up
-    VMCALL1 $FCA8             ;  | (ROM WAIT routine)
+    VMCALL1 ROM_WAIT          ;  | (ROM WAIT routine)
     VMLDI   $FF               ;  |
-    VMCALL1 $FCA8             ; /
-    VMLD    $C0EE             ; set drive to read mode
+    VMCALL1 ROM_WAIT          ; /
+    VMLD    IWM_READMODE      ; set drive to read mode
     VMLDI   $00
     VMST    RES_ERROR_COUNT   ; clear error counter
     VMCALL  .vm_read_one      ; \ read 4 sectors at
     VMCALL  .vm_read_one      ;  | different half-track
     VMCALL  .vm_read_one      ;  | positions
     VMCALL  .vm_read_one      ; /
-    VMLD    $C0E8             ; motor off
+    VMLD    IWM_MOTOROFF      ; motor off
     VMLD    RES_ERROR_COUNT+1 ; return error status
     VMRET
 
@@ -22254,18 +22256,18 @@ RESIDENT_BYTECODES:
     VMLDI   $03
     VMST    RES_RETRY_COUNT ; 3 retries
     VMCALL1 READ_AND_VERIFY_RES ; read sector
-    VMLD    $C0E7             ; \ seek: toggle phases
+    VMLD    IWM_PH3_ON        ; \ seek: toggle phases
     VMCALL1 READ_AND_VERIFY_RES ;  | for half-track
     VMCALL1 READ_AND_VERIFY_RES ; /
-    VMLD    $C0E1             ; phase 0 on
+    VMLD    IWM_PH0_ON        ; phase 0 on
     VMCALL  .vm_seek_delay
     VMLDI   $03
     VMST    RES_RETRY_COUNT
     VMCALL1 READ_AND_VERIFY_RES
-    VMLD    $C0E7             ; \ more phase toggling
+    VMLD    IWM_PH3_ON        ; \ more phase toggling
     VMCALL1 READ_AND_VERIFY_RES ;  |
     VMCALL1 READ_AND_VERIFY_RES ; /
-    VMLD    $C0E5             ; phase 2 on
+    VMLD    IWM_PH2_ON        ; phase 2 on
     VMCALL  .vm_seek_delay
     VMRET
 
@@ -22334,20 +22336,20 @@ READ_AND_VERIFY_RES:
     LDA     #$00
     ADC     RES_ERROR_COUNT   ; accumulate errors
     STA     RES_ERROR_COUNT
-    LDA     $C0E0             ; \ reset drive phases
-    LDA     $C0E2             ;  |
-    LDA     $C0E4             ;  |
-    LDA     $C0E6             ; /
+    LDA     IWM_PH0_OFF       ; \ reset drive phases
+    LDA     IWM_PH1_OFF       ;  |
+    LDA     IWM_PH2_OFF       ;  |
+    LDA     IWM_PH3_OFF       ; /
     RTS
 
     ; --- VM bytecodes: seek delay subroutine ---
 .vm_seek_delay:
     VMLDI   $70               ; delay count
     VMCALL1 DELAY_RES         ; delay
-    VMLD    $C0E0             ; \ toggle phases for
-    VMLD    $C0E2             ;  | half-track positioning
-    VMLD    $C0E4             ;  |
-    VMLD    $C0E6             ; /
+    VMLD    IWM_PH0_OFF       ; \ toggle phases for
+    VMLD    IWM_PH1_OFF       ;  | half-track positioning
+    VMLD    IWM_PH2_OFF       ;  |
+    VMLD    IWM_PH3_OFF       ; /
     VMLDI   $28               ; shorter delay
     VMCALL1 DELAY_RES
     VMRET
@@ -22365,14 +22367,14 @@ DELAY_RES:
 
     ; --- VM bytecodes: error display loop ---
 VM_RES_ERROR:
-    VMST    $0400             ; write char to screen
-    VMLDX   $068E             ; load from table (self-ref)
+    VMST    TEXT_PAGE1        ; write char to screen ($0400)
+    VMLDX   $068E             ; load from self-ref byte (VMST operand low)
     VMBEQ   VM_RES_ERROR      ; zero -> loop
-    VMLD    $068F             ; load addr
-    VMCALL1 $06B0             ; decrypt high byte
+    VMLD    $068F             ; load self-ref byte (VMLDX opcode)
+    VMCALL1 DECRYPT_HIGH_BYTE ; decrypt high byte
     VMSUBI  $FF               ; adjust
-    VMCALL1 $06B0             ; decrypt again
-    VMST    $068F             ; store back
+    VMCALL1 DECRYPT_HIGH_BYTE ; decrypt again
+    VMST    $068F             ; store back (advance screen pointer)
     VMGOTO  VM_RES_ERROR      ; infinite error loop
 ;
 ; $06A6-$06B2: Native utility routines
@@ -22784,8 +22786,19 @@ from this register in a tight loop while searching for the D5~AA~AD
 prologue and verifying the data field contents.
 
 <<defines>>=
+IWM_MOTORON             EQU     $C0E9   ; drive motor on
+IWM_PH0_OFF             EQU     $C0E0   ; stepper phase 0 off
+IWM_PH0_ON              EQU     $C0E1   ; stepper phase 0 on
+IWM_PH1_OFF             EQU     $C0E2   ; stepper phase 1 off
+IWM_PH2_OFF             EQU     $C0E4   ; stepper phase 2 off
+IWM_PH2_ON              EQU     $C0E5   ; stepper phase 2 on
+IWM_PH3_OFF             EQU     $C0E6   ; stepper phase 3 off
+IWM_PH3_ON              EQU     $C0E7   ; stepper phase 3 on (seek trigger)
+IWM_MOTOROFF            EQU     $C0E8   ; drive motor off
+IWM_READMODE            EQU     $C0EE   ; set drive to read mode
 DISK_DATA_REG           EQU     $C0EC   ; disk controller data register (active slot)
-@ %def DISK_DATA_REG
+TEXT_PAGE1              EQU     $0400   ; Apple II text screen page 1
+@ %def IWM_MOTORON IWM_PH0_OFF IWM_PH0_ON IWM_PH1_OFF IWM_PH2_OFF IWM_PH2_ON IWM_PH3_OFF IWM_PH3_ON IWM_MOTOROFF IWM_READMODE DISK_DATA_REG TEXT_PAGE1
 
 <<verify data field>>=
     ORG     $B304
