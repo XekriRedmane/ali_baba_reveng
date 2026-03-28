@@ -614,6 +614,104 @@ the two instructions as a one-liner.
     ENDM
 @ %def BAEQ, BANE, BAPL, BAMI, BALT, BAGE, BXEQ, BXNE, BYEQ, BYNE
 
+@ \paragraph{Event list macros.}  Each location has a variable-length event
+list of 3-byte entries (see \S\ref{sec:event-format}).  The following macros
+encode those entries, replacing raw [[HEX]] triples with readable forms.
+Map positions are given as separate row and column arguments; the macro
+packs them as $20 \times \mathit{row} + \mathit{col}$.
+
+[[EVSTOP]] marks the end of the list.  [[EVDATA]] encodes an empty slot
+with two raw data bytes.
+
+<<Macros>>=
+    ; --- Event list end marker ---
+    MACRO EVSTOP
+        HEX FF FF FF
+    ENDM
+
+    ; --- Empty slot with raw data bytes ---
+    MACRO EVDATA           ; {1}=byte1, {2}=byte2
+        DC.B $FE, {1}, {2}
+    ENDM
+
+@ [[EVRAND]] encodes a random encounter (\$00--\$3F).  The avoidance
+check is always the character's strength (bits~4--0 of field~5) out
+of~20---there is no per-event probability.  The \texttt{id} argument
+(0--\$3F) is a \emph{deferred encounter~ID}: if the character avoids
+the encounter, [[HANDLE_ENCOUNTER]] sets bit~6 of byte~1 (\texttt{ORA
+\#\$40}), mutating the event in-place into a specific encounter
+([[EVENCO]]) with that~ID.  On the character's next visit, the event
+fires as a specific encounter rather than a random one.  The spawn
+position (sr, sc) is where the mob appears when the encounter
+eventually triggers.
+
+[[EVENCO]] encodes a specific encounter (\$40--\$BF).  The mob index
+(0--\$7F) is offset by \$40 automatically.
+
+<<Macros>>=
+    ; --- Random encounter: id=$00-$3F (deferred encounter ID), spawn at (sr,sc) ---
+    MACRO EVRAND           ; {1}=row, {2}=col, {3}=id, {4}=spawn row, {5}=spawn col
+        DC.B 20*{1}+{2}, {3}, 20*{4}+{5}
+    ENDM
+
+    ; --- Specific encounter: mob index 0-$7F, spawn at (sr,sc) ---
+    MACRO EVENCO           ; {1}=row, {2}=col, {3}=mob, {4}=spawn row, {5}=spawn col
+        DC.B 20*{1}+{2}, {3}+$40, 20*{4}+{5}
+    ENDM
+
+@ [[EVGOLD]] encodes dropped treasure (\$C0--\$D1).  The gold amount
+(0--4607) is split across bytes~1 and~2: byte~1~=~(gold~$\gg$~8)~+~\$C0,
+byte~2~=~gold~\&~\$FF.
+
+<<Macros>>=
+    ; --- Dropped treasure: gold amount 0-4607 ---
+    MACRO EVGOLD           ; {1}=row, {2}=col, {3}=gold
+        DC.B 20*{1}+{2}, [[{3}]>>8]+$C0, [{3}]&$FF
+    ENDM
+
+@ [[EVPSCN]] encodes a persistent scene event (\$D2)---the scene remains
+active after triggering.  [[EV1SCN]] encodes a one-time scene (\$D3)---the
+slot is cleared to \$FE after the scene plays.  [[EVISCN]] encodes a scene
+with item drops (\$D4)---like [[EV1SCN]] but also spawns 1--4 bonus items.
+
+<<Macros>>=
+    ; --- Persistent scene (stays active) ---
+    MACRO EVPSCN           ; {1}=row, {2}=col, {3}=scene ID
+        DC.B 20*{1}+{2}, $D2, {3}
+    ENDM
+
+    ; --- One-time scene (cleared after trigger) ---
+    MACRO EV1SCN           ; {1}=row, {2}=col, {3}=scene ID
+        DC.B 20*{1}+{2}, $D3, {3}
+    ENDM
+
+    ; --- Scene + item drops ---
+    MACRO EVISCN           ; {1}=row, {2}=col, {3}=scene ID
+        DC.B 20*{1}+{2}, $D4, {3}
+    ENDM
+
+@ [[EVSHOP]] encodes a shop or map/area event (\$D5--\$DA).  The type
+byte is passed directly (\$D5~=~weapons, \$D6~=~armor, etc.) and the
+mask is the 8-bit item availability bitmask.
+
+[[EVSLOT]] places an interactable empty-slot object (\$FE) at a map
+position.  The data byte's top two bits select the interaction category
+(see [[HANDLE_EVENT_SLOT]]): \$00~=~trap/message, \$40+~=~treasure
+chest, \$C0~=~activated event.
+
+<<Macros>>=
+    ; --- Shop/map event: type=$D5-$DA, mask=item availability ---
+    MACRO EVSHOP           ; {1}=row, {2}=col, {3}=type, {4}=mask
+        DC.B 20*{1}+{2}, {3}, {4}
+    ENDM
+
+    ; --- Interactable empty slot at a map position ---
+    MACRO EVSLOT           ; {1}=row, {2}=col, {3}=data byte
+        DC.B 20*{1}+{2}, $FE, {3}
+    ENDM
+
+@ %def EVSTOP EVDATA EVRAND EVENCO EVGOLD EVPSCN EV1SCN EVISCN EVSHOP EVSLOT
+
 \section{The APSTR postprocessor}
 
 Ali Baba uses Pascal-formatted strings. This means that string data has one length byte, then that number
@@ -9534,6 +9632,8 @@ s_ASTROLOGERS_MAZE:
 @ %def LOCATION_NAMES
 \label{sec:event-format}
 
+\section{Event records}
+
 Each location has a variable-length event list pointed to by
 [[EVENT_PTR]] (location record fields~6--7).  Entries are 3~bytes each,
 terminated by [[$FF]] followed by two [[$FF]] padding bytes.  Each
@@ -9552,8 +9652,8 @@ The top two bits select the category:
 \begin{tabular}{lll}
 \textbf{Byte~1 range} & \textbf{Category} & \textbf{Details} \\
 \hline
-\$00--\$3F & Random encounter & Probability check vs.\ character stat; \\
-           &                  & on fail, bit~6 is set $\to$ becomes specific encounter \\
+\$00--\$3F & Random encounter & Avoidance = strength/20 (no per-event prob); \\
+           &                  & if avoided, bit~6 set $\to$ deferred specific encounter \\
 \$40--\$BF & Specific encounter & bits~5--0 = mob index $\to$ [[ACTIVE_CHAR]] \\
 \$C0--\$D1 & Dropped treasure & gold = ((\texttt{byte1} $-$ \$C0) $\times$ 256) + \texttt{byte2} \\
 \$D2       & Persistent scene & \texttt{byte2} = scene ID; not cleared after trigger \\
@@ -9588,352 +9688,759 @@ For scene events (\$D2--\$D4), a scene/event~ID.
     ORG     $451E
 LOCATION_EVENTS:
 ev_ali_baba_home:                       ; 0: ALI BABA HOME
-    HEX FE 00 00 83 82 6F FF FF FF
+    EVDATA $00,$00
+    EVENCO 6,11,$42,5,11
+    EVSTOP
 
 ev_dusty_road:                          ; 1: DUSTY ROAD
-    HEX FE 00 00 6B 03 6A 45 04 31
-    HEX 83 81 97 4B 04 37 73 D4 48
-    HEX 8A 91 1E 63 9F 3E FF FF FF
+    EVDATA $00,$00
+    EVRAND 5,7,$03,5,6
+    EVRAND 3,9,$04,2,9
+    EVENCO 6,11,$41,7,11
+    EVRAND 3,15,$04,2,15
+    EVISCN 5,15,$48
+    EVENCO 6,18,$51,1,10
+    EVENCO 4,19,$5F,3,2
+    EVSTOP
 
 ev_sultans_palace:                      ; 2: SULTAN'S PALACE
-    HEX FE 00 00 1B 44 1C 51 C0 19
-    HEX 65 D4 4C 65 79 5C 79 C0 2D
-    HEX 69 D3 46 6B 42 6C FF FF FF
+    EVDATA $00,$00
+    EVENCO 1,7,$04,1,8
+    EVGOLD 4,1,25
+    EVISCN 5,1,$4C
+    EVENCO 5,1,$39,4,12
+    EVGOLD 6,1,45
+    EV1SCN 5,5,$46
+    EVENCO 5,7,$02,5,8
+    EVSTOP
 
 ev_royal_library:                       ; 3: ROYAL LIBRARY
-    HEX FE 00 00 1B 43 1A 1D D2 47
-    HEX 45 02 59 1F D2 51 21 D2 5E
-    HEX 23 D2 5C 4B 02 5F FF FF FF
+    EVDATA $00,$00
+    EVENCO 1,7,$03,1,6
+    EVPSCN 1,9,$47
+    EVRAND 3,9,$02,4,9
+    EVPSCN 1,11,$51
+    EVPSCN 1,13,$5E
+    EVPSCN 1,15,$5C
+    EVRAND 3,15,$02,4,15
+    EVSTOP
 
 ev_astrologers_lab:                     ; 4: ASTROLOGER'S LAB
-    HEX FE 00 00 FE 00 00 04 75 8E
-    HEX 07 74 92 0A 73 96 0C 72 99
-    HEX 0F 71 9D 3F 36 37 46 D2 56
-    HEX 4C 70 29 7B 77 9B 88 6F 8D
-    HEX B8 6C 2A BB 2B 2E BF 6D 34
-    HEX C3 6E 38 FF FF FF
+    EVDATA $00,$00
+    EVDATA $00,$00
+    EVENCO 0,4,$35,7,2
+    EVENCO 0,7,$34,7,6
+    EVENCO 0,10,$33,7,10
+    EVENCO 0,12,$32,7,13
+    EVENCO 0,15,$31,7,17
+    EVRAND 3,3,$36,2,15
+    EVPSCN 3,10,$56
+    EVENCO 3,16,$30,2,1
+    EVENCO 6,3,$37,7,15
+    EVENCO 6,16,$2F,7,1
+    EVENCO 9,4,$2C,2,2
+    EVRAND 9,7,$2B,2,6
+    EVENCO 9,11,$2D,2,12
+    EVENCO 9,15,$2E,2,16
+    EVSTOP
 
 ev_bear_cave:                           ; 5: BEAR CAVE
-    HEX FE 00 00 19 FE 1F 1C FE DF
-    HEX 28 BA 37 2D FE 1F 2E C0 96
-    HEX 30 FE 1F 42 FE 1F 43 FE 1F
-    HEX 20 C0 64 70 47 84 FF FF FF
+    EVDATA $00,$00
+    EVSLOT 1,5,$1F
+    EVSLOT 1,8,$DF
+    EVENCO 2,0,$7A,2,15
+    EVSLOT 2,5,$1F
+    EVGOLD 2,6,150
+    EVSLOT 2,8,$1F
+    EVSLOT 3,6,$1F
+    EVSLOT 3,7,$1F
+    EVGOLD 1,12,100
+    EVENCO 5,12,$07,6,12
+    EVSTOP
 
 ev_rats_nest:                           ; 6: RATS NEST
-    HEX FE 00 00 70 46 5C 78 BA 87
-    HEX 90 C0 32 FF FF FF
+    EVDATA $00,$00
+    EVENCO 5,12,$06,4,12
+    EVENCO 6,0,$7A,6,15
+    EVGOLD 7,4,50
+    EVSTOP
 
 ev_dragon_lair:                         ; 7: DRAGON LAIR
-    HEX FE 00 00 55 0A 41 A5 C1 2C
-    HEX A9 89 AA FF FF FF
+    EVDATA $00,$00
+    EVRAND 4,5,$0A,3,5
+    EVGOLD 8,5,300
+    EVENCO 8,9,$49,8,10
+    EVSTOP
 
 ev_gold_for_the_lucky:                  ; 8: GOLD FOR THE LUCKY
-    HEX FE 00 00 5D 0A 49 98 FE 1F
-    HEX 99 FE 1F 9A D3 59 A9 88 A8
-    HEX AB FE 1F AD C0 32 AD C1 F4
-    HEX AE FE 1F C1 AC 2B FF FF FF
+    EVDATA $00,$00
+    EVRAND 4,13,$0A,3,13
+    EVSLOT 7,12,$1F
+    EVSLOT 7,13,$1F
+    EV1SCN 7,14,$59
+    EVENCO 8,9,$48,8,8
+    EVSLOT 8,11,$1F
+    EVGOLD 8,13,50
+    EVGOLD 8,13,500
+    EVSLOT 8,14,$1F
+    EVENCO 9,13,$6C,2,3
+    EVSTOP
 
 ev_save_the_whales:                     ; 9: SAVE THE WHALES
-    HEX FE 00 00 05 4E A5 0E 50 AE
-    HEX 1D FE D6 2A A9 23 30 FE D6
-    HEX 32 FE D6 45 FE D6 31 FE 95
-    HEX 31 D4 5A 31 C9 56 55 08 69
-    HEX 37 D6 E0 5D 09 85 FF FF FF
+    EVDATA $00,$00
+    EVENCO 0,5,$0E,8,5
+    EVENCO 0,14,$10,8,14
+    EVSLOT 1,9,$D6
+    EVENCO 2,2,$69,1,15
+    EVSLOT 2,8,$D6
+    EVSLOT 2,10,$D6
+    EVSLOT 3,9,$D6
+    EVSLOT 2,9,$95
+    EVISCN 2,9,$5A
+    EVGOLD 2,9,2390
+    EVRAND 4,5,$08,5,5
+    EVSHOP 2,15,$D6,$E0
+    EVRAND 4,13,$09,6,13
+    EVSTOP
 
 ev_slide:                               ; 10: SLIDE
-    HEX 2A D3 5D 66 C0 64 02 BE 7E
-    HEX 3E 8B 52 66 8B 7A 8E 8B A2
-    HEX B6 8D 83 FF FF FF
+    EV1SCN 2,2,$5D
+    EVGOLD 5,2,100
+    EVENCO 0,2,$7E,6,6
+    EVENCO 3,2,$4B,4,2
+    EVENCO 5,2,$4B,6,2
+    EVENCO 7,2,$4B,8,2
+    EVENCO 9,2,$4D,6,11
+    EVSTOP
 
 ev_deep_dark_stairway:                  ; 11: DEEP DARK STAIRWAY
-    HEX FE 00 00 18 A2 90 2E FE 1F
-    HEX 2F FE 9F 30 FE 1F 43 FE 9F
-    HEX 44 FE 1F 54 FE 1F 58 FE 1F
-    HEX 68 FE 1F 69 FE 9F 7C FE 1F
-    HEX 7D FE 9F 7E FE 1F 6D 8D 54
-    HEX 81 8D 68 93 13 29 FF FF FF
+    EVDATA $00,$00
+    EVENCO 1,4,$62,7,4
+    EVSLOT 2,6,$1F
+    EVSLOT 2,7,$9F
+    EVSLOT 2,8,$1F
+    EVSLOT 3,7,$9F
+    EVSLOT 3,8,$1F
+    EVSLOT 4,4,$1F
+    EVSLOT 4,8,$1F
+    EVSLOT 5,4,$1F
+    EVSLOT 5,5,$9F
+    EVSLOT 6,4,$1F
+    EVSLOT 6,5,$9F
+    EVSLOT 6,6,$1F
+    EVENCO 5,9,$4D,4,4
+    EVENCO 6,9,$4D,5,4
+    EVRAND 7,7,$13,2,1
+    EVSTOP
 
 ev_minotaur_labyrinth:                  ; 12: MINOTAUR LABYRINTH
-    HEX FE 00 00 19 FE DF 1E 8D 1D
-    HEX 1F C0 4B 23 AA 29 2E 8D 19
-    HEX 33 FE 1F 34 FE DF 35 FE 1F
-    HEX 36 FE 1F 37 FE 1F 40 FE DF
-    HEX 43 FE 1F 46 FE 1F 53 8C 6C
-    HEX 55 D3 5F 55 FE DF 58 FE 1F
-    HEX 59 FE DF 5E FE 12 60 A7 51
-    HEX 67 8C 80 68 8D 2C 6A FE 1F
-    HEX 6D 8D 6C 6E 8D 5A 6F FE 1F
-    HEX 71 FE C0 71 FE DA 71 FE 1F
-    HEX 7D 8D 83 7E FE C0 7E 99 AB
-    HEX 80 FE DF 82 8D 81 84 FE 1F
-    HEX 90 FE 04 93 8D 92 94 FE 1F
-    HEX 95 FE 1F 96 FE 9F 97 FE 1F
-    HEX 99 FE 9E 9A FE 1F A5 C0 7D
-    HEX A7 8D 93 A8 A1 1C A9 FE DB
-    HEX AE FE 1E FF FF FF
+    EVDATA $00,$00
+    EVSLOT 1,5,$DF
+    EVENCO 1,10,$4D,1,9
+    EVGOLD 1,11,75
+    EVENCO 1,15,$6A,2,1
+    EVENCO 2,6,$4D,1,5
+    EVSLOT 2,11,$1F
+    EVSLOT 2,12,$DF
+    EVSLOT 2,13,$1F
+    EVSLOT 2,14,$1F
+    EVSLOT 2,15,$1F
+    EVSLOT 3,4,$DF
+    EVSLOT 3,7,$1F
+    EVSLOT 3,10,$1F
+    EVENCO 4,3,$4C,5,8
+    EV1SCN 4,5,$5F
+    EVSLOT 4,5,$DF
+    EVSLOT 4,8,$1F
+    EVSLOT 4,9,$DF
+    EVSLOT 4,14,$12
+    EVENCO 4,16,$67,4,1
+    EVENCO 5,3,$4C,6,8
+    EVENCO 5,4,$4D,2,4
+    EVSLOT 5,6,$1F
+    EVENCO 5,9,$4D,5,8
+    EVENCO 5,10,$4D,4,10
+    EVSLOT 5,11,$1F
+    EVSLOT 5,13,$C0
+    EVSLOT 5,13,$DA
+    EVSLOT 5,13,$1F
+    EVENCO 6,5,$4D,6,11
+    EVSLOT 6,6,$C0
+    EVENCO 6,6,$59,8,11
+    EVSLOT 6,8,$DF
+    EVENCO 6,10,$4D,6,9
+    EVSLOT 6,12,$1F
+    EVSLOT 7,4,$04
+    EVENCO 7,7,$4D,7,6
+    EVSLOT 7,8,$1F
+    EVSLOT 7,9,$1F
+    EVSLOT 7,10,$9F
+    EVSLOT 7,11,$1F
+    EVSLOT 7,13,$9E
+    EVSLOT 7,14,$1F
+    EVGOLD 8,5,125
+    EVENCO 8,7,$4D,7,7
+    EVENCO 8,8,$61,1,8
+    EVSLOT 8,9,$DB
+    EVSLOT 8,14,$1E
+    EVSTOP
 
 ev_stinger_strewn_cell:                 ; 13: STINGER STREWN CELL
-    HEX FE 00 00 6A 0F 56 94 59 96
-    HEX A4 C0 E4 B9 0A 19 FF FF FF
+    EVDATA $00,$00
+    EVRAND 5,6,$0F,4,6
+    EVENCO 7,8,$19,7,10
+    EVGOLD 8,4,228
+    EVRAND 9,5,$0A,1,5
+    EVSTOP
 
 ev_guard_room:                          ; 14: GUARD ROOM
-    HEX FE 00 00 09 26 A8 6A 4E 7E
-    HEX 71 50 85 FF FF FF
+    EVDATA $00,$00
+    EVRAND 0,9,$26,8,8
+    EVENCO 5,6,$0E,6,6
+    EVENCO 5,13,$10,6,13
+    EVSTOP
 
 ev_long_way_from_home:                  ; 15: LONG WAY FROM HOME
-    HEX FE 00 00 71 0F 5D 97 59 98
-    HEX AF C0 88 C2 0A 22 FF FF FF
+    EVDATA $00,$00
+    EVRAND 5,13,$0F,4,13
+    EVENCO 7,11,$19,7,12
+    EVGOLD 8,15,136
+    EVRAND 9,14,$0A,1,14
+    EVSTOP
 
 ev_forest:                              ; 16: FOREST
-    HEX FE 00 00 0A 82 76 17 C0 03
-    HEX 2E D5 90 67 D6 58 33 FE 1F
-    HEX 3F FE 1F 40 FE 1F 45 FE 1F
-    HEX 46 FE 1F 6B FE 1F 7C FE 1F
-    HEX 7F FE 1F 95 FE 1F A1 C0 2F
-    HEX A9 FE 1F 85 92 86 AD 9E 29
-    HEX FF FF FF
+    EVDATA $00,$00
+    EVENCO 0,10,$42,5,18
+    EVGOLD 1,3,3
+    EVSHOP 2,6,$D5,$90
+    EVSHOP 5,3,$D6,$58
+    EVSLOT 2,11,$1F
+    EVSLOT 3,3,$1F
+    EVSLOT 3,4,$1F
+    EVSLOT 3,9,$1F
+    EVSLOT 3,10,$1F
+    EVSLOT 5,7,$1F
+    EVSLOT 6,4,$1F
+    EVSLOT 6,7,$1F
+    EVSLOT 7,9,$1F
+    EVGOLD 8,1,47
+    EVSLOT 8,9,$1F
+    EVENCO 6,13,$52,6,14
+    EVENCO 8,13,$5E,2,1
+    EVSTOP
 
 ev_view_from_a_tree:                    ; 17: VIEW FROM A TREE
-    HEX FE 00 00 24 95 A5 37 FE 1F
-    HEX 38 FE DF 39 FE 1F 4C D2 4E
-    HEX 85 91 84 9C 9E 2B FF FF FF
+    EVDATA $00,$00
+    EVENCO 1,16,$55,8,5
+    EVSLOT 2,15,$1F
+    EVSLOT 2,16,$DF
+    EVSLOT 2,17,$1F
+    EVPSCN 3,16,$4E
+    EVENCO 6,13,$51,6,12
+    EVENCO 7,16,$5E,2,3
+    EVSTOP
 
 ev_failing_wall:                        ; 18: FAILING WALL
-    HEX FE 00 00 31 FE 9E 44 FE 1E
-    HEX 57 FE 1E 6A FE 1E 7E FE 1E
-    HEX 91 FE C0 91 CA 2C 92 FE 1E
-    HEX 8F D5 46 6C FE 19 72 54 6A
-    HEX FF FF FF
+    EVDATA $00,$00
+    EVSLOT 2,9,$9E
+    EVSLOT 3,8,$1E
+    EVSLOT 4,7,$1E
+    EVSLOT 5,6,$1E
+    EVSLOT 6,6,$1E
+    EVSLOT 7,5,$C0
+    EVGOLD 7,5,2604
+    EVSLOT 7,6,$1E
+    EVSHOP 7,3,$D5,$46
+    EVSLOT 5,8,$19
+    EVENCO 5,14,$14,5,6
+    EVSTOP
 
 ev_minotaur_playroom:                   ; 19: MINOTAUR PLAYROOM
-    HEX FE 00 00 6B FE 19 97 C0 C8
-    HEX 38 94 38 4C 94 4C 61 94 61
-    HEX 76 94 76 26 67 A3 FF FF FF
+    EVDATA $00,$00
+    EVSLOT 5,7,$19
+    EVGOLD 7,11,200
+    EVENCO 2,16,$54,2,16
+    EVENCO 3,16,$54,3,16
+    EVENCO 4,17,$54,4,17
+    EVENCO 5,18,$54,5,18
+    EVENCO 1,18,$27,8,3
+    EVSTOP
 
 ev_thieves_cave:                        ; 20: THIEVES CAVE
-    HEX 1A C9 AF 1D C0 1E 20 C0 3C
-    HEX 60 1B 68 7C D3 50 7D FE 1F
-    HEX 7E FE 1F 92 FE 1F A5 D2 4F
-    HEX A6 FE 1F A9 C0 0A AC C9 C8
-    HEX AF C0 19 B9 92 4C FF FF FF
+    EVGOLD 1,6,2479
+    EVGOLD 1,9,30
+    EVGOLD 1,12,60
+    EVRAND 4,16,$1B,5,4
+    EV1SCN 6,4,$50
+    EVSLOT 6,5,$1F
+    EVSLOT 6,6,$1F
+    EVSLOT 7,6,$1F
+    EVPSCN 8,5,$4F
+    EVSLOT 8,6,$1F
+    EVGOLD 8,9,10
+    EVGOLD 8,12,2504
+    EVGOLD 8,15,25
+    EVENCO 9,5,$52,3,16
+    EVSTOP
 
 ev_o:                                   ; 21: O
-    HEX FE 00 00 5C D3 57 82 56 83
-    HEX 73 C0 2D 74 FE 89 8A 58 2A
-    HEX FF FF FF
+    EVDATA $00,$00
+    EV1SCN 4,12,$57
+    EVENCO 6,10,$16,6,11
+    EVGOLD 5,15,45
+    EVSLOT 5,16,$89
+    EVENCO 6,18,$18,2,2
+    EVSTOP
 
 ev_spiral_staircase:                    ; 22: SPIRAL STAIRCASE
-    HEX FE 00 00 1D 7E 23 44 FE 1F
-    HEX 45 FE 1F 6B FE 1F 6C FE 1F
-    HEX 93 18 38 FF FF FF
+    EVDATA $00,$00
+    EVENCO 1,9,$3E,1,15
+    EVSLOT 3,8,$1F
+    EVSLOT 3,9,$1F
+    EVSLOT 5,7,$1F
+    EVSLOT 5,8,$1F
+    EVRAND 7,7,$18,2,16
+    EVSTOP
 
 ev_y:                                   ; 23: Y
-    HEX FE 00 00 24 57 7F 81 FE 1F
-    HEX 82 FE 1F 83 FE 1F 97 FE DF
-    HEX 95 5A 31 96 C9 E6 FF FF FF
+    EVDATA $00,$00
+    EVENCO 1,16,$17,6,7
+    EVSLOT 6,9,$1F
+    EVSLOT 6,10,$1F
+    EVSLOT 6,11,$1F
+    EVSLOT 7,11,$DF
+    EVENCO 7,9,$1A,2,9
+    EVGOLD 7,10,2534
+    EVSTOP
 
 ev_magic_tourbillion:                   ; 24: MAGIC TOURBILLION
-    HEX FE 00 00 83 C0 64 97 80 97
-    HEX 82 D5 92 84 D6 A8 FF FF FF
+    EVDATA $00,$00
+    EVGOLD 6,11,100
+    EVENCO 7,11,$40,7,11
+    EVSHOP 6,10,$D5,$92
+    EVSHOP 6,12,$D6,$A8
+    EVSTOP
 
 ev_g:                                   ; 25: G.
-    HEX FE 00 00 31 A2 90 8D 1C 39
-    HEX 97 C0 46 FF FF FF
+    EVDATA $00,$00
+    EVENCO 2,9,$62,7,4
+    EVRAND 7,1,$1C,2,17
+    EVGOLD 7,11,70
+    EVSTOP
 
 ev_crystal_cave:                        ; 26: CRYSTAL CAVE
-    HEX 31 BA AF 42 FE C0 42 C0 23
-    HEX 5C FE C0 5C C0 19 67 15 5F
-    HEX 6D C0 19 6D FE C0 6D FE C0
-    HEX 6D C0 32 72 FE C0 72 FE C0
-    HEX 72 C0 1E 73 BE 54 90 FE C0
-    HEX 90 FE C0 90 C0 32 94 D3 4D
-    HEX 94 FE C0 94 C0 23 A8 24 2D
-    HEX 84 FE C0 84 FE C0 84 FE C0
-    HEX 84 C0 46 FF FF FF
+    EVENCO 2,9,$7A,8,15
+    EVSLOT 3,6,$C0
+    EVGOLD 3,6,35
+    EVSLOT 4,12,$C0
+    EVGOLD 4,12,25
+    EVRAND 5,3,$15,4,15
+    EVGOLD 5,9,25
+    EVSLOT 5,9,$C0
+    EVSLOT 5,9,$C0
+    EVGOLD 5,9,50
+    EVSLOT 5,14,$C0
+    EVSLOT 5,14,$C0
+    EVGOLD 5,14,30
+    EVENCO 5,15,$7E,4,4
+    EVSLOT 7,4,$C0
+    EVSLOT 7,4,$C0
+    EVGOLD 7,4,50
+    EV1SCN 7,8,$4D
+    EVSLOT 7,8,$C0
+    EVGOLD 7,8,35
+    EVRAND 8,8,$24,2,5
+    EVSLOT 6,12,$C0
+    EVSLOT 6,12,$C0
+    EVSLOT 6,12,$C0
+    EVGOLD 6,12,70
+    EVSTOP
 
 ev_b:                                   ; 27: B
-    HEX 29 20 9D FE 00 00 33 9C 39
-    HEX 3F 9C 39 59 9C 39 6D 40 AC
-    HEX 8F D6 58 6E 9C 39 FF FF FF
+    EVRAND 2,1,$20,7,17
+    EVDATA $00,$00
+    EVENCO 2,11,$5C,2,17
+    EVENCO 3,3,$5C,2,17
+    EVENCO 4,9,$5C,2,17
+    EVENCO 5,9,$00,8,12
+    EVSHOP 7,3,$D6,$58
+    EVENCO 5,10,$5C,2,17
+    EVSTOP
 
 ev_thieves_clearing:                    ; 28: THIEVES CLEARING
-    HEX FE 00 00 58 1E 44 A6 C0 4B
-    HEX 97 C0 19 FF FF FF
+    EVDATA $00,$00
+    EVRAND 4,8,$1E,3,8
+    EVGOLD 8,6,75
+    EVGOLD 7,11,25
+    EVSTOP
 
 ev_old_mine_road:                       ; 29: OLD MINE ROAD
-    HEX FE 00 00 17 92 88 22 B8 AC
-    HEX 4B D6 A8 28 91 AC 43 FE 1F
-    HEX 44 FE DF 58 5D 6C 45 FE 1F
-    HEX 3A D3 4B 3A C0 14 3A 65 55
-    HEX FF FF FF
+    EVDATA $00,$00
+    EVENCO 1,3,$52,6,16
+    EVENCO 1,14,$78,8,12
+    EVSHOP 3,15,$D6,$A8
+    EVENCO 2,0,$51,8,12
+    EVSLOT 3,7,$1F
+    EVSLOT 3,8,$DF
+    EVENCO 4,8,$1D,5,8
+    EVSLOT 3,9,$1F
+    EV1SCN 2,18,$4B
+    EVGOLD 2,18,20
+    EVENCO 2,18,$25,4,5
+    EVSTOP
 
 ev_foothills_cemetery:                  ; 30: FOOTHILLS CEMETERY
-    HEX FE 00 00 3D 82 62 45 FE 5F
-    HEX 58 FE 5F 59 FE 9F 59 C0 64
-    HEX 5A FE 5F 6D FE 5F 81 FE 5F
-    HEX 7E C0 05 9E B8 7B FF FF FF
+    EVDATA $00,$00
+    EVENCO 3,1,$42,4,18
+    EVSLOT 3,9,$5F
+    EVSLOT 4,8,$5F
+    EVSLOT 4,9,$9F
+    EVGOLD 4,9,100
+    EVSLOT 4,10,$5F
+    EVSLOT 5,9,$5F
+    EVSLOT 6,9,$5F
+    EVGOLD 6,6,5
+    EVENCO 7,18,$78,6,3
+    EVSTOP
 
 ev_i:                                   ; 31: I
-    HEX FE 00 00 18 22 90 31 FE 1F
-    HEX 45 FE 1F 59 FE 1F 6D FE 1F
-    HEX 81 FE 9E 90 C0 7D 95 FE 1F
-    HEX FF FF FF
+    EVDATA $00,$00
+    EVRAND 1,4,$22,7,4
+    EVSLOT 2,9,$1F
+    EVSLOT 3,9,$1F
+    EVSLOT 4,9,$1F
+    EVSLOT 5,9,$1F
+    EVSLOT 6,9,$9E
+    EVGOLD 7,4,125
+    EVSLOT 7,9,$1F
+    EVSTOP
 
 ev_underground_stream:                  ; 32: UNDERGROUND STREAM
-    HEX 1D D3 5B 1D FE D6 1D D1 00
-    HEX 1D C0 32 1D FE D6 1D C0 32
-    HEX 1D FE D6 FE 00 00 34 D6 50
-    HEX 0D 40 AA 49 4D A8 FF FF FF
+    EV1SCN 1,9,$5B
+    EVSLOT 1,9,$D6
+    EVGOLD 1,9,4352
+    EVGOLD 1,9,50
+    EVSLOT 1,9,$D6
+    EVGOLD 1,9,50
+    EVSLOT 1,9,$D6
+    EVDATA $00,$00
+    EVSHOP 2,12,$D6,$50
+    EVENCO 0,13,$00,8,10
+    EVENCO 3,13,$0D,8,8
+    EVSTOP
 
 ev_v:                                   ; 33: V
-    HEX FE 00 00 2E C0 41 3A 24 8E
-    HEX A4 8C 2C FF FF FF
+    EVDATA $00,$00
+    EVGOLD 2,6,65
+    EVRAND 2,18,$24,7,2
+    EVENCO 8,4,$4C,2,4
+    EVSTOP
 
 ev_gemini:                              ; 34: GEMINI
-    HEX FE 00 00 38 45 40 55 66 1C
-    HEX FF FF FF
+    EVDATA $00,$00
+    EVENCO 2,16,$05,3,4
+    EVENCO 4,5,$26,1,8
+    EVSTOP
 
 ev_r:                                   ; 35: R
-    HEX FE 00 00 19 1B 94 55 FE 1F
-    HEX 53 D5 82 69 FE 1F 7D FE 1F
-    HEX 91 FE 1F 90 C0 64 92 FE C0
-    HEX 92 C0 41 82 56 83 FF FF FF
+    EVDATA $00,$00
+    EVRAND 1,5,$1B,7,8
+    EVSLOT 4,5,$1F
+    EVSHOP 4,3,$D5,$82
+    EVSLOT 5,5,$1F
+    EVSLOT 6,5,$1F
+    EVSLOT 7,5,$1F
+    EVGOLD 7,4,100
+    EVSLOT 7,6,$C0
+    EVGOLD 7,6,65
+    EVENCO 6,10,$16,6,11
+    EVSTOP
 
 ev_old_mine_shaft:                      ; 36: OLD MINE SHAFT
-    HEX FE 00 00 54 9E 3A 59 D3 49
-    HEX 59 FE 1F 5E B5 29 FF FF FF
+    EVDATA $00,$00
+    EVENCO 4,4,$5E,2,18
+    EV1SCN 4,9,$49
+    EVSLOT 4,9,$1F
+    EVENCO 4,14,$75,2,1
+    EVSTOP
 
 ev_gilded_pathway:                      ; 37: GILDED PATHWAY
-    HEX FE 00 00 08 A3 41 31 80 97
-    HEX 43 80 AA 44 FE DF 59 C9 00
-    HEX 6B C9 00 93 8F 59 95 FE C9
-    HEX BC 4F 1D FF FF FF
+    EVDATA $00,$00
+    EVENCO 0,8,$63,3,5
+    EVENCO 2,9,$40,7,11
+    EVENCO 3,7,$40,8,10
+    EVSLOT 3,8,$DF
+    EVGOLD 4,9,2304
+    EVGOLD 5,7,2304
+    EVENCO 7,7,$4F,4,9
+    EVSLOT 7,9,$C9
+    EVENCO 9,8,$0F,1,9
+    EVSTOP
 
 ev_minotaurs_den:                       ; 38: MINOTAUR'S DEN
-    HEX FE 00 00 FE 00 00 50 8D 5F
-    HEX A7 28 A8 FF FF FF
+    EVDATA $00,$00
+    EVDATA $00,$00
+    EVENCO 4,0,$4D,4,15
+    EVRAND 8,7,$28,8,8
+    EVSTOP
 
 ev_minotaurs_vault:                     ; 39: MINOTAUR'S VAULT
-    HEX FE 00 00 84 29 70 93 27 92
-    HEX AA CA 2C AE C9 C8 FF FF FF
+    EVDATA $00,$00
+    EVRAND 6,12,$29,5,12
+    EVRAND 7,7,$27,7,6
+    EVGOLD 8,10,2604
+    EVGOLD 8,14,2504
+    EVSTOP
 
 ev_inner_staircase:                     ; 40: INNER STAIRCASE
-    HEX FE 00 00 24 0A 2B 20 FE 1F
-    HEX 21 FE 9F 34 FE 1F 48 FE C0
-    HEX 48 AA 32 5F FE 1F 72 FE 5F
-    HEX 73 FE 1F 84 28 98 FF FF FF
+    EVDATA $00,$00
+    EVRAND 1,16,$0A,2,3
+    EVSLOT 1,12,$1F
+    EVSLOT 1,13,$9F
+    EVSLOT 2,12,$1F
+    EVSLOT 3,12,$C0
+    EVENCO 3,12,$6A,2,10
+    EVSLOT 4,15,$1F
+    EVSLOT 5,14,$5F
+    EVSLOT 5,15,$1F
+    EVRAND 6,12,$28,7,12
+    EVSTOP
 
 ev_secret_passageway:                   ; 41: SECRET PASSAGEWAY
-    HEX FE 00 00 28 0D 23 33 29 48
-    HEX FF FF FF
+    EVDATA $00,$00
+    EVRAND 2,0,$0D,1,15
+    EVRAND 2,11,$29,3,12
+    EVSTOP
 
 ev_virgo:                               ; 42: VIRGO
-    HEX FE 00 00 1A 45 A7 81 6D 82
-    HEX FF FF FF
+    EVDATA $00,$00
+    EVENCO 1,6,$05,8,7
+    EVENCO 6,9,$2D,6,10
+    EVSTOP
 
 ev_leo:                                 ; 43: LEO
-    HEX FE 00 00 16 45 A4 8E C0 FA
-    HEX 7C 2B 7D FF FF FF
+    EVDATA $00,$00
+    EVENCO 1,2,$05,8,4
+    EVGOLD 7,2,250
+    EVRAND 6,4,$2B,6,5
+    EVSTOP
 
 ev_libra:                               ; 44: LIBRA
-    HEX 20 45 AB 86 6E 87 6F FE B7
-    HEX 98 C9 64 FF FF FF
+    EVENCO 1,12,$05,8,11
+    EVENCO 6,14,$2E,6,15
+    EVSLOT 5,11,$B7
+    EVGOLD 7,12,2404
+    EVSTOP
 
 ev_scorpius:                            ; 45: SCORPIUS
-    HEX 24 45 AF FE 00 00 8B 6F AC
-    HEX 9C C0 96 FF FF FF
+    EVENCO 1,16,$05,8,15
+    EVDATA $00,$00
+    EVENCO 6,19,$2F,8,12
+    EVGOLD 7,16,150
+    EVSTOP
 
 ev_sagittarius:                         ; 46: SAGITTARIUS
-    HEX FE 00 00 5C 70 48 7E FE 19
-    HEX 84 D3 53 8C 45 87 FF FF FF
+    EVDATA $00,$00
+    EVENCO 4,12,$30,3,12
+    EVSLOT 6,6,$19
+    EV1SCN 6,12,$53
+    EVENCO 7,0,$05,6,15
+    EVSTOP
 
 ev_capricornus:                         ; 47: CAPRICORNUS
-    HEX FE 00 00 0C 71 4E 1E FE 1F
-    HEX 28 45 4B 2D FE 0D 31 D4 55
-    HEX 32 FE 1F 37 C9 FA 41 FE 15
-    HEX 34 D6 F8 46 FE 1F FF FF FF
+    EVDATA $00,$00
+    EVENCO 0,12,$31,3,18
+    EVSLOT 1,10,$1F
+    EVENCO 2,0,$05,3,15
+    EVSLOT 2,5,$0D
+    EVISCN 2,9,$55
+    EVSLOT 2,10,$1F
+    EVGOLD 2,15,2554
+    EVSLOT 3,5,$15
+    EVSHOP 2,12,$D6,$F8
+    EVSLOT 3,10,$1F
+    EVSTOP
 
 ev_aquarius:                            ; 48: AQUARIUS
-    HEX FE 00 00 39 D1 00 4B 72 4A
-    HEX 61 FE 16 B1 45 23 FF FF FF
+    EVDATA $00,$00
+    EVGOLD 2,17,4352
+    EVENCO 3,15,$32,3,14
+    EVSLOT 4,17,$16
+    EVENCO 8,17,$05,1,15
+    EVSTOP
 
 ev_pisces:                              ; 49: PISCES
-    HEX FE 00 00 5D FE 95 71 D4 52
-    HEX 85 FE 55 AD 45 20 FF FF FF
+    EVDATA $00,$00
+    EVSLOT 4,13,$95
+    EVISCN 5,13,$52
+    EVSLOT 6,13,$55
+    EVENCO 8,13,$05,1,12
+    EVSTOP
 
 ev_hallway:                             ; 50: HALLWAY
-    HEX FE 00 00 1D BE A9 1E BE AA
-    HEX AA 45 1E FF FF FF
+    EVDATA $00,$00
+    EVENCO 1,9,$7E,8,9
+    EVENCO 1,10,$7E,8,10
+    EVENCO 8,10,$05,1,10
+    EVSTOP
 
 ev_aries:                               ; 51: ARIES
-    HEX FE 00 00 40 75 3F 2E C0 64
-    HEX A6 45 1B FF FF FF
+    EVDATA $00,$00
+    EVENCO 3,4,$35,3,3
+    EVGOLD 2,6,100
+    EVENCO 8,6,$05,1,7
+    EVSTOP
 
 ev_taurus:                              ; 52: TAURUS
-    HEX FE 00 00 28 A5 5D 3C 36 19
-    HEX 51 B5 52 A2 45 18 FF FF FF
+    EVDATA $00,$00
+    EVENCO 2,0,$65,4,13
+    EVRAND 3,0,$36,1,5
+    EVENCO 4,1,$75,4,2
+    EVENCO 8,2,$05,1,4
+    EVSTOP
 
 ev_gemini2:                             ; 53: GEMINI (south)
-    HEX FE 00 00 1C FE 01 44 FE 01
-    HEX 2D C9 64 38 45 40 55 77 7D
-    HEX FF FF FF
+    EVDATA $00,$00
+    EVSLOT 1,8,$01
+    EVSLOT 3,8,$01
+    EVGOLD 2,5,2404
+    EVENCO 2,16,$05,3,4
+    EVENCO 4,5,$37,6,5
+    EVSTOP
 
 ev_cancer:                              ; 54: CANCER
-    HEX FE 00 00 8F C0 32 9C 45 7C
-    HEX 84 D3 60 B9 6C 79 FF FF FF
+    EVDATA $00,$00
+    EVGOLD 7,3,50
+    EVENCO 7,16,$05,6,4
+    EV1SCN 6,12,$60
+    EVENCO 9,5,$2C,6,1
+    EVSTOP
 
 ev_the_mountain:                        ; 55: THE MOUNTAIN
-    HEX FE 00 00 17 D4 4A 18 FE 1F
-    HEX 23 7A 23 46 FE 1F 59 FE 1F
-    HEX 6C FE 1F 7F FE 1F AF D5 44
-    HEX 2B FE C0 2B 92 3A 2C FE 1F
-    HEX 40 FE 1F 4A FE 1F 4B FE 1F
-    HEX 5E FE 1F 5F C0 32 72 FE 1F
-    HEX 7A 9F 9D 82 C0 05 86 FE 1F
-    HEX A4 D4 58 C0 9E 36 FF FF FF
+    EVDATA $00,$00
+    EVISCN 1,3,$4A
+    EVSLOT 1,4,$1F
+    EVENCO 1,15,$3A,1,15
+    EVSLOT 3,10,$1F
+    EVSLOT 4,9,$1F
+    EVSLOT 5,8,$1F
+    EVSLOT 6,7,$1F
+    EVSHOP 8,15,$D5,$44
+    EVSLOT 2,3,$C0
+    EVENCO 2,3,$52,2,18
+    EVSLOT 2,4,$1F
+    EVSLOT 3,4,$1F
+    EVSLOT 3,14,$1F
+    EVSLOT 3,15,$1F
+    EVSLOT 4,14,$1F
+    EVGOLD 4,15,50
+    EVSLOT 5,14,$1F
+    EVENCO 6,2,$5F,7,17
+    EVGOLD 6,10,5
+    EVSLOT 6,14,$1F
+    EVISCN 8,4,$58
+    EVENCO 9,12,$5E,2,14
+    EVSTOP
 
 ev_shahriar_treasury:                   ; 56: SHAHRIAR TREASURY
-    HEX FE 00 00 43 C9 FA 56 C0 32
-    HEX 57 C0 64 58 C0 32 6B C0 32
-    HEX 5D 83 66 FF FF FF
+    EVDATA $00,$00
+    EVGOLD 3,7,2554
+    EVGOLD 4,6,50
+    EVGOLD 4,7,100
+    EVGOLD 4,8,50
+    EVGOLD 5,7,50
+    EVENCO 4,13,$43,5,2
+    EVSTOP
 
 ev_air_vent:                            ; 57: AIR VENT
-    HEX 0F B8 23 38 86 29 FE 00 00
-    HEX 5E BD 5D 88 87 79 AE BB AD
-    HEX C3 9B 45 FF FF FF
+    EVENCO 0,15,$78,1,15
+    EVENCO 2,16,$46,2,1
+    EVDATA $00,$00
+    EVENCO 4,14,$7D,4,13
+    EVENCO 6,16,$47,6,1
+    EVENCO 8,14,$7B,8,13
+    EVENCO 9,15,$5B,3,9
+    EVSTOP
 
 ev_deserted_tunnel:                     ; 58: DESERTED TUNNEL
-    HEX FE 00 00 93 C0 2D 94 D3 54
-    HEX 95 FE 1F A7 FE 1F A8 FE C0
-    HEX A8 B8 73 AE BA AF FF FF FF
+    EVDATA $00,$00
+    EVGOLD 7,7,45
+    EV1SCN 7,8,$54
+    EVSLOT 7,9,$1F
+    EVSLOT 8,7,$1F
+    EVSLOT 8,8,$C0
+    EVENCO 8,8,$78,5,15
+    EVENCO 8,14,$7A,8,15
+    EVSTOP
 
 ev_roy_g_biv:                           ; 59: ROY G. BIV
-    HEX 52 BD 53 65 FE C1 65 C0 64
-    HEX 8D FE C1 8D BC 79 A1 FE C0
-    HEX A1 63 2B FF FF FF
+    EVENCO 4,2,$7D,4,3
+    EVSLOT 5,1,$C1
+    EVGOLD 5,1,100
+    EVSLOT 7,1,$C1
+    EVENCO 7,1,$7C,6,1
+    EVSLOT 8,1,$C0
+    EVENCO 8,1,$23,2,3
+    EVSTOP
 
 ev_jackal_altar:                        ; 60: JACKAL ALTAR
-    HEX FE 00 00 17 C0 37 20 FE 1F
-    HEX 30 FE 1F 31 FE 1F 32 FE 1F
-    HEX 33 FE 1F 34 FE 1F 41 FE 1F
-    HEX 42 FE 1F 57 FE 1F 58 FE 1F
-    HEX 59 FE 1F 52 BC 51 5E BA 5F
-    HEX FF FF FF
+    EVDATA $00,$00
+    EVGOLD 1,3,55
+    EVSLOT 1,12,$1F
+    EVSLOT 2,8,$1F
+    EVSLOT 2,9,$1F
+    EVSLOT 2,10,$1F
+    EVSLOT 2,11,$1F
+    EVSLOT 2,12,$1F
+    EVSLOT 3,5,$1F
+    EVSLOT 3,6,$1F
+    EVSLOT 4,7,$1F
+    EVSLOT 4,8,$1F
+    EVSLOT 4,9,$1F
+    EVENCO 4,2,$7C,4,1
+    EVENCO 4,14,$7A,4,15
+    EVSTOP
 
 ev_astrologers_maze:                    ; 61: ASTROLOGER'S MAZE
-    HEX FE 00 00 1E FE 1F 23 97 31
-    HEX 2E FE 1F 33 FE 1F 35 FE 1F
-    HEX 36 FE 1F 37 FE 1F 43 FE 1F
-    HEX 46 FE 1F 53 9B 72 58 FE 1F
-    HEX 5E FE 1F 6A FE 1F 6D FE 1F
-    HEX 6E FE 1F 6F FE 1F 71 FE 1F
-    HEX 7D FE 1F 7E FE C0 7E 8B 16
-    HEX 83 C9 78 84 FE 1F 90 FE 1F
-    HEX 93 FE 1F 94 FE 1F 95 FE 1F
-    HEX 96 FE 1F 97 FE 1F 9A FE 1F
-    HEX A4 C0 32 A7 FE 1F AE FE 1F
-    HEX AF C0 0A BD B4 2F BE B3 32
-    HEX 1F D5 C6 FF FF FF
+    EVDATA $00,$00
+    EVSLOT 1,10,$1F
+    EVENCO 1,15,$57,2,9
+    EVSLOT 2,6,$1F
+    EVSLOT 2,11,$1F
+    EVSLOT 2,13,$1F
+    EVSLOT 2,14,$1F
+    EVSLOT 2,15,$1F
+    EVSLOT 3,7,$1F
+    EVSLOT 3,10,$1F
+    EVENCO 4,3,$5B,5,14
+    EVSLOT 4,8,$1F
+    EVSLOT 4,14,$1F
+    EVSLOT 5,6,$1F
+    EVSLOT 5,9,$1F
+    EVSLOT 5,10,$1F
+    EVSLOT 5,11,$1F
+    EVSLOT 5,13,$1F
+    EVSLOT 6,5,$1F
+    EVSLOT 6,6,$C0
+    EVENCO 6,6,$4B,1,2
+    EVGOLD 6,11,2424
+    EVSLOT 6,12,$1F
+    EVSLOT 7,4,$1F
+    EVSLOT 7,7,$1F
+    EVSLOT 7,8,$1F
+    EVSLOT 7,9,$1F
+    EVSLOT 7,10,$1F
+    EVSLOT 7,11,$1F
+    EVSLOT 7,14,$1F
+    EVGOLD 8,4,50
+    EVSLOT 8,7,$1F
+    EVSLOT 8,14,$1F
+    EVGOLD 8,15,10
+    EVENCO 9,9,$74,2,7
+    EVENCO 9,10,$73,2,10
+    EVSHOP 1,11,$D5,$C6
+    EVSTOP
+
 @ %def LOCATION_EVENTS
 
 The attract screen call flow:
@@ -10240,6 +10747,136 @@ maps to track~$\$11 + N/13$, sector~$N \bmod 13$.  The byte encoding
 uses $\$00$=space, $\$01$--$\$1A$=A--Z, $\$1B$--$\$24$=0--9, with
 control codes for positioning ($\$80$+) and flow ($\$7E$=pause,
 $\$7F$=end).
+
+\subsection*{Scene \$00 (0): COPYRIGHT 1981 STUART SMITH}
+
+\includegraphics[width=\columnwidth]{images/scene_00.png}
+
+\subsection*{Scene \$02 (2): TAKING A DRINK OF COOL CLEAR WATER \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_02.png}
+
+\subsection*{Scene \$03 (3): THE OAK DOOR VIBRATES WITH A HOLLOW BOOM \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_03.png}
+
+\subsection*{Scene \$04 (4): AND TO THINK THAT YOU HAVE DONE IT ALL ALONE \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_04_p1.png}
+
+\includegraphics[width=\columnwidth]{images/scene_04_p2.png}
+
+\subsection*{Scene \$05 (5): THE SULTAN RUSHES OVER TO YOUR SIDE \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_05_p1.png}
+
+\includegraphics[width=\columnwidth]{images/scene_05_p2.png}
+
+\subsection*{Scene \$06 (6): YOU BASH THE STATUE INTO SMITHEREENS \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_06.png}
+
+\subsection*{Scene \$07 (7): YOUR WEAPON IS IMPALED IN YOUR VICTIM \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_07_p1.png}
+
+\includegraphics[width=\columnwidth]{images/scene_07_p2.png}
+
+\subsection*{Scene \$09 (9): THE MAGIC POOL OF HEALING SPIRITS DRIES UP}
+
+\includegraphics[width=\columnwidth]{images/scene_09.png}
+
+\subsection*{Scene \$0A (10): AHA! AN ILLUSION! \ldots DISSOLVES INTO MIST}
+
+\includegraphics[width=\columnwidth]{images/scene_0a.png}
+
+\subsection*{Scene \$0B (11): YOU HAVE NEVER HARMED A LIVING THING \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_0b_p1.png}
+
+\includegraphics[width=\columnwidth]{images/scene_0b_p2.png}
+
+\subsection*{Scene \$0C (12): PRAISE BE TO ALLAH! YOU HAVE RESCUED \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_0c_p1.png}
+
+\includegraphics[width=\columnwidth]{images/scene_0c_p2.png}
+
+\subsection*{Scene \$10 (16): HE ALSO AWARDS YOU WITH GREAT WEALTH \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_10_p1.png}
+
+\includegraphics[width=\columnwidth]{images/scene_10_p2.png}
+
+\subsection*{Scene \$12 (18): THE SULTAN SCURRIES BACK TO HIS THRONE}
+
+\includegraphics[width=\columnwidth]{images/scene_12.png}
+
+\subsection*{Scene \$17 (23): TIS UP TO YOU WHETHER YOU WILL RETIRE NOW \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_17.png}
+
+\subsection*{Scene \$19 (25): THE STATUE TOPPLES OVER AND \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_19.png}
+
+\subsection*{Scene \$1D (29): THANK YOU FOR FIGHTING TO MAKE THIS \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_1d.png}
+
+\subsection*{Scene \$23 (35): I GRIEVE OVER YOUR UNTIMELY DEMISE \ldots (retirement)}
+
+\includegraphics[width=\columnwidth]{images/scene_23.png}
+
+\subsection*{Scene \$29 (41): A RETIRED ADVENTURER IS SELLING \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_29.png}
+
+\subsection*{Scene \$2B (43): THE ASTROLOGER OF SHAHRIAR \ldots (hint text)}
+
+\includegraphics[width=\columnwidth]{images/scene_2b.png}
+
+\subsection*{Scene \$30 (48): A BLACKSMITH OFFERS YOU SOME FINE \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_30.png}
+
+\subsection*{Scene \$32 (50): ERROR 47 FORTY-SEVEN (weapon shop)}
+
+\includegraphics[width=\columnwidth]{images/scene_32.png}
+
+\subsection*{Scene \$38 (56): STRONG FIGHTERS SUCH AS DWARVES \ldots (hint)}
+
+\includegraphics[width=\columnwidth]{images/scene_38.png}
+
+\subsection*{Scene \$39 (57): ABSORBED IN THE TREASURE CHEST \ldots (trap: theft)}
+
+\includegraphics[width=\columnwidth]{images/scene_39.png}
+
+\subsection*{Scene \$3A (58): A DARK GREEN VAPOR RISES FROM THE \ldots (trap: gas)}
+
+\includegraphics[width=\columnwidth]{images/scene_3a.png}
+
+\subsection*{Scene \$3F (63): DWARVES ARE STRONG, SLOW AND CLUMSY \ldots (hint)}
+
+\includegraphics[width=\columnwidth]{images/scene_3f.png}
+
+\subsection*{Scene \$40 (64): DWARVES AND HUMANS GENERALLY DO MORE \ldots (hint)}
+
+\includegraphics[width=\columnwidth]{images/scene_40.png}
+
+\subsection*{Scene \$43 (67): PICKING UP A BEAUTIFUL RUBY RING \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_43.png}
+
+\subsection*{Scene \$44 (68): A LANDSLIDE BEHIND YOU OBLITERATES \ldots}
+
+\includegraphics[width=\columnwidth]{images/scene_44_p1.png}
+
+\includegraphics[width=\columnwidth]{images/scene_44_p2.png}
+
+\subsection*{Scene \$45 (69): AN ORACULAR RUNE REVEALS \ldots (hint)}
+
+\includegraphics[width=\columnwidth]{images/scene_45.png}
 
 <<defines>>=
 SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene number)
@@ -12430,6 +13067,83 @@ Bit~7 is set on first entry via [[ORA \#$80]] and tested with [[BMI]] to
 skip first-visit logic on subsequent entries.
 
 The sentinel [[FFFF]] in the name pointer marks the end of the table.
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=0.5cm and 0.8cm,
+    every node/.style={font=\footnotesize},
+    block/.style={rectangle, draw, fill=orange!30, minimum width=2.2cm,
+                  minimum height=0.6cm, text centered, rounded corners=2pt},
+    decision/.style={diamond, aspect=2.2, draw, fill=green!30,
+                     minimum width=1.5cm, text centered, inner sep=1pt},
+    start/.style={rectangle, rounded corners=6pt, draw, fill=blue!30,
+                  minimum width=2.2cm, minimum height=0.6cm, text centered},
+    arr/.style={-{Stealth[length=5pt]}, thick},
+]
+
+% --- Column 1: main flow ---
+\node[start]                          (init)     {GAME\_INIT};
+\node[decision, below=of init]        (firstrun) {First run?};
+\node[block, right=of firstrun]       (attract)  {ATTRACT\_SCREEN};
+\node[block, below=of firstrun]       (reset)    {CHAR\_PTR $\leftarrow$\\LOCATION\_DATA};
+\node[decision, below=of reset]       (active)   {Char active?};
+\node[block, below=of active]         (enter)    {ENTER\_LOCATION};
+\node[decision, below=of enter]       (plr13)    {Player 1 or 3?};
+\node[block, below=of plr13]          (scene)    {CHECK\_SCENE\_EVENTS};
+\node[block, below=of scene]          (mobs)     {PROCESS\_MOB\_GROUPS};
+\node[decision, below=of mobs]        (more)     {More chars?};
+\node[block, below=of more]           (randev)   {RANDOM\_EVENTS};
+
+% --- Arrows ---
+\draw[arr] (init)     -- (firstrun);
+\draw[arr] (firstrun) -- node[left] {no} (reset);
+\draw[arr] (firstrun) -- node[above] {yes} (attract);
+\draw[arr] (attract)  |- (reset);
+\draw[arr] (reset)    -- (active);
+
+% inactive -> skip to "more chars"
+\draw[arr] (active) -- node[left] {yes} (enter);
+\draw[arr] (active.east) -- ++(3.0,0) node[right] {no} |- (more.east);
+
+\draw[arr] (enter) -- (plr13);
+\draw[arr] (plr13) -- node[left] {yes} (scene);
+\draw[arr] (plr13.east) -- ++(1.8,0) node[right] {no} |- (mobs.east);
+\draw[arr] (scene) -- (mobs);
+\draw[arr] (mobs) -- (more);
+\draw[arr] (more) -- node[left] {no} (randev);
+
+% "more chars = yes" loops back to active
+\draw[arr] (more.west) -- ++(-1.2,0) node[left] {yes} |- (active.west);
+
+% RANDOM_EVENTS loops back to reset
+\draw[arr] (randev.west) -- ++(-2.0,0) |- (reset.west);
+
+\end{tikzpicture}
+\end{center}
+
+Each location record is 9~bytes ([[CHAR_RECORD_SIZE]]):
+
+\begin{center}
+\begin{tabular}{cll}
+\toprule
+\textbf{Byte} & \textbf{Field} & \textbf{Description} \\
+\midrule
+0--1 & Name pointer   & Address of the location's display name string \\
+2    & Mob head       & Head of the mob linked list (0 = no mobs) \\
+3    & Min position   & Top-left boundary (packed $20 \times \mathit{row} + \mathit{col}$) \\
+4    & Max position   & Bottom-right boundary (same encoding) \\
+5    & Map ID         & Scene/map number (bit~7 = visited flag) \\
+6--7 & Event pointer  & Address of the location's event list \\
+8    & XP/status      & Bit~7 = status, bits~6--4 = pending XP, bits~3--0 = group count \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The mob head (byte~2) is the index of the first mob group in this location.
+Each mob's data record contains a next-link field ([[MFIELD_NEXT]], byte~2),
+forming a singly linked list of mob groups.  [[PROCESS_MOB_GROUPS]] walks
+this list from the head until it reaches a zero link (end of chain).
+A head value of \$00 means the location has no mobs.
 
 <<Location data>>=
     ORG     $4009
@@ -17732,10 +18446,13 @@ into two paths.
 
 For random encounters (type below [[$40]]), the character's avoidance stat
 (low 5~bits of field~5) is compared against a random roll out of~20.  If the
-stat is high enough, the encounter is avoided: the event is marked as
-activated and the character returns to its starting position.  Otherwise a
-second PRNG roll decides whether this is a normal encounter (tune [[$14]])
-or a rare special encounter (scene~9, which deals 1~damage).
+stat is high enough, the encounter is avoided: byte~1 is ORed with [[$40]],
+\emph{mutating the event in-place into a specific encounter} with the
+original byte~1 value as the encounter~ID.  On the character's next visit
+the event will fire as a specific encounter rather than a random one.  The
+character is returned to its starting position.  Otherwise a second PRNG roll
+decides whether this is a normal encounter (tune [[$14]]) or a rare special
+encounter (scene~9, which deals 1~damage).
 
 For specific encounters (type [[$40]] and above), the routine extracts a
 6-bit encounter ID and a destination position from the event entry, commits
