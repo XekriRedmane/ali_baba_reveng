@@ -5141,8 +5141,9 @@ The Hi-Res Character Generator (HRCG) is a library provided by the Applesoft Too
 which allows a developer to display a custom font. Applesoft Toolkit also
 contains Animatrix, which is a utility used to create fonts for the HRCG.
 
-The \href{https://archive.org/details/applesoft-toolkit}{manual for the Applesoft Toolkit}
-can be found on the Internet Archive.
+The Applesoft Toolkit \href{https://mirrors.apple2.org.za/ftp.apple.asimov.net/documentation/programming/basic/applesoft_toolkit__part_1_.pdf}{manual part 1}
+and \href{https://mirrors.apple2.org.za/ftp.apple.asimov.net/documentation/programming/basic/applesoft_toolkit__part_2_.pdf}{manual part 2}
+can be found on the Apple Asimov Archive.
 
 The HRCG defines 96 characters as a character set. These characters are the
 ``printing'' characters, which are ASCII 32 (space) through 127 (delete).
@@ -5505,15 +5506,27 @@ HRCG_PROCESS_CHAR:
 The control character handlers follow.  Each one checks the carry flag on
 entry to distinguish its normal behavior from its shifted variant.
 
-Ctrl-A is the charset selector.  In normal mode, it sets [[HRCG_MODE_FLAGS]]
-so that the \emph{next} character output will be interpreted as a charset
-number (``1'' through ``9'') rather than printed.  In shifted mode (entered via
-ctrl-A, ctrl-A, \emph{char}), it resets the video mode to replace.
+Ctrl-A is the charset selector.  In normal mode, it sets
+[[HRCG_MODE_FLAGS]] bit~7 so that the \emph{next} character output
+will be routed to [[HRCG_CHARSET_SELECT]] and interpreted as a
+charset number (``1'' through ``9'') rather than printed.  In shifted
+mode (ctrl-A, ctrl-A, \emph{char}), it resets the video mode to
+replace.
 
-When the charset-select path fires, the character is converted to a font
-pointer by multiplying the charset index by 3~pages (768~bytes per charset of
-96~characters at 8~bytes each) and adding the font base address.  Charset~0
-always maps to the standard font at [[$97A5]].
+When the charset-select path fires, the selector byte is converted to
+a font pointer.  Each charset occupies 3~pages (768~bytes =
+96~glyphs~$\times$~8~bytes), and the font address is computed as
+$\text{HRCG\_FONT\_BASE} + (\text{selector} - 1) \times \$300$.
+Selectors outside 1--9 fall through to the standard 7$\times$8 font
+at [[STD_FONT_DATA]] (\$97A5).
+
+The game's custom font spans charsets 1--5:
+\begin{itemize}
+\item Charsets 1--2 (\$83A5--\$89A4): game map icons and border
+      characters (``font group~1'').
+\item Charsets 3--5 (\$89A5--\$92A4): scene text and UI characters
+      (``font group~2'').
+\end{itemize}
 
 <<hrcg font ptr>>=
     ORG     $930D
@@ -5527,26 +5540,68 @@ HRCG_FONT_PTR_HI:
     ORG     $9424
 HRCG_CTRL_A:
     SUBROUTINE HRCG_CTRL_A
-; --- ctrl-A handler: set shift flag ---
+    ;
+    ; Ctrl-A handler: charset selector.
+    ;
+    ; Normal mode (carry clear):
+    ;   Sets HRCG_MODE_FLAGS bit 7 so that the NEXT character output
+    ;   will be routed to HRCG_CHARSET_SELECT instead of being printed.
+    ;   The next byte is interpreted as a charset number ('1'-'9').
+    ;
+    ; Shifted mode (carry set, from ctrl-A ctrl-A):
+    ;   Resets the video mode to replace ($20).
+    ;
+; --- Normal: arm charset-select for next character ---
     BCS     HRCG_SET_REPLACE  ; shifted -> set replace mode
-    STOB    #$80,HRCG_MODE_FLAGS ; set bit 7 (next char -> charset select)
+    STOB    #$80,HRCG_MODE_FLAGS ; set bit 7: next char -> charset select
     RTS
-; --- Charset select (entered from HRCG_PROCESS_CHAR BCS) ---
+    ;
+    ; --- Charset select (entered when HRCG_MODE_FLAGS bit 7 was set) ---
+    ;
+    ; Input:  A = charset selector byte ('1'-'9' = $B1-$B9 with high
+    ;             bit already stripped by HRCG_PROCESS_CHAR)
+    ;
+    ; Charset memory layout:
+    ;   Each charset occupies 3 pages (768 bytes = 96 glyphs * 8 bytes).
+    ;   Charset 1 starts at HRCG_FONT_BASE ($83A5).
+    ;   Charset N starts at HRCG_FONT_BASE + (N-1) * $300.
+    ;
+    ;   Charset  Selector  Address  Contents
+    ;   -------  --------  -------  --------
+    ;      1       $B1     $83A5    Custom font group 1 (game icons)
+    ;      2       $B2     $86A5    Custom font group 1 cont. (border)
+    ;      3       $B3     $89A5    Custom font group 2 (scene text)
+    ;      4       $B4     $8CA5    Custom font group 2 cont.
+    ;      5       $B5     $8FA5    Custom font group 2 cont.
+    ;    0 or >9   ---     $97A5    Standard 7x8 font (STD_FONT_DATA)
+    ;
+    ; Output: HRCG_FONT_PTR set to the charset's base address.
+    ;
 HRCG_CHARSET_SELECT:
-    SBC     #$31              ; A = char - '1' (carry set)
-    BAGE    #$09,HRCG_SET_STD_FONT ; valid charset 1-9?
-    LDX     HRCG_FONT_BASE    ; font base low ($A5)
+    SBC     #$31              ; A = selector - '1' (carry set from caller)
+                              ; charset '1' -> 0, '2' -> 1, ... '9' -> 8
+    BAGE    #$09,HRCG_SET_STD_FONT ; >= 9 -> invalid, use standard font
+    ;
+    ; Compute font address: HRCG_FONT_BASE + index * 3 pages
+    ;   index * 3 = index * 2 + index (via ASL + ADC)
+    ;   Result is the HIGH BYTE of the font address.
+    ;   Low byte is always HRCG_FONT_BASE low ($A5).
+    ;
+    LDX     HRCG_FONT_BASE    ; X = font base low ($A5)
     STA     $EE               ; save index
-    ASL                       ; A * 2
-    ADC     $EE               ; A * 3 (3 pages per charset)
-    ADC     HRCG_FONT_BASE+1  ; add font base high ($83)
-    BNE     .store_font       ; always branches
+    ASL                       ; A = index * 2
+    ADC     $EE               ; A = index * 3 (pages)
+    ADC     HRCG_FONT_BASE+1  ; A = $83 + index*3 = font high byte
+    BNE     .store_font       ; always taken (result never zero)
+    ;
+    ; Standard font fallback (charset 0 or invalid selector)
+    ;
 HRCG_SET_STD_FONT:
-    LDX     #<STD_FONT_DATA   ; standard font low
-    LDA     #>STD_FONT_DATA   ; standard font high ($97A5)
+    LDX     #<STD_FONT_DATA   ; X = $A5 (standard font low)
+    LDA     #>STD_FONT_DATA   ; A = $97 (standard font high -> $97A5)
 .store_font:
-    STX     HRCG_FONT_PTR_LO  ; font pointer low
-    STA     HRCG_FONT_PTR_HI  ; font pointer high
+    STX     HRCG_FONT_PTR_LO  ; update font pointer low byte
+    STA     HRCG_FONT_PTR_HI  ; update font pointer high byte
     RTS
 @ %def HRCG_CTRL_A HRCG_CHARSET_SELECT HRCG_SET_STD_FONT
 @ Ctrl-B saves the HRCG's rendering state---the 8-byte parameter block
