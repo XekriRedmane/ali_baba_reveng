@@ -1,25 +1,37 @@
 #!/usr/bin/env python3
-"""Render a scene from the Ali Baba disk image using the custom font.
+"""Render scene(s) from the Ali Baba disk image using the custom font.
 
 Usage:
-    python .claude/scripts/render_scene.py SCENE_NUM [OUTPUT_FILE]
+    python .claude/scripts/render_scene.py [SCENE_NUM ...]
+    python .claude/scripts/render_scene.py all
 
-SCENE_NUM: decimal or $hex scene number
-OUTPUT_FILE: defaults to output/scene_XX.png
+With no arguments or "all", renders all non-empty scenes.
+With scene numbers (decimal or $hex), renders those specific scenes.
+Output PNGs are saved to output/scene_XX.png.
+
+The scene text font starts at charset 3 (font character 48) in the
+custom font at $83A5 in main.bin.  Scene data is read from disk
+starting at track $11 sector 0, one 256-byte sector per scene.
 """
 from __future__ import annotations
 
+import os
 import sys
 from PIL import Image
 
 DISK_FILE = 'Ali Baba and the Forty Thieves (4am and san inc crack).dsk'
 MAIN_BIN = 'main.bin'
 MAIN_BIN_BASE = 0x0500
-FONT_START = 0x83A5
-SKEW_TABLE = [0, 7, 14, 6, 13, 5, 12, 4, 11, 3, 10, 2, 9, 1, 8, 15]
+FONT_ADDR = 0x83A5
+SCENE_CHAR_OFFSET = 48  # scene text = charset 3 = font char 48+
 
-# Scene text uses FONT_CHARSET=2 -> HRCG charset 3 -> font char offset 48
-SCENE_CHAR_OFFSET = 48
+# DOS 3.3 sector skew (physical -> logical)
+DOS_SKEW = [0, 7, 14, 6, 13, 5, 12, 4, 11, 3, 10, 2, 9, 1, 8, 15]
+
+# Scene disk layout
+SCENE_BASE_TRACK = 0x11
+SCENE_BASE_SECTOR = 0x00
+SECTORS_PER_TRACK = 13
 
 # Apple II hi-res artifact colors
 COLORS: dict[str, tuple[int, int, int]] = {
@@ -34,31 +46,37 @@ COLORS: dict[str, tuple[int, int, int]] = {
 SCALE = 3
 CHAR_W = 14
 CHAR_H = 16
-COLS = 20
-ROWS = 12
+GRID_COLS = 20
+GRID_ROWS = 12
 
 
-def read_sector(disk: bytes, track: int, sector: int) -> bytes | None:
-    for phys_s in range(16):
-        if SKEW_TABLE[phys_s] == sector:
-            offset = (track * 16 + phys_s) * 256
-            return disk[offset:offset + 256]
+def read_scene_sector(disk: bytes, scene_num: int) -> bytes | None:
+    """Read a scene's 256-byte sector from disk using DOS 3.3 skew."""
+    total = SCENE_BASE_SECTOR + scene_num
+    track = SCENE_BASE_TRACK + total // SECTORS_PER_TRACK
+    sector = total % SECTORS_PER_TRACK
+    # Find physical sector for this DOS logical sector
+    for phys in range(16):
+        if DOS_SKEW[phys] == sector:
+            offset = (track * 16 + phys) * 256
+            if offset + 256 <= len(disk):
+                return disk[offset:offset + 256]
     return None
 
 
 def get_char_pixels(ref: bytes, font_char_idx: int) -> list[list[str]]:
     """Get 14x16 colored pixel array using Apple II hi-res color algorithm."""
-    font_offset = FONT_START - MAIN_BIN_BASE
-    data = ref[font_offset + font_char_idx * 32:
-               font_offset + (font_char_idx + 1) * 32]
-    if len(data) < 32:
+    font_offset = FONT_ADDR - MAIN_BIN_BASE
+    d = ref[font_offset + font_char_idx * 32:
+            font_offset + (font_char_idx + 1) * 32]
+    if len(d) < 32:
         return [['.' for _ in range(14)] for _ in range(16)]
 
     sprite_data: list[str] = [""] * 16
     for j in range(8):
-        sprite_data[j] = f"{data[j]:08b}{data[j+8]:08b}"
+        sprite_data[j] = f"{d[j]:08b}{d[j+8]:08b}"
     for j in range(8):
-        sprite_data[j + 8] = f"{data[j+16]:08b}{data[j+24]:08b}"
+        sprite_data[j + 8] = f"{d[j+16]:08b}{d[j+24]:08b}"
 
     pixel_data: list[list[str]] = []
     for line in sprite_data:
@@ -78,29 +96,33 @@ def get_char_pixels(ref: bytes, font_char_idx: int) -> list[list[str]]:
                 pixels[i:i + 2] = list("WW")
         for i in range(12):
             if raw[i:i + 3] == "010":
-                color = color10 if ((i + 1) % 2) == 0 else color01
-                pixels[i + 1] = color
+                pixels[i + 1] = color10 if ((i + 1) % 2) == 0 else color01
             elif raw[i:i + 3] == "101":
-                color = color10 if ((i + 1) % 2) == 1 else color01
-                pixels[i + 1] = color
+                pixels[i + 1] = color10 if ((i + 1) % 2) == 1 else color01
         pixel_data.append(pixels)
     return pixel_data
 
 
-def render_scene(scene_num: int, output_file: str) -> None:
-    ref = open(MAIN_BIN, 'rb').read()
-    disk = open(DISK_FILE, 'rb').read()
+def is_empty_scene(data: bytes) -> bool:
+    """Check if scene data is empty (all zeros or no content before $7F)."""
+    for b in data:
+        if b == 0x7F:
+            return True
+        if b != 0x00:
+            return False
+    return True
 
-    total_sector = scene_num
-    track = 0x11 + total_sector // 13
-    sector = total_sector % 13
-    scene_data = read_sector(disk, track, sector)
+
+def render_scene(ref: bytes, disk: bytes, scene_num: int, output_file: str) -> bool:
+    """Render one scene to a PNG. Returns True if non-empty."""
+    scene_data = read_scene_sector(disk, scene_num)
     if scene_data is None:
-        print(f"Error: could not read scene {scene_num}")
-        return
+        return False
+    if is_empty_scene(scene_data):
+        return False
 
-    img_w = COLS * CHAR_W * SCALE
-    img_h = ROWS * CHAR_H * SCALE
+    img_w = GRID_COLS * CHAR_W * SCALE
+    img_h = GRID_ROWS * CHAR_H * SCALE
     img = Image.new('RGB', (img_w, img_h), (0, 0, 0))
 
     def draw_char(scene_char_idx: int, col: int, row: int) -> None:
@@ -108,16 +130,16 @@ def render_scene(scene_num: int, output_file: str) -> None:
             return
         font_idx = SCENE_CHAR_OFFSET + scene_char_idx
         pixels = get_char_pixels(ref, font_idx)
-        px_x = col * CHAR_W * SCALE
-        px_y = row * CHAR_H * SCALE
+        px_base = col * CHAR_W * SCALE
+        py_base = row * CHAR_H * SCALE
         for y in range(CHAR_H):
             for x in range(CHAR_W):
                 color = COLORS.get(pixels[y][x], (0, 0, 0))
                 if color != (0, 0, 0):
                     for sy in range(SCALE):
                         for sx in range(SCALE):
-                            ix = px_x + x * SCALE + sx
-                            iy = py + y * SCALE + sy
+                            ix = px_base + x * SCALE + sx
+                            iy = py_base + y * SCALE + sy
                             if 0 <= ix < img_w and 0 <= iy < img_h:
                                 img.putpixel((ix, iy), color)
 
@@ -139,7 +161,8 @@ def render_scene(scene_num: int, output_file: str) -> None:
         elif b >= 0x80:
             row = b & 0x7F
             i += 1
-            col = scene_data[i]
+            if i < len(scene_data):
+                col = scene_data[i]
         else:
             draw_char(b, col, row)
             col += 1
@@ -149,22 +172,37 @@ def render_scene(scene_num: int, output_file: str) -> None:
         i += 1
 
     img.save(output_file)
-    print(f"Saved {output_file} ({img_w}x{img_h})")
+    return True
+
+
+def parse_number(s: str) -> int:
+    if s.startswith('$'):
+        return int(s[1:], 16)
+    elif s.startswith('0x') or s.startswith('0X'):
+        return int(s, 16)
+    else:
+        return int(s)
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} SCENE_NUM [OUTPUT_FILE]")
-        sys.exit(1)
+    ref = open(MAIN_BIN, 'rb').read()
+    disk = open(DISK_FILE, 'rb').read()
+    os.makedirs('output', exist_ok=True)
 
-    arg = sys.argv[1]
-    if arg.startswith('$') or arg.startswith('0x'):
-        scene_num = int(arg.lstrip('$').lstrip('0x'), 16)
+    args = sys.argv[1:]
+    if not args or args == ['all']:
+        scene_nums = list(range(70))
     else:
-        scene_num = int(arg)
+        scene_nums = [parse_number(a) for a in args]
 
-    output_file = sys.argv[2] if len(sys.argv) > 2 else f"output/scene_{scene_num:02x}.png"
-    render_scene(scene_num, output_file)
+    rendered = 0
+    for scene_num in scene_nums:
+        output_file = f"output/scene_{scene_num:02x}.png"
+        if render_scene(ref, disk, scene_num, output_file):
+            print(f"  Scene ${scene_num:02X} ({scene_num:2d}) -> {output_file}")
+            rendered += 1
+
+    print(f"\nRendered {rendered} scenes.")
 
 
 if __name__ == '__main__':
