@@ -26,7 +26,7 @@ Report the result:
 
 ## Verify against reference binaries
 
-After assembling, verify output matches the reference binaries:
+After assembling, verify output matches the reference binaries (run relative to project root):
 
 ```
 python .claude/skills/assemble/verify.py              # main full report
@@ -45,7 +45,7 @@ Targets and their reference binaries:
 
 ## Reorder chunks
 
-If chunk references get out of ORG order (causing "Origin Reverse-indexed" errors):
+If chunk references get out of ORG order (causing "Origin Reverse-indexed" errors) (run relative to project root):
 
 ```
 python .claude/skills/assemble/reorder_chunks.py          # main only

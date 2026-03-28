@@ -41,6 +41,8 @@ def read_track(dsk, track, base_page, mem):
         file_pos = (track * 16 + dos_logical) * 256
         dest = (base_page + page_offset) * 256 - BASE_ADDR
         if 0 <= dest and dest + 256 <= SIZE:
+            print(f"mem ${dest + BASE_ADDR:04X} = dsk ${file_pos:04X} (track {track},"
+                  f" dos sector {dos_logical}, physical sector {phys})")
             mem[dest:dest + 256] = dsk[file_pos:file_pos + 256]
 
 
