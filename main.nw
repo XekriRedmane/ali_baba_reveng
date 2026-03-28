@@ -5158,16 +5158,31 @@ loads them into the hi-res page area [[$2000--$32FF]] (tracks~[[$0F]] and
 [[$10]]).  During [[GAME_INIT]], the routine at [[$6DA5]] copies
 [[$2000--$32FF]] to [[$9600--$A8FF]] and clears [[$2000--$3FFF]].
 
-The Ali Baba font data for HRCG is stored at [[$83A5-$92A4]], starting with character set 1.
-Each character is 32 bytes, broken
-up into four blocks of eight bytes (7x8 blocks) each. The first block is the upper left of the character, the second block is
-the upper right, the third is the lower left, and the fourth is the lower right.
-Thus, each character is 14x16.
+The Ali Baba font data for HRCG is stored at [[$83A5--$92A4]] (3840~bytes,
+120~characters $\times$ 32~bytes each).  Each character is four 7$\times$8
+blocks (upper-left, upper-right, lower-left, lower-right) forming a
+14$\times$16 pixel glyph.
 
-Here are the font characters. There are 120 defined: 96 for character set 1,
-and 24 for character set 2. Characters 114-119 (character set 2, characters 18-23)
-form the EA logo that is displayed on the splash screen. Then character set 0
-defines the fallback characters 32 through 127.
+The 120~characters span five overlapping HRCG charsets (see
+Section~\ref{ch:scenes} for the charset overlap model):
+\begin{itemize}
+\item Characters 0--23 (charset~1): game map entity icons.
+\item Characters 24--47 (charset~2): border tiles and decorations.
+      Characters 114--119 (charset~2, positions 18--23) form the EA
+      logo displayed on the splash screen.
+\item Characters 48--119 (charsets~3--5): scene text in an ornate
+      medieval/Arabian typeface with colored pixels.
+\end{itemize}
+Charset~0 ([[STD_FONT_DATA]] at [[$97A5]]) provides the standard
+7$\times$8 fallback font (characters 32--127).
+
+\paragraph{Corrupted digit glyphs.}
+In the 4am/san~inc crack, the font glyphs for digits 2--8 (scene
+bytes \$1D--\$23, font characters 77--83) are zeroed out.  Digits~0,
+1, and~9 have partial data.  This is damage from the crack patching
+process---the original disk image contains intact digit glyphs.  As
+a result, numeric text in scenes (e.g.\ the copyright year ``1981''
+and the phone number in scene~0) renders with missing digits.
 
 <<font data>>=
     ORG     $83A5
