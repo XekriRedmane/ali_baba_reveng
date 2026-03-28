@@ -113,19 +113,25 @@ def is_empty_scene(data: bytes) -> bool:
     return True
 
 
-def render_scene(ref: bytes, disk: bytes, scene_num: int, output_file: str) -> bool:
-    """Render one scene to a PNG. Returns True if non-empty."""
+def render_scene(ref: bytes, disk: bytes, scene_num: int, output_base: str) -> int:
+    """Render one scene to PNG(s). Returns number of pages rendered.
+
+    If the scene has page breaks ($7E), each page is saved as a
+    separate file: output_base.png, output_base_p2.png, etc.
+    """
     scene_data = read_scene_sector(disk, scene_num)
     if scene_data is None:
-        return False
+        return 0
     if is_empty_scene(scene_data):
-        return False
+        return 0
 
     img_w = GRID_COLS * CHAR_W * SCALE
     img_h = GRID_ROWS * CHAR_H * SCALE
-    img = Image.new('RGB', (img_w, img_h), (0, 0, 0))
 
-    def draw_char(scene_char_idx: int, col: int, row: int) -> None:
+    def new_page() -> Image.Image:
+        return Image.new('RGB', (img_w, img_h), (0, 0, 0))
+
+    def draw_char(img: Image.Image, scene_char_idx: int, col: int, row: int) -> None:
         if scene_char_idx == 0:
             return
         font_idx = SCENE_CHAR_OFFSET + scene_char_idx
@@ -143,6 +149,8 @@ def render_scene(ref: bytes, disk: bytes, scene_num: int, output_file: str) -> b
                             if 0 <= ix < img_w and 0 <= iy < img_h:
                                 img.putpixel((ix, iy), color)
 
+    pages: list[Image.Image] = []
+    img = new_page()
     col = 2
     row = 0
     left_margin = 2
@@ -154,7 +162,11 @@ def render_scene(ref: bytes, disk: bytes, scene_num: int, output_file: str) -> b
         if b == 0x7F:
             break
         elif b == 0x7E:
-            pass  # page break — skip for static render
+            # Page break: save current page and start a new one
+            pages.append(img)
+            img = new_page()
+            col = left_margin
+            row = 0
         elif b == 0x7D:
             left_margin = 0
             right_margin = 20
@@ -164,15 +176,30 @@ def render_scene(ref: bytes, disk: bytes, scene_num: int, output_file: str) -> b
             if i < len(scene_data):
                 col = scene_data[i]
         else:
-            draw_char(b, col, row)
+            draw_char(img, b, col, row)
             col += 1
             if col >= right_margin:
                 col = left_margin
                 row += 1
         i += 1
 
-    img.save(output_file)
-    return True
+    pages.append(img)
+
+    # Save pages
+    # Strip .png extension from output_base if present
+    if output_base.endswith('.png'):
+        base = output_base[:-4]
+    else:
+        base = output_base
+
+    for page_num, page_img in enumerate(pages):
+        if len(pages) == 1:
+            filename = f"{base}.png"
+        else:
+            filename = f"{base}_p{page_num + 1}.png"
+        page_img.save(filename)
+
+    return len(pages)
 
 
 def parse_number(s: str) -> int:
@@ -196,13 +223,17 @@ def main() -> None:
         scene_nums = [parse_number(a) for a in args]
 
     rendered = 0
+    total_pages = 0
     for scene_num in scene_nums:
-        output_file = f"output/scene_{scene_num:02x}.png"
-        if render_scene(ref, disk, scene_num, output_file):
-            print(f"  Scene ${scene_num:02X} ({scene_num:2d}) -> {output_file}")
+        output_base = f"output/scene_{scene_num:02x}.png"
+        pages = render_scene(ref, disk, scene_num, output_base)
+        if pages > 0:
+            suffix = f" ({pages} pages)" if pages > 1 else ""
+            print(f"  Scene ${scene_num:02X} ({scene_num:2d}) -> output/scene_{scene_num:02x}*.png{suffix}")
             rendered += 1
+            total_pages += pages
 
-    print(f"\nRendered {rendered} scenes.")
+    print(f"\nRendered {rendered} scenes ({total_pages} pages total).")
 
 
 if __name__ == '__main__':
