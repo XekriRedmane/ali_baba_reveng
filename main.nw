@@ -5520,13 +5520,30 @@ $\text{HRCG\_FONT\_BASE} + (\text{selector} - 1) \times \$300$.
 Selectors outside 1--9 fall through to the standard 7$\times$8 font
 at [[STD_FONT_DATA]] (\$97A5).
 
-The game's custom font spans charsets 1--5:
+The game's custom font data spans \$83A5--\$92A4 (3840~bytes,
+120~characters at 32~bytes each).  Each charset page contains
+96~HRCG glyphs (768~bytes), and each custom character uses
+4~consecutive glyphs, so one page holds 24~characters.  Since
+charset pages overlap (each starts only 768~bytes after the
+previous), the 120~characters are distributed as:
+
 \begin{itemize}
-\item Charsets 1--2 (\$83A5--\$89A4): game map icons and border
-      characters (``font group~1'').
-\item Charsets 3--5 (\$89A5--\$92A4): scene text and UI characters
-      (``font group~2'').
+\item Charset~1 (\$83A5): characters 0--23 (game map icons).
+\item Charset~2 (\$86A5): characters 24--47 (border tiles).
+\item Charset~3 (\$89A5): characters 48--71 (scene text, stylized).
+\item Charset~4 (\$8CA5): characters 72--95 (scene text cont.).
+\item Charset~5 (\$8FA5): characters 96--119 (scene text cont.).
 \end{itemize}
+
+The scene text font (charsets 3--5) uses an ornate,
+medieval/Arabian-themed typeface with a decorative horizontal divider
+row across each letter---fitting the game's Arabian Nights setting.
+Characters are rendered in Apple~II hi-res color (not monochrome):
+the HRCG color artifact algorithm produces green, violet, orange, blue,
+and white pixels depending on bit patterns and the palette bit (bit~7).
+See [[font_data.py]] for the full color rendering algorithm, and
+\texttt{font\_data.tex} for a complete visual reference (characters
+48--119 correspond to the scene text glyphs).
 
 <<hrcg font ptr>>=
     ORG     $930D
@@ -5566,14 +5583,18 @@ HRCG_CTRL_A:
     ;   Charset 1 starts at HRCG_FONT_BASE ($83A5).
     ;   Charset N starts at HRCG_FONT_BASE + (N-1) * $300.
     ;
-    ;   Charset  Selector  Address  Contents
-    ;   -------  --------  -------  --------
-    ;      1       $B1     $83A5    Custom font group 1 (game icons)
-    ;      2       $B2     $86A5    Custom font group 1 cont. (border)
-    ;      3       $B3     $89A5    Custom font group 2 (scene text)
-    ;      4       $B4     $8CA5    Custom font group 2 cont.
-    ;      5       $B5     $8FA5    Custom font group 2 cont.
-    ;    0 or >9   ---     $97A5    Standard 7x8 font (STD_FONT_DATA)
+    ;   Charset  Selector  Address  Chars   Contents
+    ;   -------  --------  -------  -----   --------
+    ;      1       $B1     $83A5    0-23    Game map icons
+    ;      2       $B2     $86A5    24-47   Border tiles
+    ;      3       $B3     $89A5    48-71   Scene text (ornate font)
+    ;      4       $B4     $8CA5    72-95   Scene text cont.
+    ;      5       $B5     $8FA5    96-119  Scene text cont.
+    ;    0 or >9   ---     $97A5    ---     Standard 7x8 font
+    ;
+    ;   Each charset holds 96 glyphs (768 bytes).  Charsets overlap:
+    ;   charset N+1 starts 24 characters (768 bytes) after charset N.
+    ;   Scene text (group 2) starts at char 48 = charset 3.
     ;
     ; Output: HRCG_FONT_PTR set to the charset's base address.
     ;
