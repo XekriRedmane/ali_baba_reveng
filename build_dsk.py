@@ -143,13 +143,8 @@ def build_disk() -> bytearray:
     # Boot ROM reads physical sectors 0-4 into $0800-$0CFF
     # In .dsk, physical sector N is at offset logical_sector * 256
     # boot1.bin has pages in memory order ($0800, $0900, $0A00, $0B00, $0C00)
-    # First load all track 0 sectors (includes 4am crack code, etc.)
-    if os.path.exists('scenes/track_00.asm'):
-        t0_sectors = load_track_asm('scenes/track_00.asm')
-        for logical in range(16):
-            write_sector(dsk, 0, logical, t0_sectors[logical])
-
-    # Then overwrite the boot1 sectors (physical 0-4 = DOS logical 0,7,14,6,13)
+    # Write boot1 sectors (physical 0-4 = DOS logical 0,7,14,6,13).
+    # Remaining track 0 sectors are left as zeros.
     for page in range(5):
         phys = page  # Boot ROM reads physical sectors 0,1,2,3,4
         logical = DOS_SKEW[phys]
