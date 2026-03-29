@@ -25807,58 +25807,405 @@ layout (\$50--\$5F).
 <<EALDR unused prot vm>>=
     ORG     $A000
 EALDR_PROT_VM:
+    SUBROUTINE EALDR_PROT_VM
     ; Unused copy-protection VM ($A000-$A2FF).
     ; Checksummed by EALDR VM bytecodes but never executed.
-    ; Contains: data field verifier, address field search,
-    ; VM execution loop, dispatch, opcode handlers, bytecodes.
-    HEX     4C 69 A0 A0 20 88 F0 58 AD EC C0 10 FB 49 D5 D0    ; $A000: JMP $A069; verify data field (D5 AA AD)
-    HEX     F4 AD EC C0 10 FB C9 AA D0 F3 AD EC C0 10 FB C9    ; $A010
-    HEX     AD D0 EA 48 68 A0 56 AD EC C0 10 FB 2C 00 C0 C9    ; $A020
-    HEX     AF D0 31 88 D0 F1 A0 00 AD EC C0 10 FB 2C 00 C0    ; $A030
-    HEX     C9 AF D0 20 88 D0 F1 AC EC C0 10 FB 48 68 AD EC    ; $A040
-    HEX     C0 10 FB C9 DE D0 09 AD EC C0 10 FB C9 AA F0 02    ; $A050
-    HEX     38 60 18 60 8D F6 A2 38 60 20 E0 A1 20 B3 A1 4C    ; $A060: SEC;RTS / CLC;RTS / vm_loop
-    HEX     69 A0 04 63 79 07 74 02 8F 78 04 62 79 07 2C 02    ; $A070: VM bytecodes (copy-protection program)
-    HEX     8F 78 04 64 79 07 74 02 8F 78 05 A4 79 02 90 79    ; $A080
-    HEX     00 A7 79 05 A4 79 02 9F 79 00 A7 79 07 4E 02 8F    ; $A090
-    HEX     78 00 71 79 08 A5 78 04 EA 19 03 B3 01 AB 25 03    ; $A0A0
-    HEX     B3 01 AB 25 04 ED 19 03 4C 06 E1 7B 05 CC 79 05    ; $A0B0
-    HEX     CC 79 05 CC 79 05 CC 79 04 EB 19 04 E1 7B 09 03    ; $A0C0
-    HEX     4F 06 4F 78 01 4E 78 04 E4 19 01 4E 78 01 4E 78    ; $A0D0
-    HEX     04 E2 19 05 69 78 03 4F 06 4F 78 01 4E 78 04 E4    ; $A0E0
-    HEX     19 01 4E 78 01 4E 78 04 E6 19 05 69 78 09 A0 FF    ; $A0F0
-    HEX     AE 4C A1 AD EC C0 10 FB C9 D5 F0 07 88 D0 F4 CA    ; $A100: find sector (D5 AA 96 address field)
-    HEX     D0 F1 60 AD EC C0 10 FB C9 AA F0 05 88 D0 E4 38    ; $A110
-    HEX     60 AD EC C0 10 FB C9 96 F0 05 88 D0 D6 38 60 A0    ; $A120
-    HEX     02 AD EC C0 10 FB 2A 85 50 AD EC C0 10 FB 25 50    ; $A130
-    HEX     85 50 88 8E 4C A1 10 E9 18 A2 01 60 03 20 FE A0    ; $A140: read header nibbles; read-and-verify
-    HEX     B0 03 20 03 A0 A9 00 6D E2 A2 8D E2 A2 AD E0 C0    ; $A150
-    HEX     AD E2 C0 AD E4 C0 AD E6 C0 60 03 3C 01 82 78 04    ; $A160: phases off; more bytecodes
-    HEX     E3 19 04 E1 19 04 E7 19 04 E5 19 03 64 01 82 78    ; $A170
-    HEX     09 A2 20 CA D0 FD 38 E9 01 D0 F6 60 06 03 DD 0A    ; $A180: delay loop; bytecodes (continued)
-    HEX     8D 78 02 8F 78 04 8C 78 01 B3 78 07 B3 01 B3 78    ; $A190
-    HEX     06 8C 78 00 8F 78 20 E0 A1 18 60 20 E0 A1 38 60    ; $A1A0: vm_exit_ok; vm_exit_err; xor_d9
-    HEX     49 D9 60 8A 48 98 48 20 38 A2 68 85 52 68 85 53    ; $A1B0: vm_dispatch (RTS-trick entry)
-    HEX     A0 04 B1 52 C8 D0 02 E6 53 AA BD D3 A1 8D E0 A2    ; $A1C0: fetch + dispatch via table
-    HEX     4C DF A2 00 27 55 5F 6D 8A AD B9 4F A2 CE 26 79    ; $A1D0: dispatch table (13 entries, page $A2)
-    HEX     A2 0F B5 50 48 BD E5 A2 95 50 68 9D E5 A2 CA 10    ; $A1E0: context swap (ZP $50-$5F <-> $A2E5)
-    HEX     F1 60 C4 CF CE A7 D4 A0 C2 D2 C5 C1 CB A0 D4 C8    ; $A1F0: "DON'T BREAK TH" (high-ASCII)
-    HEX     20 10 A2 A5 54 85 52 A5 55 85 53 A0 00 4C C2 A1    ; $A200: OP GOTO; read_arg16
-    HEX     B1 52 49 03 C8 D0 02 E6 53 85 54 B1 52 C8 D0 02    ; $A210
-    HEX     E6 53 49 D9 85 55 60 20 10 A2 98 48 A5 56 20 52    ; $A220: OP CALL1; pull_ip (RTS-trick)
-    HEX     A2 85 56 68 A8 4C C2 A1 68 85 54 68 85 55 68 85    ; $A230
-    HEX     52 68 85 53 E6 52 E6 54 D0 02 E6 55 6C 54 00 20    ; $A240: pull_ip (cont); OP CALL; OP BEQ
-    HEX     10 A2 6C 54 00 20 10 A2 A5 56 D0 A7 4C C2 A1 B1    ; $A250
-    HEX     52 C8 D0 02 E6 53 49 4C 85 56 4C C2 A1 20 10 A2    ; $A260: OP LDI; OP LD
-    HEX     A2 00 A1 54 85 56 4C C2 A1 20 10 A2 A5 56 18 65    ; $A270
-    HEX     54 85 54 90 02 E6 55 4C 70 A2 20 10 A2 98 18 65    ; $A280: OP LDX; OP CALL_SAVE
-    HEX     52 85 52 90 02 E6 53 A5 52 48 A5 53 48 A0 00 4C    ; $A290
-    HEX     03 A2 68 85 53 68 85 52 A0 00 4C C2 A1 20 10 A2    ; $A2A0: OP RET; OP ST
-    HEX     A5 56 A2 00 81 54 4C C2 A1 B1 52 C8 D0 02 E6 53    ; $A2B0
-    HEX     49 4C 85 54 A5 56 38 E5 54 85 56 4C C2 A1 20 10    ; $A2C0: OP SUBI; OP INC
-    HEX     A2 A2 00 A1 54 18 69 01 81 54 85 56 4C C2 A1 4C    ; $A2D0
-    HEX     00 A2 00 00 00 0E 96 8C 41 96 41 20 D3 D3 D3 D3    ; $A2E0: trampoline; err acc; saved ZP state
-    HEX     D3 D3 D3 D3 D3 D3 00 5E 24 46 46 35 39 0D 02 3B    ; $A2F0: scratch/padding
+
+    ; --- $A000: entry trampoline ---
+    JMP     .vm_loop
+
+    ; --- $A003: VERIFY_DATA_FIELD ---
+    ; D5 AA AD prologue, verify 342 nibbles = $AF, DE AA epilogue.
+.verify_data:
+    LDY     #$20
+.vd_retry:
+    DEY
+    BEQ     .vd_fail
+.vd_wait_d5:
+    LDA     $C0EC
+    BPL     .vd_wait_d5
+.vd_chk_d5:
+    EOR     #$D5
+    BNE     .vd_retry
+.vd_wait_aa:
+    LDA     $C0EC
+    BPL     .vd_wait_aa
+    CMP     #$AA
+    BNE     .vd_chk_d5
+.vd_wait_ad:
+    LDA     $C0EC
+    BPL     .vd_wait_ad
+    CMP     #$AD
+    BNE     .vd_chk_d5
+    PHA
+    PLA
+    LDY     #$56
+.vd_sec:
+    LDA     $C0EC
+    BPL     .vd_sec
+    BIT     $C000
+    CMP     #$AF
+    BNE     .vd_bad
+    DEY
+    BNE     .vd_sec
+    LDY     #$00
+.vd_pri:
+    LDA     $C0EC
+    BPL     .vd_pri
+    BIT     $C000
+    CMP     #$AF
+    BNE     .vd_bad
+    DEY
+    BNE     .vd_pri
+.vd_epi:
+    LDY     $C0EC
+    BPL     .vd_epi
+    PHA
+    PLA
+.vd_de:
+    LDA     $C0EC
+    BPL     .vd_de
+    CMP     #$DE
+    BNE     .vd_fail
+.vd_aa2:
+    LDA     $C0EC
+    BPL     .vd_aa2
+    CMP     #$AA
+    BEQ     .vd_ok
+.vd_fail:
+    SEC
+    RTS
+.vd_ok:
+    CLC
+    RTS
+.vd_bad:
+    STA     EALDR_PROT_LAST_BAD
+    SEC
+    RTS
+
+    ; --- $A069: VM execution loop ---
+.vm_loop:
+    JSR     .context_swap
+    JSR     .vm_dispatch
+    JMP     .vm_loop
+
+    ; --- $A072: VM bytecodes (copy-protection program) ---
+    ; Last 2 bytes ($A0FE) = LDY #$FF entry for find_sector.
+EALDR_PROT_BYTECODES_1:
+    HEX     04 63 79 07 74 02 8F 78 04 62 79 07 2C 02 8F 78
+    HEX     04 64 79 07 74 02 8F 78 05 A4 79 02 90 79 00 A7
+    HEX     79 05 A4 79 02 9F 79 00 A7 79 07 4E 02 8F 78 00
+    HEX     71 79 08 A5 78 04 EA 19 03 B3 01 AB 25 03 B3 01
+    HEX     AB 25 04 ED 19 03 4C 06 E1 7B 05 CC 79 05 CC 79
+    HEX     05 CC 79 05 CC 79 04 EB 19 04 E1 7B 09 03 4F 06
+    HEX     4F 78 01 4E 78 04 E4 19 01 4E 78 01 4E 78 04 E2
+    HEX     19 05 69 78 03 4F 06 4F 78 01 4E 78 04 E4 19 01
+    HEX     4E 78 01 4E 78 04 E6 19 05 69 78 09 A0 FF
+
+    ; --- $A100: FIND_SECTOR (D5 AA 96 search) ---
+.find_sector:
+    LDX     .fs_retries
+.fs_d5:
+    LDA     $C0EC
+    BPL     .fs_d5
+    CMP     #$D5
+    BEQ     .fs_got_d5
+    DEY
+    BNE     .fs_d5
+    DEX
+    BNE     .fs_d5
+    RTS
+.fs_got_d5:
+    LDA     $C0EC
+    BPL     .fs_got_d5
+    CMP     #$AA
+    BEQ     .fs_got_aa
+    DEY
+    BNE     .fs_d5
+    SEC
+    RTS
+.fs_got_aa:
+    LDA     $C0EC
+    BPL     .fs_got_aa
+    CMP     #$96
+    BEQ     .fs_hdr
+    DEY
+    BNE     .fs_d5
+    SEC
+    RTS
+.fs_hdr:
+    LDY     #$02
+.fs_pair:
+    LDA     $C0EC
+    BPL     .fs_pair
+    ROL
+    STA     $50
+.fs_even:
+    LDA     $C0EC
+    BPL     .fs_even
+    AND     $50
+    STA     $50
+    DEY
+    STX     .fs_retries
+    BPL     .fs_pair
+    CLC
+    LDX     #$01
+    RTS
+.fs_retries:
+    DC.B    $03
+
+    ; --- $A14D: READ_AND_VERIFY ---
+.read_verify:
+    JSR     EALDR_PROT_BYTECODES_1+140
+    BCS     .rv_done
+    JSR     .verify_data
+.rv_done:
+    LDA     #$00
+    ADC     EALDR_PROT_ERR_ACC
+    STA     EALDR_PROT_ERR_ACC
+    LDA     $C0E0
+    LDA     $C0E2
+    LDA     $C0E4
+    LDA     $C0E6
+    RTS
+
+    ; --- $A16A: VM bytecodes (continued) ---
+EALDR_PROT_BYTECODES_2:
+    HEX     03 3C 01 82 78 04 E3 19 04 E1 19 04 E7 19 04 E5 19 03 64 01 82 78 09
+
+    ; --- $A181: delay loop (called by VM CALL1) ---
+.prot_delay:
+    LDX     #$20
+.pd_inner:
+    DEX
+    BNE     .pd_inner
+    SEC
+    SBC     #$01
+    BNE     .prot_delay
+    RTS
+
+    ; --- $A18C: VM bytecodes (continued) ---
+EALDR_PROT_BYTECODES_3:
+    HEX     06 03 DD 0A 8D 78 02 8F 78 04 8C 78 01 B3 78 07 B3 01 B3 78 06 8C 78 00 8F 78
+
+    ; --- $A1A6: VM exit routines ---
+.vm_exit_ok:
+    JSR     .context_swap
+    CLC
+    RTS
+.vm_exit_err:
+    JSR     .context_swap
+    SEC
+    RTS
+.xor_d9:
+    EOR     #$D9
+    RTS
+
+    ; --- $A1B3: VM dispatch (RTS-trick) ---
+.vm_dispatch:
+    TXA
+    PHA
+    TYA
+    PHA
+    JSR     .pull_ip
+    PLA
+    STA     $52
+    PLA
+    STA     $53
+    LDY     #$04
+.vm_resume:
+    LDA     ($52),Y
+    INY
+    BNE     .vm_np
+    INC     $53
+.vm_np:
+    TAX
+    LDA     .dispatch_tbl,X
+    STA     EALDR_PROT_JMP+1
+    JMP     EALDR_PROT_JMP
+
+    ; --- $A1D3: dispatch table (13 entries, page $A2) ---
+.dispatch_tbl:
+    HEX     00 27 55 5F 6D 8A AD B9 4F A2 CE 26 79
+
+    ; --- $A1E0: context swap ($50-$5F <-> saved state) ---
+.context_swap:
+    LDX     #$0F
+.cs_loop:
+    LDA     $50,X
+    PHA
+    LDA     EALDR_PROT_ZP_SAVE,X
+    STA     $50,X
+    PLA
+    STA     EALDR_PROT_ZP_SAVE,X
+    DEX
+    BPL     .cs_loop
+    RTS
+
+    ; --- $A1F2: "DON'T BREAK TH" (high-ASCII) ---
+EALDR_PROT_MESSAGE:
+    HEX     C4 CF CE A7 D4 A0 C2 D2 C5 C1 CB A0 D4 C8
+
+    ; --- $A200: VM opcode handlers ---
+    ; OP $00: GOTO
+EALDR_PROT_OP_GOTO:
+    JSR     .read_arg16
+    LDA     $54
+    STA     $52
+    LDA     $55
+    STA     $53
+    LDY     #$00
+    JMP     .vm_resume
+    ; read_arg16: decrypt 2-byte address -> $54/$55
+.read_arg16:
+    LDA     ($52),Y
+    EOR     #$03
+    INY
+    BNE     .ra1
+    INC     $53
+.ra1:
+    STA     $54
+    LDA     ($52),Y
+    INY
+    BNE     .ra2
+    INC     $53
+.ra2:
+    EOR     #$D9
+    STA     $55
+    RTS
+    ; OP $01: CALL1
+.op_call1:
+    JSR     .read_arg16
+    TYA
+    PHA
+    LDA     $56
+    JSR     .call_ind
+    STA     $56
+    PLA
+    TAY
+    JMP     .vm_resume
+    ; pull_ip (RTS-trick bootstrap)
+.pull_ip:
+    PLA
+    STA     $54
+    PLA
+    STA     $55
+    PLA
+    STA     $52
+    PLA
+    STA     $53
+    INC     $52
+    INC     $54
+    BNE     .pi_nc
+    INC     $55
+.pi_nc:
+    JMP     ($0054)
+    ; OP $05: CALL
+.op_call:
+    JSR     .read_arg16
+.call_ind:
+    JMP     ($0054)
+    ; OP $02: BNE
+.op_bne:
+    JSR     .read_arg16
+    LDA     $56
+    BNE     EALDR_PROT_OP_GOTO+3
+    JMP     .vm_resume
+    ; OP $03: LDI
+.op_ldi:
+    LDA     ($52),Y
+    INY
+    BNE     .ldi_np
+    INC     $53
+.ldi_np:
+    EOR     #$4C
+    STA     $56
+    JMP     .vm_resume
+    ; OP $04: LD
+.op_ld:
+    JSR     .read_arg16
+.ld_do:
+    LDX     #$00
+    LDA     ($54,X)
+    STA     $56
+    JMP     .vm_resume
+    ; OP $0B: LDX (indexed)
+.op_ldx:
+    JSR     .read_arg16
+    LDA     $56
+    CLC
+    ADC     $54
+    STA     $54
+    BCC     .ldx_nc
+    INC     $55
+.ldx_nc:
+    JMP     .ld_do
+    ; OP $05 alt: CALL with IP save
+.op_call_s:
+    JSR     .read_arg16
+    TYA
+    CLC
+    ADC     $52
+    STA     $52
+    BCC     .ocs_nc
+    INC     $53
+.ocs_nc:
+    LDA     $52
+    PHA
+    LDA     $53
+    PHA
+    LDY     #$00
+    JMP     EALDR_PROT_OP_GOTO+3
+    ; OP $06: RET
+.op_ret:
+    PLA
+    STA     $53
+    PLA
+    STA     $52
+    LDY     #$00
+    JMP     .vm_resume
+    ; OP $07: ST
+.op_st:
+    JSR     .read_arg16
+    LDA     $56
+    LDX     #$00
+    STA     ($54,X)
+    JMP     .vm_resume
+    ; OP $08: SUBI
+.op_subi:
+    LDA     ($52),Y
+    INY
+    BNE     .sub_np
+    INC     $53
+.sub_np:
+    EOR     #$4C
+    STA     $54
+    LDA     $56
+    SEC
+    SBC     $54
+    STA     $56
+    JMP     .vm_resume
+    ; OP $0A: INC
+.op_inc:
+    JSR     .read_arg16
+    LDX     #$00
+    LDA     ($54,X)
+    CLC
+    ADC     #$01
+    STA     ($54,X)
+    STA     $56
+    JMP     .vm_resume
+
+    ; --- $A2DF: dispatch trampoline ---
+EALDR_PROT_JMP:
+    JMP     EALDR_PROT_OP_GOTO
+EALDR_PROT_ERR_ACC:
+    DC.B    $00,$00,$00
+EALDR_PROT_ZP_SAVE:
+    HEX     0E 96 8C 41 96 41 20 D3 D3 D3 D3 D3 D3 D3 D3 D3 D3
+EALDR_PROT_LAST_BAD:
+    DC.B    $00
+    HEX     5E 24 46 46 35 39 0D 02 3B
 @ %def EALDR_PROT_VM
 
 @ \subsection{Resident routines copy (\$A300--\$A5FF)}
