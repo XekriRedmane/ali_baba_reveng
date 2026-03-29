@@ -1858,7 +1858,7 @@ the mob data table and associated name strings.
 The 128 mob data records and name strings are documented in
 Chapter~\ref{ch:mob-data}.
 
-@ [[s_PRINT_FONT_CHAR]] at [[$80A4]] is the 10-byte self-modifying HRCG
+@ [[s_PRINT_FONT_CHAR]] is the 10-byte self-modifying HRCG
 control string that [[RENDER_FONT_CHAR]] patches with character-set and
 glyph codes before passing to [[PRINT_STRING]].  It is a 9-byte
 self-modifying string: the routine patches [[CHAR_CHARSET]],
@@ -2013,7 +2013,8 @@ the current selection index back into the table.
 
 <<zero page defines>>=
 MENU_DESC_PTR           EQU     $C0     ; menu descriptor table pointer (2 bytes, $C0/$C1)
-@ %def MENU_DESC_PTR
+MENU_OPTION_PTR         EQU     $C2     ; current menu option record pointer (2 bytes, $C2/$C3)
+@ %def MENU_DESC_PTR MENU_OPTION_PTR
 
 <<var current selection>>=
     ORG     $5AAB
@@ -2120,16 +2121,16 @@ SHOP_BUY_HANDLER:
 @ [[CHECK_INPUT]] polls the keyboard and joystick for input.
 
 \paragraph{Keyboard mode.}
-Reads [[$C000]]; if a key is pressed, compares it against three 5-byte
+Reads [[KBD_DATA]]; if a key is pressed, compares it against three 5-byte
 direction key tables (uppercase IJKM+space, lowercase ijkm+CR, and
 control variants).  If matched, returns the direction index (0--4) in~A
 with the N~flag clear.  Unmatched keys clear the strobe and return with
 N~set.
 
 \paragraph{Joystick mode.}
-If [[INPUT_MODE]] is nonzero, first checks the paddle button ([[$C061]]);
+If [[INPUT_MODE]] is nonzero, first checks the paddle button ([[PADDL0]]);
 if pressed, returns 0 (fire).  Otherwise reads both paddles via the ROM
-[[PREAD]] routine ([[$FB1E]]), converts each axis to a zone (0=low, 1=center,
+[[PREAD]] routine ([[ROM_PREAD]]), converts each axis to a zone (0=low, 1=center,
 2=high) using the threshold tables at [[JOY_THRESH_LO]]/[[JOY_THRESH_HI]],
 and maps the two zones to a direction index (1=up, 2=down, 3=left, 4=right).
 If both axes are centered, re-checks the paddle button.
@@ -4289,7 +4290,7 @@ SET_RESTRICTED:
 \chapter{Input System}
 
 The game's menu-driven input system uses a table-based architecture.  Each
-menu is defined by a descriptor block pointed to by [[$C0/$C1]]: byte~0 is
+menu is defined by a descriptor block pointed to by [[MENU_DESC_PTR]]: byte~0 is
 the number of options, byte~1 is the default selection, bytes~2--3 hold a
 pointer to an initialization routine, and each option record contains display
 data and an exit handler.  [[INPUT_LOOP]] drives the cycle: it calls
@@ -4436,10 +4437,10 @@ DRAW_INPUT_OPTIONS:
     RTS
 @ %def DRAW_INPUT_OPTIONS
 @ [[CALC_RECORD_PTR]] translates a 1-based option index in~A to a pointer to
-that option's 10-byte record.  The formula is [[$C2/$C3]] =
-[[$C0/$C1]] + A$\times$10 $-$ 6, which accounts for the 4-byte table
+that option's 10-byte record.  The formula is [[MENU_OPTION_PTR]] =
+[[MENU_DESC_PTR]] + A$\times$10 $-$ 6, which accounts for the 4-byte table
 header (so option~1 maps to the first record after the header).  The
-resulting pointer in [[$C2/$C3]] is used by [[SETUP_CURSOR]],
+resulting pointer in [[MENU_OPTION_PTR]] is used by [[SETUP_CURSOR]],
 [[VALIDATE_INPUT]], and other input routines to access the selected option's
 data.
 
@@ -4493,7 +4494,7 @@ SETUP_CURSOR_EXT:
 @ [[SETUP_CURSOR]] positions the cursor at the location specified by the
 current option record, sends HRCG control codes A/B via [[PRINT_CTRL_AB]]
 to enter character output mode, loads the option's display string pointer
-from bytes~6--7 of the record at [[$C2]], prints it with
+from bytes~6--7 of the record at [[MENU_OPTION_PTR]], prints it with
 [[PRINT_STRING]], and finishes with ctrl-N to restore normal video.
 
 <<setup cursor>>=
@@ -4521,7 +4522,7 @@ SETUP_CURSOR:
     JMP     PRINT_CTRL_N
 @ %def SETUP_CURSOR
 @ [[SET_CURSOR_POS]] converts the linear position stored in byte~1 of the
-option record at [[$C2]] into screen coordinates.  Positions 0--39 map to
+option record at [[MENU_OPTION_PTR]] into screen coordinates.  Positions 0--39 map to
 row~21, 40--79 to row~22, and 80+ to row~23.  The column within each row is
 the remainder after subtracting the row offset.  The result is written to
 the Apple~II cursor position bytes [[$24]] (HTAB) and [[$25]] (VTAB).
@@ -4570,7 +4571,7 @@ SET_CURSOR_POS:
 candidate, it calls [[CALC_RECORD_PTR]] and checks byte~0 of the record:
 if non-zero, the option is valid and its index is returned in~A.  Zero or
 the current selection are returned directly (indicating ``no change'' or
-``same selection'').  The saved [[$C2/$C3]] pointer is restored before
+``same selection'').  The saved [[MENU_OPTION_PTR]] pointer is restored before
 returning so the caller's record context is preserved.
 
 @ [[INPUT_SCAN_OFFSET]] is a scratch byte used by
@@ -4622,7 +4623,7 @@ VALIDATE_INPUT:
     RTS
 @ %def VALIDATE_INPUT
 @ [[READ_INPUT_CHAR]] reads a character code from the option record by
-indexing into the record at [[$C2]] using the offset stored at~\$5B24 plus~1.
+indexing into the record at [[MENU_OPTION_PTR]] using the offset stored at~\$5B24 plus~1.
 This returns the key code that would select the option one position after the
 stored offset, used by [[VALIDATE_INPUT]] to scan through valid inputs.
 
@@ -4648,7 +4649,7 @@ READ_INPUT_CHAR:
     RTS
 @ %def READ_INPUT_CHAR
 @ [[CALL_INPUT_INIT]] reads the initialization routine address from bytes~2--3
-of the menu descriptor at [[$C0]] and executes it via an indirect jump through
+of the menu descriptor at [[MENU_DESC_PTR]] and executes it via an indirect jump through
 [[INPUT_JMP_VEC]].  This allows each menu to run custom setup code---for
 example, enabling or disabling options based on the current game state---before
 the input loop begins.
@@ -4729,7 +4730,7 @@ RENDER_INPUT_BUFFER:
 @ %def RENDER_INPUT_BUFFER
 @ [[COPY_RECORD_DATA]] copies an option's display string into the input
 display buffer.  It loads the string pointer from bytes~6--7 of the record
-at [[$C2]], reads the string length from byte~0 of the string, uses byte~1
+at [[MENU_OPTION_PTR]], reads the string length from byte~0 of the string, uses byte~1
 of the record as a column offset, and copies the string's characters into
 [[INPUT_BUFFER]] at the computed position.  The copy runs backwards (from
 last character to first) to avoid needing a separate length counter.
@@ -6569,7 +6570,7 @@ CHECK_ENCOUNTER:
 Walks the group chain starting from the current mob ([[MOB_PTR]]),
 looking for another mob at the same map position (byte~3 of mob data).
 If the current mob is the last in the chain (byte~2 = 0), the search
-wraps around to the first mob via the group head ([[$FA/$FB]]).
+wraps around to the first mob via the group head ([[CHAR_PTR]]).
 
 Returns in~[[A]]:
 \begin{itemize}
@@ -8052,7 +8053,7 @@ during specific encounters (type [[$40]] and above).  [[HANDLE_ENCOUNTER]]
 writes the character's updated position from this variable after committing
 the move and reordering the character.
 
-@ [[EVENT_PTR]] is a 2-byte zero-page pointer at [[$BE/$BF]] that points
+@ [[EVENT_PTR]] is a 2-byte zero-page pointer at [[ENTITY_REC]] that points
 to the current event list entry.  [[HANDLE_ENCOUNTER]] reads the event
 type from byte 1 and the destination from byte 2 through this pointer.
 
@@ -9723,7 +9724,7 @@ INC_MOB_COUNTERS:
 @ [[FIND_NEAREST_EVENT]] scans the character's event list for the closest
 non-activated event, measured by Manhattan distance from the entity's current
 position.  It loads the event list pointer from bytes~6--7 of the character
-record at [[$FA]] and walks the 3-byte entries: entries with byte~1 at~\$C0 or
+record at [[CHAR_PTR]] and walks the 3-byte entries: entries with byte~1 at~\$C0 or
 above are already activated and are skipped, entries marked~\$FE (empty slot)
 are skipped, and~\$FF marks the end of the list.  For each eligible entry,
 the routine calls [[MANHATTAN_DISTANCE]] and keeps track of the nearest one
@@ -11908,7 +11909,7 @@ sub-values below~\$1B, at~\$1D, and above~\$1D each routed differently.
 Nine distinct handler addresses are used in total, covering the full range
 of entity types from empty slots to treasure, mobs, shops, and map features.
 
-@ [[HANDLER_PTR]] is a 2-byte zero-page pointer at [[$BC/$BD]] that
+@ [[HANDLER_PTR]] is a 2-byte zero-page pointer at [[PRINT_STRING_ADDR]] that
 [[CLASSIFY_ENTITY_TYPE]] sets to the address of the handler routine matching
 the entity's type.  Callers use this pointer to dispatch entity-specific
 behavior after classification.
@@ -12805,7 +12806,7 @@ INCR_GROUP_COUNT:
     STA     (DATA_PTR),Y      ; /
     RTS
 @ %def DECR_GROUP_COUNT INCR_GROUP_COUNT
-Group iteration uses two zero-page pointer pairs: [[$FA/$FB]] points
+Group iteration uses two zero-page pointer pairs: [[CHAR_PTR]] points
 to the group head (or the member currently being processed), and
 [[MOB_PTR]] is the iteration cursor that advances through the chain.
 Both routines follow the ``next'' link in byte~2 of a mob data record,
@@ -12814,7 +12815,7 @@ If the link is zero (end of chain), [[MOB_PTR]] is set to null.
 
 \begin{itemize}
 \item [[FIRST_GROUP_MEMBER]] ([[FIRST_GROUP_MEMBER]]): begins iteration by following
-      byte~2 of the group head at~[[$FA/$FB]].  If that link is zero,
+      byte~2 of the group head at~[[CHAR_PTR]].  If that link is zero,
       falls through to check [[MOB_PTR]] as a fallback.
 \item [[NEXT_GROUP_MEMBER]] ([[NEXT_GROUP_MEMBER]]): continues iteration by following
       byte~2 of the current cursor at~[[MOB_PTR]].
@@ -13024,7 +13025,7 @@ SETUP_CHAR_SPRITE:
     JMP     RENDER_FONT_CHAR
 @ %def SETUP_CHAR_SPRITE
 @ [[LOAD_CHAR_TO_FA]] is a thin wrapper: it calls [[GET_CHAR_RECORD]] and
-copies the result from [[DATA_PTR]] to [[CHAR_PTR]] ([[$FA/$FB]]).  Several
+copies the result from [[DATA_PTR]] to [[CHAR_PTR]] ([[CHAR_PTR]]).  Several
 callers use this as a shortcut to both look up a character and set the
 main iteration pointer.
 
@@ -14259,7 +14260,7 @@ SETUP_TEXT_POS_COL20:          ; $76D8 - original SETUP_TEXT_POS_COL20 entry
 \section{Character stats display}
 
 [[DISPLAY_CHAR_STATS]] formats and displays the statistics of the
-character whose record is pointed to by [[ENTITY_PTR]] ([[$F8/$F9]]).
+character whose record is pointed to by [[ENTITY_PTR]] ([[ENTITY_PTR]]).
 It reads eight fields from the entity record, converts each to decimal
 via [[NUM_TO_DECIMAL]], and writes the digits into a pre-formatted
 string template at [[STATS_TEMPLATE]].  After displaying the stats, it waits for
@@ -14531,15 +14532,15 @@ DISPLAY_CHAR_STATS:
 before the main loop or attract screen.  The steps, in order:
 
 \begin{enumerate}
-\item Set the reset vector to [[COLD_RESTART]] via the ROM routine at [[$FB6F]].
+\item Set the reset vector to [[COLD_RESTART]] via the ROM routine at [[ROM_SETRES]].
 \item Disable the blink cursor by setting [[BLINK_COL]] to [[20]].
 \item Call [[RELOCATE_HIRES_STAGING]] to copy the HRCG library and disk I/O
   routines from the staging area at [[$2000--$3FFF]] to their runtime
   addresses ([[$9600+]] and [[$B300+]]), then clear the staging area to free
   the hi-res page for graphics.
 \item Switch to hi-res graphics mode by setting the soft switches at
-  [[$C050]] (graphics), [[$C052]] (full screen), [[$C054]] (page~1), and
-  [[$C057]] (hi-res).
+  [[TXTCLR]] (graphics), [[MIXCLR]] (full screen), [[PAGE1]] (page~1), and
+  [[HIRES]] (hi-res).
 \item Call [[INIT_DISK_IOB]] to set up the disk I/O parameter block.
 \item Call [[INIT_HRCG]] to patch and initialize the [[HRCG]] text engine.
 \item Call [[SET_TEXT_WINDOW_WRAP]] to enable text window wrap mode.
@@ -14560,7 +14561,7 @@ before the main loop or attract screen.  The steps, in order:
     use when drawing the map).  Zeroing ensures it will be reloaded from the
     location record on the first scene entry.
   \item [[ENTITY_PTR+1]]---the high byte of the entity record pointer
-    ([[$F8/$F9]]).  Zeroing signals ``no entity selected,'' preventing stale
+    ([[ENTITY_PTR]]).  Zeroing signals ``no entity selected,'' preventing stale
     pointer references before the first character is processed.
   \end{itemize}
 \item Call [[SELECT_INPUT_MODE]] to detect keyboard or joystick.
@@ -14575,7 +14576,7 @@ before the main loop or attract screen.  The steps, in order:
 [[BLINK_COL]] is the cursor blink column; storing [[$14]] disables the
 blink.  [[LOCATION_POS]], [[LOCATION_STYLE]], and [[CURRENT_PLAYER]] are
 the three variables cleared to zero during step~13/17 (described above).
-[[ENTITY_PTR]] ([[$F8/$F9]]) is the 2-byte pointer to the entity record
+[[ENTITY_PTR]] ([[ENTITY_PTR]]) is the 2-byte pointer to the entity record
 currently being processed.
 
 <<defines>>=
@@ -14698,8 +14699,8 @@ The copy loop at [[.copy]] also clears each source byte, leaving the
 hi-res page zeroed for use as a graphics buffer.
 
 @ [[RELOCATE_HIRES_STAGING]] uses two zero-page pointer pairs for
-its block copy: [[COPY_SRC]] ([[$BC/$BD]]) points to the source
-address in the staging area, and [[COPY_DEST]] ([[$BA/$BB]]) points
+its block copy: [[COPY_SRC]] ([[PRINT_STRING_ADDR]]) points to the source
+address in the staging area, and [[COPY_DEST]] ([[MOB_DATA_PTR]]) points
 to the runtime destination.  The loop copies one byte at a time,
 zeroing the source as it goes.
 
@@ -14832,7 +14833,7 @@ opening tune.  Steps:
 \item Calls [[INIT_GAME_DISPLAY]] to initialize the game display (draws borders,
   sets text windows).
 \item Sets [[DISPATCH_VEC]] to point to the game action handler at [[GAME_ACTION_HANDLER]],
-  used by the tune player's indirect dispatch at [[$7A49]].
+  used by the tune player's indirect dispatch at [[TUNE_ACTION_INDIRECT]].
 \item Clears [[INPUT_MODE]] (game state flag).
 \item Patches [[CHAR_CHARSET]] to [[$B1]] ([[LDA (zp),Y]] opcode), restoring
   the character renderer's indirect load.
@@ -14842,7 +14843,7 @@ opening tune.  Steps:
 \end{enumerate}
 
 @ [[INIT_GAME_STATE]] stores [[GAME_ACTION_HANDLER]] into the zero-page
-vector [[DISPATCH_VEC]] ([[$F6/$F7]]).  The tune player uses this vector
+vector [[DISPATCH_VEC]] ([[EFFECT_REC]]).  The tune player uses this vector
 for indirect action dispatch; after the opening tune finishes,
 [[INIT_GAME_STATE]] patches the dispatch site to bypass the vector entirely.
 
@@ -14909,7 +14910,20 @@ active, [[ROM_COUT1]] is redirected through the CSW vector to
 
 <<defines>>=
 ROM_COUT1            EQU     $FDED   ; Apple II ROM COUT1 (character output)
-@ %def ROM_COUT1
+ROM_PREAD            EQU     $FB1E   ; Apple II ROM PREAD (read paddle)
+ROM_SETRES           EQU     $FB6F   ; Apple II ROM SETRES (set reset vector)
+@ %def ROM_COUT1 ROM_PREAD ROM_SETRES
+
+<<defines>>=
+KBD_DATA             EQU     $C000   ; keyboard data register (bit 7 = key available)
+KBD_STROBE           EQU     $C010   ; keyboard strobe (clear bit 7)
+SPEAKER              EQU     $C030   ; speaker toggle
+PADDL0               EQU     $C061   ; paddle button 0
+TXTCLR               EQU     $C050   ; display soft-switch: graphics mode
+MIXCLR               EQU     $C052   ; display soft-switch: full screen (no text window)
+PAGE1                EQU     $C054   ; display soft-switch: page 1
+HIRES                EQU     $C057   ; display soft-switch: hi-res mode
+@ %def KBD_DATA KBD_STROBE SPEAKER PADDL0 TXTCLR MIXCLR PAGE1 HIRES
 
 <<zero page defines>>=
 TEXT_STREAM_PTR         EQU     $06     ; text stream pointer for TEXT_RENDERER (2 bytes)
@@ -15086,7 +15100,7 @@ before drawing.  The position tables ([[BORDER_POS_HORIZ]],
 [[BORDER_POS_VERT_L]], [[BORDER_POS_VERT_R]]) each contain pairs of
 column/row bytes.  The pattern strings ([[BORDER_STR_HORIZ]],
 [[BORDER_STR_VERT_L]], [[BORDER_STR_VERT_R]]) are printed at each
-position via [[PRINT_STRING_ADDR]] ([[$BC/$BD]]).  [[BORDER_LOOP_CTR]]
+position via [[PRINT_STRING_ADDR]] ([[PRINT_STRING_ADDR]]).  [[BORDER_LOOP_CTR]]
 is a RAM counter used to track the loop iteration.
 
 <<zero page defines>>=
@@ -15678,7 +15692,7 @@ SELECT_INPUT_MODE:
 
 @ [[INIT_MOB_COUNT]] is called once during [[GAME_INIT]] to initialize
 [[TOTAL_MOB_COUNT]].  It walks all 9-byte character records using
-[[CHAR_PTR]] ([[$FA/$FB]]) starting from index~1 (skipping the group-0
+[[CHAR_PTR]] ([[CHAR_PTR]]) starting from index~1 (skipping the group-0
 header at [[MOB_BASE_LO]]), summing byte~8 (group member count) of each record
 until the end sentinel (byte~1 = [[$FF]]) is reached.
 
@@ -16021,7 +16035,7 @@ COLROW_TO_POS:
 
 @ [[GET_MOB_DATA]] computes a pointer into the game data from a 1-based
 index in~A.  Each record is 16~bytes.  The result [[MOB_DATA_PTR]]
-([[$BA/$BB]]) = [[MOB_BASE_LO]]/[[MOB_BASE_HI]] base + (index$-$1)$\times$16.
+([[MOB_DATA_PTR]]) = [[MOB_BASE_LO]]/[[MOB_BASE_HI]] base + (index$-$1)$\times$16.
 
 <<zero page defines>>=
 MOB_DATA_PTR            EQU     $BA     ; mob data record pointer (2 bytes, $BA/$BB)
@@ -16276,7 +16290,7 @@ DISPATCH_ON_MODE:
 \section{Field utilities}
 
 @ [[CLAMP_CHAR_FIELD]] ensures that byte~6 of the record at [[MOB_PTR]]
-([[$F4/$F5]]) has its lower 6~bits at least as large as byte~5's lower
+([[MOB_PTR]]) has its lower 6~bits at least as large as byte~5's lower
 5~bits.  If byte~6 is smaller, its low bits are replaced with byte~5's
 value (preserving byte~6's top 2~bits).  This clamps a stat floor---
 likely ensuring current HP does not fall below a minimum derived from
@@ -16621,8 +16635,8 @@ from disk.  Its contents change with each scene.
 
 @ [[SAVE_ZP_CONTEXT]] and [[RESTORE_ZP_CONTEXT]] save and restore four
 zero-page pointer pairs to/from shadow locations in the [[$5A]] page:
-[[TARGET_REC]] ([[$BC/$BD]]), [[ENTITY_PTR]] ([[$F8/$F9]]),
-[[DATA_PTR]] ([[$BE/$BF]]), and [[MOB_PTR]] ([[$F4/$F5]]).
+[[TARGET_REC]] ([[PRINT_STRING_ADDR]]), [[ENTITY_PTR]] ([[ENTITY_PTR]]),
+[[DATA_PTR]] ([[ENTITY_REC]]), and [[MOB_PTR]] ([[MOB_PTR]]).
 These pointers are heavily aliased---the same zero-page bytes serve
 different roles in different routines---so saving and restoring them is
 necessary when entering nested operations like scene loading or disk~I/O.
@@ -17005,8 +17019,8 @@ A second entry point at~[[$0DA4]] (1~caller) skips the initialization
 of~Y and the leading-zero flag, allowing the caller to control the
 starting output position and suppression behavior.
 
-@ [[NUM_TO_DECIMAL]] converts a 16-bit value in [[NUM_VALUE]] ([[$BC/$BD]])
-to a decimal ASCII string stored at [[DECIMAL_OUT_PTR]] ([[$BA/$BB]]).  It
+@ [[NUM_TO_DECIMAL]] converts a 16-bit value in [[NUM_VALUE]] ([[PRINT_STRING_ADDR]])
+to a decimal ASCII string stored at [[DECIMAL_OUT_PTR]] ([[MOB_DATA_PTR]]).  It
 divides repeatedly by powers of ten (10000, 1000, 100, 10, 1), accumulating
 each digit in [[NUM_DIGIT]] and writing it to the output buffer.
 [[NUM_LEADING]] suppresses leading zeros: it starts at~0 (suppress) and
@@ -17446,7 +17460,7 @@ GAME_MESSAGE_STRINGS:
 
 \label{sec:text_renderer}
 
-Reads a byte stream from the pointer at [[$06/$07]] and renders
+Reads a byte stream from the pointer at [[TEXT_STREAM_PTR]] and renders
 characters on the hi-res screen.  It maintains column/row state and
 supports several control codes.
 
@@ -17578,7 +17592,7 @@ that the frequency of the note played will be equal to [[510204 / (10X+31)]] Hz.
 See \href{https://6502disassembly.com/a2-rom/}{The Oft Misunderstood WAIT} for a derivation of average cycle time.
 
 @ [[PLAY_HIGH_TONE]] generates a square wave tone by toggling the Apple~II
-speaker at [[$C030]].  The outer loop runs 10~iterations (Y), each toggling
+speaker at [[SPEAKER]].  The outer loop runs 10~iterations (Y), each toggling
 the speaker then delaying by~X cycles.  After all 10~toggles, the whole
 sequence repeats [[SOUND_DURATION]] times.  [[SOUND_FREQ]] controls the
 pitch (higher value = lower frequency).
@@ -17902,7 +17916,7 @@ TUNE_PLAYER:
     DEY
     STY     $80E3             ; patch byte in script 2 data
 @
-@ [[TUNE_PC]] is the 2-byte script instruction pointer at [[$E4/$E5]].
+@ [[TUNE_PC]] is the 2-byte script instruction pointer at [[TUNE_PC]].
 The script base address is loaded from the table at [[TUNE_TABLE]] into
 [[TUNE_PC]], and the interpreter reads successive bytes through this
 pointer, advancing it after each instruction.
@@ -19095,7 +19109,7 @@ during boot, and remains at these addresses throughout the game.
 \section{Mob data records}
 
 Each record is 16~bytes.  [[GET_MOB_DATA]] indexes into the table
-via the base pointer at [[$4000/$4001]].
+via the base pointer at [[MOB_BASE_LO]]/[[MOB_BASE_HI]].
 
 \begin{center}
 \begin{tabular}{cll}
@@ -21711,7 +21725,7 @@ first run (when [[TOTAL_MOB_COUNT]]~=~0), and when the scene ends,
 control returns to [[MAIN_ENTRY]] where the game is initialized and
 started normally.
 
-The soft-switch reads at [[$C050]]--[[$C057]] configure the Apple II display:
+The soft-switch reads at [[TXTCLR]]--[[HIRES]] configure the Apple II display:
 [[GR]], full-screen (no split text), page 1, hi-res. This puts the display
 into HGR mode showing the framebuffer at [[HIRES_PAGE]]--[[$3FFF]].
 
@@ -22896,7 +22910,7 @@ The blinking works by toggling the 7~pixel bits at the cursor's screen
 position.  A countdown register ([[X]]) controls the blink rate: every time
 the high byte of the blink timer overflows, [[X]] decrements, and when it
 reaches zero the cursor pixels are inverted.  The blink timer at [[$4E/$4F]]
-ticks continuously while the routine polls [[$C000]] for a keypress.
+ticks continuously while the routine polls [[KBD_DATA]] for a keypress.
 
 When a key arrives, the routine checks whether it was called from the ROM
 input routine at [[$F8xx]] (by peeking at the return address on the stack).
@@ -24443,7 +24457,7 @@ DISK_VM_MISC_B49C:
     RTS
 @ %def DISK_VM_MISC_B49C
 Swaps 16~bytes between zero-page locations [[$50--$5F]] and the
-saved VM state at [[$B5E5--$B5F4]].  This preserves the caller's
+saved VM state at [[DISK_VM_SAVED_STATE]].  This preserves the caller's
 zero-page state while the VM executes, and restores it afterward.
 
 <<disk vm swap>>=
