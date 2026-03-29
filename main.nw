@@ -25861,6 +25861,19 @@ EALDR_PROT_VM:
     HEX     D3 D3 D3 D3 D3 D3 00 5E 24 46 46 35 39 0D 02 3B    ; $A2F0: scratch/padding
 @ %def EALDR_PROT_VM
 
+@ \subsection{Resident routines copy (\$A300--\$A5FF)}
+
+The region \$A300--\$A5FF contains the resident routines that the EALDR
+copies to \$0500--\$07FF during boot (see chapter on Resident Routines).
+This data is byte-identical to the assembled resident routines in
+[[main.bin]].  Rather than duplicating the assembly source, this chunk
+includes the generated file [[resident\_copy.asm]], which is extracted
+from [[output/main.bin]] by the build pipeline.
+
+<<EALDR resident copy>>=
+    INCLUDE "resident_copy.asm"
+@ %def EALDR_RESIDENT_COPY
+
 \section{Entry point}
 
 The entry code at [[$A806]] fills the hi-res HGR1 screen ([[$2000--$3FFF]]) and beyond
@@ -29532,6 +29545,7 @@ The following root chunks produce the assembly files when tangled.
 <<EALDR VM macros>>
 <<ealdr defines>>
 <<EALDR unused prot vm>>
+<<EALDR resident copy>>
 <<EALDR checksum source listing>>
 <<EALDR entry>>
 <<EALDR copy subroutine>>

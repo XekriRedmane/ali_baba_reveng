@@ -13,10 +13,11 @@ Tangle main.nw and assemble using dasm. Reports any errors.
 Run these commands in sequence:
 
 1. Tangle: `python weave.py main.nw output`
-2. Copy support files: `cp ea_splash_screen.asm dos.asm mobdata.asm fontdata.asm stdfontdata.asm output/`
+2. Copy support files: `cp ea_splash_screen.asm dos.asm fontdata.asm stdfontdata.asm output/`
 3. Assemble main: `cd output && dasm main.asm -f3 -omain.bin -lmain.lst -smain.sym`
-3. Assemble boot1: `dasm boot1.asm -f3 -oboot1.bin -lboot1.lst -sboot1.sym`
-4. Assemble ealdr: `dasm ealdr.asm -f3 -oealdr.bin -lealdr.lst -sealdr.sym`
+4. Assemble boot1: `dasm boot1.asm -f3 -oboot1.bin -lboot1.lst -sboot1.sym`
+5. Generate resident_copy.asm: `python -c "m=open('main.bin','rb').read();f=open('resident_copy.asm','w');f.write('    ORG     \$A300\nEALDR_RESIDENT_COPY:\n');[f.write('    HEX     '+' '.join(f'{b:02X}'for b in m[i:i+16])+'\n')for i in range(0,0x300,16)]"`
+6. Assemble ealdr: `dasm ealdr.asm -f3 -oealdr.bin -lealdr.lst -sealdr.sym`
 
 Report the result:
 - If assembly succeeds with no errors, say so.
