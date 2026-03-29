@@ -144,11 +144,33 @@ def build_disk() -> bytearray:
     # In .dsk, physical sector N is at offset logical_sector * 256
     # boot1.bin has pages in memory order ($0800, $0900, $0A00, $0B00, $0C00)
     # Write boot1 sectors (physical 0-4 = DOS logical 0,7,14,6,13).
-    # Remaining track 0 sectors are left as zeros.
-    for page in range(5):
-        phys = page  # Boot ROM reads physical sectors 0,1,2,3,4
+    for page in range(len(boot1) // SECTOR_SIZE):
+        phys = page
         logical = DOS_SKEW[phys]
         data = boot1[page * 256:(page + 1) * 256]
+        write_sector(dsk, 0, logical, data)
+
+    # Physical sectors 5-7 contain residual disk format data (not loaded
+    # during boot — sector count byte is $05).  Each sector is mostly $FF
+    # fill with the physical sector number as a trailing signature.
+    TRACK0_EXTRA: dict[int, bytes] = {
+        5: (  # DOS logical 5: all $FF except last 3 bytes = $0D $0D $FF
+            bytes([0xFF] * 253 + [0x0D, 0x0D, 0xFF])),
+        6: (  # DOS logical 12: sparse format data
+            bytes.fromhex(
+                'd300000000000000000000000000000000000000000000000000000000000000'
+                '0000000000000000ff0000000000000000000000000000000000000000000000'
+                'bf00000000000000000000000000000000000000000000000000000000000000'
+                '0000000000000000ff0000000000000000000000000000000000000000000000'
+                '0000000000000000000000000000000000000000000000000000000000000000'
+                '0000000000000000000000000000000000000000000000000000000000000000'
+                '0000000000000000000000000000000000000000000000000000000000000000'
+                '0000000000000000000000000000000000000000000000000000000000000e0e')),
+        7: (  # DOS logical 4: $0F + $FF fill, last byte $0F
+            bytes([0x0F] + [0xFF] * 254 + [0x0F])),
+    }
+    for phys, data in TRACK0_EXTRA.items():
+        logical = DOS_SKEW[phys]
         write_sector(dsk, 0, logical, data)
 
     # --- Tracks 1-2: EALDR ---
