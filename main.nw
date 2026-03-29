@@ -27208,6 +27208,78 @@ EALDR_SOURCE_COMMENTS:
 
 @ %def EALDR_DXR_STEP
 
+@ \subsection{Checksum source listing}
+
+The region \$A600--\$A805 contains embedded EA~VM source code
+that documents the checksum verification bytecode program at
+\$A072--\$A0FF.  It uses the same formatting conventions as
+[[EALDR_SOURCE_COMMENTS]] at \$B800: [[$0D]]~=~line separator,
+[[$E5]]~=~opcode marker, [[$D8]]~=~operand marker, and printable
+ASCII for mnemonics, labels, and comments.  The listing describes
+the checksum loop that sums memory \$A000--\$A2E0 using the VM's
+LDI, LDA, LDX, SBA, STA, INC, BNE, and SUB opcodes.
+
+The last 6~bytes (\$A800--\$A805) are not part of the source listing;
+they are residual data between the listing and the EALDR entry point
+at \$A806.
+
+<<EALDR checksum source listing>>=
+    ORG     $A600
+EALDR_CHECKSUM_LISTING:
+    ; VM source listing for the checksum verification program.
+    ; Format: $0D = line break, $E5 = opcode marker, $D8 = operand,
+    ;         $0C/$06/$0E/$10/$11/$0A/$1F/$21 = indent/length codes.
+    ;
+    ; Line 1: LDI,$4C^0          (load immediate $4C XOR 0)
+    HEX     0D 0C E5 20 4C 44 49 2C 24 34 43 5E 30
+    ; Line 2: STA &&55555^PTR    (store to PTR)
+    HEX     0D 06 E5 20 53 54 41 0D 0C 26 26 35 35 35 35 35 5E 50 54 52
+    ; Line 3: STA 55555^SUM      (store to SUM)
+    HEX     0D 06 E5 20 53 54 41 0D 0C D8 20 35 35 35 35 35 5E 53 55 4D
+    ; Line 4: CKSLOOP LDA 55555^PTR
+    HEX     0D 0E 43 4B 53 4C 4F 4F 50 20 E5 20 4C 44 41 0D 0C D8 20 35 35 35 35 35 5E 50 54 52
+    ; Comment: "; LDX: LOAD pseudo accumulator"
+    HEX     0D 1F 3B 20 4C 44 58 3A 20 4C 4F 41 44 20 70 73 65 75 64 6F 20 61 63 63 75 6D 75 6C 61 74 6F 72
+    ; Comment: "!; indexed by current pseudo acc."
+    HEX     0D 21 3B 20 69 6E 64 65 78 65 64 20 62 79 20 63 75 72 72 65 6E 74 20 70 73 65 75 64 6F 20 61 63 63 2E
+    ; Line 5: LDX 55555^CHECKER
+    HEX     0D 06 E5 20 4C 44 58 0D 10 D8 20 35 35 35 35 35 5E 43 48 45 43 4B 45 52
+    ; Line 6: SBA 55555^SUM
+    HEX     0D 06 E5 20 53 42 41 0D 0C D8 20 35 35 35 35 35 5E 53 55 4D
+    ; Line 7: STA 55555^SUM
+    HEX     0D 06 E5 20 53 54 41 0D 0C D8 20 35 35 35 35 35 5E 53 55 4D
+    ; Line 8: LDA 55555^PTR
+    HEX     0D 06 E5 20 4C 44 41 0D 0C D8 20 35 35 35 35 35 5E 50 54 52
+    ; Line 9: LDX 55555^CHECKER1
+    HEX     0D 06 E5 20 4C 44 58 0D 11 D8 20 35 35 35 35 35 5E 43 48 45 43 4B 45 52 31
+    ; Line 10: SBA 55555^SUM
+    HEX     0D 06 E5 20 53 42 41 0D 0C D8 20 35 35 35 35 35 5E 53 55 4D
+    ; Line 11: ''TA 55555^SUM    (STA with corrupted mnemonic)
+    HEX     0D 06 E5 27 27 54 41 0D 0C D8 20 35 35 35 35 35 5E 53 55 4D
+    ; Line 12: INC 55555^PTR
+    HEX     0D 06 E5 20 49 4E 43 0D 0C D8 20 35 35 35 35 35 5E 50 54 52
+    ; Line 13: BNE 55555^CKSLOOP
+    HEX     0D 06 E5 20 42 4E 45 0D 10 D8 20 35 35 35 35 35 5E 43 4B 53 4C 4F 4F 50
+    ; Line 14: CKSLOO2 LDA 55555^PTR
+    HEX     0D 0E 43 4B 53 4C 4F 4F 32 20 E5 20 4C 44 41 0D 0C D8 20 35 35 35 35 35 5E 50 54 52
+    ; Line 15: LDX 55555^CHECKER2
+    HEX     0D 06 E5 20 4C 44 58 0D 11 D8 20 35 35 35 35 35 5E 43 48 45 43 4B 45 52 32
+    ; Line 16: SBA 55555^SUM
+    HEX     0D 06 E5 20 53 42 41 0D 0C D8 20 35 35 35 35 35 5E 53 55 4D
+    ; Line 17: STA 55555^SUM
+    HEX     0D 06 E5 20 53 54 41 0D 0C D8 20 35 35 35 35 35 5E 53 55 4D
+    ; Line 18: INC 55555^PTR
+    HEX     0D 06 E5 20 49 4E 43 0D 0C D8 20 35 35 35 35 35 5E 50 54 52
+    ; Line 19: SUB $4C^$E0       (subtract: length = $2E0)
+    HEX     0D 06 E5 20 53 55 42 0D 0A E5 20 24 34 43 5E 24 45 30
+    ; Comment: ";LENGTH=$2E0"
+    HEX     0D 0D 3B 4C 45 4E 47 54 48 3D 24 32 45 30
+    ; Line 20: BNE 55555^CKSLOO2
+    HEX     0D 06 E5 20 42 4E 45 0D 10 D8 20 35 35 35 35 35 5E 43 4B 53 4C 4F 4F 32
+    ; Trailing data (last opcode marker + residual bytes before $A806 entry)
+    HEX     0D 06 E5 01 17 05 DA 04 00
+@ %def EALDR_CHECKSUM_LISTING
+
 \section{Disk I/O routines}
 
 @ The EALDR RWTS (Read/Write Track/Sector) occupies [[$BC00]]--[[$BFFF]]
@@ -29364,6 +29436,7 @@ The following root chunks produce the assembly files when tangled.
 <<Macros>>
 <<EALDR VM macros>>
 <<ealdr defines>>
+<<EALDR checksum source listing>>
 <<EALDR entry>>
 <<EALDR copy subroutine>>
 <<EALDR VM exec>>
