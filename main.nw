@@ -25766,6 +25766,101 @@ load the game data from disk, decrypt a portion of it, and transfer control
 to the main program at [[$0800]].  It occupies [[$A000]]--[[$BFFF]], with
 the entry point at [[$A806]].
 
+\section{Unused copy-protection VM (\$A000--\$A2FF)}
+
+The first 768~bytes of the EALDR contain a complete, self-contained
+copy-protection virtual machine that is never executed.  The EALDR~VM
+bytecodes at \$A8CC checksum this region to verify it is intact, but
+the code itself is dead---the 4am crack neutralized the call path.
+
+The structure is identical to the Disk~VM at \$B300+ and the Resident~VM
+at \$0569+: a data field verifier, an address field search routine, a
+VM execution loop with context swap, an RTS-trick dispatcher with a
+13-entry opcode table, and opcode handlers using the same zero-page
+layout (\$50--\$5F).
+
+\paragraph{Layout.}
+\begin{itemize}
+  \item \$A000--\$A002: [[JMP]] to VM loop.
+  \item \$A003--\$A068: Data field verifier (searches for D5~AA~AD,
+        verifies 342 nibbles, checks DE~AA epilogue).
+  \item \$A069--\$A071: VM execution loop.
+  \item \$A072--\$A0FF: VM bytecodes (copy-protection program).
+  \item \$A100--\$A14C: Address field search (D5~AA~96 prologue).
+  \item \$A14D--\$A169: Read-and-verify wrapper.
+  \item \$A16A--\$A181: More VM bytecodes.
+  \item \$A182--\$A18B: Delay loop.
+  \item \$A18C--\$A1A5: VM bytecodes (continued).
+  \item \$A1A6--\$A1B2: VM exit routines (OK/error) and XOR helper.
+  \item \$A1B3--\$A1D2: VM dispatch (RTS-trick).
+  \item \$A1D3--\$A1DF: Dispatch table (13 one-byte offsets, page \$A2).
+  \item \$A1E0--\$A1F1: Context swap (ZP \$50--\$5F $\leftrightarrow$ \$A2E5).
+  \item \$A1F2--\$A1FF: High-ASCII string ``DON'T BREAK TH''
+        (truncated message, similar to [[RESIDUAL_DONT_BREAK]] at \$06F2).
+  \item \$A200--\$A2DE: VM opcode handlers.
+  \item \$A2DF--\$A2E1: Dispatch trampoline ([[JMP]] to handler page).
+  \item \$A2E2--\$A2E4: Error accumulator and scratch.
+  \item \$A2E5--\$A2F5: Saved ZP state (shadow of \$50--\$5F + padding).
+  \item \$A2F6--\$A2FF: Scratch storage.
+\end{itemize}
+
+<<EALDR unused prot vm>>=
+    ORG     $A000
+EALDR_PROT_VM:
+    ; Unused copy-protection VM ($A000-$A2FF).
+    ; Checksummed by EALDR VM bytecodes but never executed.
+    ; Contains: data field verifier, address field search,
+    ; VM execution loop, dispatch, opcode handlers, bytecodes.
+    HEX     4C 69 A0 A0 20 88 F0 58 AD EC C0 10 FB 49 D5 D0    ; $A000: JMP $A069; verify data field (D5 AA AD)
+    HEX     F4 AD EC C0 10 FB C9 AA D0 F3 AD EC C0 10 FB C9    ; $A010
+    HEX     AD D0 EA 48 68 A0 56 AD EC C0 10 FB 2C 00 C0 C9    ; $A020
+    HEX     AF D0 31 88 D0 F1 A0 00 AD EC C0 10 FB 2C 00 C0    ; $A030
+    HEX     C9 AF D0 20 88 D0 F1 AC EC C0 10 FB 48 68 AD EC    ; $A040
+    HEX     C0 10 FB C9 DE D0 09 AD EC C0 10 FB C9 AA F0 02    ; $A050
+    HEX     38 60 18 60 8D F6 A2 38 60 20 E0 A1 20 B3 A1 4C    ; $A060: SEC;RTS / CLC;RTS / vm_loop
+    HEX     69 A0 04 63 79 07 74 02 8F 78 04 62 79 07 2C 02    ; $A070: VM bytecodes (copy-protection program)
+    HEX     8F 78 04 64 79 07 74 02 8F 78 05 A4 79 02 90 79    ; $A080
+    HEX     00 A7 79 05 A4 79 02 9F 79 00 A7 79 07 4E 02 8F    ; $A090
+    HEX     78 00 71 79 08 A5 78 04 EA 19 03 B3 01 AB 25 03    ; $A0A0
+    HEX     B3 01 AB 25 04 ED 19 03 4C 06 E1 7B 05 CC 79 05    ; $A0B0
+    HEX     CC 79 05 CC 79 05 CC 79 04 EB 19 04 E1 7B 09 03    ; $A0C0
+    HEX     4F 06 4F 78 01 4E 78 04 E4 19 01 4E 78 01 4E 78    ; $A0D0
+    HEX     04 E2 19 05 69 78 03 4F 06 4F 78 01 4E 78 04 E4    ; $A0E0
+    HEX     19 01 4E 78 01 4E 78 04 E6 19 05 69 78 09 A0 FF    ; $A0F0
+    HEX     AE 4C A1 AD EC C0 10 FB C9 D5 F0 07 88 D0 F4 CA    ; $A100: find sector (D5 AA 96 address field)
+    HEX     D0 F1 60 AD EC C0 10 FB C9 AA F0 05 88 D0 E4 38    ; $A110
+    HEX     60 AD EC C0 10 FB C9 96 F0 05 88 D0 D6 38 60 A0    ; $A120
+    HEX     02 AD EC C0 10 FB 2A 85 50 AD EC C0 10 FB 25 50    ; $A130
+    HEX     85 50 88 8E 4C A1 10 E9 18 A2 01 60 03 20 FE A0    ; $A140: read header nibbles; read-and-verify
+    HEX     B0 03 20 03 A0 A9 00 6D E2 A2 8D E2 A2 AD E0 C0    ; $A150
+    HEX     AD E2 C0 AD E4 C0 AD E6 C0 60 03 3C 01 82 78 04    ; $A160: phases off; more bytecodes
+    HEX     E3 19 04 E1 19 04 E7 19 04 E5 19 03 64 01 82 78    ; $A170
+    HEX     09 A2 20 CA D0 FD 38 E9 01 D0 F6 60 06 03 DD 0A    ; $A180: delay loop; bytecodes (continued)
+    HEX     8D 78 02 8F 78 04 8C 78 01 B3 78 07 B3 01 B3 78    ; $A190
+    HEX     06 8C 78 00 8F 78 20 E0 A1 18 60 20 E0 A1 38 60    ; $A1A0: vm_exit_ok; vm_exit_err; xor_d9
+    HEX     49 D9 60 8A 48 98 48 20 38 A2 68 85 52 68 85 53    ; $A1B0: vm_dispatch (RTS-trick entry)
+    HEX     A0 04 B1 52 C8 D0 02 E6 53 AA BD D3 A1 8D E0 A2    ; $A1C0: fetch + dispatch via table
+    HEX     4C DF A2 00 27 55 5F 6D 8A AD B9 4F A2 CE 26 79    ; $A1D0: dispatch table (13 entries, page $A2)
+    HEX     A2 0F B5 50 48 BD E5 A2 95 50 68 9D E5 A2 CA 10    ; $A1E0: context swap (ZP $50-$5F <-> $A2E5)
+    HEX     F1 60 C4 CF CE A7 D4 A0 C2 D2 C5 C1 CB A0 D4 C8    ; $A1F0: "DON'T BREAK TH" (high-ASCII)
+    HEX     20 10 A2 A5 54 85 52 A5 55 85 53 A0 00 4C C2 A1    ; $A200: OP GOTO; read_arg16
+    HEX     B1 52 49 03 C8 D0 02 E6 53 85 54 B1 52 C8 D0 02    ; $A210
+    HEX     E6 53 49 D9 85 55 60 20 10 A2 98 48 A5 56 20 52    ; $A220: OP CALL1; pull_ip (RTS-trick)
+    HEX     A2 85 56 68 A8 4C C2 A1 68 85 54 68 85 55 68 85    ; $A230
+    HEX     52 68 85 53 E6 52 E6 54 D0 02 E6 55 6C 54 00 20    ; $A240: pull_ip (cont); OP CALL; OP BEQ
+    HEX     10 A2 6C 54 00 20 10 A2 A5 56 D0 A7 4C C2 A1 B1    ; $A250
+    HEX     52 C8 D0 02 E6 53 49 4C 85 56 4C C2 A1 20 10 A2    ; $A260: OP LDI; OP LD
+    HEX     A2 00 A1 54 85 56 4C C2 A1 20 10 A2 A5 56 18 65    ; $A270
+    HEX     54 85 54 90 02 E6 55 4C 70 A2 20 10 A2 98 18 65    ; $A280: OP LDX; OP CALL_SAVE
+    HEX     52 85 52 90 02 E6 53 A5 52 48 A5 53 48 A0 00 4C    ; $A290
+    HEX     03 A2 68 85 53 68 85 52 A0 00 4C C2 A1 20 10 A2    ; $A2A0: OP RET; OP ST
+    HEX     A5 56 A2 00 81 54 4C C2 A1 B1 52 C8 D0 02 E6 53    ; $A2B0
+    HEX     49 4C 85 54 A5 56 38 E5 54 85 56 4C C2 A1 20 10    ; $A2C0: OP SUBI; OP INC
+    HEX     A2 A2 00 A1 54 18 69 01 81 54 85 56 4C C2 A1 4C    ; $A2D0
+    HEX     00 A2 00 00 00 0E 96 8C 41 96 41 20 D3 D3 D3 D3    ; $A2E0: trampoline; err acc; saved ZP state
+    HEX     D3 D3 D3 D3 D3 D3 00 5E 24 46 46 35 39 0D 02 3B    ; $A2F0: scratch/padding
+@ %def EALDR_PROT_VM
+
 \section{Entry point}
 
 The entry code at [[$A806]] fills the hi-res HGR1 screen ([[$2000--$3FFF]]) and beyond
@@ -29436,6 +29531,7 @@ The following root chunks produce the assembly files when tangled.
 <<Macros>>
 <<EALDR VM macros>>
 <<ealdr defines>>
+<<EALDR unused prot vm>>
 <<EALDR checksum source listing>>
 <<EALDR entry>>
 <<EALDR copy subroutine>>
