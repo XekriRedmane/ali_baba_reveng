@@ -4303,13 +4303,13 @@ cursor is repositioned and the loop continues; if the selection stays the
 same, the tune player is called with tune~\$12 to play the
 in-place action.
 
-@ [[INPUT_JMP_VEC]] at [[INPUT_JMP_VEC]] is a 2-byte indirect jump vector used by
+@ [[INPUT_JMP_VEC]] is a 2-byte indirect jump vector used by
 [[INPUT_LOOP]] to dispatch exit handlers and initialization callbacks.
 [[CURRENT_SELECTION]] tracks which menu option is currently highlighted.
 [[INPUT_LOOP]] writes the exit handler address from the selected record
 into [[INPUT_JMP_VEC]] and executes it via [[JMP (INPUT_JMP_VEC)]].
 
-@ [[READ_KEYBOARD]] at [[READ_KEYBOARD]] is the keyboard input routine.
+@ [[READ_KEYBOARD]] is the keyboard input routine.
 [[INPUT_LOOP]] calls it to wait for
 a keypress; a zero return indicates the player pressed return (select),
 while any other value is passed to [[VALIDATE_INPUT]].
@@ -4573,7 +4573,7 @@ the current selection are returned directly (indicating ``no change'' or
 ``same selection'').  The saved [[$C2/$C3]] pointer is restored before
 returning so the caller's record context is preserved.
 
-@ [[INPUT_SCAN_OFFSET]] at [[INPUT_SCAN_OFFSET]] is a scratch byte used by
+@ [[INPUT_SCAN_OFFSET]] is a scratch byte used by
 [[VALIDATE_INPUT]] and [[READ_INPUT_CHAR]] as an index into the current
 input record.  It saves the starting offset for the scan so
 [[READ_INPUT_CHAR]] can return the key code one position beyond it.
@@ -6227,7 +6227,7 @@ WRITE_GAME_DATA:
 
 [[READ_GAME_DATA]] reads [[SAVE_SECTOR_COUNT]] (26) sectors of save
 data from disk into the \$4000 buffer.  On persistent failure, it
-displays message~\$3B and jumps to [[COLD_RESTART]] at [[COLD_RESTART]].
+displays message~\$3B and jumps to [[COLD_RESTART]].
 
 [[SETUP_SLOT_IOB]] calculates the disk track for a given slot:
 \begin{itemize}
@@ -10374,7 +10374,7 @@ Most rounds see zero or one random events, but occasionally a flurry of
 activity hits at once---new mobs spawn, faction skirmishes trigger, and the
 game world feels unpredictably alive.
 
-@ [[EVENT_THRESHOLD]] at [[EVENT_THRESHOLD]] is the probability threshold for random
+@ [[EVENT_THRESHOLD]] is the probability threshold for random
 events.  [[RANDOM_EVENTS]] compares each PRNG roll against this value; a
 roll below the threshold triggers the corresponding event handler.
 
@@ -15327,18 +15327,17 @@ BORDER_POS_TABLE:
 @ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE
 \subsection{Border animation handler}
 
-[[GAME_ACTION_HANDLER]] at [[GAME_ACTION_HANDLER]] is called via [[DISPATCH_VEC]]
+[[GAME_ACTION_HANDLER]] is called via [[DISPATCH_VEC]]
 between tune notes.  It animates the game border by cycling through
 the [[BORDER_POS_TABLE]] entries, drawing icons at each border cell.
 
-The handler runs 3~passes per call (controlled by [[BORDER_ANIM_SAVE]]
-at [[BORDER_ANIM_SAVE]]).  On pass~1, it calls [[ANIM_BORDER_ICONS_A]] ([[ANIM_BORDER_ICONS_A]])
+The handler runs 3~passes per call (controlled by [[BORDER_ANIM_SAVE]]).  On pass~1, it calls [[ANIM_BORDER_ICONS_A]] ([[ANIM_BORDER_ICONS_A]])
 which randomly places icons from [[$5E1F]] along the border.  On pass~0,
 it calls [[ANIM_BORDER_ICONS_B]] ([[ANIM_BORDER_ICONS_B]]) which uses icons from
 [[$5DE9]].  On other passes, it iterates through the handler pointer
 table at [[BORDER_HANDLER_TABLE]].
 
-[[TICK_BORDER_ANIM]] at [[TICK_BORDER_ANIM]] advances the animation index through
+[[TICK_BORDER_ANIM]] advances the animation index through
 the border positions, wrapping from \$15 back to \$05.
 
 @ Current game speed / animation index, used by [[BORDER_ANIMATION]].
@@ -15582,7 +15581,7 @@ INIT_WORLD:
     JMP     INPUT_LOOP        ; initialize world from data table
 
 @ A single [[RTS]]---another no-op stub called from [[GAME_INIT]], like
-[[INIT_STUB]] at [[INIT_STUB]].
+[[INIT_STUB]].
 
 <<init stub2>>=
     ORG     $6B94
@@ -15592,7 +15591,7 @@ INIT_STUB2:
 
 @ [[INIT_DISK_IOB]] sets the zero-page pointer [[RWTS_IOB_PTR]]
 ([[$08/$09]]) to the address of the RWTS Input/Output Block
-([[RWTS_IOB]] at [[RWTS_IOB]]).  This single-assignment call during
+([[RWTS_IOB]]).  This single-assignment call during
 [[GAME_INIT]] enables all subsequent disk operations to access the IOB
 fields through indirect-indexed addressing (e.g.\ [[LDA ($08),Y]]
 with~Y selecting the field).
@@ -16029,8 +16028,7 @@ MOB_DATA_PTR            EQU     $BA     ; mob data record pointer (2 bytes, $BA/
 @ %def MOB_DATA_PTR
 
 @ The mob data base address is stored in the first two bytes of the
-character table header record at [[MOB_BASE_LO]].  [[CHAR_LIST_HEAD]] at
-[[CHAR_LIST_HEAD]] is the head of the character linked list.
+character table header record at [[MOB_BASE_LO]].  [[CHAR_LIST_HEAD]] is the head of the character linked list.
 
 <<defines>>=
 HIGH_NIBBLE_MASK    EQU     $F0     ; bits 7-4: generic high nibble extraction
@@ -16213,7 +16211,7 @@ TIMED_WAIT:
 @ %def TIMED_WAIT
 
 @ [[CALL_ROM_WAIT]] loads the wait duration from [[WAIT_DURATION]] and
-tail-calls the Apple~II ROM [[WAIT]] routine ([[ROM_WAIT]] at [[ROM_WAIT]]),
+tail-calls the Apple~II ROM [[WAIT]] routine ([[ROM_WAIT]]),
 which delays for approximately $A \times 2.5 + 13.5$ microseconds.
 
 <<defines>>=
@@ -16739,7 +16737,7 @@ PRINT_STRING_AT_ADDR:
 @ %def PRINT_STRING_AT_ADDR
 [[PRINT_STRING]] prints a length-prefixed string from
 [[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]] via COUT.
-[[PRINT_STRING_AT_ADDR]] at [[PRINT_STRING_AT_ADDR]] stores [[X/Y]] into
+[[PRINT_STRING_AT_ADDR]] stores [[X/Y]] into
 [[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]] first, then falls through.
 
 <<print string>>=
@@ -22731,7 +22729,7 @@ RES_VM_VMINC:
     JMP     RESIDENT_DISPATCH_FETCH
 @ %def RES_VM_VMINC
 A 3-byte relay in the handler page.  Jumps to
-[[RES_VM_DISPATCH]] at [[RES_VM_DISPATCH]].
+[[RES_VM_DISPATCH]].
 
 <<decode dispatch relay>>=
     ORG     $07DF
@@ -24036,7 +24034,7 @@ data is included verbatim from [[dos.asm]].  The only call into the
 DOS RWTS (\$B600--\$BFFF) from outside that region is [[JSR RWTS_ENTRY]]
 at \$6C26 in [[DISK_READ_FIELD]].
 
-@ [[RWTS_CORE]] at [[RWTS_CORE]] is the main dispatcher inside the standard
+@ [[RWTS_CORE]] is the main dispatcher inside the standard
 DOS 3.3 RWTS.  [[RWTS_ENTRY]] calls it after saving the processor status
 and disabling interrupts.
 
@@ -24067,7 +24065,7 @@ verifies each byte equals~[[$AF]].  Finally checks the data epilogue
 
 [[VERIFY_DATA_FIELD]] is called internally by the disk~VM (via [[JSR VERIFY_DATA_FIELD]]).
 
-@ [[DISK_DATA_REG]] at [[DISK_DATA_REG]] is the Disk~II controller's data
+@ [[DISK_DATA_REG]] is the Disk~II controller's data
 register for the active slot.  [[VERIFY_DATA_FIELD]] reads nibble bytes
 from this register in a tight loop while searching for the D5~AA~AD
 prologue and verifying the data field contents.
