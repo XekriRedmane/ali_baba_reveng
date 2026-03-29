@@ -25784,6 +25784,7 @@ through the hi-res screen pages during the fill loop.
 EALDR_SRC           EQU     $4C     ; VM source pointer (2 bytes)
 SOFTEV              EQU     $03F2   ; Apple II reset vector (2 bytes)
 PWREDUP             EQU     $03F4   ; power-up byte
+DISK_BOOT_ROM       EQU     $C600   ; Disk II boot ROM entry point
 @
 
 <<EALDR entry>>=

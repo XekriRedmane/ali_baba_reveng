@@ -174,8 +174,9 @@ def build_disk() -> bytearray:
         write_sector(dsk, 0, logical, data)
 
     # --- Tracks 1-2: EALDR ---
-    ealdr_path = 'output/ealdr.bin' if os.path.exists('output/ealdr.bin') else 'ealdr.bin'
-    ealdr = open(ealdr_path, 'rb').read()
+    # Use reference ealdr.bin until EALDR is fully disassembled
+    # (output/ealdr.bin is incomplete — many undocumented gaps remain)
+    ealdr = open('ealdr.bin', 'rb').read()
     # EALDR loaded with custom loader interleave, base pages $A0 and $B0
     ealdr_base = 0xA000
     write_track_loader(dsk, 1, 0xA0, ealdr, ealdr_base)
