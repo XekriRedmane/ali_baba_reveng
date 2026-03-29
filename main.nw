@@ -410,7 +410,7 @@ the initial [[CLC]] and [[LDA]] instructions.
 [[ADDW]] is a macro that adds two 16-bit values in memory and stores
 it to a third 16-bit memory location.
 
-For example, [[ADDW $01FF, $0300, $0400]] adds the 16-bit value at memory location [[$01FF]] to the 16-bit value at memory location [[$0300]], and stores the result at memory location [[$0400]].
+For example, [[ADDW $01FF, $0300, $0400]] adds the 16-bit value at memory location [[$01FF]] to the 16-bit value at memory location [[$0300]], and stores the result at memory location [[TEXT_PAGE1]].
 
 <<Macros>>=
     MACRO ADDW
@@ -475,7 +475,7 @@ the 16-bit value at memory location [[$01FF]] and stores it back.
 [[SUBW]] is a macro that subtracts the 16-bit memory value in the second argument from a 16-bit memory location in the first argument,
 and stores it in the 16-bit memory location in the third argument.
 
-For example, [[SUBW $01FF, $0300, $0400]] subtracts the 16-bit value at memory location [[$0300]] from the 16-bit value at memory location [[$01FF]], and stores the result at memory location [[$0400]].
+For example, [[SUBW $01FF, $0300, $0400]] subtracts the 16-bit value at memory location [[$0300]] from the 16-bit value at memory location [[$01FF]], and stores the result at memory location [[TEXT_PAGE1]].
 
 <<Macros>>=
     MACRO SUBW
@@ -492,7 +492,7 @@ For example, [[SUBW $01FF, $0300, $0400]] subtracts the 16-bit value at memory l
 [[SUBWL]] is a macro that subtracts the 16-bit memory value in the second argument from the 16-bit literal in the first argument,
 and stores it in the 16-bit memory location in the third argument.
 
-For example, [[SUBWL #$01FF, $0300, $0400]] subtracts the 16-bit value at memory location [[$0300]] from the 16-bit value [[#$01FF]], and stores the result at memory location [[$0400]].
+For example, [[SUBWL #$01FF, $0300, $0400]] subtracts the 16-bit value at memory location [[$0300]] from the 16-bit value [[#$01FF]], and stores the result at memory location [[TEXT_PAGE1]].
 
 <<Macros>>=
     MACRO SUBWL
@@ -824,8 +824,8 @@ GET_CHAR_RECORD:
     BNE     .loop                       ; always taken: high byte >= $40
 @ %def GET_CHAR_RECORD
 Location data and character data share the same 9-byte record table at
-[[$4000]].  [[GET_CHAR_RECORD]] indexes into this table (index~$\times$~9
-+ \$4000).  Record~0 at \$4000 is a header; records~1--62 are the actual
+[[MOB_BASE_LO]].  [[GET_CHAR_RECORD]] indexes into this table (index~$\times$~9
++ \$4000).  Record~0 at [[MOB_BASE_LO]] is a header; records~1--62 are the actual
 entries.  [[LOCATION_DATA]] points to record~1 (\$4009).
 
 Each record is 9~bytes:
@@ -1005,7 +1005,7 @@ The top two bits select the category:
 \$D2       & Persistent scene & \texttt{byte2} = scene ID; not cleared after trigger \\
 \$D3       & One-time scene   & \texttt{byte2} = scene ID; slot cleared to \$FE \\
 \$D4       & Scene + item drop & like \$D3 but also spawns 1--4 bonus items \\
-\$D5--\$DA & Map/area event   & indexed from table at \$7EDD \\
+\$D5--\$DA & Map/area event   & indexed from table at [[SHOP_TABLE]] \\
 \$DB--\$FD & (unknown)        & \\
 \$FE       & Empty-slot data  & \texttt{byte2} has sub-encoding
 \end{tabular}
@@ -1026,7 +1026,7 @@ For scene events (\$D2--\$D4), a scene/event~ID.
 \item \$1260 --- fills empty [[$FE]] slots with combat loot, or
       accumulates value in \$C0--\$D0 entries (treasure drops).
       Entries saturate at byte~1~=~\$D1.
-\item [[HANDLE_ENCOUNTER]] (\$1C01) --- encounter handler: dispatches
+\item [[HANDLE_ENCOUNTER]] --- encounter handler: dispatches
       random vs.\ specific encounters based on byte~1~$<$~\$40.
 \end{itemize}
 
@@ -1792,13 +1792,13 @@ ev_astrologers_maze:                    ; 61: ASTROLOGER'S MAZE
 The attract screen call flow:
 
 \begin{itemize}
-  \item [[MAIN_ENTRY]] ([[$0800]]): calls [[GAME_INIT]], then
+  \item [[MAIN_ENTRY]] ([[MAIN_ENTRY]]): calls [[GAME_INIT]], then
         [[ATTRACT_SCREEN]] if [[TOTAL_MOB_COUNT]] is zero.
-  \item [[ATTRACT_SCREEN]] ([[$09F4]]): sets scene index 1, calls
+  \item [[ATTRACT_SCREEN]] ([[ATTRACT_SCREEN]]): sets scene index 1, calls
         [[GET_MOB_DATA]], tail-calls [[SCENE_LOOP]] with scene \$26.
-  \item [[SCENE_LOOP]] ([[$6C37]]): saves ZP pointers, steps PRNG,
+  \item [[SCENE_LOOP]] ([[SCENE_LOOP]]): saves ZP pointers, steps PRNG,
         conditionally loads scene data from disk.  In a loop: calls
-        [[LOAD_SCENE_FROM_DISK]] (\$A478), displays status bar, renders
+        [[LOAD_SCENE_FROM_DISK]], displays status bar, renders
         scene text via [[TEXT_RENDERER]], runs [[TUNE_PLAYER]] with
         tune~\#6.  Exits on disk error or when scene sequence ends.
 \end{itemize}
@@ -1811,7 +1811,7 @@ Key subsystems:
   \item \textbf{Tune player} ([[TUNE_PLAYER]]): Plays sound effects and
         music from [[TUNE_TABLE]].  Supports loops, gosub, high/low
         octave selection, and PRNG-based note randomization.
-  \item \textbf{Resident interpreter} ([[$0500]]--[[$07FF]]): A
+  \item \textbf{Resident interpreter} ([[RESET_VECTOR]]--[[$07FF]]): A
         secondary VM copied from EALDR, using context-swapped zero-page
         state and XOR-encrypted addresses.
   \item \textbf{PRNG} ([[STEP_PRNG]]): Linear congruential generator with
@@ -2097,7 +2097,7 @@ SHOP_BUY_HANDLER:
     JSR     SET_CURSOR_ROW21
     LDA     #$31                   ; message: "can't afford"
     JSR     DISPLAY_MESSAGE
-    JMP     $7194                  ; return to shop menu
+    JMP BROWSE_HANDLER                  ; return to shop menu
 .can_afford:
     ; --- Deduct price and execute purchase ---
     LDA     SHOP_PRICE             ; \ NUM_VALUE = price
@@ -2105,7 +2105,7 @@ SHOP_BUY_HANDLER:
     LDA     SHOP_PRICE+1           ;  |
     STA     NUM_VALUE+1            ; /
     LDY     #$00
-    JSR     $70D4                  ; deduct price from gold
+    JSR MODIFY_CURRENT_STATS                  ; deduct price from gold
     JSR     SET_CURSOR_ROW21
     LDA     #$26                   ; message: "bought"
     JSR     DISPLAY_MESSAGE
@@ -2342,7 +2342,7 @@ to [[SCENE_LOOP]] when entering the shop).
 \paragraph{Item name strings (\$7F2F--\$7FBD).}
 Ten length-prefixed high-ASCII item name strings (5~weapons,
 5~armor), interleaved with the [[SHOP_EFFECT_TABLE]] (5~bytes at
-\$7F6D) and the [[XP_AWARD_TABLE]] (5~bytes at \$7FBE).
+\$7F6D) and the [[XP_AWARD_TABLE]] (5~bytes at [[XP_AWARD_TABLE]]).
 The substring ``CHAIN MAIL'' at \$7FA9 is referenced directly by
 6~callers in [[CLASSIFY_ENTITY_TYPE]] (\$1178--\$11ED).
 
@@ -2491,7 +2491,7 @@ HRCG_CTRL_TAIL:
 10~bytes of HRCG mode/address control data.
 
 \paragraph{Tune pointer table copy (\$82BF--\$82D0).}
-Duplicate of the tune pointer table at [[$80AE]], mapping tune
+Duplicate of the tune pointer table at [[TUNE_TABLE]], mapping tune
 indices to bytecode addresses in the \$A3xx--\$A4xx range.
 
 \paragraph{Tune bytecodes copy (\$82D1--$82EF, \$82F0--\$8305).}
@@ -2547,13 +2547,13 @@ BORDER_BITMAP_DATA:
 \chapter{The Main Loop}
 \label{ch:attract}
 
-[[MAIN_ENTRY]] (\$0800) is where the EALDR transfers control after loading
+[[MAIN_ENTRY]] is where the EALDR transfers control after loading
 and decrypting the game data.  It initializes hardware via [[GAME_INIT]],
 then runs the top-level game loop indefinitely.
 
 \paragraph{Startup.}  On first run ([[TOTAL_MOB_COUNT]] = 0), the attract
 screen plays until the player presses a key.  [[CHAR_PTR]] is set to
-[[LOCATION_DATA]] (\$4009), the base of the 9-byte character record array.
+[[LOCATION_DATA]], the base of the 9-byte character record array.
 
 \paragraph{Main loop.}  Each pass iterates the character records, advancing
 [[CHAR_PTR]] by [[CHAR_RECORD_SIZE]] (9) per step:
@@ -3370,7 +3370,7 @@ handled:
 \end{itemize}
 
 \paragraph{Disk checkpoint.}  A 1-in-24 PRNG roll (AND \$17) triggers a
-periodic disk checkpoint at \$A508.
+periodic disk checkpoint at [[VERIFY_DISK_IO]].
 
 <<process mob groups>>=
     ORG     $0884
@@ -3384,7 +3384,7 @@ PROCESS_MOB_GROUPS:
     ; Behavior:
     ;   Reads CFIELD_NEXT from (CHAR_PTR) as the initial link and saves it
     ;   in CURRENT_ROOM.  Rolls a 1-in-24 PRNG chance to call the disk
-    ;   checkpoint at $A508.  Then iterates the linked list: for each mob,
+    ;   checkpoint at [[VERIFY_DISK_IO]].  Then iterates the linked list: for each mob,
     ;   resolves via GET_MOB_DATA, copies to ENTITY_PTR, reads the next link.
     ;   HP < 3 (inactive): SHOW_IDLE_STATUS + AUTO_HEAL.
     ;   HP >= 3 (active): START_MOB_TURN, then reset BLINK_COL to MAP_WIDTH.
@@ -3404,7 +3404,7 @@ PROCESS_MOB_GROUPS:
     LDA     PRNG_OUTPUT
     AND     #$17             ; 1-in-24 chance (bits 0-2,4)
     BNE     .walk_list
-    JSR     $A508            ; periodic disk checkpoint
+    JSR VERIFY_DISK_IO            ; periodic disk checkpoint
 .walk_list:
     LDA     CURRENT_ROOM     ; current link in chain
     BNE     .has_mob
@@ -3686,8 +3686,8 @@ or if [[CHECK_ENCOUNTER]] returns~2 (hostile territory), a
 ``restricted'' flag is set (bit~2 of field~15).
 
 \paragraph{Input.}
-For the player ([[$5A05]]~=~0), keyboard input is read via the
-keyboard input routine at [[$A44C]].  For NPCs, [[AI_CHOOSE_TARGET]]
+For the player ([[CHAR_AI_MODE]]~=~0), keyboard input is read via the
+keyboard input routine at [[READ_KEYBOARD]].  For NPCs, [[AI_CHOOSE_TARGET]]
 selects a destination and [[FUN_6742]] computes a direction.
 The direction value encodes both movement and commands:
 
@@ -3873,7 +3873,7 @@ MOVE_LOOP:                     ; $1A31 - external entry point
 .have_input:
     JSR     GET_INPUT_TABLE_PTR
     JSR     SETUP_INPUT
-    JSR     $A44C                    ; read keyboard
+    JSR READ_KEYBOARD                    ; read keyboard
     STA     INPUT_DIR
     BANE    #$00,.do_move            ; player goes straight to movement
     JMP     TEARDOWN_INPUT           ; cancelled
@@ -4303,13 +4303,13 @@ cursor is repositioned and the loop continues; if the selection stays the
 same, the tune player is called with tune~\$12 to play the
 in-place action.
 
-@ [[INPUT_JMP_VEC]] at [[$5F5E]] is a 2-byte indirect jump vector used by
+@ [[INPUT_JMP_VEC]] at [[INPUT_JMP_VEC]] is a 2-byte indirect jump vector used by
 [[INPUT_LOOP]] to dispatch exit handlers and initialization callbacks.
 [[CURRENT_SELECTION]] tracks which menu option is currently highlighted.
 [[INPUT_LOOP]] writes the exit handler address from the selected record
 into [[INPUT_JMP_VEC]] and executes it via [[JMP (INPUT_JMP_VEC)]].
 
-@ [[READ_KEYBOARD]] at [[$A44C]] is the keyboard input routine.
+@ [[READ_KEYBOARD]] at [[READ_KEYBOARD]] is the keyboard input routine.
 [[INPUT_LOOP]] calls it to wait for
 a keypress; a zero return indicates the player pressed return (select),
 while any other value is passed to [[VALIDATE_INPUT]].
@@ -4573,7 +4573,7 @@ the current selection are returned directly (indicating ``no change'' or
 ``same selection'').  The saved [[$C2/$C3]] pointer is restored before
 returning so the caller's record context is preserved.
 
-@ [[INPUT_SCAN_OFFSET]] at [[$5B24]] is a scratch byte used by
+@ [[INPUT_SCAN_OFFSET]] at [[INPUT_SCAN_OFFSET]] is a scratch byte used by
 [[VALIDATE_INPUT]] and [[READ_INPUT_CHAR]] as an index into the current
 input record.  It saves the starting offset for the scan so
 [[READ_INPUT_CHAR]] can return the key code one position beyond it.
@@ -4950,7 +4950,7 @@ the table address into X/Y and jumps to [[INPUT_LOOP]].
 \end{center}
 
 @ ``See Your Lot'' (\$6101) shows the character stats screen, then returns to
-the main menu.  ``Attack'' (\$6107) checks eligibility via [[$1564]], then
+the main menu.  ``Attack'' (\$6107) checks eligibility via [[CHECK_ATTACK_ELIGIBLE]], then
 either enters the attack direction menu or exits.
 
 <<menu handlers>>=
@@ -4965,7 +4965,7 @@ MENU_CHECK_ATTACK:
     JMP     FIND_ATTACK_TARGET ; hostile here -> target directly
 @ %def MENU_SEE_YOUR_LOT MENU_CHECK_ATTACK
 
-@ The attack direction menu at [[$610F]].
+@ The attack direction menu at [[ATTACK_DIR_TABLE]].
 
 <<attack direction table>>=
     ORG     $610F
@@ -4999,8 +4999,8 @@ ENTER_ATTACK_MENU:
     LDY     #<ATTACK_DIR_TABLE ; Y = low byte
     JMP     INPUT_LOOP
 @ %def ATTACK_DIR_TABLE ENTER_ATTACK_MENU
-@ The ``Other Options'' sub-menu at [[$614C]].  Record~5 (``Other
-Options'') chains to the game settings menu via [[$61F1]].
+@ The ``Other Options'' sub-menu at [[OTHER_OPTIONS_TABLE]].  Record~5 (``Other
+Options'') chains to the game settings menu via [[MENU_GAME_SETTINGS]].
 
 <<other options table>>=
     ORG     $614C
@@ -5052,13 +5052,13 @@ RETIRE_CHARACTER:
     JMP     SCENE_LOOP
 @ %def RETIRE_CHARACTER
 
-@ The game settings menu at [[$6193]].  This includes game speed
+@ The game settings menu at [[GAME_SETTINGS_TABLE]].  This includes game speed
 adjustment (records~1--3 with arrow keys), sound toggle, danger level
-(records~5--7), and save game.  The ``game settings'' entry at [[$61F1]]
-is an indirect jump through [[$A963]], a resident vector.  [[$61F6]] is
+(records~5--7), and save game.  The ``game settings'' entry at [[MENU_GAME_SETTINGS]]
+is an indirect jump through [[$A963]], a resident vector.  [[MENU_GAME_SETTINGS_ENTER]] is
 the direct entry that loads the settings table and enters [[INPUT_LOOP]].
-[[$61FD]] initializes the settings display: it calls the splash routine
-at [[SETTINGS_DISPLAY_INIT]] ([[$09AC]]), then formats the current game speed ([[ANIM_INDEX]]) as a digit
+[[MENU_SETTINGS_INIT]] initializes the settings display: it calls the splash routine
+at [[SETTINGS_DISPLAY_INIT]] ([[SETTINGS_DISPLAY_INIT]]), then formats the current game speed ([[ANIM_INDEX]]) as a digit
 into the ``GAME SPEED'' label string at [[$7D66]].
 
 <<game settings table>>=
@@ -5105,7 +5105,7 @@ MENU_GAME_SETTINGS_ENTER:
     JMP     INPUT_LOOP
 
 MENU_SETTINGS_INIT:
-    JSR     $09AC              ; splash screen setup
+    JSR SETTINGS_DISPLAY_INIT              ; splash screen setup
     LDA     ANIM_INDEX         ; game speed value
     ORA     #$B0               ; convert to ASCII digit
     STA     $7D66              ; patch into "GAME SPEED : X" string
@@ -5157,16 +5157,16 @@ SETTINGS_SPEED_DOWN:
 
 SETTINGS_DANGER_UP:
     JSR     STORE_SELECTION_TO_RECORD
-    JSR     $09CF              ; increment danger threshold
+    JSR INC_THRESHOLD_WRAP              ; increment danger threshold
     JMP     MENU_GAME_SETTINGS_ENTER
 
 SETTINGS_DANGER_DOWN:
     JSR     STORE_SELECTION_TO_RECORD
-    JSR     $09CB              ; decrement danger threshold
+    JSR DEC_THRESHOLD_WRAP              ; decrement danger threshold
     JMP     MENU_GAME_SETTINGS_ENTER
 @ %def SETTINGS_SPEED_UP SETTINGS_SPEED_DOWN SETTINGS_DANGER_UP SETTINGS_DANGER_DOWN
 
-@ The attack target menu at [[$623F]].
+@ The attack target menu at [[ATTACK_TARGET_TABLE]].
 
 <<attack target table>>=
     ORG     $623F
@@ -5197,7 +5197,7 @@ MENU_ATTACK_INIT:
     RTS
 @ %def ATTACK_TARGET_TABLE MENU_ATTACK_TARGET MENU_ATTACK_INIT
 
-@ The drop gold menu at [[$626C]].
+@ The drop gold menu at [[DROP_GOLD_TABLE]].
 
 <<drop gold table>>=
     ORG     $626C
@@ -5246,7 +5246,7 @@ MENU_DROP_DEC:
     JMP     ADJ_DROP_DEC       ; binary search: add step
 @ %def DROP_GOLD_TABLE MENU_DROP_GOLD MENU_DROP_GOLD_INIT MENU_DROP_INC MENU_DROP_DEC
 
-@ The save/load game menu at [[$62B9]].
+@ The save/load game menu at [[WORLD_INIT_DATA]].
 
 <<save load table>>=
     ORG     $62B9
@@ -5303,12 +5303,12 @@ SAVE_LOAD_INIT:
 
 @ [[SLOT_INC]] increments [[SLOT_NUMBER]].  If the result exceeds
 [[MAX_SLOT_NUMBER]], it clamps back.  Either way, it patches the menu
-record via [[$6071]] and reformats the display.
+record via [[STORE_SELECTION_TO_RECORD]] and reformats the display.
 
 [[SLOT_DEC]] decrements [[SLOT_NUMBER]].  If it reaches zero, it wraps
 back to~1.
 
-[[SLOT_UPDATE]] patches the current menu record via [[$6071]], then
+[[SLOT_UPDATE]] patches the current menu record via [[STORE_SELECTION_TO_RECORD]], then
 jumps to [[FORMAT_SLOT_NUMBER]] to redisplay the number.
 
 [[SLOT_INC_ENTER]] and [[SLOT_DEC_ENTER]] are the menu handlers for the
@@ -5541,7 +5541,7 @@ and the table's [[max\_range]] is set to~2.  Control then jumps to
 [[ENTER_CHAR_SELECT]].
 
 [[CHAR_SELECT_NEXT]] and [[CHAR_SELECT_PREV]] browse through player
-characters.  They patch the current menu record via [[$6071]], advance
+characters.  They patch the current menu record via [[STORE_SELECTION_TO_RECORD]], advance
 or retreat in the PC list, then re-enter the character selection menu.
 
 [[CHAR_SELECT_HERE]] and [[CHAR_SELECT_HOME]] are the handlers for
@@ -5615,7 +5615,7 @@ CHAR_SELECT_HOME:
 
 The alternative input table is used by [[START_GAME_INPUT]] for shop
 interactions and special scenes.  It has three options: ``PAY [amount]
-FOR [item]'' (handler at \$71AC), ``BUY SOMETHING ELSE'' (handler at
+FOR [item]'' (handler at [[SHOP_BUY_HANDLER]]), ``BUY SOMETHING ELSE'' (handler at
 \$7194), and ``NO SALE'' (return to no-op init at \$626B).
 
 <<alt input table>>=
@@ -5780,7 +5780,7 @@ SHUFFLE_ENTITIES:
     ;
     ; Behavior:
     ;   Each iteration walks a random distance (0-63) into the linked
-    ;   list at $4000, unlinks the reached node, then re-appends it
+    ;   list at [[MOB_BASE_LO]], unlinks the reached node, then re-appends it
     ;   at the end. Recurses until SHUFFLE_COUNT < 0.
     ;
     ; Modifies: entity linked list (byte 2 pointers)
@@ -5838,7 +5838,7 @@ option in the save game slot menu.
 \begin{itemize}
 \item If [[SLOT_NUMBER]] is below [[GAME_DISK_SLOTS]], it saves directly
   to the game disk via [[WRITE_GAME_DATA]], then returns to [[MOVE_LOOP]].
-\item Otherwise, it checks the self-modifying flag at [[$6A58]]
+\item Otherwise, it checks the self-modifying flag at [[SCENARIO_INIT_FLAG]]
   ([[SCENARIO_INIT_FLAG]]).  On first use, it calls [[ENSURE_GAME_DISK]]
   and enters scene~\$42 (the scenario disk prompt scene), then sets the
   flag.  Subsequent calls jump directly to [[ENTER_SCENARIO_DISK]].
@@ -6096,7 +6096,7 @@ VERIFY_DISK_SIGNATURE:
 @ \subsection{IOB setup and game disk check}
 
 [[SETUP_DATA_IOB]] configures the RWTS IOB for a single-sector
-operation with the data buffer at [[SCENE_TEXT_DATA]] (\$5C00).
+operation with the data buffer at [[SCENE_TEXT_DATA]].
 It clears the track/sector fields and sets the buffer pointer.
 
 [[VERIFY_GAME_DISK]] reads the game disk at [[GAME_SIG_TRACK]]/
@@ -6227,7 +6227,7 @@ WRITE_GAME_DATA:
 
 [[READ_GAME_DATA]] reads [[SAVE_SECTOR_COUNT]] (26) sectors of save
 data from disk into the \$4000 buffer.  On persistent failure, it
-displays message~\$3B and jumps to [[COLD_RESTART]] at [[$A56F]].
+displays message~\$3B and jumps to [[COLD_RESTART]] at [[COLD_RESTART]].
 
 [[SETUP_SLOT_IOB]] calculates the disk track for a given slot:
 \begin{itemize}
@@ -6295,7 +6295,7 @@ SETUP_SLOT_IOB:
     ; Behavior:
     ;   Determines game vs scenario disk, computes starting track
     ;   as slot*2 + base, sets IOB fields: track, sector 0,
-    ;   buffer at $4000.
+    ;   buffer at [[MOB_BASE_LO]].
     ;
     ; Clobbers: A, X, Y
 
@@ -6514,7 +6514,7 @@ resolve the character to a mob pointer, then walks the group chain via
 position.  Candidate mobs must have byte~6 bits~5--0~$\ge3$ (active mob
 type) and be from a different faction (checked via [[CHECK_HOSTILE]]).
 
-Result stored in [[$5A1F]]:
+Result stored in [[ENCOUNTER_RESULT]]:
 \begin{itemize}
 \item 0 --- no mob found at same position (or character is not a mob)
 \item 1 --- found co-located mob but same faction (wrapped search)
@@ -6748,12 +6748,12 @@ and accumulates their combined threat level.  Input: [[A]]~= position
 
 For each adjacent position (left, right, up, down), calls
 [[SUM_HOSTILE_AT_POS]] to find hostile mobs not already in combat and
-sum their strength (byte~5 bits~4--0) into [[$5A26]].  After checking
+sum their strength (byte~5 bits~4--0) into [[ADJACENT_THREAT]].  After checking
 all neighbors, compares the accumulated threat against the character's
 defense value (byte~5 bits~4--1 of the [[ENTITY_PTR]] record).
 
 Returns [[A]]=1 if defense~$\ge$~threat (safe), [[A]]=0 if overwhelmed.
-The threat total remains in [[$5A26]] for callers that check it directly.
+The threat total remains in [[ADJACENT_THREAT]] for callers that check it directly.
 
 Boundary checks prevent wrapping: position~0 has no left neighbor,
 position~199 no right, positions~0--19 no up, positions~180--199 no down.
@@ -6832,7 +6832,7 @@ CHECK_ADJACENT_THREATS:
     RTS
 @ %def CHECK_ADJACENT_THREATS
 Finds all hostile mobs at a given map position and adds their strength
-to the threat accumulator [[$5A26]].  Input: [[A]]~= position,
+to the threat accumulator [[ADJACENT_THREAT]].  Input: [[A]]~= position,
 [[\TARGET_REC/\TARGET_REC+1]]~= reference mob for faction comparison.
 
 For each mob found at the position, checks hostility via
@@ -7193,7 +7193,7 @@ FIND_ATTACK_TARGET:
 [[INIT_ATTACK_DISPLAY]] is the initialization callback for the attack
 target menu ([[ATTACK_TARGET_TABLE]]).  It reads the target's name
 from the entity record at [[MOB_PTR]] and copies it into the display
-buffer at [[$7C9B]].  Byte~0 of the record gives the name length;
+buffer at [[ATTACK_NAME_BUF]].  Byte~0 of the record gives the name length;
 bytes~1--20 are the name characters.  Positions beyond the name length
 are filled with spaces (\$20).
 
@@ -10154,17 +10154,17 @@ ADD_PRICE_COMPONENT:
 
 @ \subsection{Shop buy effects}
 
-When a player buys an item, the buy handler at [[$71AC]] dispatches
+When a player buys an item, the buy handler at [[SHOP_BUY_HANDLER]] dispatches
 through a function pointer in the shop data.  Five entry points
 (indexed 0--4) apply the purchased item's effect to the entity record
 at [[ENTITY_PTR]].  Each entry sets X (item type 0--4) and Y (target
 field offset: 7 or~9), then falls through to the common handler.
 
 The common handler loads a base value from the effect table at
-[[$7F6D]][X], adds [[LOCATION_STYLE\_BITS]] ([[$5A84]]), and stores
+[[SHOP_EFFECT_TABLE]][X], adds [[LOCATION_STYLE\_BITS]] ([[LOCATION_STYLE_BITS]]), and stores
 the result at byte~Y of the entity record.  It then extracts bits~2--1
 of byte~5 (defense field) and adds that bonus to the same field.
-Finally it jumps to [[$7194]] (the browse handler, to continue
+Finally it jumps to [[BROWSE_HANDLER]] (the browse handler, to continue
 shopping).
 
 <<shop buy effects>>=
@@ -10235,7 +10235,7 @@ The common handler:
   level, subtracts 16 (\$10) from byte~8 repeatedly until it fits.
 \item Computes the remaining level (old level $-$ new pending XP) and
   merges it with the saved upper bits back into byte~11.
-\item Jumps to [[$7194]] (browse handler).
+\item Jumps to [[BROWSE_HANDLER]] (browse handler).
 \end{itemize}
 
 <<defines>>=
@@ -10361,7 +10361,7 @@ EXTRACT_PENDING_XP:
 
 After every character has taken a turn, [[RANDOM_EVENTS]] runs a cascading
 chain of random event checks.  Each step rolls the PRNG and compares the
-result against [[EVENT_THRESHOLD]] (the byte at [[$4239]], approximately a
+result against [[EVENT_THRESHOLD]] (the byte at [[EVENT_THRESHOLD]], approximately a
 7\% chance per roll).
 
 The structure is deliberately cascading: each successive stage is only reached
@@ -10374,7 +10374,7 @@ Most rounds see zero or one random events, but occasionally a flurry of
 activity hits at once---new mobs spawn, faction skirmishes trigger, and the
 game world feels unpredictably alive.
 
-@ [[EVENT_THRESHOLD]] at [[$4239]] is the probability threshold for random
+@ [[EVENT_THRESHOLD]] at [[EVENT_THRESHOLD]] is the probability threshold for random
 events.  [[RANDOM_EVENTS]] compares each PRNG roll against this value; a
 roll below the threshold triggers the corresponding event handler.
 
@@ -10493,7 +10493,7 @@ EVENT_FACTION_SCENE:
     ; Pick a random mob, find another mob with matching faction,
     ; and trigger a scene between them.
     ;
-    ; Input:  TOTAL_MOB_COUNT, char records at $4000+
+    ; Input:  TOTAL_MOB_COUNT, char records at [[MOB_BASE_LO]]+
     ; Output: SCENE_SETUP called if faction match found,
     ;         else falls through to EVENT_SPAWN_MOB
     ; Clobbers: A, X, Y, CHAR_PTR, MOB_PTR, CHAR_INDEX,
@@ -10541,7 +10541,7 @@ EVENT_SPAWN_MOB:
     ; field nonzero), retries once.  On success, reorders the
     ; char into the mob group and clamps its stats.
     ;
-    ; Input:  CURRENT_PLAYER, char records at $4000+
+    ; Input:  CURRENT_PLAYER, char records at [[MOB_BASE_LO]]+
     ; Output: REORDER_CHAR + CLAMP_CHAR_FIELD called if spawned
     ; Clobbers: A, X, Y, CHAR_PTR, MOB_PTR, CHAR_INDEX,
     ;           FACTION_MASK, SOURCE_CHAR, ACTIVE_CHAR, TARGET_REC
@@ -12291,7 +12291,7 @@ addresses.  The search proceeds in two phases:
         address (bit~7 clear = character).
 \end{enumerate}
 
-@ [[ENTITY_SEARCH_POS]] at \$5A17 temporarily holds the target map position
+@ [[ENTITY_SEARCH_POS]] at [[LOCATION_ID]] temporarily holds the target map position
 during [[FIND_ENTITY_AT_POS]].
 
 @ [[MOB_PTR_FLAG]] (\$80) is ORed into the high byte of [[ENTITY_REC]]+1 to
@@ -12575,7 +12575,7 @@ at index~[[SOURCE_CHAR]] from the list and re-inserts it in sorted order
 relative to index~[[ACTIVE_CHAR]].
 
 The linked-list ``next'' pointer is byte~2 of each character record.
-[[GET_MOB_DATA]] (\$0C32) resolves a byte-2 value into a record pointer
+[[GET_MOB_DATA]] resolves a byte-2 value into a record pointer
 at [[\MOB_DATA_PTR/\MOB_DATA_PTR+1]].
 
 Phase~1 (removal):
@@ -12744,12 +12744,12 @@ Byte~8 of the \emph{group head}'s mob data record is a packed field:
 These two entry points adjust the group member count (low nibble of
 byte~8) on the head record pointed to by~[[\CHAR_REC/\CHAR_REC+1]]:
 \begin{itemize}
-\item [[$102F]] ([[DECR_GROUP_COUNT]]): decrements by~1 (source group lost a member)
-\item [[$1033]] ([[INCR_GROUP_COUNT]]): increments by~1 (destination group gained a member)
+\item [[DECR_GROUP_COUNT]] ([[DECR_GROUP_COUNT]]): decrements by~1 (source group lost a member)
+\item [[INCR_GROUP_COUNT]] ([[INCR_GROUP_COUNT]]): increments by~1 (destination group gained a member)
 \end{itemize}
 Guards: bails out if [[\CHAR_REC]] is zero (null pointer) or if byte~4 of the
 record at~[[TARGET_REC]] is~$\ge$~\$15 (inactive/dead character).
-Called exclusively from [[REORDER_CHAR]] (\$0F84).
+Called exclusively from [[REORDER_CHAR]].
 
 @ [[GROUP_COUNT_DELTA]] holds +1 or $-$1, set by the two entry points
 [[INCR_GROUP_COUNT]] and [[DECR_GROUP_COUNT]] respectively.  The shared
@@ -12813,10 +12813,10 @@ resolve it via [[GET_MOB_DATA]], and store the result in~[[MOB_PTR]].
 If the link is zero (end of chain), [[MOB_PTR]] is set to null.
 
 \begin{itemize}
-\item [[$12FA]] ([[FIRST_GROUP_MEMBER]]): begins iteration by following
+\item [[FIRST_GROUP_MEMBER]] ([[FIRST_GROUP_MEMBER]]): begins iteration by following
       byte~2 of the group head at~[[$FA/$FB]].  If that link is zero,
       falls through to check [[MOB_PTR]] as a fallback.
-\item [[$1300]] ([[NEXT_GROUP_MEMBER]]): continues iteration by following
+\item [[NEXT_GROUP_MEMBER]] ([[NEXT_GROUP_MEMBER]]): continues iteration by following
       byte~2 of the current cursor at~[[MOB_PTR]].
 \end{itemize}
 
@@ -13278,7 +13278,7 @@ transitions complete.
   \item Disables the blink cursor and saves zero-page pointers.
   \item Tests [[PRNG_OUTPUT]] bits~1 and~3; if any set ($\sim$75\%),
         skips [[LOAD_SCENE_DATA]].
-  \item Calls [[LOAD_SCENE_FROM_DISK]] (\$A478) to load scene text from
+  \item Calls [[LOAD_SCENE_FROM_DISK]] to load scene text from
         disk; carry set means the disk read failed.
   \item Renders the status bar and scene text via [[TEXT_RENDERER]].
   \item Plays the attract tune ([[TUNE_ATTRACT]], index~6).
@@ -13471,7 +13471,7 @@ $\$7F$=end).
 
 <<defines>>=
 SCENE_TRANSITION    EQU     $5CFF   ; scene transition flag (nonzero = new scene number)
-SCENE_TEXT_DATA     EQU     $5C00   ; scene text buffer (overwrites border code at $5C00-$5CFF)
+SCENE_TEXT_DATA     EQU     $5C00   ; scene text buffer (overwrites border code at [[SCENE_TEXT_DATA]]-$5CFF)
 PRNG_SCENE_SKIP_MASK EQU    $0A     ; bits 1+3: skip disk load ~75% of iterations
 TUNE_ATTRACT        EQU     $06     ; tune player index for attract/opening music
 @ %def SCENE_TRANSITION SCENE_TEXT_DATA PRNG_SCENE_SKIP_MASK TUNE_ATTRACT
@@ -13694,7 +13694,7 @@ location is unchanged and the routine returns immediately.  Otherwise:
 \begin{enumerate}
   \item Stores the new position and calls [[ANIM_TICK_AND_WAIT]],
         [[SET_TEXT_WINDOW_BOTTOM]], and [[CLEAR_MAP]].
-  \item Points [[ENTITY_PTR]] at [[CANDIDATE_POS]] (\$5A15) and calls
+  \item Points [[ENTITY_PTR]] at [[CANDIDATE_POS]] and calls
         [[FIND_NEAREST_EVENT]] to compute [[EVENT_POS]].
   \item Reads [[CFIELD_STYLE]] (byte~5); strips the visited flag with
         [[STYLE_ID_MASK]].  If the style changed, updates
@@ -14262,7 +14262,7 @@ SETUP_TEXT_POS_COL20:          ; $76D8 - original SETUP_TEXT_POS_COL20 entry
 character whose record is pointed to by [[ENTITY_PTR]] ([[$F8/$F9]]).
 It reads eight fields from the entity record, converts each to decimal
 via [[NUM_TO_DECIMAL]], and writes the digits into a pre-formatted
-string template at [[$7D83]].  After displaying the stats, it waits for
+string template at [[STATS_TEMPLATE]].  After displaying the stats, it waits for
 a keypress (or joystick button if [[INPUT_MODE]] is nonzero), then
 exits via [[CLEAR_MAP]].
 
@@ -14363,7 +14363,7 @@ STATS_PROMPT_KEYBOARD:        ; $7E01
     APSTR "\x09PRESS M TO CONTINUE \x0E" ; \x09=tab, \x0E=ctrl-E (HRCG clear to EOL)
 STATS_PROMPT_JOYSTICK:        ; $7E18
     APSTR "\x09PUSH BUTTON TO GO ON\x0E" ; \x09=tab, \x0E=ctrl-E (HRCG clear to EOL)
-    ; (STATUS_BORDER_DATA follows immediately at $7E2F)
+    ; (STATUS_BORDER_DATA follows immediately at [[STATUS_BORDER_DATA]])
 @ %def STATS_PROMPT_KEYBOARD STATS_PROMPT_JOYSTICK
 
 <<display char stats>>=
@@ -14486,7 +14486,7 @@ DISPLAY_CHAR_STATS:
     LDA     #$00                       ;  | screen)
     STA     $24                        ; /
     LDA     #<STATS_TEMPLATE           ; \ print the stats template
-    STA     PRINT_STRING_ADDR          ;  | string at $7D83
+    STA     PRINT_STRING_ADDR          ;  | string at [[STATS_TEMPLATE]]
     LDA     #>STATS_TEMPLATE           ;  |
     STA     PRINT_STRING_ADDR+1        ; /
     JSR     PRINT_STRING               ; display stats
@@ -14499,11 +14499,11 @@ DISPLAY_CHAR_STATS:
     LDA     INPUT_MODE
     BEQ     .keyboard                  ; 0 = keyboard mode
     LDX     #$18                       ; \ joystick: "PUSH BUTTON
-    LDY     #$7E                       ; / TO GO ON" at $7E18
+    LDY     #$7E                       ; / TO GO ON" at [[STATS_PROMPT_JOYSTICK]]
     BNE     .print_prompt
 .keyboard:
     LDX     #$01                       ; \ keyboard: "PRESS M TO
-    LDY     #$7E                       ; / CONTINUE" at $7E01
+    LDY     #$7E                       ; / CONTINUE" at [[STATS_PROMPT_KEYBOARD]]
 .print_prompt:
     JSR     PRINT_STRING_AT_ADDR       ; print prompt
     JSR     ANIM_TICK_AND_WAIT         ; tick animation + wait
@@ -14531,7 +14531,7 @@ DISPLAY_CHAR_STATS:
 before the main loop or attract screen.  The steps, in order:
 
 \begin{enumerate}
-\item Set the reset vector to [[$A56F]] via the ROM routine at [[$FB6F]].
+\item Set the reset vector to [[COLD_RESTART]] via the ROM routine at [[$FB6F]].
 \item Disable the blink cursor by setting [[BLINK_COL]] to [[20]].
 \item Call [[RELOCATE_HIRES_STAGING]] to copy the HRCG library and disk I/O
   routines from the staging area at [[$2000--$3FFF]] to their runtime
@@ -14774,7 +14774,7 @@ above.
 
 Initializes the Hi-Res Character Generator (HRCG) by patching two
 locations in the HRCG code and then jumping to its entry point at
-[[$92A8]].  The patches modify the HRCG initialization to work within
+[[HRCG_INIT]].  The patches modify the HRCG initialization to work within
 the game's environment:
 
 \begin{itemize}
@@ -14785,7 +14785,7 @@ the game's environment:
   want.
 \end{itemize}
 
-After patching, the routine tail-calls the HRCG init via [[JMP $92A8]],
+After patching, the routine tail-calls the HRCG init via [[JMP HRCG_INIT]],
 which returns to [[GAME_INIT]] via the patched RTS.
 
 @ [[INIT_HRCG]] patches two locations in the HRCG library before calling
@@ -14829,15 +14829,15 @@ Called once from [[GAME_INIT]] to set up the game display and run the
 opening tune.  Steps:
 
 \begin{enumerate}
-\item Calls [[$5C6D]] to initialize the game display (draws borders,
+\item Calls [[INIT_GAME_DISPLAY]] to initialize the game display (draws borders,
   sets text windows).
-\item Sets [[DISPATCH_VEC]] to point to the game action handler at [[$5B2A]],
+\item Sets [[DISPATCH_VEC]] to point to the game action handler at [[GAME_ACTION_HANDLER]],
   used by the tune player's indirect dispatch at [[$7A49]].
-\item Clears [[$5A00]] (game state flag).
-\item Patches [[$80A6]] to [[$B1]] ([[LDA (zp),Y]] opcode), restoring
+\item Clears [[INPUT_MODE]] (game state flag).
+\item Patches [[CHAR_CHARSET]] to [[$B1]] ([[LDA (zp),Y]] opcode), restoring
   the character renderer's indirect load.
 \item Runs the opening tune (index~6) via [[TUNE_PLAYER]].
-\item Patches [[$7A49--$7A4B]] from [[JMP (DISPATCH_VEC)]] to [[JMP $7A4F]],
+\item Patches [[$7A49--$7A4B]] from [[JMP (DISPATCH_VEC)]] to [[JMP TUNE_ADVANCE]],
   disabling the indirect action handler now that init is complete.
 \end{enumerate}
 
@@ -14846,7 +14846,7 @@ vector [[DISPATCH_VEC]] ([[$F6/$F7]]).  The tune player uses this vector
 for indirect action dispatch; after the opening tune finishes,
 [[INIT_GAME_STATE]] patches the dispatch site to bypass the vector entirely.
 
-@ [[GAME_ACTION_HANDLER]] is defined in [[<<border animation>>]] at [[$5B2A]].
+@ [[GAME_ACTION_HANDLER]] is defined in [[<<border animation>>]] at [[GAME_ACTION_HANDLER]].
 
 <<zero page defines>>=
 DISPATCH_VEC            EQU     $F6     ; tune action dispatch vector (2 bytes, $F6/$F7)
@@ -14868,7 +14868,7 @@ INIT_GAME_STATE:
     ; Behavior:
     ;   1. Calls INIT_GAME_DISPLAY to draw the main screen layout.
     ;   2. Sets DISPATCH_VEC to GAME_ACTION_HANDLER.
-    ;   3. Patches character renderer at $80A6 and jump at $7A49-$7A4B.
+    ;   3. Patches character renderer at [[CHAR_CHARSET]] and jump at $7A49-$7A4B.
     ;   4. Plays tune 6 (attract/opening music).
     ;
     ; Modifies: DISPATCH_VEC, INPUT_MODE, $80A6, $7A49-$7A4B
@@ -14881,11 +14881,11 @@ INIT_GAME_STATE:
     STX     $80A6                 ; patch character renderer
     LDX     #$06                  ; tune 3: attract/opening
     JSR     TUNE_PLAYER
-    STOW    $4F4C,$7A49 ; patch $7A49 to JMP $7A4F
+    STOW    $4F4C,$7A49 ; patch $7A49 to JMP TUNE_ADVANCE
 INPUT_SCAN_OFFSET:                     ; $5B24: also scan position index (runtime storage)
-    LDA     #$7A                   ; (also UNDER_LEVEL at $5B25)
+    LDA     #$7A                   ; (also UNDER_LEVEL at [[UNDER_LEVEL]])
 SAFE_TO_REST:                          ; $5B26: also 1 if no adjacent threats (runtime storage)
-    STA     $7A4B                  ; (also TURN_ACTIVE at $5B27)
+    STA     $7A4B                  ; (also TURN_ACTIVE at [[TURN_ACTIVE]])
     RTS
 
 UNDER_LEVEL     EQU INPUT_SCAN_OFFSET+1 ; $5B25: 1 if char level < steps taken (runtime storage)
@@ -14900,10 +14900,10 @@ and finishes with the copyright notice ([[S_COPYRIGHT]]) and ``press
 space bar'' prompt ([[S_PRESS_SPACE_BOOT]]).  The decorative strings
 [[S_DECOR_ROW1]] through [[S_DECOR_ROW3]] are drawn on the right panel.
 
-@ [[UI_TEXT_STREAM]] is the label at [[$5E55]] defined in [[<<ui text stream>>]].
+@ [[UI_TEXT_STREAM]] is the label at [[UI_TEXT_STREAM]] defined in [[<<ui text stream>>]].
 
 @ All character output in the game passes through [[ROM_COUT1]], the
-Apple~II ROM's character output routine at [[$FDED]].  When the HRCG is
+Apple~II ROM's character output routine at [[ROM_COUT1]].  When the HRCG is
 active, [[ROM_COUT1]] is redirected through the CSW vector to
 [[HRCG_COUT]], which renders characters in hi-res graphics mode.
 
@@ -15249,7 +15249,7 @@ DRAW_BORDER_ICONS:
 @ %def DRAW_BORDER_ICONS
 
 
-@ Border display data at [[$5DBF]]--[[$5F18]].  The border animation
+@ Border display data at [[BORDER_INITIAL_CHAR]]--[[$5F18]].  The border animation
 cycles through positions in [[BORDER_POS_TABLE]], drawing icons at
 each map border cell.  The 3-byte records are (icon, column, row):
 icon=\$00 draws the default border glyph; nonzero icons draw special
@@ -15327,18 +15327,18 @@ BORDER_POS_TABLE:
 @ %def BORDER_INITIAL_CHAR BORDER_ANIM_INDEX BORDER_ANIM_SAVE BORDER_ICON_CHARS BORDER_HANDLER_TABLE BORDER_POS_TABLE
 \subsection{Border animation handler}
 
-[[GAME_ACTION_HANDLER]] at [[$5B2A]] is called via [[DISPATCH_VEC]]
+[[GAME_ACTION_HANDLER]] at [[GAME_ACTION_HANDLER]] is called via [[DISPATCH_VEC]]
 between tune notes.  It animates the game border by cycling through
 the [[BORDER_POS_TABLE]] entries, drawing icons at each border cell.
 
 The handler runs 3~passes per call (controlled by [[BORDER_ANIM_SAVE]]
-at [[$5DC1]]).  On pass~1, it calls [[ANIM_BORDER_ICONS_A]] ([[$5C0E]])
+at [[BORDER_ANIM_SAVE]]).  On pass~1, it calls [[ANIM_BORDER_ICONS_A]] ([[ANIM_BORDER_ICONS_A]])
 which randomly places icons from [[$5E1F]] along the border.  On pass~0,
-it calls [[ANIM_BORDER_ICONS_B]] ([[$5C1A]]) which uses icons from
+it calls [[ANIM_BORDER_ICONS_B]] ([[ANIM_BORDER_ICONS_B]]) which uses icons from
 [[$5DE9]].  On other passes, it iterates through the handler pointer
 table at [[BORDER_HANDLER_TABLE]].
 
-[[TICK_BORDER_ANIM]] at [[$5BE8]] advances the animation index through
+[[TICK_BORDER_ANIM]] at [[TICK_BORDER_ANIM]] advances the animation index through
 the border positions, wrapping from \$15 back to \$05.
 
 @ Current game speed / animation index, used by [[BORDER_ANIMATION]].
@@ -15349,7 +15349,7 @@ ANIM_INDEX:
     DC.B    $02                     ; current game speed / animation index
 @ %def ANIM_INDEX
 
-@ Runtime aliases for bytes within [[BORDER_ICON_CHARS]] ([[$5DC2]]):
+@ Runtime aliases for bytes within [[BORDER_ICON_CHARS]] ([[BORDER_ICON_OFFSET]]):
 the border animation reuses these three bytes as loop variables during
 icon drawing.
 
@@ -15582,7 +15582,7 @@ INIT_WORLD:
     JMP     INPUT_LOOP        ; initialize world from data table
 
 @ A single [[RTS]]---another no-op stub called from [[GAME_INIT]], like
-[[INIT_STUB]] at [[$7919]].
+[[INIT_STUB]] at [[INIT_STUB]].
 
 <<init stub2>>=
     ORG     $6B94
@@ -15592,7 +15592,7 @@ INIT_STUB2:
 
 @ [[INIT_DISK_IOB]] sets the zero-page pointer [[RWTS_IOB_PTR]]
 ([[$08/$09]]) to the address of the RWTS Input/Output Block
-([[RWTS_IOB]] at [[$B7E8]]).  This single-assignment call during
+([[RWTS_IOB]] at [[RWTS_IOB]]).  This single-assignment call during
 [[GAME_INIT]] enables all subsequent disk operations to access the IOB
 fields through indirect-indexed addressing (e.g.\ [[LDA ($08),Y]]
 with~Y selecting the field).
@@ -15680,7 +15680,7 @@ SELECT_INPUT_MODE:
 @ [[INIT_MOB_COUNT]] is called once during [[GAME_INIT]] to initialize
 [[TOTAL_MOB_COUNT]].  It walks all 9-byte character records using
 [[CHAR_PTR]] ([[$FA/$FB]]) starting from index~1 (skipping the group-0
-header at [[$4000]]), summing byte~8 (group member count) of each record
+header at [[MOB_BASE_LO]]), summing byte~8 (group member count) of each record
 until the end sentinel (byte~1 = [[$FF]]) is reached.
 
 The result in [[TOTAL_MOB_COUNT]] is the total number of mobs assigned to
@@ -16029,8 +16029,8 @@ MOB_DATA_PTR            EQU     $BA     ; mob data record pointer (2 bytes, $BA/
 @ %def MOB_DATA_PTR
 
 @ The mob data base address is stored in the first two bytes of the
-character table header record at [[$4000]].  [[CHAR_LIST_HEAD]] at
-[[$4002]] is the head of the character linked list.
+character table header record at [[MOB_BASE_LO]].  [[CHAR_LIST_HEAD]] at
+[[CHAR_LIST_HEAD]] is the head of the character linked list.
 
 <<defines>>=
 HIGH_NIBBLE_MASK    EQU     $F0     ; bits 7-4: generic high nibble extraction
@@ -16115,7 +16115,7 @@ DELAY_WITH_ANIMATION:
 @ %def DELAY_WITH_ANIMATION
 
 @ [[TICK_ANIM_COUNTER]] decrements [[ANIM_FRAME_CTR]].  When it reaches
-zero, it calls [[$74CB]] to advance the animation frame, then reloads the
+zero, it calls [[DRAW_BLINK_ALT]] to advance the animation frame, then reloads the
 wait loop count from [[ANIM_WAIT_TABLE]] (indexed by [[ANIM_INDEX]]) into
 [[WAIT_LOOP_COUNT]].
 
@@ -16213,7 +16213,7 @@ TIMED_WAIT:
 @ %def TIMED_WAIT
 
 @ [[CALL_ROM_WAIT]] loads the wait duration from [[WAIT_DURATION]] and
-tail-calls the Apple~II ROM [[WAIT]] routine ([[ROM_WAIT]] at [[$FCA8]]),
+tail-calls the Apple~II ROM [[WAIT]] routine ([[ROM_WAIT]] at [[ROM_WAIT]]),
 which delays for approximately $A \times 2.5 + 13.5$ microseconds.
 
 <<defines>>=
@@ -16235,7 +16235,7 @@ CALL_ROM_WAIT:
     ; Call the Apple II ROM WAIT routine.
     ;
     ; Inputs:
-    ;   A — delay parameter (passed to ROM WAIT at $FCA8)
+    ;   A — delay parameter (passed to ROM WAIT at [[ROM_WAIT]])
     ;
     ; Behavior:
     ;   Tail-calls the ROM WAIT routine. Delay is approximately
@@ -16482,7 +16482,7 @@ COPY_PC_NAME_TO_BUF:
 @ %def COPY_PC_NAME_TO_BUF
 
 @ [[FIND_NEXT_PC_WRAP]] is a trivial wrapper that calls [[FIND_NEXT_PC]]
-and returns.  This exists as a separate entry point at \$0AFE so callers
+and returns.  This exists as a separate entry point at [[FIND_NEXT_PC_WRAP]] so callers
 can [[JSR]] to it.
 
 <<find first pc>>=
@@ -16612,13 +16612,13 @@ INIT_CHAR_SELECT:
 .found:
     JMP     ENTER_CHAR_SELECT          ; -> character selection menu
 @ %def INIT_CHAR_SELECT
-The scene loop calls [[LOAD_SCENE_FROM_DISK]] (\$A478) each iteration
+The scene loop calls [[LOAD_SCENE_FROM_DISK]] each iteration
 to load the current scene's text sector from disk.  If carry is set
 (read failed), the loop exits.  Otherwise, it displays the status bar,
 renders the scene text from [[SCENE_TEXT_DATA]], plays the attract tune,
 and checks [[SCENE_TRANSITION]] for a scene change.
 
-The [[$5C00]] region is populated dynamically by [[LOAD_SCENE_DATA]]
+The [[SCENE_TEXT_DATA]] region is populated dynamically by [[LOAD_SCENE_DATA]]
 from disk.  Its contents change with each scene.
 
 @ [[SAVE_ZP_CONTEXT]] and [[RESTORE_ZP_CONTEXT]] save and restore four
@@ -16735,11 +16735,11 @@ PRINT_STRING_AT_ADDR:
     STX     PRINT_STRING_ADDR
     STY     PRINT_STRING_ADDR+1
 
-    ; falls through to PRINT_STRING at $775C
+    ; falls through to PRINT_STRING at [[PRINT_STRING]]
 @ %def PRINT_STRING_AT_ADDR
 [[PRINT_STRING]] prints a length-prefixed string from
 [[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]] via COUT.
-[[PRINT_STRING_AT_ADDR]] at [[$7758]] stores [[X/Y]] into
+[[PRINT_STRING_AT_ADDR]] at [[PRINT_STRING_AT_ADDR]] stores [[X/Y]] into
 [[\PRINT_STRING_ADDR/\PRINT_STRING_ADDR+1]] first, then falls through.
 
 <<print string>>=
@@ -16866,7 +16866,7 @@ SET_TEXT_WINDOW_SCROLL:
     LDA     #$93 ; ctrl-S
     JMP     ROM_COUT1
 
-; PRINT_CTRL_AB (PRINT_CTRL_AB) follows at $774E, defined in its own chunk
+; PRINT_CTRL_AB (PRINT_CTRL_AB) follows at [[PRINT_CTRL_AB]], defined in its own chunk
 
 @ %def SET_TEXT_WINDOW_WRAP SET_TEXT_WINDOW_SCROLL
 @ The game screen is divided into an upper map area and a lower status/input
@@ -17156,7 +17156,7 @@ The display behavior depends on the line number:
 \begin{itemize}
   \item Line~1 ([[MSG_LINE_COUNT]]~=~0): calls [[PRINT_BOTTOM_CENTERED]], then scrolls.
   \item Line~2 ([[MSG_LINE_COUNT]]~=~1): scrolls first, then prints.
-  \item Line~3+: scrolls, prints, then calls [[$0D10]] (delay) and [[$774E]] ([[PRINT_CTRL_AB]]) before looping back.
+  \item Line~3+: scrolls, prints, then calls [[DELAY_WITH_ANIMATION]] (delay) and [[PRINT_CTRL_AB]] ([[PRINT_CTRL_AB]]) before looping back.
 \end{itemize}
 
 An entry with a zero length byte terminates the message.  If exactly
@@ -17905,7 +17905,7 @@ TUNE_PLAYER:
     STY     $80E3             ; patch byte in script 2 data
 @
 @ [[TUNE_PC]] is the 2-byte script instruction pointer at [[$E4/$E5]].
-The script base address is loaded from the table at [[$80AE]] into
+The script base address is loaded from the table at [[TUNE_TABLE]] into
 [[TUNE_PC]], and the interpreter reads successive bytes through this
 pointer, advancing it after each instruction.
 
@@ -17980,7 +17980,7 @@ TUNE_2_COMBAT_DAMAGE:
 \subsubsection{Scripts 3--11 --- resident region}
 
 Note that scripts 4 and~5 overlap: script~5 (NPC death) starts at
-[[$A3CE]], which is partway through script~4 (mob death).  Script~5 is
+[[TUNE_5_NPC_DEATH]], which is partway through script~4 (mob death).  Script~5 is
 the shorter suffix of the same descending melody.
 
 <<resident tune bytecode>>=
@@ -18110,7 +18110,7 @@ TUNE_3_ATTRACT:
 @ %def TUNE_3_ATTRACT
 
 @ Script 4 (mob death) and script 5 (NPC death) overlap: script~5
-begins at [[$A3CE]], which is partway through script~4.  Both end at
+begins at [[TUNE_5_NPC_DEATH]], which is partway through script~4.  Both end at
 [[$A3DD]].
 
 <<resident tune bytecode>>=
@@ -18225,7 +18225,7 @@ TUNE_11_MOVEMENT:
     DC.B    $26               ; NORAND
     DC.B    $23               ; HIGH
     DC.B    $3F,$1E            ; G6 (96ms)
-    ; END byte ($24) is provided by TUNE_STUB_BIT's BIT opcode at $A440
+    ; END byte ($24) is provided by TUNE_STUB_BIT's BIT opcode at [[TUNE_END_MARKER]]
 @ %def TUNE_11_MOVEMENT
 
 @ \section{Game support routines}
@@ -18236,8 +18236,8 @@ scene data loading, disk checkpointing, and integrity checking.
 \subsection{Tune stubs and keyboard dispatch}
 
 [[TUNE_STUB_BIT]] is a short entry point that tests bit~\$A2 (a ZP
-flag), loads A=\$0A, and jumps to the tune player at [[$A4BE]].
-[[DISK_READ_JUMP]] jumps to [[DISK_READ]] (\$6C12).
+flag), loads A=\$0A, and jumps to the tune player at [[SETUP_AND_READ_DISK]].
+[[DISK_READ_JUMP]] jumps to [[DISK_READ]].
 [[DISK_RTS]] is a single RTS used as a no-op call target.
 
 <<tune stubs>>=
@@ -18262,9 +18262,9 @@ DISK_RTS:
 [[READ_KEYBOARD]] polls for a keypress while running idle processing.
 It ticks the animation, steps the PRNG, and periodically verifies
 code integrity (1-in-64 chance per call via [[VERIFY_INTEGRITY]]).
-The main poll loop calls [[$755E]] (undocumented keyboard/joystick
-input handler) and [[$0D5E]] (undocumented idle animation handler)
-each iteration.  On keypress it calls [[$0D36]] (the frame-check
+The main poll loop calls [[CHECK_INPUT]] (undocumented keyboard/joystick
+input handler) and [[IDLE_ANIM_HANDLER]] (undocumented idle animation handler)
+each iteration.  On keypress it calls [[ANIM_CHECK_FRAME]] (the frame-check
 entry of [[ANIM_TICK_AND_WAIT]]) before returning the key code.
 
 <<read keyboard routine>>=
@@ -18277,7 +18277,7 @@ READ_KEYBOARD:
     ;   1. Clears keyboard strobe, ticks animation via ANIM_TICK_AND_WAIT.
     ;   2. 1-in-64 chance: calls VERIFY_INTEGRITY (PRNG AND $7E == 0).
     ;   3. Poll loop: steps PRNG, checks keyboard/joystick via $755E.
-    ;      On no input, runs idle handler at $0D5E and loops.
+    ;      On no input, runs idle handler at [[IDLE_ANIM_HANDLER]] and loops.
     ;   4. On keypress: clears strobe, runs frame check, returns key.
     ;
     ; Outputs:
@@ -18312,10 +18312,10 @@ READ_KEYBOARD:
 @ \subsection{Load scene data from disk}
 
 [[LOAD_SCENE_FROM_DISK]] reads one 256-byte sector of scene text
-data from the game disk into [[SCENE_TEXT_DATA]] (\$5C00).
+data from the game disk into [[SCENE_TEXT_DATA]].
 
-\paragraph{Dual-use memory at \$5C00--\$5CFF.}
-The 256-byte buffer at [[SCENE_TEXT_DATA]] (\$5C00) overlaps with
+\paragraph{Dual-use memory at [[SCENE_TEXT_DATA]]--\$5CFF.}
+The 256-byte buffer at [[SCENE_TEXT_DATA]] overlaps with
 active code.  Loading a scene \emph{overwrites} the following
 routines:
 
@@ -18402,7 +18402,7 @@ LOAD_SCENE_FROM_DISK:
     ; Reads one sector of scene text data from disk.
     ;
     ; Input:   SCENE_NUMBER = scene index (0-69)
-    ; Output:  C clear = success (data at $5C00), C set = failure
+    ; Output:  C clear = success (data at [[SCENE_TEXT_DATA]]), C set = failure
     ; Clobbers: A, X, Y, $BE
     ;
     ; Disk mapping:
@@ -18465,7 +18465,7 @@ LOAD_SCENE_FROM_DISK:
 
 @ \subsection{Tune player dispatch}
 
-[[$A4BE]] sets up the RWTS IOB with the given track (X) and sector (A),
+[[SETUP_AND_READ_DISK]] sets up the RWTS IOB with the given track (X) and sector (A),
 buffer at \$A400, then reads from disk with retries.  On persistent
 failure it jumps to the [[COLD_RESTART]] error handler.
 
@@ -18669,8 +18669,8 @@ WIPE_TAIL_LEN           EQU     $6F     ; bytes to clear in final partial page (
 @ %def DISK_BOOT_ROM WIPE_END_PAGE WIPE_TAIL_LEN
 
 [[COLD_RESTART]] is the fatal error handler.  It clears memory from
-[[MAIN_ENTRY]] (\$0800) to [[COLD_RESTART]] (\$A56F), then jumps to
-[[DISK_BOOT_ROM]] (\$C600) to restart the system from disk.
+[[MAIN_ENTRY]] to [[COLD_RESTART]], then jumps to
+[[DISK_BOOT_ROM]] to restart the system from disk.
 
 <<cold restart>>=
     ORG     $A56F
@@ -21715,7 +21715,7 @@ started normally.
 
 The soft-switch reads at [[$C050]]--[[$C057]] configure the Apple II display:
 [[GR]], full-screen (no split text), page 1, hi-res. This puts the display
-into HGR mode showing the framebuffer at [[$2000]]--[[$3FFF]].
+into HGR mode showing the framebuffer at [[HIRES_PAGE]]--[[$3FFF]].
 
 \subsection{Sound and settings routines}
 
@@ -21730,7 +21730,7 @@ SCENE_RETIRE        EQU     $23     ; scene number for character retirement
 @ %def S_SOUND_CHAR1 S_SOUND_CHAR2 S_DANGER_OUT RTS_OPCODE LDY_OPCODE MAX_THRESHOLD SCENE_RETIRE
 
 
-[[TOGGLE_SOUND]] (\$0984) is the handler for the ``SOUND IS ON'' menu
+[[TOGGLE_SOUND]] is the handler for the ``SOUND IS ON'' menu
 option.  It checks whether [[PLAY_HIGH_TONE]] starts with \$60 (RTS,
 meaning sound is off) or \$A0 (LDY, meaning sound is on).  To disable
 sound, it writes RTS (\$60) to both [[PLAY_HIGH_TONE]] and
@@ -21739,7 +21739,7 @@ it restores the original LDY~\#\$0A opcode (\$A0).  It also patches
 the ``SOUND IS ON'' label string: ``ON~'' (\$CE/\$A0) becomes ``OFF''
 (\$C6/\$C6).
 
-[[SETTINGS_DISPLAY_INIT]] (\$09AC) initializes the game settings
+[[SETTINGS_DISPLAY_INIT]] initializes the game settings
 display by writing spaces into the ``DANGER'' label, formatting
 [[EVENT_THRESHOLD]] via [[NUM_TO_DECIMAL]], and jumping to the
 settings menu.
@@ -21836,14 +21836,14 @@ INC_EVENT_THRESHOLD:
 
 \label{sec:resident_interp}
 
-EALDR copies 768 bytes from [[$A300]]--[[$A5FF]] to [[$0500]]--[[$07FF]]
+EALDR copies 768 bytes from [[TUNE_3_ATTRACT]]--[[$A5FF]] to [[RESET_VECTOR]]--[[$07FF]]
 before entering the main program.  This region contains a second bytecode
 interpreter, separate from the EALDR VM, that runs during gameplay and
 the attract screen.  It uses the same XOR encryption scheme as the EALDR
 VM (low byte XOR [[$03]], high byte XOR [[$D9]]).
 
 \paragraph{Disk origin.}
-The source data at [[$A300]]--[[$A5FF]] is part of the EALDR image that
+The source data at [[TUNE_3_ATTRACT]]--[[$A5FF]] is part of the EALDR image that
 BOOT1 loads from tracks~1--2 into [[$A000]]--[[$BFFF]].  Within
 track~1, the three pages map to physical sectors via the custom loader
 interleave:
@@ -21860,10 +21860,10 @@ interleave:
 \end{tabular}
 \end{center}
 
-After [[GAME_INIT]], the original [[$A300]]--[[$A5FF]] is overwritten
+After [[GAME_INIT]], the original [[TUNE_3_ATTRACT]]--[[$A5FF]] is overwritten
 with HRCG/font data.  From that point on, only the copy at
-[[$0500]]--[[$07FF]] survives.  The tune pointer table
-(\S\ref{sec:tune_player}) references the original [[$A300]]-based
+[[RESET_VECTOR]]--[[$07FF]] survives.  The tune pointer table
+(\S\ref{sec:tune_player}) references the original [[TUNE_3_ATTRACT]]-based
 addresses, which is safe because tunes~3--7 run only during attract
 mode, before [[GAME_INIT]].
 
@@ -21902,7 +21902,7 @@ the resident copy-protection verifier and disk~I/O routines:
 \item [[RES_ABORT_NIBBLE]] (\$07F6, 1~byte): last nibble stored when a
   disk read is aborted by a keypress.
 \end{itemize}
-The 9~bytes at \$07F7--\$07FF are residual data from the EALDR copy,
+The 9~bytes at [[RESIDUAL_E_CHECKER]]--\$07FF are residual data from the EALDR copy,
 decoding as the low-ASCII fragment ``\texttt{e checker}''---see the
 Dead Code chapter.
 
@@ -22046,7 +22046,7 @@ VM [[CALL0]] opcodes:
 \begin{itemize}
 \item \textbf{SEARCH\_ADDR\_FIELD} (\$05FD--\$0649): searches for a
       disk address field (D5~AA~96 prologue) and decodes 4\&4 nibble
-      data.  Self-modifying code at \$064C stores the retry count.
+      data.  Self-modifying code at [[RES_RETRY_COUNT]] stores the retry count.
 \item \textbf{DELAY\_LOOP} (\$0681--\$068B): nested countdown delay
       for motor spin-up timing.
 \item \textbf{READ\_AND\_VERIFY} (\$064B--\$0667): calls
@@ -22353,7 +22353,7 @@ The stack trick works as follows:
 Since [[JSR RESIDENT_DISPATCH]] is at \$056C, the return address on the
 stack is \$056E.  Adding~4 gives \$0572 = [[RESIDENT_BYTECODES]]---the
 first VM instruction.  The ``JMP ATTRACT\_LOOP'' at \$056F and the
-bytecodes' ORG at \$0572 are placed so that the IP lands exactly at the
+bytecodes' ORG at [[RESIDENT_BYTECODES]] are placed so that the IP lands exactly at the
 start of the bytecode program.
 
 The VM always starts from \$0572.  Each call to [[RESIDENT_DISPATCH]]
@@ -22512,7 +22512,7 @@ this is one of the Passport crack patches that disables copy-protection
 branching.
 
 @ Opcode \$0B (VMYIELD in the resident VM, VMASL in the EALDR VM)
-reuses the RTS at \$0726, the last byte of [[DECODE_ENCRYPTED_ADDR]].
+reuses the RTS at [[RES_VM_VMYIELD]], the last byte of [[DECODE_ENCRYPTED_ADDR]].
 The handler is simply RTS---a no-op that returns to the dispatch loop
 without modifying the accumulator.  This opcode is not used by the
 resident bytecode program.
@@ -22532,7 +22532,7 @@ RES_VM_CALL1:
     JMP     RESIDENT_DISPATCH_FETCH ; dispatch next
 @ %def RES_VM_CALL1
 
-[[PULL_TWO_RET_ADDRS]] (\$0738) is a stack-manipulation utility used by
+[[PULL_TWO_RET_ADDRS]] is a stack-manipulation utility used by
 [[RESIDENT_DISPATCH]].  It pulls four bytes from the stack:
 \begin{enumerate}
 \item Its own return address $\to$ [[VM_OPERAND]] (incremented by~1 to
@@ -22731,7 +22731,7 @@ RES_VM_VMINC:
     JMP     RESIDENT_DISPATCH_FETCH
 @ %def RES_VM_VMINC
 A 3-byte relay in the handler page.  Jumps to
-[[RES_VM_DISPATCH]] at [[$0700]].
+[[RES_VM_DISPATCH]] at [[RES_VM_DISPATCH]].
 
 <<decode dispatch relay>>=
     ORG     $07DF
@@ -22812,7 +22812,7 @@ HRCG_VERSION_STR:
 
 The HRCG hooks the character output (CSW)
 and keyboard input (KSW) vectors to render text on the hi-res graphics
-screen.  The library is self-contained at \$92A8--\$97A4 and provides:
+screen.  The library is self-contained at [[HRCG_INIT]]--\$97A4 and provides:
 \begin{itemize}
 \item Character rendering in multiple fonts (up to 10 charsets of 8-byte glyphs)
 \item Video modes: replace, OR, AND, XOR with optional page-2 overlay
@@ -23131,7 +23131,7 @@ a font pointer.  Each charset occupies 3~pages (768~bytes =
 96~glyphs~$\times$~8~bytes), and the font address is computed as
 $\text{HRCG\_FONT\_BASE} + (\text{selector} - 1) \times \$300$.
 Selectors outside 1--9 fall through to the standard 7$\times$8 font
-at [[STD_FONT_DATA]] (\$97A5).
+at [[STD_FONT_DATA]].
 
 The game's custom font data spans \$83A5--\$92A4 (3840~bytes,
 120~characters at 32~bytes each).  Each charset page contains
@@ -23684,7 +23684,7 @@ Once the font address is in [[$EE/$EF]] and the screen address is in
 with [[HRCG_MASK]] (for inverse video), then combined with the screen
 according to the draw mode: replace writes directly, OR combines with the
 existing screen content, AND masks it, and XOR toggles it.  The screen
-address advances by [[$0400]] per scan line---the standard Apple II
+address advances by [[TEXT_PAGE1]] per scan line---the standard Apple II
 hi-res interleaving within a character cell.
 
 <<hrcg draw char>>=
@@ -23942,7 +23942,7 @@ memory addresses.  The HRCG solves this with a 12-entry lookup table
 encode the row's position within the hi-res page.
 
 The computation works as follows: the row is divided by~2 (the carry from the
-[[LSR]] is preserved for later), the quotient mod~4 selects which [[$0400]]
+[[LSR]] is preserved for later), the quotient mod~4 selects which [[TEXT_PAGE1]]
 group the row falls in, and the table provides the base offset ([[$00]],
 [[$50]], or [[$A0]]).  The saved carry bit (odd vs.\ even row) is rotated
 back in via [[ROR]] to set bit~7 of the low byte, and [[WNDLFT]] is added
@@ -24014,8 +24014,8 @@ The main program calls two entry points in this area:
 \toprule
 \thead{Address} & \thead{Label} & \thead{Called from} \\
 \midrule
-[[$B300]] & [[DISK_READ_FIELD]] & [[LOAD_SCENE_DATA]] (\$6DD8) \\
-[[$B7B5]] & [[RWTS_ENTRY]] & [[RWTS_DISPATCH]] (\$6C18) \\
+[[DISK_READ_FIELD]] & [[DISK_READ_FIELD]] & [[LOAD_SCENE_DATA]] (\$6DD8) \\
+[[RWTS_ENTRY]] & [[RWTS_ENTRY]] & [[RWTS_DISPATCH]] \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -24027,7 +24027,7 @@ relocated to~[[$B6--$BF]]).  Byte-for-byte comparison with the DOS~3.3
 System Master (680-0051-00) confirms that all code is identical after
 relocation, except for the three patched bytes noted above.  The
 remaining differences are runtime state in the IOB parameter block
-at~[[$B7E8]] and the contents of the nibble buffers
+at~[[RWTS_IOB]] and the contents of the nibble buffers
 at~[[$BB00--$BC55]].
 
 The RWTS is fully documented in \emph{Beneath Apple DOS} (Worth \&
@@ -24036,7 +24036,7 @@ data is included verbatim from [[dos.asm]].  The only call into the
 DOS RWTS (\$B600--\$BFFF) from outside that region is [[JSR RWTS_ENTRY]]
 at \$6C26 in [[DISK_READ_FIELD]].
 
-@ [[RWTS_CORE]] at [[$BD00]] is the main dispatcher inside the standard
+@ [[RWTS_CORE]] at [[RWTS_CORE]] is the main dispatcher inside the standard
 DOS 3.3 RWTS.  [[RWTS_ENTRY]] calls it after saving the processor status
 and disabling interrupts.
 
@@ -24049,7 +24049,7 @@ DOS33_RWTS:
 @ %def DOS33_RWTS RWTS_ENTRY RWTS_IOB RWTS_CORE
 [[DISK_READ_FIELD]] is the entry point called by [[LOAD_SCENE_DATA]]
 to read sector data from disk.  It is a trampoline into the disk~VM
-interpreter loop at~[[$B36A]], which uses an embedded bytecode program
+interpreter loop at~[[DISK_VM_LOOP]], which uses an embedded bytecode program
 to control the multi-sector read process.  The carry flag is clear on
 entry (set by the caller) to indicate a read operation.
 
@@ -24065,9 +24065,9 @@ the disk, then reads all 342 nibbles (86~secondary + 256~primary) and
 verifies each byte equals~[[$AF]].  Finally checks the data epilogue
 ([[DE AA]]).  Returns carry clear on success, carry set on error.
 
-[[VERIFY_DATA_FIELD]] is called internally by the disk~VM (via [[JSR $B304]]).
+[[VERIFY_DATA_FIELD]] is called internally by the disk~VM (via [[JSR VERIFY_DATA_FIELD]]).
 
-@ [[DISK_DATA_REG]] at [[$C0EC]] is the Disk~II controller's data
+@ [[DISK_DATA_REG]] at [[DISK_DATA_REG]] is the Disk~II controller's data
 register for the active slot.  [[VERIFY_DATA_FIELD]] reads nibble bytes
 from this register in a tight loop while searching for the D5~AA~AD
 prologue and verifying the data field contents.
@@ -24156,7 +24156,7 @@ VERIFY_DATA_FIELD:
     RTS
 @ %def VERIFY_DATA_FIELD
 The disk~VM interpreter loop.  Each iteration swaps the VM context
-(zero-page [[$50--$5F]] $\leftrightarrow$ saved state at [[$B5E5]])
+(zero-page [[$50--$5F]] $\leftrightarrow$ saved state at [[DISK_VM_SAVED_STATE]])
 and then dispatches the next VM opcode.  The VM bytecode program
 follows immediately after the [[JMP]] at~[[$B370]] and controls the
 multi-sector disk read sequence.  The loop has no explicit exit; the
@@ -24168,7 +24168,7 @@ DISK_VM_LOOP:
     JSR     DISK_VM_SWAP     ; swap ZP $50-$5F with saved state
     JSR     DISK_VM_DISPATCH ; execute next VM opcode
     JMP     DISK_VM_LOOP     ; repeat
-; VM bytecode program follows at $B373
+; VM bytecode program follows at [[DISK_VM_BYTECODE]]
 @ %def DISK_VM_LOOP
 The VM bytecode program follows immediately after the VM loop.  All
 address operands are encrypted (low byte XOR~[[$9C]], high byte
@@ -24264,9 +24264,9 @@ DISK_VM_BYTECODE:
 ; $B3FF: next byte ($A0) is the LDY opcode of SEARCH_ADDR_FIELD
 @ %def DISK_VM_BYTECODE
 Searches for the D5~AA~96 address field prologue on disk.  The entry
-point at [[$B3FF]] sets~Y to~[[$FF]] (256~inner retries), then falls
+point at [[SEARCH_ADDR_FIELD]] sets~Y to~[[$FF]] (256~inner retries), then falls
 through to the search loop.  The outer retry count is loaded from and
-saved back to the data byte at~[[$B44D]].  On success, returns with
+saved back to the data byte at~[[DISK_RETRY_COUNT]].  On success, returns with
 carry clear, X~=~1, and the last decoded address-field nibble
 (sector number) in~[[$50]].  On failure, returns with carry set.
 
@@ -24334,7 +24334,7 @@ DISK_RETRY_COUNT:
     DC.B    3                  ; $B44D: outer retry counter (default 3)
 @ %def SEARCH_ADDR_FIELD DISK_IO_END DISK_RETRY_COUNT
 Three bytes between the dispatch trampoline and the saved state.
-[[$B5E2]] is the error accumulator used by [[READ_AND_VERIFY]]
+[[DISK_VM_ERROR_ACCUM]] is the error accumulator used by [[READ_AND_VERIFY]]
 to count failed sector reads across multiple attempts.
 
 <<disk vm error accum>>=
@@ -24344,9 +24344,9 @@ DISK_VM_ERROR_ACCUM:
     DC.B    0,0 ; scratch
 @ %def DISK_VM_ERROR_ACCUM
 Native routine called by the VM via CALL1.  Searches for an address
-field ([[JSR $B3FF]]), then verifies the data field
+field ([[JSR SEARCH_ADDR_FIELD]]), then verifies the data field
 ([[JSR VERIFY_DATA_FIELD]]).  Accumulates errors in
-[[DISK_VM_ERROR_ACCUM]] at~[[$B5E2]].  Afterward, turns off all
+[[DISK_VM_ERROR_ACCUM]] at~[[DISK_VM_ERROR_ACCUM]].  Afterward, turns off all
 four stepper motor phases (preventing motor heating).
 
 <<read and verify>>=
@@ -24478,8 +24478,8 @@ DISK_VM_DATA_B4DE:
 @ %def DISK_VM_DATA_B4DE
 Executes one VM opcode.  Pulls the return address from the stack to
 locate the current instruction pointer, reads the next opcode byte,
-looks up the handler address (low byte) in the table at~[[$B4BF]],
-and self-modifies a [[JMP]] at~[[$B5DF]] to dispatch to the
+looks up the handler address (low byte) in the table at~[[DISK_VM_HANDLER_TBL]],
+and self-modifies a [[JMP]] at~[[DISK_VM_TRAMPOLINE]] to dispatch to the
 handler in page~[[$B5]].
 
 <<disk vm dispatch>>=
@@ -24503,7 +24503,7 @@ DISK_VM_RESUME:
 .no_page:
     TAX
     LDA     DISK_VM_HANDLER_TBL,X ; look up handler low byte
-    STA     $B5E0                 ; self-modify JMP target at $B5DF
+    STA     $B5E0                 ; self-modify JMP target at [[DISK_VM_TRAMPOLINE]]
     JMP     DISK_VM_TRAMPOLINE    ; dispatch (JMP $B5xx)
 
 ; --- VM opcode handler table ---
@@ -24533,7 +24533,7 @@ convention of pushing address$-$1 during JSR.  Execution then resumes at the
 inner return address via an indirect jump, allowing the dispatcher to
 ``capture'' its caller's position as the starting bytecode address.
 
-This is the same stack trick used by [[PULL_TWO_RET_ADDRS]] ([[$0738]]) in
+This is the same stack trick used by [[PULL_TWO_RET_ADDRS]] ([[PULL_TWO_RET_ADDRS]]) in
 the resident~VM dispatcher.  Both routines pull two nested return addresses to
 bootstrap the VM instruction pointer from the call site.
 
@@ -24583,9 +24583,9 @@ DISK_VM_HALT:                   ; opcode $0B handler: HALT (just RTS)
     RTS
 @ %def DISK_VM_READ_ADDR DISK_VM_HALT
 The disk~VM has 13~opcodes (indices 0--12).  Each handler's low
-address is stored in the table at~[[$B4BF]]; dispatch jumps to
+address is stored in the table at~[[DISK_VM_HANDLER_TBL]]; dispatch jumps to
 [[$B5xx]].  Handlers return to the dispatch loop by jumping to
-[[DISK_VM_RESUME]] at~[[$B4AE]], which reads the next opcode and
+[[DISK_VM_RESUME]] at~[[DISK_VM_RESUME]], which reads the next opcode and
 dispatches again.
 
 \begin{center}
@@ -24676,7 +24676,7 @@ DISK_VM_SET_IP:
 @ %def DISK_VM_OP_GOTO DISK_VM_SET_IP
 Exits the VM by executing [[RTS]], which returns to the caller of
 [[DISK_VM_DISPATCH]].  This handler is just the [[RTS]] at the end
-of [[DISK_VM_READ_ADDR]]---the dispatch table points to~[[$B526]]
+of [[DISK_VM_READ_ADDR]]---the dispatch table points to~[[DISK_VM_HALT]]
 which is that instruction.
 
 Calls a native 6502 subroutine.  Passes the VM accumulator in~[[A]]
@@ -24701,7 +24701,7 @@ DISK_VM_OP_CALL1:
 Jumps to a native 6502 routine and does not return to the VM\@.
 Used for operations like ``enter the main program'' or ``jump to
 a disk routine'' that take over control flow.  The [[JMP ($54)]]
-at~[[$B552]] also serves as a reusable trampoline for opcode~1.
+at~[[DISK_VM_JMP_IND]] also serves as a reusable trampoline for opcode~1.
 
 <<disk vm op call0>>=
     ORG     $B54F
@@ -24858,7 +24858,7 @@ zero-page values on each VM entry and exit.  Bytes~11--13 (\$5B--\$5D)
 hold initial values [[$4A $4C $4E]].
 
 Bytes at~[[$B5F5--$B5FF]] are additional VM workspace:
-[[DISK_BAD_NIBBLE]] (\$B5F6) stores a mismatched nibble from [[VERIFY_DATA_FIELD]].
+[[DISK_BAD_NIBBLE]] stores a mismatched nibble from [[VERIFY_DATA_FIELD]].
 
 <<disk vm saved state>>=
     ORG     $B5E5
