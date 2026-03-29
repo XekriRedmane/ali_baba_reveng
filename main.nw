@@ -25108,6 +25108,7 @@ disk drive motor for slot~6.
 SOFTEV          EQU     $03F2   ; reset vector (2 bytes)
 PWREDUP         EQU     $03F4   ; power-up byte (EOR of SOFTEV bytes)
 IWM_MOTORON     EQU     $C0E9   ; IWM motor on (slot-indexed)
+DISK_BOOT_ROM   EQU     $C600   ; Disk II boot ROM entry point
 @ %def SOFTEV PWREDUP
 
 @ [[BOOT1_ERROR_FLAG]] is set by [[BOOT1_LOAD_TRACK]] when a timeout occurs.

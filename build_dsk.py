@@ -18,6 +18,7 @@ With --verify, compares against the original .dsk image and reports diffs.
 from __future__ import annotations
 
 import os
+from collections.abc import Generator
 import re
 import sys
 
@@ -48,7 +49,7 @@ for phys, page in enumerate(LOADER_INTERLEAVE):
 MAIN_BASE = 0x0500
 
 # EALDR DXR decryption: needed to re-encrypt $4000-$67FF before writing to disk
-def funny_inc_gen(bot: int = 2, top: int = 3) -> int:
+def funny_inc_gen(bot: int = 2, top: int = 3) -> Generator[int, None, None]:
     """Yield the EALDR funny_inc key sequence."""
     while True:
         bot += 1
@@ -138,9 +139,7 @@ def build_disk() -> bytearray:
     dsk = bytearray(DISK_SIZE)
 
     # --- Track 0: BOOT1 ---
-    # Use reference boot1.bin (output/boot1.bin may be incomplete due to
-    # cross-file symbol dependencies)
-    boot1 = open('boot1.bin', 'rb').read()
+    boot1 = open('output/boot1.bin', 'rb').read()
     # Boot ROM reads physical sectors 0-4 into $0800-$0CFF
     # In .dsk, physical sector N is at offset logical_sector * 256
     # boot1.bin has pages in memory order ($0800, $0900, $0A00, $0B00, $0C00)
@@ -158,7 +157,8 @@ def build_disk() -> bytearray:
         write_sector(dsk, 0, logical, data)
 
     # --- Tracks 1-2: EALDR ---
-    ealdr = open('ealdr.bin', 'rb').read()
+    ealdr_path = 'output/ealdr.bin' if os.path.exists('output/ealdr.bin') else 'ealdr.bin'
+    ealdr = open(ealdr_path, 'rb').read()
     # EALDR loaded with custom loader interleave, base pages $A0 and $B0
     ealdr_base = 0xA000
     write_track_loader(dsk, 1, 0xA0, ealdr, ealdr_base)
