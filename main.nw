@@ -25804,6 +25804,54 @@ layout (\$50--\$5F).
   \item \$A2F6--\$A2FF: Scratch storage.
 \end{itemize}
 
+The protection~VM uses a different opcode numbering than the main
+EALDR~VM at \$A806.  The following macros encode the protection~VM
+bytecodes with the same XOR encryption (\$03/\$D9 for addresses,
+\$4C for immediates).
+
+<<EALDR prot VM macros>>=
+    ; Protection VM bytecode macros (different opcode table from main EALDR VM)
+    MACRO PVMGOTO  ;  $00 addr
+        DC.B $00, <[{1}] ^ $03, >[{1}] ^ $D9
+    ENDM
+    MACRO PVMCALL1 ;  $01 addr -- call native, ACC in/out
+        DC.B $01, <[{1}] ^ $03, >[{1}] ^ $D9
+    ENDM
+    MACRO PVMBNE   ;  $02 addr -- branch if ACC != 0
+        DC.B $02, <[{1}] ^ $03, >[{1}] ^ $D9
+    ENDM
+    MACRO PVMLDI   ;  $03 val  -- load immediate
+        DC.B $03, [{1}] ^ $4C
+    ENDM
+    MACRO PVMLD    ;  $04 addr -- load absolute
+        DC.B $04, <[{1}] ^ $03, >[{1}] ^ $D9
+    ENDM
+    MACRO PVMCALLS ;  $05 addr -- VM subroutine call (saves IP)
+        DC.B $05, <[{1}] ^ $03, >[{1}] ^ $D9
+    ENDM
+    MACRO PVMST    ;  $06 addr -- store ACC
+        DC.B $06, <[{1}] ^ $03, >[{1}] ^ $D9
+    ENDM
+    MACRO PVMSUBI  ;  $07 val  -- ACC -= immediate
+        DC.B $07, [{1}] ^ $4C
+    ENDM
+    MACRO PVMCALL  ;  $08 addr -- call via indirect
+        DC.B $08, <[{1}] ^ $03, >[{1}] ^ $D9
+    ENDM
+    MACRO PVMRET   ;  $09      -- return from VM subroutine
+        DC.B $09
+    ENDM
+    MACRO PVMINC   ;  $0A addr -- increment and load
+        DC.B $0A, <[{1}] ^ $03, >[{1}] ^ $D9
+    ENDM
+    MACRO PVMHALT  ;  $0B      -- halt (exit VM)
+        DC.B $0B
+    ENDM
+    MACRO PVMLDX   ;  $0C addr -- load indexed by ACC
+        DC.B $0C, <[{1}] ^ $03, >[{1}] ^ $D9
+    ENDM
+@
+
 <<EALDR unused prot vm>>=
     ORG     $A000
 EALDR_PROT_VM:
@@ -25890,17 +25938,74 @@ EALDR_PROT_VM:
     JMP     .vm_loop
 
     ; --- $A072: VM bytecodes (copy-protection program) ---
-    ; Last 2 bytes ($A0FE) = LDY #$FF entry for find_sector.
+    ; Verifies disk integrity: checks specific bytes in the data field
+    ; verifier ($A060-$A068), then reads/verifies sectors on multiple
+    ; tracks using stepper phase manipulation.
+    ; Last 2 bytes ($A0FE-$A0FF) = LDY #$FF entry for find_sector.
 EALDR_PROT_BYTECODES_1:
-    HEX     04 63 79 07 74 02 8F 78 04 62 79 07 2C 02 8F 78
-    HEX     04 64 79 07 74 02 8F 78 05 A4 79 02 90 79 00 A7
-    HEX     79 05 A4 79 02 9F 79 00 A7 79 07 4E 02 8F 78 00
-    HEX     71 79 08 A5 78 04 EA 19 03 B3 01 AB 25 03 B3 01
-    HEX     AB 25 04 ED 19 03 4C 06 E1 7B 05 CC 79 05 CC 79
-    HEX     05 CC 79 05 CC 79 04 EB 19 04 E1 7B 09 03 4F 06
-    HEX     4F 78 01 4E 78 04 E4 19 01 4E 78 01 4E 78 04 E2
-    HEX     19 05 69 78 03 4F 06 4F 78 01 4E 78 04 E4 19 01
-    HEX     4E 78 01 4E 78 04 E6 19 05 69 78 09 A0 FF
+    ; --- check data field verifier integrity ---
+    PVMLD   $A060              ; load byte at $A060 (SEC = $38)
+    PVMSUBI #$38               ; subtract expected value
+    PVMBNE  EALDR_PROT_BYTECODES_3 ; mismatch -> error handler
+    PVMLD   $A061              ; load byte at $A061 (RTS = $60)
+    PVMSUBI #$60
+    PVMBNE  EALDR_PROT_BYTECODES_3
+    PVMLD   $A067              ; load byte at $A067 (SEC = $38)
+    PVMSUBI #$38
+    PVMBNE  EALDR_PROT_BYTECODES_3
+    ; --- read and verify sectors on two tracks ---
+    PVMCALLS .prot_read_track  ; read track (subroutine at $A0A7)
+    PVMBNE  .prot_try2         ; nonzero errors -> try again
+    PVMGOTO .prot_ok           ; zero errors -> success
+.prot_try2:
+    PVMCALLS .prot_read_track
+    PVMBNE  .prot_chk_err
+    PVMGOTO .prot_ok
+.prot_chk_err:
+    PVMSUBI #$02               ; allow up to 2 errors
+    PVMBNE  EALDR_PROT_BYTECODES_3 ; too many -> error handler
+    PVMGOTO EALDR_PROT_BYTECODES_1 ; retry from start
+    ; --- success: call vm_exit_ok ---
+.prot_ok:
+    PVMCALL .vm_exit_ok        ; exit VM with carry clear
+    ; --- subroutine: read one track ---
+.prot_read_track:
+    PVMLD   $C0E9              ; motor on
+    PVMLDI  #$FF               ;   \  delay via ROM_WAIT
+    PVMCALL1 $FCA8             ;   /
+    PVMLDI  #$FF               ;   \  delay again
+    PVMCALL1 $FCA8             ;   /
+    PVMLD   $C0EE              ; read mode
+    PVMLDI  #$00
+    PVMST   EALDR_PROT_ERR_ACC ; clear error counter
+    PVMCALLS .prot_verify_4    ; verify 4 sectors
+    PVMCALLS .prot_verify_4    ; verify 4 more
+    PVMCALLS .prot_verify_4
+    PVMCALLS .prot_verify_4    ; 16 total
+    PVMLD   $C0E8              ; motor off
+    PVMLD   EALDR_PROT_ERR_ACC ; return error count in ACC
+    PVMRET
+    ; --- subroutine: verify 4 sectors and step head ---
+.prot_verify_4:
+    PVMLDI  #$03               ;   \  set retry count
+    PVMST   .fs_retries        ;   /  (self-modify find_sector)
+    PVMCALL1 .read_verify      ; read + verify sector
+    PVMLD   $C0E7              ; stepper phase 3 on
+    PVMCALL1 .read_verify
+    PVMCALL1 .read_verify
+    PVMLD   $C0E1              ; stepper phase 0 on
+    PVMCALLS EALDR_PROT_BYTECODES_2 ; delay + phases off
+    PVMLDI  #$03
+    PVMST   .fs_retries
+    PVMCALL1 .read_verify
+    PVMLD   $C0E7              ; stepper phase 3 on
+    PVMCALL1 .read_verify
+    PVMCALL1 .read_verify
+    PVMLD   $C0E5              ; stepper phase 2 on
+    PVMCALLS EALDR_PROT_BYTECODES_2 ; delay + phases off
+    PVMRET
+    ; --- entry for find_sector with Y=#$FF preloaded ---
+    LDY     #$FF               ; $A0FE: also part of bytecodes
 
     ; --- $A100: FIND_SECTOR (D5 AA 96 search) ---
 .find_sector:
@@ -25969,9 +26074,17 @@ EALDR_PROT_BYTECODES_1:
     LDA     $C0E6
     RTS
 
-    ; --- $A16A: VM bytecodes (continued) ---
+    ; --- $A16A: subroutine: delay + turn off stepper phases ---
 EALDR_PROT_BYTECODES_2:
-    HEX     03 3C 01 82 78 04 E3 19 04 E1 19 04 E7 19 04 E5 19 03 64 01 82 78 09
+    PVMLDI  #$70               ; delay count
+    PVMCALL1 .prot_delay       ; call native delay loop
+    PVMLD   $C0E0              ; phase 0 off
+    PVMLD   $C0E2              ; phase 1 off
+    PVMLD   $C0E4              ; phase 2 off
+    PVMLD   $C0E6              ; phase 3 off
+    PVMLDI  #$28               ; shorter delay
+    PVMCALL1 .prot_delay
+    PVMRET
 
     ; --- $A181: delay loop (called by VM CALL1) ---
 .prot_delay:
@@ -25984,9 +26097,20 @@ EALDR_PROT_BYTECODES_2:
     BNE     .prot_delay
     RTS
 
-    ; --- $A18C: VM bytecodes (continued) ---
+    ; --- $A18C: error handler ---
+    ; Fills text page with encoded bytes, then halts in infinite loop.
+    ; Self-modifying: increments its own ST target address to walk
+    ; through the text screen.
 EALDR_PROT_BYTECODES_3:
-    HEX     06 03 DD 0A 8D 78 02 8F 78 04 8C 78 01 B3 78 07 B3 01 B3 78 06 8C 78 00 8F 78
+    PVMST   $0400              ; store to text page 1
+    PVMINC  EALDR_PROT_BYTECODES_3+2 ; increment encrypted addr hi of ST
+    PVMBNE  EALDR_PROT_BYTECODES_3   ; loop until wraps to 0
+    PVMLD   EALDR_PROT_BYTECODES_3+3 ; load next byte (encrypted addr depends on layout)
+    PVMCALL1 .xor_d9           ; XOR with $D9 (decode)
+    PVMSUBI #$FF               ; subtract $FF
+    PVMCALL1 .xor_d9           ; XOR with $D9 (re-encode)
+    PVMST   EALDR_PROT_BYTECODES_3+3 ; store back
+    PVMGOTO EALDR_PROT_BYTECODES_3   ; loop forever
 
     ; --- $A1A6: VM exit routines ---
 .vm_exit_ok:
@@ -29891,6 +30015,7 @@ The following root chunks produce the assembly files when tangled.
 <<Macros>>
 <<EALDR VM macros>>
 <<ealdr defines>>
+<<EALDR prot VM macros>>
 <<EALDR unused prot vm>>
 <<EALDR resident copy>>
 <<EALDR checksum source listing>>
