@@ -51,7 +51,8 @@ $ python build.py --verify
 $ python weave.py main.nw output
 $ cp noweb.sty output/
 $ cp -r images output/
-$ cp font_data.tex output/
+$ python font_data.py 83A5 92A4 output/font_data.tex
+$ python mob_font_data.py
 $ cd output
 $ pdflatex main.tex
 $ pdflatex main.tex
@@ -69,8 +70,10 @@ Yes, you have to run `pdflatex` twice. The first run generates auxiliary informa
 * `images/` — Images used in the document.
 * `ea_splash_screen.asm` — EA splash screen bitmap data.
 * `dos.asm` — DOS 3.3 RWTS binary data.
-* `font_data.tex` — LaTeX source for showing the game's custom font. Generated from the reference `main.bin` via `python font_data.py 83A5 92A4 font_data.tex`. 
+* `font_data.py` — Generates `output/font_data.tex` (custom font pixel grids) from `main.bin`.
+* `mob_font_data.py` — Generates `output/mob_font_data.tex` (per-mob font character sprites) from `main.bin`.
 * `boot1.bin`, `ealdr.bin`, `main.bin` — Reference binaries for verification.
+* `noweb.sty` — The LaTeX style for `main.nw`, by Norman Ramsay, redistributed under the BSD-2 license (see below).
 
 ## License
 
@@ -82,3 +85,34 @@ This work is licensed under a
 [cc-by-sa]: http://creativecommons.org/licenses/by-sa/4.0/
 [cc-by-sa-image]: https://licensebuttons.net/l/by-sa/4.0/88x31.png
 [cc-by-sa-shield]: https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg
+
+### The BSD-2 license for `noweb.sty`:
+
+```txt
+BSD 2-Clause License
+
+Copyright © 2018, Norman Ramsey
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```

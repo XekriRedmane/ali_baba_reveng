@@ -64,6 +64,8 @@
 \newcommand{\Cbg}{\cellcolor{green}}
 \newcommand{\Cbv}{\cellcolor{violet}}
 
+\input{mob_font_data}
+
 \maketitle
 \tableofcontents
 
@@ -2495,7 +2497,7 @@ HRCG_CTRL_TAIL:
 Duplicate of the tune pointer table at [[TUNE_TABLE]], mapping tune
 indices to bytecode addresses in the \$A3xx--\$A4xx range.
 
-\paragraph{Tune bytecodes copy (\$82D1--$82EF, \$82F0--\$8305).}
+\paragraph{Tune bytecodes copy (\$82D1--\$82EF, \$82F0--\$8305).}
 Two copies of tune scripts 1--2 (combat hit / combat damage),
 followed by a second tune pointer fragment.
 
@@ -5205,7 +5207,7 @@ The sentinel [[FFFF]] in the name pointer marks the end of the table.
 \node[start]                          (init)     {GAME\_INIT};
 \node[decision, below=of init]        (firstrun) {First run?};
 \node[block, right=of firstrun]       (attract)  {ATTRACT\_SCREEN};
-\node[block, below=of firstrun]       (reset)    {CHAR\_PTR $\leftarrow$\\LOCATION\_DATA};
+\node[block, below=of firstrun]       (reset)    {CHAR\_PTR $\leftarrow$ LOCATION\_DATA};
 \node[decision, below=of reset]       (active)   {Char active?};
 \node[block, below=of active]         (enter)    {ENTER\_LOCATION};
 \node[decision, below=of enter]       (plr13)    {Player 1 or 3?};
@@ -16860,8 +16862,6 @@ The region \$4C80--\$5AFF holds the mob data table (128 records
 $\times$ 16~bytes), associated name strings, and residual diagnostic
 text.  This data is loaded from tracks \$07--\$09, DXR-decrypted
 during boot, and remains at these addresses throughout the game.
-
-\input{mob_font_data}
 
 \chapter{Game Display}
 
