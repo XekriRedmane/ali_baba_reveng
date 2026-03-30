@@ -3,7 +3,7 @@ Reverse engineering of Ali Baba and the Forty Thieves for the Apple II.
 
 [main.pdf](main.pdf) is the literate programming document for this project. This means the explanatory text is interspersed with source code. The source code can be extracted from the document and compiled.
 
-The goal is to provide all the source code necessary to reproduce a binary identical to the one found on the Internet Archive's [Ali Baba and the Forty Thieves (4am and san inc crack)](https://archive.org/details/AntiquesAliBabaAndTheFortyThieves4amCrack) disk image.
+The goal is to provide all the source code necessary to reproduce a binary identical to the one found on the Internet Archive's [Ali Baba and the Forty Thieves (4am and san inc crack)](https://archive.org/details/AliBabaAndTheFortyThieves4amCrack) disk image.
 
 The assembly code is assembled using [`dasm`](https://dasm-assembler.github.io/).
 
@@ -16,6 +16,7 @@ This document doesn't explain every last detail. It's assumed that the reader ca
 * [6502 Assembly Language Programming](https://archive.org/details/6502alp), by Lance A. Leventhal, 1979.
 * [Beagle Bros Apple Colors and ASCII Values](https://archive.org/details/Beagle_Bros-Poster_1), Beagle Bros Micro Software Inc, 1984.
 * [Hi-Res Graphics and Animation Using Assembly Language, The Guide for Apple II Programmers](https://archive.org/details/hi-res-graphics-and-animation-using-assembly-language), by Leanard I. Malkin, 1985.
+* [Applesoft Toolkit manual part 1](https://mirrors.apple2.org.za/ftp.apple.asimov.net/documentation/programming/basic/applesoft_toolkit__part_1_.pdf), [part 2](https://mirrors.apple2.org.za/ftp.apple.asimov.net/documentation/programming/basic/applesoft_toolkit__part_2_.pdf), Apple Computer, 1980. Includes the Hi-Res Character Generator documentation.
 
 ## Building
 
@@ -50,7 +51,7 @@ $ python build.py --verify
 $ python weave.py main.nw output
 $ cp noweb.sty output/
 $ cp -r images output/
-$ python font_data.py 83A5 92A4 output/font_data.tex
+$ cp font_data.tex output/
 $ cd output
 $ pdflatex main.tex
 $ pdflatex main.tex
@@ -60,12 +61,15 @@ Yes, you have to run `pdflatex` twice. The first run generates auxiliary informa
 
 ## Project structure
 
+* `main.pdf` — Compiled literate programming document.
 * `main.nw` — Literate programming source (noweb format). Contains all assembly code, prose documentation, and build instructions.
 * `build.py` — Build pipeline: tangle, assemble, reconstruct disk image.
 * `weave.py` — Custom noweb tangler/weaver that generates `.asm` and `.tex` files from `main.nw`.
 * `scenes/` — Scene data tracks extracted from the disk image (HEX format, one file per track).
+* `images/` — Images used in the document.
 * `ea_splash_screen.asm` — EA splash screen bitmap data.
 * `dos.asm` — DOS 3.3 RWTS binary data.
+* `font_data.tex` — LaTeX source for showing the game's custom font. Generated from the reference `main.bin` via `python font_data.py 83A5 92A4 font_data.tex`. 
 * `boot1.bin`, `ealdr.bin`, `main.bin` — Reference binaries for verification.
 
 ## License
